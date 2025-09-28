@@ -1,0 +1,7 @@
+{
+  "name": "POSTVending",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}

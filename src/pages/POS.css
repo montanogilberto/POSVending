@@ -1,0 +1,66 @@
+/* Contenedor del formulario de efectivo */
+.cash-form-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  padding: 20px;
+  gap: 16px;
+  background-color: #f4f4f4; /* cambia este fondo si deseas */
+}
+
+/* Estilo del IonItem */
+.cash-item {
+  width: 100%;
+  max-width: 300px;
+  background: #ffffffdd; /* blanco semitransparente */
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+}
+
+/* Etiqueta del input */
+.cash-label {
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+/* Input de efectivo */
+.cash-input {
+  font-size: 1.2rem;
+  color: #111;
+  padding: 10px 0;
+}
+
+/* Lista de transacciones */
+.transaction-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+/* Tarjetas de movimientos */
+.transaction-list ion-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+/* Subtítulo (fecha) en la tarjeta */
+.transaction-list ion-card-subtitle {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Contenido (monto) en la tarjeta */
+.transaction-list ion-card-content {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #222;
+}
+
+
