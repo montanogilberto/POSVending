@@ -1,66 +1,224 @@
-/* Contenedor del formulario de efectivo */
-.cash-form-container {
+@config "../../tailwind.config.js";
+
+/* Dashboard Header */
+.dashboard-header {
+  --background: #fff;
+  --box-shadow: var(--header-shadow, 0 1px 3px rgba(0,0,0,0.1));
+  box-shadow: var(--header-shadow);
+}
+
+.dashboard-header ion-toolbar {
+  --background: #fff;
+  --color: var(--text-primary, #222);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-chip {
+  --chip-background: transparent;
+  --color: var(--text-primary);
+}
+
+.logo-title h2 {
+  margin: 0;
+  font-weight: bold;
+  color: var(--text-primary, #222);
+  font-size: 1.2rem;
+}
+
+.screen-title {
+  font-weight: bold;
+  color: var(--text-primary, #222);
+}
+
+/* Dashboard Cards */
+.dashboard-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft, 0 2px 6px rgba(0,0,0,0.08));
+  margin: 10px 0;
+}
+
+.dashboard-card ion-card-header {
+  text-align: center;
+  padding-bottom: 0;
+}
+
+.dashboard-card ion-icon {
+  margin-bottom: 8px;
+}
+
+/* Total Number */
+.total-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: var(--dashboard-blue, #007BFF);
+  text-align: center;
+  margin: 0;
+}
+
+/* Secondary Text */
+.secondary-text {
+  color: var(--text-secondary, #666);
+  font-size: 0.9rem;
+}
+
+/* Payment Section */
+.payment-label {
+  font-weight: bold;
+  color: var(--text-primary, #222);
+  font-size: 1.1rem;
+  display: block;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.payment-input-item {
+  --background: #fff;
+  --border-color: #E5E5E5;
+  --border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.payment-input {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  font-size: 1.2rem;
+}
+
+.accept-button {
+  --background: var(--button-blue, #0056D2);
+  --color: #fff;
+  --border-radius: 8px;
+  --font-weight: bold;
+  margin-top: 10px;
+  text-transform: uppercase;
+}
+
+/* Payments Table */
+.payments-table {
+  width: 100%;
+}
+
+.table-header {
+  font-weight: bold;
+  color: var(--text-primary, #222);
+  border-bottom: 1px solid var(--divider, #E5E5E5);
+  margin-bottom: 10px;
+}
+
+.table-row {
+  border-bottom: 1px solid var(--divider, #E5E5E5);
+  padding: 8px 0;
+}
+
+.table-row ion-col {
+  align-self: center;
+}
+
+.divider hr {
+  border-color: var(--divider, #E5E5E5);
+  margin: 5px 0;
+}
+
+/* Timeline */
+.timeline {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 15px;
+  position: relative;
+  padding-left: 20px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #E5E5E5;
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
   align-items: center;
-  height: 100%;
-  padding: 20px;
-  gap: 16px;
-  background-color: #f4f4f4; /* cambia este fondo si deseas */
-}
-
-/* Estilo del IonItem */
-.cash-item {
-  width: 100%;
-  max-width: 300px;
-  background: #ffffffdd; /* blanco semitransparente */
-  border-radius: 12px;
-  padding: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 16px;
-}
-
-/* Etiqueta del input */
-.cash-label {
-  font-size: 1.1rem;
-  color: #333;
-  font-weight: 600;
-}
-
-/* Input de efectivo */
-.cash-input {
-  font-size: 1.2rem;
-  color: #111;
   padding: 10px 0;
 }
 
-/* Lista de transacciones */
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -25px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--timeline-dot-bg, #666);
+  z-index: 1;
+}
+
+.timeline-item.success .timeline-icon {
+  color: #28A745;
+}
+
+.timeline-item.warning .timeline-icon {
+  color: #FFC107;
+}
+
+.timeline-item.danger .timeline-icon {
+  color: #DC3545;
+}
+
+.timeline-icon {
+  font-size: 1.2rem;
+  margin-right: 10px;
+  z-index: 2;
+  position: relative;
+}
+
+.timeline-content {
+  flex: 1;
+  font-size: 0.95rem;
+  color: var(--text-primary, #222);
+}
+
+/* Custom Tab Bar */
+.custom-tabbar {
+  --background: #fff;
+  --border: 1px solid var(--divider, #E5E5E5);
+  --color: var(--text-secondary, #666);
+  --color-selected: var(--dashboard-blue, #007BFF);
+  --font-size: 0.8rem;
+  padding: 8px 0;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+}
+
+.custom-tabbar ion-tab-button {
+  --ripple-color: transparent;
+  --color: var(--text-secondary, #666);
+  --color-selected: var(--dashboard-blue, #007BFF);
+  --font-weight: normal;
+}
+
+.custom-tabbar ion-icon {
+  font-size: 1.5rem;
+  stroke-width: 40px; /* Line style effect */
+  stroke: currentColor;
+  fill: none;
+}
+
+/* Legacy styles - can be removed if not used */
 .transaction-list {
   max-height: 500px;
   overflow-y: auto;
   padding-bottom: 20px;
-}
-
-/* Tarjetas de movimientos */
-.transaction-list ion-card {
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-  margin-bottom: 12px;
-  background: #fff;
-}
-
-/* Subtítulo (fecha) en la tarjeta */
-.transaction-list ion-card-subtitle {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-/* Contenido (monto) en la tarjeta */
-.transaction-list ion-card-content {
-  font-size: 1.1rem;
-  font-weight: bold;
-  color: #222;
 }
 
 

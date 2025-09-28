@@ -1,4 +1,4 @@
-import { Redirect, Route, useHistory } from 'react-router-dom';
+import { Redirect, Route, useHistory, useLocation } from 'react-router-dom';
 import {
   IonApp,
   IonCol,
@@ -55,6 +55,24 @@ import React, { useState } from 'react';
 setupIonicReact();
 
 const App: React.FC = () => {
+  const location = useLocation();
+
+  const getTitleFromPath = (pathname: string): string => {
+    switch (pathname) {
+      case '/POS':
+        return 'Lavandería';
+      case '/Laundry':
+        return '';
+      case '/ScannerQR':
+        return 'Lector QR';
+      case '/Setting':
+        return 'Configuración';
+      case '/Sells':
+        return 'Ventas';
+      default:
+        return 'Dashboard';
+    }
+  };
 
   const [authenticated, setAuthenticated] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
@@ -101,7 +119,12 @@ const App: React.FC = () => {
   return (
     <IonApp>
       <IonReactRouter>
-        <Header presentAlertPopover={presentAlertPopover} presentMailPopover={presentMailPopover} handleLogout={handleLogout} />
+        <Header 
+          presentAlertPopover={presentAlertPopover} 
+          presentMailPopover={presentMailPopover} 
+          handleLogout={handleLogout}
+          screenTitle={getTitleFromPath(location.pathname)}
+        />
           
           <IonTabs>
             <IonRouterOutlet>
@@ -124,7 +147,7 @@ const App: React.FC = () => {
                 <Redirect to="/Laundry" />
               </Route>
             </IonRouterOutlet>
-            <IonTabBar slot="bottom">
+            <IonTabBar slot="bottom" className="custom-tabbar">
               <IonTabButton tab="Laundry" href="/Laundry">
                 <IonIcon aria-hidden="true" icon={shirt} />
                 <IonLabel>Laundry</IonLabel>

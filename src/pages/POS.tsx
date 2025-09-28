@@ -1,9 +1,7 @@
+import React from 'react';
 import {
   IonContent,
-  IonHeader,
   IonPage,
-  IonTitle,
-  IonToolbar,
   IonInput,
   IonButton,
   IonItem,
@@ -17,13 +15,16 @@ import {
   IonGrid,
   IonRow,
   IonCol,
+  IonIcon,
 } from '@ionic/react';
+import { waterOutline, receiptOutline, documentsOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import './POS.css';
 
 interface Transaction {
   date: string;
   amount: number;
+  user: string;
 }
 
 interface VendingData {
@@ -122,8 +123,9 @@ const fetchAllVending = async () => {
 
     const now = new Date();
     const newTransaction: Transaction = {
-      date: now.toLocaleString(),
+      date: now.toLocaleDateString('es-ES') + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
       amount: cash,
+      user: 'Juan P.',
     };
 
     setTransactions(prev => [newTransaction, ...prev].slice(0, 5));
@@ -140,100 +142,120 @@ const fetchAllVending = async () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle className="ion-text-center">Punto de Venta</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-
       <IonContent fullscreen>
         <IonGrid className="ion-padding">
 
-          {/* 🔢 Total de Ventas */}
+          {/* Total de Ingresos */}
           <IonRow className="ion-justify-content-center">
             <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonCard>
+              <IonCard className="dashboard-card">
                 <IonCardHeader>
-                  <IonCardSubtitle>💰 Total de Ventas</IonCardSubtitle>
+                  <IonIcon icon={waterOutline} size="large" color="primary" />
+                  <IonCardSubtitle className="secondary-text">Total de Ingresos</IonCardSubtitle>
                 </IonCardHeader>
-                <IonCardContent>
+                <IonCardContent className="total-number">
                   ${calculateTotal().toFixed(2)}
                 </IonCardContent>
               </IonCard>
             </IonCol>
           </IonRow>
 
-          {/* Formulario de ingreso */}
+          {/* Ingrese el Pago */}
           <IonRow className="ion-justify-content-center">
             <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonItem className="cash-item" lines="none">
-                <IonLabel position="floating" className="cash-label">Ingrese el efectivo</IonLabel>
-                  <br></br>
-
-                <IonInput
-                  type="number"
-                  value={cash}
-                  onIonChange={(e) => setCash(parseFloat(e.detail.value!))}
-                  placeholder="Ej. 100.00"
-                  className="cash-input"
-                />
-              </IonItem>
-              <IonButton expand="block" onClick={handleAccept}>
-                Aceptar Dinero
-              </IonButton>
+              <IonCard className="dashboard-card">
+                <IonCardHeader>
+                  <IonLabel className="payment-label">Ingrese el pago</IonLabel>
+                </IonCardHeader>
+                <IonCardContent>
+                  <IonItem lines="none" className="payment-input-item">
+                    <IonInput
+                      type="number"
+                      value={cash}
+                      onIonChange={(e) => setCash(parseFloat(e.detail.value!))}
+                      placeholder="Ej. 50.00"
+                      className="payment-input"
+                    />
+                  </IonItem>
+                  <IonButton expand="block" className="accept-button" onClick={handleAccept}>
+                    ACEPTAR PAGO
+                  </IonButton>
+                </IonCardContent>
+              </IonCard>
             </IonCol>
           </IonRow>
 
-          {/* Transacciones recientes (local) */}
+          {/* Últimos Pagos (Local) */}
           <IonRow className="ion-justify-content-center ion-margin-top">
             <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonList className="transaction-list">
-                <IonCard>
-                  <IonCardHeader>
-                    <IonCardSubtitle>🧾 Últimos ingresos (local)</IonCardSubtitle>
-                  </IonCardHeader>
-                </IonCard>
-                {transactions.map((txn, index) => (
-                  <IonCard key={index}>
-                    <IonCardHeader>
-                      <IonCardSubtitle>Fecha: {txn.date}</IonCardSubtitle>
-                    </IonCardHeader>
-                    <IonCardContent>
-                      Monto: ${txn.amount.toFixed(2)}
-                    </IonCardContent>
-                  </IonCard>
-                ))}
-              </IonList>
+              <IonCard className="dashboard-card">
+                <IonCardHeader>
+                  <IonIcon icon={receiptOutline} size="large" />
+                  <IonCardSubtitle>Últimos Pagos (Local)</IonCardSubtitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  {transactions.length === 0 ? (
+                    <p className="secondary-text ion-text-center">No hay pagos registrados</p>
+                  ) : (
+                    <IonGrid className="payments-table">
+                      <IonRow className="table-header">
+                        <IonCol>Fecha</IonCol>
+                        <IonCol>Usuario</IonCol>
+                        <IonCol>Monto</IonCol>
+                      </IonRow>
+                      {transactions.map((txn, index) => (
+                        <React.Fragment key={index}>
+                          <IonRow className="table-row">
+                            <IonCol>{txn.date}</IonCol>
+                            <IonCol>{txn.user}</IonCol>
+                            <IonCol>${txn.amount.toFixed(2)}</IonCol>
+                          </IonRow>
+                          {index < transactions.length - 1 && <IonRow><IonCol className="divider" col-12><hr /></IonCol></IonRow>}
+                        </React.Fragment>
+                      ))}
+                    </IonGrid>
+                  )}
+                </IonCardContent>
+              </IonCard>
             </IonCol>
           </IonRow>
 
-         {/* Lista desde el backend */}
-<IonRow className="ion-justify-content-center ion-margin-top">
-  <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-    <IonList className="backend-list">
-      <IonCard>
-        <IonCardHeader>
-          <IonCardSubtitle>💾 Actividad</IonCardSubtitle>
-        </IonCardHeader>
-      </IonCard>
-      {allVending.length === 0 ? (
-        <IonCard>
-          <IonCardContent className="ion-text-center">
-            🚫 Sin actividad
-          </IonCardContent>
-        </IonCard>
-      ) : (
-        allVending.map((item, index) => (
-          <IonCard key={index}>
-            <IonCardContent>
-              Ingreso registrado: ${item.ingreso.toFixed(2)}
-            </IonCardContent>
-          </IonCard>
-        ))
-      )}
-    </IonList>
-  </IonCol>
-</IonRow>
+         {/* Actividad Reciente */}
+         <IonRow className="ion-justify-content-center ion-margin-top">
+           <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
+             <IonCard className="dashboard-card">
+               <IonCardHeader>
+                 <IonIcon icon={documentsOutline} size="large" />
+                 <IonCardSubtitle>Actividad Reciente</IonCardSubtitle>
+               </IonCardHeader>
+               <IonCardContent>
+                 {allVending.length === 0 ? (
+                   <div className="timeline-item secondary-text">
+                     ❌ Sin actividad — (ayer)
+                   </div>
+                 ) : (
+                   <div className="timeline">
+                     {allVending.slice(0, 3).map((item, index) => {
+                       const now = new Date();
+                       const time = new Date(now.getTime() - index * 3600000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                       const status = index % 3 === 0 ? '✅ Pago recibido' : index % 3 === 1 ? '🕒 En espera' : '❌ Sin actividad';
+                       const color = index % 3 === 0 ? 'success' : index % 3 === 1 ? 'warning' : 'danger';
+                       return (
+                         <div key={index} className={`timeline-item ${color}`}>
+                           <span className="timeline-icon">{index % 3 === 0 ? '✅' : index % 3 === 1 ? '🕒' : '❌'}</span>
+                           <div className="timeline-content">
+                             <span>{status} — ${item.ingreso.toFixed(2)} ({time})</span>
+                           </div>
+                           <span className="timeline-dot" style={{backgroundColor: index % 3 === 0 ? '#007BFF' : '#666'}}></span>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 )}
+               </IonCardContent>
+             </IonCard>
+           </IonCol>
+         </IonRow>
 
         </IonGrid>
 

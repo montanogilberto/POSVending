@@ -1,0 +1,185 @@
+/* Dashboard Cards */
+.dashboard-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft, 0 2px 6px rgba(0,0,0,0.08));
+  margin: 10px 0;
+}
+
+.dashboard-card ion-card-header {
+  text-align: center;
+  padding-bottom: 0;
+}
+
+.dashboard-card ion-icon {
+  margin-bottom: 8px;
+}
+
+/* Total Number */
+.total-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: var(--dashboard-blue, #007BFF);
+  text-align: center;
+  margin: 0;
+}
+
+/* Secondary Text */
+.secondary-text {
+  color: var(--text-secondary, #666);
+  font-size: 0.9rem;
+}
+
+/* Payment Section */
+.payment-label {
+  font-weight: bold;
+  color: var(--text-primary, #222);
+  font-size: 1.1rem;
+  display: block;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.payment-input-item {
+  --background: #fff;
+  --border-color: #E5E5E5;
+  --border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.payment-input {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  font-size: 1.2rem;
+}
+
+.accept-button {
+  --background: var(--button-blue, #0056D2);
+  --color: #fff;
+  --border-radius: 8px;
+  --font-weight: bold;
+  margin-top: 10px;
+  text-transform: uppercase;
+}
+
+/* Payments Table */
+.payments-table {
+  width: 100%;
+}
+
+.table-header {
+  font-weight: bold;
+  color: var(--text-primary, #222);
+  border-bottom: 1px solid var(--divider, #E5E5E5);
+  margin-bottom: 10px;
+}
+
+.table-row {
+  border-bottom: 1px solid var(--divider, #E5E5E5);
+  padding: 8px 0;
+}
+
+.table-row ion-col {
+  align-self: center;
+}
+
+.divider hr {
+  border-color: var(--divider, #E5E5E5);
+  margin: 5px 0;
+}
+
+/* Timeline */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  position: relative;
+  padding-left: 20px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #E5E5E5;
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -25px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--timeline-dot-bg, #666);
+  z-index: 1;
+}
+
+.timeline-item.success .timeline-icon {
+  color: #28A745;
+}
+
+.timeline-item.warning .timeline-icon {
+  color: #FFC107;
+}
+
+.timeline-item.danger .timeline-icon {
+  color: #DC3545;
+}
+
+.timeline-icon {
+  font-size: 1.2rem;
+  margin-right: 10px;
+  z-index: 2;
+  position: relative;
+}
+
+.timeline-content {
+  flex: 1;
+  font-size: 0.95rem;
+  color: var(--text-primary, #222);
+}
+
+ion-card-subtitle {
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+}
+
+/* Total Meta */
+.total-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  margin-top: 5px;
+}
+
+.percentage-change {
+  color: #28A745; /* Green for +0% */
+  font-weight: bold;
+}
+
+/* Table Adjustments for Image Match */
+.table-header ion-col,
+.table-row ion-col {
+  text-align: left;
+  padding: 4px 0;
+}
+
+.table-row ion-col:first-child {
+  font-weight: bold;
+  color: var(--dashboard-blue, #007BFF);
+}
+  
