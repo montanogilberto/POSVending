@@ -10,7 +10,7 @@ interface HeaderProps {
   screenTitle?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ presentAlertPopover, presentMailPopover, handleLogout, screenTitle = 'Dashboard' }) => {
+const Header: React.FC<HeaderProps> = ({ presentAlertPopover, presentMailPopover, handleLogout, screenTitle = 'POS GMO' }) => {
   const { username = 'admin', avatarUrl } = useUser();
 
   return (
@@ -23,7 +23,7 @@ const Header: React.FC<HeaderProps> = ({ presentAlertPopover, presentMailPopover
             </IonAvatar>
           </IonChip>
           <div className="logo-title">
-            <h2>Lavandería</h2>
+            <h2>POS GMO</h2>
           </div>
         </div>
         <IonTitle className="screen-title">{screenTitle}</IonTitle>
