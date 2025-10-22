@@ -104,7 +104,7 @@ const Laundry: React.FC = () => {
   }, [location.state]);
 
   const handleStartSeller = () => {
-    history.push('/product-selection');
+    history.push('/category');
   };
 
   const handleConfirmSale = async () => {

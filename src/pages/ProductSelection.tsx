@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   IonPage,
   IonContent,
@@ -16,7 +16,6 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonList,
   IonItem,
   IonLabel,
   IonRadioGroup,
@@ -25,6 +24,7 @@ import {
   IonLoading,
   IonToast,
   IonIcon,
+  IonCheckbox,
 } from '@ionic/react';
 import { close } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
@@ -38,7 +38,7 @@ interface Choice {
 interface Option {
   id: number;
   name: string;
-  type: 'radio';
+  type: 'radio' | 'checkbox';
   choices: Choice[];
 }
 
@@ -48,7 +48,7 @@ interface Product {
   description: string;
   price: number;
   categoryId: number;
-  options: Option[];
+  options?: Option[];
 }
 
 interface SelectedItem {
@@ -57,7 +57,7 @@ interface SelectedItem {
   description: string;
   basePrice: number;
   quantity: number;
-  selectedOptions: { [optionId: number]: number }; // choiceId
+  selectedOptions: { [optionId: number]: number | number[] };
   totalPrice: number;
 }
 
@@ -69,11 +69,16 @@ const ProductSelection: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  // State for selected options and quantity per product (use index or id for simplicity)
-  const [selectedChoices, setSelectedChoices] = useState<{ [productId: number]: { [optionId: number]: number } }>({});
+  const [selectedChoices, setSelectedChoices] = useState<{
+    [productId: number]: { [optionId: number]: number | number[] };
+  }>({});
+
   const [quantities, setQuantities] = useState<{ [productId: number]: number }>({});
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
     fetchProducts();
   }, []);
 
@@ -81,21 +86,41 @@ const ProductSelection: React.FC = () => {
     try {
       setLoading(true);
       setFetchError(null);
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/by_company_products', {
+  
+      const res = await fetch('https://smartloansbackend.azurewebsites.net/by_company_products', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          products: [{ companyId: '1' }]
-        }),
+        headers: {
+          accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ products: [{ companyId: '1' }] }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Error fetching products: ${response.status}`);
+  
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('Backend error body:', text);
+        throw new Error(`Error fetching products: ${res.status} ${res.statusText}`);
       }
-
-      const data = await response.json();
-      console.log('Fetched products:', data);
-      setProducts(data.products || []);
+  
+      const data = await res.json();
+  
+      // 🔧 normalize option.type and choice ids to numbers
+      const list: Product[] = (Array.isArray(data) ? data : data?.products ?? []).map((p: Product) => ({
+        ...p,
+        options: (p.options ?? []).map((o) => ({
+          ...o,
+          type: o.name === 'Ciclo' ? 'radio' : (String(o.type || 'radio').toLowerCase() === 'checkbox' ? 'checkbox' : 'radio'),
+          choices: (o.choices ?? []).map((c) => ({
+            ...c,
+            id: Number(c.id), // just in case API sends strings
+            price: Number(c.price) || 0,
+          })),
+        })),
+        price: Number(p.price) || 0,
+      }));
+  
+      setProducts(list);
+      console.log('Fetched products:', list);
     } catch (error) {
       console.error('Error fetching products:', error);
       setFetchError('No se pudieron cargar los productos.');
@@ -106,65 +131,83 @@ const ProductSelection: React.FC = () => {
     }
   };
 
-  const handleOptionChange = (productId: number, optionId: number, choiceId: number) => {
-    setSelectedChoices(prev => ({
+  // --- Handlers ---
+  const handleRadioChange = (productId: number, optionId: number, choiceId: number) => {
+    setSelectedChoices((prev) => ({
       ...prev,
-      [productId]: {
-        ...prev[productId],
-        [optionId]: choiceId
-      }
+      [productId]: { ...(prev[productId] || {}), [optionId]: choiceId },
     }));
   };
 
+  const handleCheckboxToggle = (
+    productId: number,
+    optionId: number,
+    choiceId: number,
+    checked: boolean
+  ) => {
+    setSelectedChoices((prev) => {
+      const productSel = { ...(prev[productId] || {}) };
+      const current = productSel[optionId];
+      const arr = Array.isArray(current) ? [...current] : [];
+      const next = checked
+        ? Array.from(new Set([...arr, choiceId]))
+        : arr.filter((id) => id !== choiceId);
+      return { ...prev, [productId]: { ...productSel, [optionId]: next } };
+    });
+  };
+
   const handleQuantityChange = (productId: number, quantity: number) => {
-    if (quantity > 0) {
-      setQuantities(prev => ({ ...prev, [productId]: quantity }));
+    if (Number.isFinite(quantity) && quantity > 0) {
+      setQuantities((prev) => ({ ...prev, [productId]: quantity }));
     }
   };
 
   const calculateTotalPrice = (product: Product) => {
-    let total = product.price;
-    const productId = product.id;
-    const productChoices = selectedChoices[productId] || {};
-    product.options.forEach(option => {
-      const choiceId = productChoices[option.id];
-      if (choiceId) {
-        const choice = option.choices.find(c => c.id === choiceId);
-        if (choice) total += choice.price;
+    let total = Number(product.price) || 0;
+    const productSel = selectedChoices[product.id] || {};
+    (product.options ?? []).forEach((option) => {
+      const sel = productSel[option.id];
+      if (Array.isArray(sel)) {
+        sel.forEach((id) => {
+          const c = option.choices.find((ch) => ch.id === id);
+          if (c) total += Number(c.price) || 0;
+        });
+      } else if (typeof sel === 'number' && sel) {
+        const c = option.choices.find((ch) => ch.id === sel);
+        if (c) total += Number(c.price) || 0;
       }
     });
     return total;
   };
 
   const addToCart = (product: Product) => {
-    const productId = product.id;
-    const quantity = quantities[productId] || 1;
+    const quantity = quantities[product.id] || 1;
     if (quantity < 1) {
       setToastMessage('Seleccione una cantidad válida.');
       setShowToast(true);
       return;
     }
 
-    const selectedOptions = selectedChoices[productId] || {};
+    const selectedOptions = selectedChoices[product.id] || {};
     const totalPrice = calculateTotalPrice(product) * quantity;
 
     const item: SelectedItem = {
-      productId,
+      productId: product.id,
       name: product.name,
       description: product.description,
       basePrice: product.price,
       quantity,
       selectedOptions,
-      totalPrice
+      totalPrice,
     };
 
-    // Navigate back to /laundry with item in state
     history.push('/laundry', { from: 'product-selection', item });
 
     setToastMessage(`Producto "${product.name}" agregado al carrito.`);
     setShowToast(true);
   };
 
+  // --- UI ---
   if (loading) {
     return (
       <IonPage>
@@ -203,8 +246,10 @@ const ProductSelection: React.FC = () => {
           <IonTitle>Seleccionar Productos</IonTitle>
         </IonToolbar>
       </IonHeader>
+
       <IonContent className="ion-padding">
         {fetchError && <p className="ion-text-center">{fetchError}</p>}
+
         {products.length > 0 ? (
           <IonGrid>
             <IonRow>
@@ -219,42 +264,73 @@ const ProductSelection: React.FC = () => {
                       </IonCardHeader>
                       <IonCardContent>
                         <p>{product.description}</p>
-                        
-                        {/* Options */}
-                        {product.options.map((option) => (
-                          <IonItem key={option.id}>
-                            <IonLabel>{option.name}</IonLabel>
-                            <IonRadioGroup
-                              value={selectedChoices[product.id]?.[option.id] || ''}
-                              onIonChange={(e) => handleOptionChange(product.id, option.id, parseInt(e.detail.value))}
+
+                        {(product.options ?? []).map((option) => (
+                          <div key={option.id}>
+                            <h3>{option.name}</h3>
+
+                            {option.type === 'radio' ? (
+                              <IonRadioGroup
+                              value={
+                                typeof selectedChoices[product.id]?.[option.id] === 'number'
+                                  ? (selectedChoices[product.id]?.[option.id] as number)
+                                  : undefined
+                              }
+                              onIonChange={(e) => handleRadioChange(product.id, option.id, Number(e.detail.value))}
                             >
                               {option.choices.map((choice) => (
                                 <IonItem key={choice.id}>
-                                  <IonLabel>{choice.name} (+${choice.price.toFixed(2)})</IonLabel>
-                                  <IonRadio slot="start" value={choice.id.toString()} />
+                                  <IonLabel>
+                                    {choice.name} (+${choice.price.toFixed(2)})
+                                  </IonLabel>
+                                  <IonRadio slot="start" value={choice.id} />
                                 </IonItem>
                               ))}
                             </IonRadioGroup>
-                          </IonItem>
+                            ) : (
+                              option.choices.map((choice) => {
+                                const current = selectedChoices[product.id]?.[option.id];
+                                const checked = Array.isArray(current)
+                                  ? current.includes(choice.id)
+                                  : false;
+                                return (
+                                  <IonItem key={choice.id}>
+                                    <IonLabel>
+                                      {choice.name} (+${choice.price.toFixed(2)})
+                                    </IonLabel>
+                                    <IonCheckbox
+                                      slot="start"
+                                      checked={checked}
+                                      onIonChange={(e) =>
+                                        handleCheckboxToggle(
+                                          product.id,
+                                          option.id,
+                                          choice.id,
+                                          e.detail.checked
+                                        )
+                                      }
+                                    />
+                                  </IonItem>
+                                );
+                              })
+                            )}
+                          </div>
                         ))}
 
-                        {/* Quantity */}
                         <IonItem>
                           <IonLabel>Cantidad</IonLabel>
                           <IonInput
                             type="number"
                             min="1"
-                            value={quantities[product.id] || 1}
-                            onIonChange={(e) => handleQuantityChange(product.id, parseInt(e.detail.value!) || 1)}
+                            value={quantities[product.id] ?? 1}
+                            onIonChange={(e) =>
+                              handleQuantityChange(product.id, Number(e.detail.value) || 1)
+                            }
                             slot="end"
                           />
                         </IonItem>
 
-                        <IonButton
-                          expand="block"
-                          onClick={() => addToCart(product)}
-                          className="add-to-cart-button"
-                        >
+                        <IonButton expand="block" onClick={() => addToCart(product)}>
                           Agregar al Carrito
                         </IonButton>
                       </IonCardContent>
@@ -268,7 +344,6 @@ const ProductSelection: React.FC = () => {
           !loading && <p className="ion-padding ion-text-center">No hay productos disponibles.</p>
         )}
 
-        {/* Toast */}
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
