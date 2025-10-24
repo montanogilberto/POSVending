@@ -114,7 +114,7 @@ const CartPage: React.FC = () => {
 
 
   const handleAddMoreProducts = () => {
-    history.push('/tabs/home');
+    history.push('/category');
   };
 
   return (

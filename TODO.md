@@ -1,2 +1,7 @@
 - [x] Update categories.ts: Modify fetchCategories to use POST method with the provided API call (URL, headers, body), and parse response as data.product_categories
 - [x] Update Category.tsx: Import fetchCategories from categories.ts, remove local fetchCategories function, update Category interface to match Categories (use productCategoryId), adjust code to use imported function
+- [x] Create CartItem component
+- [x] Update Category.tsx to navigate to ProductListPage instead of ProductSelection
+- [x] Add routes for ProductListPage, ProductDetailPage, CartPage in App.tsx
+- [x] Fix ProductListPage navigation to /products/:productId
+- [x] Update products.ts to use new API by_company_products with POST method

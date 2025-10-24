@@ -32,11 +32,14 @@ const ProductListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const categoryIdNumber = +categoryId;
+  console.log('Category ID from URL:', categoryIdNumber);
+
   useEffect(() => {
     const fetchData = async () => {
       console.log('Fetching products...');
       try {
-        const data = await getProducts();
+        const data = await getProducts(categoryIdNumber);
         console.log('Fetched products:', data);
         setProducts(data);
       } catch (error) {
@@ -48,13 +51,11 @@ const ProductListPage: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [categoryIdNumber]);
 
-  const categoryIdNumber = +categoryId;
-  console.log('Category ID from URL:', categoryIdNumber);
-
-  const filteredProducts = products.filter(p => p.categoryId === categoryIdNumber);
-  console.log('Filtered products by category:', filteredProducts);
+  // Since we're now fetching products by category, no need to filter
+  const filteredProducts = products;
+  console.log('Products for category:', filteredProducts);
 
   if (loading) {
     console.log('Loading is true, showing loading message.');
@@ -108,7 +109,7 @@ const ProductListPage: React.FC = () => {
                           expand="block"
                           onClick={() => {
                             console.log(`Navigating to product details for ID: ${product.id}`);
-                            history.push(`/productS/${product.id}`);
+                            history.push(`/products/${product.id}`, { product });
                           }}
                         >
                           Ver detalles

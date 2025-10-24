@@ -22,10 +22,9 @@ import {
   IonAlert
 } from '@ionic/react';
 
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
-import { getProducts } from '../../data/products';
 import { Product, CartItem } from '../../data/type_products';
 
 interface RouteParams {
@@ -35,6 +34,7 @@ interface RouteParams {
 const ProductDetailPage: React.FC = () => {
   const { productId } = useParams<RouteParams>();
   const history = useHistory();
+  const location = useLocation();
   const { addToCart } = useCart();
   const [product, setProduct] = useState<Product | undefined>(undefined);
   const [quantity, setQuantity] = useState(1);
@@ -44,15 +44,17 @@ const ProductDetailPage: React.FC = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   useEffect(() => {
-    const fetchProduct = async () => {
-      const products = await getProducts();
-      console.log("All products fetched:", products);
-      const foundProduct = products.find(p => p.id === parseInt(productId, 10));
-      console.log("Matched product:", foundProduct);
-      setProduct(foundProduct);
-    };
-    fetchProduct();
-  }, [productId]);
+    // Check if product is passed in location state
+    const stateProduct = (location.state as any)?.product;
+    if (stateProduct) {
+      console.log("Product from state:", stateProduct);
+      setProduct(stateProduct);
+    } else {
+      // Fallback: fetch all products (though this should not happen if navigation is correct)
+      console.warn("Product not found in state, this should not happen");
+      setProduct(undefined);
+    }
+  }, [productId, location.state]);
 
   if (!product) return <IonPage><IonContent><p>Producto no encontrado.</p></IonContent></IonPage>;
 

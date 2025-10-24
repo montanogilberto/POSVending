@@ -10,6 +10,7 @@ import CreateAccount from './pages/Authentication/CreateAccount';
 const container = document.getElementById('root');
 const root = createRoot(container!);
 import { UserProvider } from './components/UserContext';
+import { CartProvider } from './context/CartContext';
 
 const Main: React.FC = () => {
   // State to manage authentication
@@ -22,21 +23,23 @@ const Main: React.FC = () => {
 
   return (
     <UserProvider>
-      <Router> {/* Wrap your entire application with BrowserRouter */}
-        <React.StrictMode>
-          <Switch>
-            <Route path="/forgot-password" component={ForgotPassword} />
-            <Route path="/create-account" component={CreateAccount} />
-            <Route path="/login">
-              <Login onLoginSuccess={handleLoginSuccess} />
-            </Route>
-            <Route>
-              {/* Default route */}
-              {authenticated ? <App /> : <Login onLoginSuccess={handleLoginSuccess} />}
-            </Route>
-          </Switch>
-        </React.StrictMode>
-      </Router>
+      <CartProvider>
+        <Router> {/* Wrap your entire application with BrowserRouter */}
+          <React.StrictMode>
+            <Switch>
+              <Route path="/forgot-password" component={ForgotPassword} />
+              <Route path="/create-account" component={CreateAccount} />
+              <Route path="/login">
+                <Login onLoginSuccess={handleLoginSuccess} />
+              </Route>
+              <Route>
+                {/* Default route */}
+                {authenticated ? <App /> : <Login onLoginSuccess={handleLoginSuccess} />}
+              </Route>
+            </Switch>
+          </React.StrictMode>
+        </Router>
+      </CartProvider>
     </UserProvider>
   );
 };
