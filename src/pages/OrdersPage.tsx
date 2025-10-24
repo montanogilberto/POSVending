@@ -132,7 +132,6 @@ const OrdersPage: React.FC = () => {
 
   const {
     isListening,
-    listeningForCommand,
     transcript,
     toggleListening,
   } = useAzureSpeech({
