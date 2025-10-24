@@ -1,0 +1,10 @@
+# Node
+node_modules/
+
+# Capacitor/Android build
+android/
+ios/
+
+# Environment files
+.env
+.env.*
