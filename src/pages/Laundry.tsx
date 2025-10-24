@@ -19,6 +19,7 @@ import {
 } from '@ionic/react';
 import { waterOutline, receiptOutline, documentsOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
+import { useHistory, useLocation } from 'react-router-dom';
 import { helpCircleOutline, notificationsOutline, logOutOutline } from 'ionicons/icons';
 import './Laundry.css';
 
@@ -26,61 +27,63 @@ interface Transaction {
   date: string;
   amount: number;
   user: string;
+  productName?: string;
+  quantity?: number;
 }
 
 interface LaundryData {
-  ingreso: number;
+  laundryId: number;
+  total: number;
+  create_at: string;
+  update_at: string;
+  details?: Array<{
+    laundryDetailId: number;
+    productId: number;
+    cantidad: number;
+    precio_unitario: number;
+    subtotal: number;
+    create_at: string;
+    update_at: string;
+  }>;
+}
+
+interface CartItem {
+  productId: number;
+  name: string;
+  description: string;
+  price: number;
+  quantity: number;
+  subtotal: number;
+  selectedOptions: { [optionId: number]: number };
+}
+
+interface LocationState {
+  from?: string;
+  item?: CartItem;
 }
 
 const Laundry: React.FC = () => {
-  const [cash, setCash] = useState<number | undefined>();
+  const history = useHistory();
+  const location = useLocation();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allLaundry, setAllLaundry] = useState<LaundryData[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [showCart, setShowCart] = useState(false);
 
-  // 🔄 POST al backend
-  const sendToBackend = async (amount: number): Promise<boolean> => {
-    try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/laundry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          laundry: [{ ingreso: amount, action: 1 }],
-        }),
-      });
-
-      if (!response.ok) throw new Error(`Error al enviar al backend: ${response.status}`);
-      await response.json();
-      return true;
-    } catch (error) {
-      console.error(error);
-      setToastMessage('Error al enviar datos al backend.');
-      setShowToast(true);
-      return false;
-    }
-  };
-
-  // 🔄 GET ingresos
+  // 🔄 GET all_laundry
   const fetchAllLaundry = async () => {
     try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_vending');
+      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_laundry');
       if (!response.ok) throw new Error(`Error al obtener datos del backend: ${response.status}`);
 
       const data = await response.json();
-      let laundryData = data.laundry;
-
-      if (typeof laundryData === 'string') {
-        try {
-          laundryData = JSON.parse(laundryData);
-        } catch {
-          laundryData = [];
-        }
-      }
-      setAllLaundry(Array.isArray(laundryData) ? laundryData : []);
+      console.log('Fetched all_laundry:', data);
+      setAllLaundry(data.pos_laundry || []);
     } catch (error) {
       console.error(error);
-      setToastMessage('Error al obtener ingresos del backend.');
+      setToastMessage('Error al obtener ventas del backend.');
       setShowToast(true);
     }
   };
@@ -89,32 +92,74 @@ const Laundry: React.FC = () => {
     fetchAllLaundry();
   }, []);
 
-  const handleAccept = async () => {
-    if (!cash || cash <= 0) {
-      setToastMessage('Ingrese una cantidad válida mayor a 0.');
+  useEffect(() => {
+    const state = location.state as LocationState | undefined;
+    if (state && state.from === 'product-selection' && state.item) {
+      const item = state.item;
+      setCart(prev => [...prev, item]);
+      setShowCart(true);
+      setToastMessage(`Producto "${item.name}" agregado al carrito.`);
+      setShowToast(true);
+    }
+  }, [location.state]);
+
+  const handleStartSeller = () => {
+    history.push('/category');
+  };
+
+  const handleConfirmSale = async () => {
+    if (cart.length === 0) {
+      setToastMessage('El carrito está vacío.');
       setShowToast(true);
       return;
     }
 
-    const enviado = await sendToBackend(cash);
-    if (!enviado) return;
+    try {
+      const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+      const response = await fetch('https://smartloansbackend.azurewebsites.net/pos_laundry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pos_laundry: {
+            details: cart.map(item => ({
+              productId: item.productId,
+              cantidad: item.quantity,
+              precio_unitario: item.price,
+              subtotal: item.subtotal
+            })),
+            total
+          }
+        }),
+      });
 
-    const now = new Date();
-    const newTransaction: Transaction = { 
-      date: now.toLocaleDateString('es-ES') + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-      amount: cash,
-      user: 'Juan P.',
-    };
+      if (!response.ok) throw new Error(`Error al crear venta: ${response.status}`);
+      const data = await response.json();
+      console.log('Venta creada:', data);
 
-    setTransactions((prev) => [newTransaction, ...prev].slice(0, 5));
-    setToastMessage(`Pago aceptado: $${cash.toFixed(2)}`);
-    setShowToast(true);
-    setCash(undefined);
-    fetchAllLaundry();
+      const now = new Date();
+      const newTransaction: Transaction = {
+        date: now.toLocaleDateString('es-ES') + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        amount: total,
+        user: 'admin',
+        productName: cart.map(item => item.name).join(', '),
+        quantity: cart.reduce((sum, item) => sum + item.quantity, 0)
+      };
+
+      setTransactions(prev => [newTransaction, ...prev].slice(0, 5));
+      setToastMessage(`Venta confirmada: $${total.toFixed(2)}`);
+      setShowToast(true);
+      setCart([]);
+      setShowCart(false);
+      fetchAllLaundry();
+    } catch (error) {
+      console.error(error);
+      setToastMessage('Error al confirmar la venta.');
+      setShowToast(true);
+    }
   };
 
   const calculateTotal = (): number =>
-    allLaundry.reduce((sum, item) => sum + item.ingreso, 0);
+    allLaundry.reduce((sum, sale) => sum + sale.total, 0);
 
   const currentMonthYear = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
   const currentUser = 'admin'; // From UserContext if available
@@ -145,76 +190,61 @@ const Laundry: React.FC = () => {
             </IonCol>
           </IonRow>
 
-          {/* Formulario */}
+          {/* Iniciar Venta */}
           <IonRow className="ion-justify-content-center">
             <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
               <IonCard className="dashboard-card">
                 <IonCardHeader>
-                  <IonLabel className="payment-label">Ingrese el pago</IonLabel>
+                  <IonLabel className="payment-label">Iniciar Venta</IonLabel>
                 </IonCardHeader>
                 <IonCardContent>
-                  <IonItem lines="none" className="payment-input-item">
-                    <IonInput
-                      type="number"
-                      value={cash}
-                      onIonChange={(e) => setCash(parseFloat(e.detail.value!))}
-                      placeholder="Ej. 50.00"
-                      className="payment-input"
-                    />
-                  </IonItem>
-                  <IonButton expand="block" className="accept-button" onClick={handleAccept}>
-                    ACEPTAR PAGO
+                  <IonButton expand="block" className="start-seller-button" onClick={handleStartSeller}>
+                    Iniciar Selección de Productos
                   </IonButton>
                 </IonCardContent>
               </IonCard>
             </IonCol>
           </IonRow>
 
-          {/* Últimos pagos */}
-          <IonRow className="ion-justify-content-center ion-margin-top">
-            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonCard className="dashboard-card">
-                <IonCardHeader>
-                  <IonIcon icon={receiptOutline} size="large" />
-                  <IonCardSubtitle>Últimos Pagos (Local)</IonCardSubtitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  {transactions.length === 0 ? (
-                    <p className="secondary-text ion-text-center">No hay pagos registrados</p>
-                  ) : (
-                    <IonGrid className="payments-table">
-                      <IonRow className="table-header">
-                        <IonCol>Monto</IonCol>
-                        <IonCol>Fecha</IonCol>
-                        <IonCol>Usuario</IonCol>
-                      </IonRow>
-                      {transactions.length > 0 ? transactions.slice(0, 3).map((txn, i) => (
-                        <React.Fragment key={i}>
-                          <IonRow className="table-row">
-                            <IonCol>${txn.amount.toFixed(2)}</IonCol>
-                            <IonCol>{txn.date}</IonCol>
-                            <IonCol>{txn.user}</IonCol>
-                          </IonRow>
-                          {i < 2 && <IonRow><IonCol className="divider" col-12><hr /></IonCol></IonRow>}
-                        </React.Fragment>
-                      )) : (
-                        <IonRow className="table-row">
-                          <IonCol className="ion-text-center" col-12>No hay pagos registrados</IonCol>
-                        </IonRow>
-                      )}
-                    </IonGrid>
-                  )}
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
+          {/* Carrito Summary if showCart */}
+          {showCart && cart.length > 0 && (
+            <IonRow className="ion-justify-content-center">
+              <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
+                <IonCard className="dashboard-card">
+                  <IonCardHeader>
+                    <IonCardSubtitle>Carrito de Compra</IonCardSubtitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    {cart.map((item, i) => (
+                      <IonItem key={i} lines="full">
+                        <IonLabel>
+                          <h2>{item.name} x{item.quantity}</h2>
+                          <p>${item.subtotal.toFixed(2)}</p>
+                        </IonLabel>
+                      </IonItem>
+                    ))}
+                    <div className="cart-total">
+                      <strong>Total: ${cart.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2)}</strong>
+                    </div>
+                    <IonButton expand="block" className="confirm-sale-button" onClick={handleConfirmSale}>
+                      Confirmar Venta
+                    </IonButton>
+                    <IonButton expand="block" fill="clear" onClick={() => { setShowCart(false); setCart([]); }}>
+                      Cancelar
+                    </IonButton>
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            </IonRow>
+          )}
+
 
           {/* Actividad */}
           <IonRow className="ion-justify-content-center ion-margin-top">
             <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
               <IonCard className="dashboard-card">
                 <IonCardHeader>
-                  <IonIcon icon={documentsOutline} size="large" />
+                  
                   <IonCardSubtitle>Actividad Reciente</IonCardSubtitle>
                 </IonCardHeader>
                 <IonCardContent>
@@ -224,26 +254,23 @@ const Laundry: React.FC = () => {
                     </div>
                   ) : (
                     <div className="timeline">
-                      {allLaundry.length > 0 ? allLaundry.slice(0, 3).map((item, i) => {
-                        const now = new Date();
-                        const time = new Date(now.getTime() - i * 3600000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        const status = i % 2 === 0 ? 'Pago recibido' : 'En espera';
-                        const icon = i % 2 === 0 ? '✅' : '🕒';
-                        const color = i % 2 === 0 ? 'success' : 'warning';
+                      {allLaundry.slice(0, 3).map((sale, i) => {
+                        const now = new Date(sale.create_at);
+                        const time = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        const status = 'Venta';
+                        const icon = '✅';
+                        const color = 'success';
+                        const productCount = sale.details ? sale.details.length : 1;
                         return (
                           <div key={i} className={`timeline-item ${color}`}>
                             <span className="timeline-icon">{icon}</span>
                             <div className="timeline-content">
-                              <span>{status} — ${item.ingreso.toFixed(2)} ({time})</span>
+                              <span>{status} — ${sale.total.toFixed(2)} ({productCount} productos, {time})</span>
                             </div>
                             <span className="timeline-dot" style={{backgroundColor: '#007BFF'}}></span>
                           </div>
                         );
-                      }) : (
-                        <div className="timeline-item secondary-text">
-                          Sin actividad reciente
-                        </div>
-                      )}
+                      })}
                     </div>
                   )}
                 </IonCardContent>

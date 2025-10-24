@@ -20,6 +20,12 @@ import Setting from './pages/Setting';
 import Sells from './pages/Sells';
 import Laundry from './pages/Laundry'; // 👈 Importamos tu nueva página
 import ScannerQR from './pages/ScannerQR';
+import Category from './pages/CategoryPage/CategoryPage';
+import ProductSelection from './pages/ProductSelection';
+import ProductListPage from './pages/products/ProductListPage';
+import ProductDetailPage from './pages/products/ProductDetailPage';
+import CartPage from './pages/CartPage';
+
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
 
@@ -143,6 +149,21 @@ const App: React.FC = () => {
               <Route path="/ScannerQR">
                 <ScannerQR />
               </Route>
+              <Route path="/product-selection">
+                <ProductSelection />
+              </Route>
+              <Route exact path="/category">
+                <Category />
+              </Route>
+              <Route exact path="/CategoryPage">
+                <Category />
+              </Route>
+              <Route exact path="/category">
+                <Category />
+              </Route>
+              <Route exact path="/product/:categoryId" component={ProductListPage} />
+              <Route exact path="/products/:productId" component={ProductDetailPage} />
+              <Route exact path="/cart" component={CartPage} />
               <Route exact path="/">
                 <Redirect to="/Laundry" />
               </Route>
