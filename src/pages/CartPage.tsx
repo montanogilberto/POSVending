@@ -100,6 +100,33 @@ const CartPage: React.FC = () => {
       try {
         const response = await submitOrder(orderData);
         if (response.ok) {
+          // Call income endpoint
+          try {
+            const incomeResponse = await fetch('https://smartloansbackend.azurewebsites.net/income', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                income: orderData.orders.map(order => ({
+                  action: 1,
+                  orderId: order.orderNumber,
+                  total: order.total,
+                  paymentMethod: order.paymentMethod,
+                  paymentDate: new Date().toISOString(),
+                  userId: order.userId,
+                  clientId: order.clientId,
+                  companyId: 1
+                }))
+              })
+            });
+            if (incomeResponse.ok) {
+              const incomeData = await incomeResponse.json();
+              console.log('Income response:', incomeData);
+            } else {
+              console.error('Income call failed:', incomeResponse.status);
+            }
+          } catch (incomeError) {
+            console.error('Income call error:', incomeError);
+          }
           setShowSuccessToast(true);
         } else {
           const errorData = await response.json();

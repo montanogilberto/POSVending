@@ -31,20 +31,15 @@ interface Transaction {
   quantity?: number;
 }
 
-interface LaundryData {
-  laundryId: number;
+interface Income {
+  incomeId: number;
+  orderId: number;
   total: number;
-  create_at: string;
-  update_at: string;
-  details?: Array<{
-    laundryDetailId: number;
-    productId: number;
-    cantidad: number;
-    precio_unitario: number;
-    subtotal: number;
-    create_at: string;
-    update_at: string;
-  }>;
+  paymentMethod: string;
+  paymentDate: string;
+  userId: number;
+  clientId: number;
+  companyId: number;
 }
 
 interface CartItem {
@@ -68,19 +63,19 @@ const Laundry: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [allLaundry, setAllLaundry] = useState<LaundryData[]>([]);
+  const [allIncome, setAllIncome] = useState<Income[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
 
   // 🔄 GET all_laundry
   const fetchAllLaundry = async () => {
     try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_laundry');
+      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_income');
       if (!response.ok) throw new Error(`Error al obtener datos del backend: ${response.status}`);
 
       const data = await response.json();
-      console.log('Fetched all_laundry:', data);
-      setAllLaundry(data.pos_laundry || []);
+      console.log('Fetched all_income:', data);
+      setAllIncome(data.income || []);
     } catch (error) {
       console.error(error);
       setToastMessage('Error al obtener ventas del backend.');
@@ -159,7 +154,7 @@ const Laundry: React.FC = () => {
   };
 
   const calculateTotal = (): number =>
-    allLaundry.reduce((sum, sale) => sum + sale.total, 0);
+    allIncome.reduce((sum, income) => sum + income.total, 0);
 
   const currentMonthYear = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
   const currentUser = 'admin'; // From UserContext if available
@@ -248,24 +243,23 @@ const Laundry: React.FC = () => {
                   <IonCardSubtitle>Actividad Reciente</IonCardSubtitle>
                 </IonCardHeader>
                 <IonCardContent>
-                  {allLaundry.length === 0 ? (
+                  {allIncome.length === 0 ? (
                     <div className="timeline-item secondary-text">
                       ❌ Sin actividad — (ayer)
                     </div>
                   ) : (
                     <div className="timeline">
-                      {allLaundry.slice(0, 3).map((sale, i) => {
-                        const now = new Date(sale.create_at);
+                      {allIncome.slice(0, 3).map((income, i) => {
+                        const now = new Date(income.paymentDate);
                         const time = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        const status = 'Venta';
-                        const icon = '✅';
+                        const status = 'Ingreso';
+                        const icon = '💰';
                         const color = 'success';
-                        const productCount = sale.details ? sale.details.length : 1;
                         return (
                           <div key={i} className={`timeline-item ${color}`}>
                             <span className="timeline-icon">{icon}</span>
                             <div className="timeline-content">
-                              <span>{status} — ${sale.total.toFixed(2)} ({productCount} productos, {time})</span>
+                              <span>{status} — ${income.total.toFixed(2)} ({income.paymentMethod}, {time})</span>
                             </div>
                             <span className="timeline-dot" style={{backgroundColor: '#007BFF'}}></span>
                           </div>
