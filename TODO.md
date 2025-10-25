@@ -16,6 +16,7 @@
 - [x] Followup steps:
   - [x] Test the API call to ensure it fetches products correctly.
   - [x] Verify that the product list renders with proper error handling and price formatting.
+  - [x] Center the header in App.tsx.
 
 ## New Task: Add Recent Activity Page with Movements
 
