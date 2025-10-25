@@ -126,12 +126,16 @@ const App: React.FC = () => {
   return (
     <IonApp>
       <IonReactRouter>
-        <Header 
-          presentAlertPopover={presentAlertPopover} 
-          presentMailPopover={presentMailPopover} 
-          handleLogout={handleLogout}
-          screenTitle={getTitleFromPath(location.pathname)}
-        />
+        <IonRow className="ion-justify-content-center">
+          <IonCol size="12" sizeSm="8" sizeMd="6" sizeLg="4">
+            <Header
+              presentAlertPopover={presentAlertPopover}
+              presentMailPopover={presentMailPopover}
+              handleLogout={handleLogout}
+              screenTitle={getTitleFromPath(location.pathname)}
+            />
+          </IonCol>
+        </IonRow>
           
           <IonTabs>
             <IonRouterOutlet>
