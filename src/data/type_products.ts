@@ -22,6 +22,10 @@ export interface Choice {
     options?: Option[]; // Reuse the Option interface you already have
   }
   
+  export interface ApiResponse {
+    products: Product[];
+  }
+
   // types.ts or inside CartContext if it's defined there
   export interface CartItem {
     id: string;

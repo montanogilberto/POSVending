@@ -19,6 +19,13 @@ import {
   IonFabButton,
   IonInput,
   IonToast,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonCard,
+  IonCardHeader,
+  IonCardSubtitle,
+  IonCardContent,
 } from '@ionic/react';
 import { useCart } from '../context/CartContext';
 import { useState, useEffect } from 'react';
@@ -155,73 +162,86 @@ const CartPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent className="ion-padding">
-        {cart.length === 0 ? (
-          <IonText>El carrito está vacío.</IonText>
-        ) : (
-          <>
-            <IonList>
-              {cart.map((item) => (
-                <CartItem
-                  key={item.id}
-                  id={item.id}
-                  name={item.name}
-                  quantity={item.quantity}
-                  price={item.price}
-                  selectedOptionLabels={item.selectedOptionLabels}
-                  onRemove={removeFromCart}
-                />
-              ))}
-            </IonList>
-            <IonFab slot="fixed" horizontal="center" >
-              <IonFabButton onClick={handleAddMoreProducts} aria-label="agregar mas productos">
-                <IonIcon icon={addCircle} />
-              </IonFabButton>
-            </IonFab>
+      <IonContent>
+        <IonGrid className="ion-padding">
+          <IonRow className="ion-justify-content-center">
+            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
+              <IonCard className="dashboard-card">
+                <IonCardHeader>
+                  <IonCardSubtitle>Carrito de Compras</IonCardSubtitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  {cart.length === 0 ? (
+                    <IonText>El carrito está vacío.</IonText>
+                  ) : (
+                    <>
+                      <IonList>
+                        {cart.map((item) => (
+                          <CartItem
+                            key={item.id}
+                            id={item.id}
+                            name={item.name}
+                            quantity={item.quantity}
+                            price={item.price}
+                            selectedOptionLabels={item.selectedOptionLabels}
+                            onRemove={removeFromCart}
+                          />
+                        ))}
+                      </IonList>
 
-            <IonItem lines="none">
-              <IonLabel>
-                <h2>Total: ${total.toFixed(2)}</h2>
-              </IonLabel>
-            </IonItem>
+                      <IonItem lines="none">
+                        <IonLabel>
+                          <h2>Total: ${total.toFixed(2)}</h2>
+                        </IonLabel>
+                      </IonItem>
 
-            <IonItem>
-              <IonLabel position="stacked">Método de pago</IonLabel>
-              <IonSelect
-                value={paymentMethod}
-                onIonChange={(e) => {
-                  setPaymentMethod(e.detail.value);
-                  setCashPaid('');
-                }}
-                interface="popover"
-              >
-                <IonSelectOption value="efectivo">Efectivo</IonSelectOption>
-                <IonSelectOption value="tarjeta">Tarjeta</IonSelectOption>
-              </IonSelect>
-            </IonItem>
+                      <IonItem>
+                        <IonLabel position="stacked">Método de pago</IonLabel>
+                        <IonSelect
+                          value={paymentMethod}
+                          onIonChange={(e) => {
+                            setPaymentMethod(e.detail.value);
+                            setCashPaid('');
+                          }}
+                          interface="popover"
+                        >
+                          <IonSelectOption value="efectivo">Efectivo</IonSelectOption>
+                          <IonSelectOption value="tarjeta">Tarjeta</IonSelectOption>
+                        </IonSelect>
+                      </IonItem>
 
-            {paymentMethod === 'efectivo' && (
-              <IonItem>
-                <IonLabel position="stacked">Efectivo recibido</IonLabel>
-                <IonInput
-                  type="number"
-                  value={cashPaid}
-                  onIonChange={e => setCashPaid(e.detail.value!)}
-                  placeholder="Ingrese el efectivo recibido"
-                  min={total}
-                />
-              </IonItem>
-            )}
+                      {paymentMethod === 'efectivo' && (
+                        <IonItem>
+                          <IonLabel position="stacked">Efectivo recibido</IonLabel>
+                          <IonInput
+                            type="number"
+                            value={cashPaid}
+                            onIonChange={e => setCashPaid(e.detail.value!)}
+                            placeholder="Ingrese el efectivo recibido"
+                            min={total}
+                          />
+                        </IonItem>
+                      )}
 
-            <IonButton expand="block" color="primary" onClick={handleCheckout}>
-              Proceder al pago
-            </IonButton>
+                      <IonButton expand="block" color="primary" onClick={handleCheckout}>
+                        Proceder al pago
+                      </IonButton>
 
-            <IonButton expand="block" color="medium" onClick={clearCart}>
-              Vaciar carrito
-            </IonButton>
-          </>
-        )}
+                      <IonButton expand="block" color="medium" onClick={clearCart}>
+                        Vaciar carrito
+                      </IonButton>
+                    </>
+                  )}
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+        </IonGrid>
+        <IonFab slot="fixed" horizontal="center" >
+          <IonFabButton onClick={handleAddMoreProducts} aria-label="agregar mas productos">
+            <IonIcon icon={addCircle} />
+          </IonFabButton>
+        </IonFab>
 
 
 
@@ -255,6 +275,7 @@ const CartPage: React.FC = () => {
           clearCart();
           setShowSuccessToast(false);
           history.push('/tabs/home');
+          window.location.reload();
         }}
         message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
           paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total

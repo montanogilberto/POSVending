@@ -75,7 +75,11 @@ const Laundry: React.FC = () => {
 
       const data = await response.json();
       console.log('Fetched all_income:', data);
-      setAllIncome(data.income || []);
+      // Sort by paymentDate descending (newest first)
+      const sortedIncome = (data.income || []).sort((a: Income, b: Income) =>
+        new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+      );
+      setAllIncome(sortedIncome);
     } catch (error) {
       console.error(error);
       setToastMessage('Error al obtener ventas del backend.');
@@ -239,7 +243,6 @@ const Laundry: React.FC = () => {
             <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
               <IonCard className="dashboard-card">
                 <IonCardHeader>
-                  
                   <IonCardSubtitle>Actividad Reciente</IonCardSubtitle>
                 </IonCardHeader>
                 <IonCardContent>
@@ -249,9 +252,10 @@ const Laundry: React.FC = () => {
                     </div>
                   ) : (
                     <div className="timeline">
-                      {allIncome.slice(0, 3).map((income, i) => {
+                      {allIncome.slice(0, 10).map((income, i) => {
                         const now = new Date(income.paymentDate);
                         const time = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        const date = now.toLocaleDateString('es-ES');
                         const status = 'Ingreso';
                         const icon = '💰';
                         const color = 'success';
@@ -259,12 +263,19 @@ const Laundry: React.FC = () => {
                           <div key={i} className={`timeline-item ${color}`}>
                             <span className="timeline-icon">{icon}</span>
                             <div className="timeline-content">
-                              <span>{status} — ${income.total.toFixed(2)} ({income.paymentMethod}, {time})</span>
+                              <span>{status} — ${income.total.toFixed(2)} ({income.paymentMethod}, {date} {time})</span>
                             </div>
                             <span className="timeline-dot" style={{backgroundColor: '#007BFF'}}></span>
                           </div>
                         );
                       })}
+                      {allIncome.length > 10 && (
+                        <div className="timeline-item show-more">
+                          <IonButton fill="clear" size="small" onClick={() => history.push('/movements')}>
+                            Ver más movimientos
+                          </IonButton>
+                        </div>
+                      )}
                     </div>
                   )}
                 </IonCardContent>

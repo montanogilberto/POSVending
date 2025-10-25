@@ -1,4 +1,4 @@
-import { IonPage, IonContent, IonHeader, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonButtons, IonButton, IonIcon, IonBadge } from '@ionic/react';
+import { IonPage, IonContent, IonHeader, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonButtons, IonButton, IonIcon, IonBadge } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { fetchCategories, Categories } from '../../data/categories';
@@ -63,18 +63,31 @@ const CategoryPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
-        <IonGrid>
-          <IonRow>
-            {categories.map((category, index) => (
-              <IonCol size="6" key={category.categoryId || index}>
-                <IonCard onClick={() => history.push(`/product/${category.categoryId}`)}>
-                  <img src={category.image} alt={category.name} className="category-image" />
-                  <IonCardContent className="ion-text-center">
-                    <h2>{category.name}</h2>
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
-            ))}
+        <IonGrid className="ion-padding">
+          <IonRow className="ion-justify-content-center">
+            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
+              <IonCard className="dashboard-card">
+                <IonCardHeader>
+                  <IonCardSubtitle>Categorías Disponibles</IonCardSubtitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <IonGrid>
+                    <IonRow>
+                      {categories.map((category, index) => (
+                        <IonCol size="6" key={category.categoryId || index}>
+                          <IonCard onClick={() => history.push(`/product/${category.categoryId}`)}>
+                            <img src={category.image} alt={category.name} className="category-image" />
+                            <IonCardContent className="ion-text-center">
+                              <h2>{category.name}</h2>
+                            </IonCardContent>
+                          </IonCard>
+                        </IonCol>
+                      ))}
+                    </IonRow>
+                  </IonGrid>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
           </IonRow>
         </IonGrid>
       </IonContent>

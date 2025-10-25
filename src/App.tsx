@@ -25,6 +25,7 @@ import ProductSelection from './pages/ProductSelection';
 import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/CartPage';
+import MovementsPage from './pages/MovementsPage';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -164,6 +165,7 @@ const App: React.FC = () => {
               <Route exact path="/product/:categoryId" component={ProductListPage} />
               <Route exact path="/products/:productId" component={ProductDetailPage} />
               <Route exact path="/cart" component={CartPage} />
+              <Route exact path="/movements" component={MovementsPage} />
               <Route exact path="/">
                 <Redirect to="/Laundry" />
               </Route>

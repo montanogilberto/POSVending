@@ -19,7 +19,11 @@ import {
   IonButton,
   IonBackButton,
   IonButtons,
-  IonAlert
+  IonAlert,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonCardSubtitle,
 } from '@ionic/react';
 
 import { useParams, useHistory, useLocation } from 'react-router-dom';
@@ -178,81 +182,93 @@ const ProductDetailPage: React.FC = () => {
       </IonHeader>
 
       <IonContent>
-        <IonCard>
+        <IonGrid className="ion-padding">
+          <IonRow className="ion-justify-content-center">
+            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
+              <IonCard className="dashboard-card">
+                <IonCardHeader>
+                  <IonCardTitle>{product.name}</IonCardTitle>
+                  <IonCardSubtitle>
+                    {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
+                  </IonCardSubtitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <p>{product.description}</p>
 
-          <IonCardContent>
-
-            {product.options?.map((option) => (
-              <IonList key={option.id}>
-                <IonItem>
-                  <IonLabel>{option.name}</IonLabel>
-                </IonItem>
-
-                {option.type === 'checkbox' && (
-                  <>
-                    <IonItem>
-                      <IonLabel>Seleccionar todos</IonLabel>
-                      <IonCheckbox
-                        slot="start"
-                        checked={
-                          selectedOptions[option.id]?.length === option.choices.length
-                        }
-                        onIonChange={() =>
-                          handleSelectAll(option.id, option.choices.map((c) => c.id))
-                        }
-                      />
-                    </IonItem>
-                    {option.choices.map((choice) => (
-                      <IonItem key={choice.id}>
-                        <IonLabel>{choice.name} (+${choice.price})</IonLabel>
-                        <IonCheckbox
-                          slot="start"
-                          checked={selectedOptions[option.id]?.includes(choice.id)}
-                          onIonChange={() => handleCheckboxChange(option.id, choice.id)}
-                        />
+                  {product.options?.map((option) => (
+                    <IonList key={option.id}>
+                      <IonItem>
+                        <IonLabel>{option.name}</IonLabel>
                       </IonItem>
-                    ))}
-                  </>
-                )}
 
-                {option.type === 'radio' && (
-                  <IonRadioGroup
-                    value={selectedOptions[option.id] || ''}
-                    onIonChange={(e) =>
-                      handleRadioChange(option.id, e.detail.value)
-                    }
-                  >
-                    {option.choices.map((choice) => (
-                      <IonItem key={choice.id}>
-                        <IonLabel>{choice.name} (+${choice.price})</IonLabel>
-                        <IonRadio slot="start" value={choice.id} />
-                      </IonItem>
-                    ))}
-                  </IonRadioGroup>
-                )}
-              </IonList>
-            ))}
+                      {option.type === 'checkbox' && (
+                        <>
+                          <IonItem>
+                            <IonLabel>Seleccionar todos</IonLabel>
+                            <IonCheckbox
+                              slot="start"
+                              checked={
+                                selectedOptions[option.id]?.length === option.choices.length
+                              }
+                              onIonChange={() =>
+                                handleSelectAll(option.id, option.choices.map((c) => c.id))
+                              }
+                            />
+                          </IonItem>
+                          {option.choices.map((choice) => (
+                            <IonItem key={choice.id}>
+                              <IonLabel>{choice.name} (+${choice.price})</IonLabel>
+                              <IonCheckbox
+                                slot="start"
+                                checked={selectedOptions[option.id]?.includes(choice.id)}
+                                onIonChange={() => handleCheckboxChange(option.id, choice.id)}
+                              />
+                            </IonItem>
+                          ))}
+                        </>
+                      )}
 
-            <IonItem>
-              <IonLabel position="stacked">Cantidad</IonLabel>
-              <IonSelect
-                value={quantity}
-                onIonChange={(e) => setQuantity(Number(e.detail.value))}
-                interface="popover"
-              >
-                {[...Array(10)].map((_, i) => (
-                  <IonSelectOption key={i + 1} value={i + 1}>
-                    {i + 1}
-                  </IonSelectOption>
-                ))}
-              </IonSelect>
-            </IonItem>
+                      {option.type === 'radio' && (
+                        <IonRadioGroup
+                          value={selectedOptions[option.id] || ''}
+                          onIonChange={(e) =>
+                            handleRadioChange(option.id, e.detail.value)
+                          }
+                        >
+                          {option.choices.map((choice) => (
+                            <IonItem key={choice.id}>
+                              <IonLabel>{choice.name} (+${choice.price})</IonLabel>
+                              <IonRadio slot="start" value={choice.id} />
+                            </IonItem>
+                          ))}
+                        </IonRadioGroup>
+                      )}
+                    </IonList>
+                  ))}
 
-            <IonButton expand="block" onClick={handleAddToCart}>
-              Agregar al carrito
-            </IonButton>
-          </IonCardContent>
-        </IonCard>
+                  <IonItem>
+                    <IonLabel position="stacked">Cantidad</IonLabel>
+                    <IonSelect
+                      value={quantity}
+                      onIonChange={(e) => setQuantity(Number(e.detail.value))}
+                      interface="popover"
+                    >
+                      {[...Array(10)].map((_, i) => (
+                        <IonSelectOption key={i + 1} value={i + 1}>
+                          {i + 1}
+                        </IonSelectOption>
+                      ))}
+                    </IonSelect>
+                  </IonItem>
+
+                  <IonButton expand="block" onClick={handleAddToCart}>
+                    Agregar al carrito
+                  </IonButton>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+        </IonGrid>
 
         <IonAlert
           isOpen={showAlert}
