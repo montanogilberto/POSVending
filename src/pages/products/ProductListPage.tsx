@@ -96,33 +96,50 @@ const ProductListPage: React.FC = () => {
                 <IonCardHeader>
                   <IonCardSubtitle>Productos Disponibles</IonCardSubtitle>
                 </IonCardHeader>
-                <IonCardContent>
-                  {error && <p className="ion-padding">{error}</p>}
+                <IonCardContent style={{ padding: '16px 24px' }}>
+                  {error && <p style={{ padding: '16px 0' }}>{error}</p>}
 
                   {filteredProducts.length > 0 ? (
-                    <IonList>
-                      {filteredProducts.map((product) => (
-                        <IonItem key={product.id}>
-                          <IonLabel>
-                            <h2>{product.name}</h2>
-                            <p>{product.description}</p>
-                            <p>
+                    <div>
+                      {filteredProducts.map((product, index) => (
+                        <div
+                          key={product.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '16px 0',
+                            borderBottom: index < filteredProducts.length - 1 ? '1px solid #e5e7eb' : 'none',
+                          }}
+                        >
+                          <div style={{ flex: 1 }}>
+                            <h3 style={{ margin: 0, color: '#111827', fontSize: '18px', fontWeight: 'bold' }}>
+                              {product.name}
+                            </h3>
+                            <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                              {product.description}
+                            </p>
+                          </div>
+                          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                            <p style={{ margin: 0, color: '#2563eb', fontSize: '16px', fontWeight: 'bold' }}>
                               {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
                             </p>
-                          </IonLabel>
-                          <IonButton
-                            fill="clear"
-                            onClick={() => {
-                              history.push(`/products/${product.id}`, { product });
-                            }}
-                          >
-                            Ver detalles
-                          </IonButton>
-                        </IonItem>
+                            <IonButton
+                              fill="clear"
+                              color="primary"
+                              style={{ textTransform: 'uppercase', fontWeight: 'bold' }}
+                              onClick={() => {
+                                history.push(`/products/${product.id}`, { product });
+                              }}
+                            >
+                              Ver detalles
+                            </IonButton>
+                          </div>
+                        </div>
                       ))}
-                    </IonList>
+                    </div>
                   ) : (
-                    <p className="ion-padding">No hay productos en esta categoría.</p>
+                    <p style={{ padding: '16px 0' }}>No hay productos en esta categoría.</p>
                   )}
                 </IonCardContent>
               </IonCard>

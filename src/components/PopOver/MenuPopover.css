@@ -1,0 +1,22 @@
+.custom-tab-bar {
+    text-align: center;
+  }
+  
+  .icon-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0;
+    color: #000; /* Change to desired color */
+  }
+  
+  .icon-button ion-icon {
+    font-size: 30px; /* Adjust the size as needed */
+    margin-bottom: 10px; /* Space between icon and text */
+  }
+  
+  .icon-button ion-label {
+    font-size: 16px; /* Adjust the font size as needed */
+  }
+  
