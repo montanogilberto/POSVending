@@ -14,7 +14,7 @@ import {
 } from '@ionic/react';
 import Header from './components/Header';
 import { IonReactRouter } from '@ionic/react-router';
-import { cash, settings, barChart, shirt, qrCode } from 'ionicons/icons';
+import { cash, settings, barChart, shirt, qrCode, bulb } from 'ionicons/icons';
 import POS from './pages/POS';
 import Setting from './pages/Setting';
 import Sells from './pages/Sells';
@@ -26,6 +26,7 @@ import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/CartPage';
 import MovementsPage from './pages/MovementsPage';
+import LedStatusPage from './pages/LedStatusPage';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -170,6 +171,7 @@ const App: React.FC = () => {
               <Route exact path="/products/:productId" component={ProductDetailPage} />
               <Route exact path="/cart" component={CartPage} />
               <Route exact path="/movements" component={MovementsPage} />
+              <Route exact path="/led-status" component={LedStatusPage} />
               <Route exact path="/">
                 <Redirect to="/Laundry" />
               </Route>
@@ -194,6 +196,10 @@ const App: React.FC = () => {
               <IonTabButton tab="POS" href="/POS">
                 <IonIcon aria-hidden="true" icon={cash} />
                 <IonLabel>Vending POS</IonLabel>
+              </IonTabButton>
+              <IonTabButton tab="LedStatus" href="/led-status">
+                <IonIcon aria-hidden="true" icon={bulb} />
+                <IonLabel>LED Status</IonLabel>
               </IonTabButton>
             </IonTabBar>
           </IonTabs>
