@@ -10,11 +10,21 @@ import {
   IonTabBar,
   IonTabButton,
   IonTabs,
+  IonMenu,
+  IonList,
+  IonItem,
+  IonItemDivider,
+  IonMenuToggle,
+  IonHeader,
+  IonContent,
+  IonToolbar,
+  IonTitle,
+  IonAvatar,
   setupIonicReact
 } from '@ionic/react';
 import Header from './components/Header';
 import { IonReactRouter } from '@ionic/react-router';
-import { cash, settings, barChart, shirt, qrCode, bulb } from 'ionicons/icons';
+import { cash, settings, barChart, shirt, qrCode, bulb, ellipsisHorizontal, menu, logOutOutline, people, cube, notifications, mail, grid, person } from 'ionicons/icons';
 import POS from './pages/POS';
 import Setting from './pages/Setting';
 import Sells from './pages/Sells';
@@ -27,6 +37,12 @@ import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/CartPage';
 import MovementsPage from './pages/MovementsPage';
 import LedStatusPage from './pages/LedStatusPage';
+import ClientsPage from './pages/ClientsPage';
+import ProductsManagementPage from './pages/ProductsManagementPage';
+import AlertsPage from './pages/AlertsPage';
+import EmailsPage from './pages/EmailsPage';
+import CategoriesPage from './pages/CategoriesPage';
+import UsersPage from './pages/UsersPage';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -65,79 +81,79 @@ setupIonicReact();
 const App: React.FC = () => {
   const location = useLocation();
 
-  const getTitleFromPath = (pathname: string): string => {
-    switch (pathname) {
-      case '/POS':
-        return 'Lavandería';
-      case '/Laundry':
-        return '';
-      case '/ScannerQR':
-        return 'Lector QR';
-      case '/Setting':
-        return 'Configuración';
-      case '/Sells':
-        return 'Ventas';
-      default:
-        return 'Dashboard';
-    }
-  };
-
-  const [authenticated, setAuthenticated] = useState(false);
-  const [showLogoutAlert, setShowLogoutAlert] = useState(false);
-  const history = useHistory();
-  const [showMenuModal, setShowMenuModal] = useState(false);
-
-
-  const handleLoginSuccess = () => {
-    setAuthenticated(true);
-  };
-
-  const handleMenuClick = () => {
-    setShowMenuModal(true);
-  };
-
-  const handleLogout = () => {
-    setShowLogoutAlert(true);
-  };
-
-  const handleLogoutConfirm = () => {
-    setAuthenticated(false);
-    history.push('/Login');
-    setShowLogoutAlert(false);
-  };
-
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
-
-  const presentAlertPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  };
-
-  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-
-  const presentMailPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  };
-
-  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
-
-
   return (
     <IonApp>
       <IonReactRouter>
-        <IonRow className="ion-justify-content-center">
-          <IonCol size="12" sizeSm="8" sizeMd="6" sizeLg="4">
-            <Header
-              presentAlertPopover={presentAlertPopover}
-              presentMailPopover={presentMailPopover}
-              handleLogout={handleLogout}
-              screenTitle={getTitleFromPath(location.pathname)}
-            />
-          </IonCol>
-        </IonRow>
-          
+        <IonMenu menuId="main-menu" contentId="main-content">
+          <IonHeader className="menu-header">
+            <IonToolbar>
+              <IonTitle>POS GMO</IonTitle>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent>
+            <div className="profile-section">
+              <IonAvatar className="profile-avatar">
+                <img src="https://via.placeholder.com/80" alt="Profile" />
+              </IonAvatar>
+              <div className="profile-info">
+                <h3>admin</h3>
+                <p>Administrator</p>
+              </div>
+            </div>
+            <IonList>
+              <IonItemDivider>Catalog</IonItemDivider>
+              <IonItem button routerLink="/clients">
+                <IonIcon icon={people} slot="start" />
+                <IonLabel>Clientes</IonLabel>
+              </IonItem>
+              <IonItem button routerLink="/products-management">
+                <IonIcon icon={cube} slot="start" />
+                <IonLabel>Productos</IonLabel>
+              </IonItem>
+              <IonItem button routerLink="/categories">
+                <IonIcon icon={grid} slot="start" />
+                <IonLabel>Categorías</IonLabel>
+              </IonItem>
+
+              <IonItemDivider>Messages</IonItemDivider>
+              <IonItem button routerLink="/alerts">
+                <IonIcon icon={notifications} slot="start" />
+                <IonLabel>Alertas</IonLabel>
+              </IonItem>
+              <IonItem button routerLink="/emails">
+                <IonIcon icon={mail} slot="start" />
+                <IonLabel>Correos</IonLabel>
+              </IonItem>
+
+              <IonItemDivider>Administration</IonItemDivider>
+              <IonItem button routerLink="/users">
+                <IonIcon icon={person} slot="start" />
+                <IonLabel>Usuarios</IonLabel>
+              </IonItem>
+
+              <IonItemDivider>IOT</IonItemDivider>
+              <IonItem button routerLink="/led-status">
+                <IonIcon icon={bulb} slot="start" />
+                <IonLabel>LED Status</IonLabel>
+              </IonItem>
+
+              <IonItemDivider>System</IonItemDivider>
+              <IonItem button routerLink="/Setting">
+                <IonIcon icon={settings} slot="start" />
+                <IonLabel>Setting</IonLabel>
+              </IonItem>
+              <IonItem button routerLink="/Sells">
+                <IonIcon icon={barChart} slot="start" />
+                <IonLabel>Sells</IonLabel>
+              </IonItem>
+              <IonItem button onClick={() => {}}>
+                <IonIcon icon={logOutOutline} slot="start" />
+                <IonLabel>Sign Out</IonLabel>
+              </IonItem>
+            </IonList>
+          </IonContent>
+        </IonMenu>
+        <IonPage id="main-content">
           <IonTabs>
             <IonRouterOutlet>
               <Route exact path="/POS">
@@ -172,6 +188,12 @@ const App: React.FC = () => {
               <Route exact path="/cart" component={CartPage} />
               <Route exact path="/movements" component={MovementsPage} />
               <Route exact path="/led-status" component={LedStatusPage} />
+              <Route exact path="/clients" component={ClientsPage} />
+              <Route exact path="/products-management" component={ProductsManagementPage} />
+              <Route exact path="/categories" component={CategoriesPage} />
+              <Route exact path="/alerts" component={AlertsPage} />
+              <Route exact path="/emails" component={EmailsPage} />
+              <Route exact path="/users" component={UsersPage} />
               <Route exact path="/">
                 <Redirect to="/Laundry" />
               </Route>
@@ -185,25 +207,19 @@ const App: React.FC = () => {
                 <IonIcon aria-hidden="true" icon={qrCode} />
                 <IonLabel>Lector QR</IonLabel>
               </IonTabButton>
-              <IonTabButton tab="Setting" href="/Setting">
-                <IonIcon aria-hidden="true" icon={settings} />
-                <IonLabel>Setting</IonLabel>
-              </IonTabButton>
-              <IonTabButton tab="Sells" href="/Sells">
-                <IonIcon aria-hidden="true" icon={barChart} />
-                <IonLabel>Sells</IonLabel>
-              </IonTabButton>
               <IonTabButton tab="POS" href="/POS">
                 <IonIcon aria-hidden="true" icon={cash} />
                 <IonLabel>Vending POS</IonLabel>
               </IonTabButton>
-              <IonTabButton tab="LedStatus" href="/led-status">
-                <IonIcon aria-hidden="true" icon={bulb} />
-                <IonLabel>LED Status</IonLabel>
+              <IonTabButton tab="Menu" href="#" onClick={(e) => e.preventDefault()}>
+                <IonMenuToggle menu="main-menu">
+                  <IonIcon aria-hidden="true" icon={menu} />
+                  <IonLabel>Menu</IonLabel>
+                </IonMenuToggle>
               </IonTabButton>
             </IonTabBar>
           </IonTabs>
-        
+        </IonPage>
       </IonReactRouter>
     </IonApp>
   );

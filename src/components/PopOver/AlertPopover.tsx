@@ -9,6 +9,7 @@ import {
   IonIcon,
 } from '@ionic/react';
 import { closeOutline } from 'ionicons/icons';
+import { useUser } from '../UserContext';
 
 interface AlertPopoverProps {
   isOpen: boolean;
@@ -17,17 +18,19 @@ interface AlertPopoverProps {
 }
 
 const AlertPopover: React.FC<AlertPopoverProps> = ({ isOpen, event, onDidDismiss }) => {
+  const { username } = useUser();
+
   return (
     <IonPopover isOpen={isOpen} event={event} onDidDismiss={onDidDismiss}>
       <IonList>
         <IonItemDivider>
-          Alert Details
+          Alertas
           <IonButton fill="clear" slot="end" onClick={onDidDismiss}>
             <IonIcon icon={closeOutline} />
           </IonButton>
         </IonItemDivider>
         <IonItem>
-          <IonLabel>Name: Your Name</IonLabel>
+          <IonLabel>Name: {username || 'Usuario no identificado'}</IonLabel>
         </IonItem>
       </IonList>
     </IonPopover>

@@ -1,8 +1,5 @@
 import {
   IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
   IonCard,
   IonCardHeader,
@@ -17,8 +14,6 @@ import {
   IonSelect,
   IonSelectOption,
   IonButton,
-  IonBackButton,
-  IonButtons,
   IonAlert,
   IonGrid,
   IonRow,
@@ -30,6 +25,10 @@ import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
 import { Product, CartItem } from '../../data/type_products';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import { fetchCategories } from '../../data/categories';
 
 interface RouteParams {
   productId: string;
@@ -46,6 +45,22 @@ const ProductDetailPage: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [missingMessage, setMissingMessage] = useState('');
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
+    showAlertPopover: false,
+    showMailPopover: false,
+  });
+
+  const presentAlertPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
+
+  const presentMailPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
   useEffect(() => {
     // Check if product is passed in location state
@@ -56,7 +71,24 @@ const ProductDetailPage: React.FC = () => {
     } else {
       // Fallback: fetch all products (though this should not happen if navigation is correct)
       console.warn("Product not found in state, this should not happen");
-      setProduct(undefined);
+      // Try to fetch products from the category to find the product
+      const fetchProduct = async () => {
+        try {
+          const categories = await fetchCategories();
+          const category = categories.find(cat => cat.categoryId === parseInt(productId));
+          if (category) {
+            // If we have a category, we could fetch products for that category
+            // For now, just set product to undefined
+            setProduct(undefined);
+          } else {
+            setProduct(undefined);
+          }
+        } catch (error) {
+          console.error("Error fetching categories:", error);
+          setProduct(undefined);
+        }
+      };
+      fetchProduct();
     }
   }, [productId, location.state]);
 
@@ -172,14 +204,14 @@ const ProductDetailPage: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">
-            <IonBackButton defaultHref="/" />
-          </IonButtons>
-          <IonTitle>{product.name}</IonTitle>
-        </IonToolbar>
-      </IonHeader>
+      <Header
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle={product.name}
+        showBackButton={true}
+        backButtonText="Productos"
+        backButtonHref="/Products"
+      />
 
       <IonContent>
         <IonGrid className="ion-padding">
@@ -279,6 +311,17 @@ const ProductDetailPage: React.FC = () => {
           translucent={true}
         />
       </IonContent>
+
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
     </IonPage>
   );
 };

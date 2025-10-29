@@ -1,10 +1,13 @@
-import { IonPage, IonContent, IonHeader, IonTitle, IonToolbar, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonButtons, IonButton, IonIcon, IonBadge } from '@ionic/react';
+import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonButtons, IonButton, IonIcon, IonBadge } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { fetchCategories, Categories } from '../../data/categories';
 import { cartOutline } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
 import { IonLoading } from '@ionic/react';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
 
 const CategoryPage: React.FC = () => {
   const history = useHistory();
@@ -12,6 +15,22 @@ const CategoryPage: React.FC = () => {
   const [categories, setCategories] = useState<Categories[]>([]);
   const [loading, setLoading] = useState(true);
   const hasFetched = useRef(false);
+  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
+    showAlertPopover: false,
+    showMailPopover: false,
+  });
+
+  const presentAlertPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
+
+  const presentMailPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
   // Calculate total quantity of products in cart
   const totalQuantity = cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -47,21 +66,14 @@ const CategoryPage: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Menu</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={() => history.push('/cart')} aria-label="Go to Cart" style={{ position: 'relative' }}>
-              <IonIcon icon={cartOutline} size="large"/>
-              {totalQuantity > 0 && (
-                <IonBadge color="danger" >
-                  {totalQuantity}
-                </IonBadge>
-              )}
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
+      <Header
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle="Categorías"
+        showBackButton={true}
+        backButtonText="Dashboard"
+        backButtonHref="/Laundry"
+      />
       <IonContent fullscreen>
         <IonGrid className="ion-padding">
           <IonRow className="ion-justify-content-center">
@@ -90,7 +102,28 @@ const CategoryPage: React.FC = () => {
             </IonCol>
           </IonRow>
         </IonGrid>
+        <IonButtons slot="end" style={{ position: 'absolute', top: '10px', right: '10px' }}>
+          <IonButton onClick={() => history.push('/cart')} aria-label="Go to Cart" style={{ position: 'relative' }}>
+            <IonIcon icon={cartOutline} size="large"/>
+            {totalQuantity > 0 && (
+              <IonBadge color="danger" >
+                {totalQuantity}
+              </IonBadge>
+            )}
+          </IonButton>
+        </IonButtons>
       </IonContent>
+
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
     </IonPage>
   );
 };

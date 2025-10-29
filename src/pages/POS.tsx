@@ -17,7 +17,7 @@ import {
   IonCol,
   IonIcon,
 } from '@ionic/react';
-import { waterOutline, receiptOutline, documentsOutline } from 'ionicons/icons';
+import { waterOutline, receiptOutline, documentsOutline, helpCircleOutline, notificationsOutline, mailOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import './POS.css';
 
@@ -142,6 +142,46 @@ const fetchAllVending = async () => {
 
   return (
     <IonPage>
+      {/* Professional Header */}
+      <div className="professional-header">
+        <div className="header-content">
+          <div className="header-brand">
+            <div className="brand-logo">P</div>
+            <h1 className="brand-text">POS GMO</h1>
+          </div>
+          <div className="header-actions">
+            <IonButton className="action-button" fill="clear">
+              <IonIcon icon={helpCircleOutline} />
+            </IonButton>
+            <IonButton className="action-button" fill="clear">
+              <IonIcon icon={notificationsOutline} />
+              <div className="notification-badge"></div>
+            </IonButton>
+            <IonButton className="action-button" fill="clear">
+              <IonIcon icon={mailOutline} />
+            </IonButton>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Preview Card */}
+      <div className="stats-preview">
+        <div className="stats-card">
+          <div className="stats-main">
+            <div className="stats-icon">
+              <IonIcon icon={waterOutline} />
+            </div>
+            <div className="stats-info">
+              <h3>Total de Ingresos</h3>
+              <p>Hoy • ${calculateTotal().toFixed(2)}</p>
+            </div>
+          </div>
+          <div className="stats-amount">
+            ${calculateTotal().toFixed(2)}
+          </div>
+        </div>
+      </div>
+
       <IonContent fullscreen>
         <IonGrid className="ion-padding">
 

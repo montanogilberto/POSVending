@@ -237,7 +237,7 @@ const CartPage: React.FC = () => {
             </IonCol>
           </IonRow>
         </IonGrid>
-        <IonFab slot="fixed" horizontal="center" >
+        <IonFab slot="fixed" horizontal="end" >
           <IonFabButton onClick={handleAddMoreProducts} aria-label="agregar mas productos">
             <IonIcon icon={addCircle} />
           </IonFabButton>

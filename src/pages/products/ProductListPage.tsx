@@ -1,28 +1,23 @@
 import {
   IonPage,
   IonContent,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
   IonCard,
   IonCardContent,
   IonCardHeader,
   IonCardTitle,
   IonCardSubtitle,
   IonButton,
-  IonButtons,
-  IonBackButton,
   IonGrid,
   IonRow,
   IonCol,
-  IonList,
-  IonItem,
-  IonLabel,
 } from '@ionic/react';
 import { useParams, useHistory } from 'react-router-dom';
 import { getProducts } from '../../data/products';
 import { Product } from '../../data/type_products';
 import { useEffect, useState, useRef } from 'react';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
 
 interface RouteParams {
   categoryId: string;
@@ -35,6 +30,22 @@ const ProductListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const hasFetched = useRef(false);
+  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
+    showAlertPopover: false,
+    showMailPopover: false,
+  });
+
+  const presentAlertPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
+
+  const presentMailPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
   const categoryIdNumber = +categoryId;
 
@@ -62,14 +73,14 @@ const ProductListPage: React.FC = () => {
   if (loading) {
     return (
       <IonPage>
-        <IonHeader>
-          <IonToolbar>
-            <IonButtons slot="start">
-              <IonBackButton defaultHref="/" />
-            </IonButtons>
-            <IonTitle>Productos</IonTitle>
-          </IonToolbar>
-        </IonHeader>
+        <Header
+          presentAlertPopover={presentAlertPopover}
+          presentMailPopover={presentMailPopover}
+          screenTitle="Productos"
+          showBackButton={true}
+          backButtonText="Categorías"
+          backButtonHref="/Category"
+        />
         <IonContent className="ion-padding">
           <p>Cargando productos...</p>
         </IonContent>
@@ -79,14 +90,14 @@ const ProductListPage: React.FC = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">
-            <IonBackButton defaultHref="/" />
-          </IonButtons>
-          <IonTitle>Productos</IonTitle>
-        </IonToolbar>
-      </IonHeader>
+      <Header
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle="Productos"
+        showBackButton={true}
+        backButtonText="Categorías"
+        backButtonHref="/Category"
+      />
 
       <IonContent>
         <IonGrid className="ion-padding">
@@ -147,6 +158,17 @@ const ProductListPage: React.FC = () => {
           </IonRow>
         </IonGrid>
       </IonContent>
+
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
     </IonPage>
   );
 };
