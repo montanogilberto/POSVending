@@ -15,6 +15,8 @@ import {
   IonSelectOption,
   IonAlert,
   IonIcon,
+  IonFab,
+  IonFabButton,
   IonInput,
   IonToast,
   IonGrid,
@@ -30,7 +32,7 @@ import { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import CartItem from '../components/CartItem';
 import { submitOrder } from '../api/cartApi';
-import { addCircle } from 'ionicons/icons';
+import { addCircle, addCircleOutline } from 'ionicons/icons';
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
@@ -50,8 +52,10 @@ const CartPage: React.FC = () => {
     const cash = parseFloat(cashPaid);
     if (paymentMethod === 'efectivo' && !isNaN(cash) && cash > total) {
       setChangeAmount(cash - total);
+      //setToastMessage(`Cambio a devolver: $${(cash - total).toFixed(2)}`);
+      //setShowToast(true);
     } else {
-      setChangeAmount(0);
+      setShowToast(false);
     }
   }, [cashPaid, paymentMethod, total]);
 
@@ -69,6 +73,8 @@ const CartPage: React.FC = () => {
     if (paymentMethod === 'efectivo') {
       const cash = parseFloat(cashPaid);
       if (isNaN(cash) || cash < total) {
+        console.log("cash:" + cash)
+        console.log("total:" + total)
         showErrorToast('El efectivo pagado debe ser igual o mayor al total.');
         return;
       }
@@ -165,30 +171,6 @@ const CartPage: React.FC = () => {
                   <IonCardSubtitle>Carrito de Compras</IonCardSubtitle>
                 </IonCardHeader>
                 <IonCardContent>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-                    <IonButton
-                      fill="clear"
-                      size="small"
-                      onClick={handleAddMoreProducts}
-                      style={{
-                        '--color': '#3B82F6',
-                        '--color-hover': '#2563EB',
-                        padding: '8px',
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
-                        color: 'white',
-                        boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
-                        transition: 'all 0.2s ease-in-out',
-                        minWidth: '40px',
-                        height: '40px',
-                      }}
-                      className="add-product-btn"
-                      title="Agregar más productos"
-                    >
-                      <IonIcon icon={addCircle} style={{ fontSize: '20px' }} />
-                    </IonButton>
-                  </div>
-
                   {cart.length === 0 ? (
                     <IonText>El carrito está vacío.</IonText>
                   ) : (
@@ -234,13 +216,7 @@ const CartPage: React.FC = () => {
                           <IonInput
                             type="number"
                             value={cashPaid}
-                            onIonChange={e => setCashPaid(e.detail.value || '')}
-                            onBlur={() => {
-                              const cash = parseFloat(cashPaid);
-                              if (isNaN(cash) || cash <= 0) {
-                                setCashPaid('');
-                              }
-                            }}
+                            onIonChange={e => setCashPaid(e.detail.value!)}
                             placeholder="Ingrese el efectivo recibido"
                             min={total}
                           />
@@ -261,6 +237,14 @@ const CartPage: React.FC = () => {
             </IonCol>
           </IonRow>
         </IonGrid>
+        <IonFab slot="fixed" horizontal="end" >
+          <IonFabButton onClick={handleAddMoreProducts} aria-label="agregar mas productos">
+            <IonIcon icon={addCircle} />
+          </IonFabButton>
+        </IonFab>
+
+
+
       </IonContent>
 
       <IonToast
