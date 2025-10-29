@@ -10,7 +10,6 @@ import {
   IonCardHeader,
   IonCardSubtitle,
   IonCardContent,
-  IonList,
   IonGrid,
   IonRow,
   IonCol,
@@ -20,8 +19,12 @@ import {
 import { waterOutline, receiptOutline, documentsOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { helpCircleOutline, notificationsOutline, logOutOutline } from 'ionicons/icons';
+import { helpCircleOutline, notificationsOutline } from 'ionicons/icons';
 import './Laundry.css';
+import Header from '../components/Header';
+import AlertPopover from '../components/PopOver/AlertPopover';
+import LogoutAlert from '../components/Alerts/LogoutAlert';
+import MailPopover from '../components/PopOver/MailPopover';
 
 interface Transaction {
   date: string;
@@ -58,7 +61,7 @@ interface LocationState {
 }
 
 const Laundry: React.FC = () => {
-  const history = useHistory();
+  // Remove the duplicate declaration of history
   const location = useLocation();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -66,6 +69,8 @@ const Laundry: React.FC = () => {
   const [allIncome, setAllIncome] = useState<Income[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
+  const [showLogoutAlert, setShowLogoutAlert] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
   // 🔄 GET all_laundry
   const fetchAllLaundry = async () => {
@@ -164,11 +169,59 @@ const Laundry: React.FC = () => {
   const currentUser = 'admin'; // From UserContext if available
   const percentageChange = '+0%'; // Mock; calculate from previous month if backend provides
 
+  const history = useHistory();
+
+  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
+    showAlertPopover: false,
+    showMailPopover: false,
+  });
+
+  const presentAlertPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
+
+  const presentMailPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
+
+  const handleLogoutConfirm = () => {
+    setAuthenticated(false);
+    history.push('/Login');
+    setShowLogoutAlert(false);
+  };
+
+  const getTitleFromPath = (pathname: string): string => {
+    switch (pathname) {
+      case '/POS':
+        return 'Lavandería';
+      case '/Laundry':
+        return 'Lavandería';
+      case '/ScannerQR':
+        return 'Lector QR';
+      case '/Setting':
+        return 'Configuración';
+      case '/Sells':
+        return 'Ventas';
+      default:
+        return 'POS GMO';
+    }
+  };
+
+
   return (
     <IonPage>
+      <Header
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle={getTitleFromPath(location.pathname)}
+
+      />
       <IonContent fullscreen>
         <IonGrid className="ion-padding">
-          <IonRow>test</IonRow>
           {/* 💧 Total de ingresos */}
           <IonRow className="ion-justify-content-center">
             <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
@@ -282,7 +335,6 @@ const Laundry: React.FC = () => {
               </IonCard>
             </IonCol>
           </IonRow>
-
         </IonGrid>
 
         {/* Toast */}
@@ -292,6 +344,22 @@ const Laundry: React.FC = () => {
           message={toastMessage}
           duration={2000}
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
+        />
+
+        <AlertPopover
+          isOpen={popoverState.showAlertPopover}
+          event={popoverState.event}
+          onDidDismiss={dismissAlertPopover}
+        />
+        <MailPopover
+          isOpen={popoverState.showMailPopover}
+          event={popoverState.event}
+          onDidDismiss={dismissMailPopover}
+        />
+        <LogoutAlert
+          isOpen={showLogoutAlert}
+          onDidDismiss={() => setShowLogoutAlert(false)}
+          handleLogoutConfirm={handleLogoutConfirm}
         />
       </IonContent>
     </IonPage>
