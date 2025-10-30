@@ -13,12 +13,15 @@ import { UserProvider } from './components/UserContext';
 import { CartProvider } from './context/CartContext';
 
 const Main: React.FC = () => {
-  // State to manage authentication
-  const [authenticated, setAuthenticated] = React.useState(false);
+  // State to manage authentication, initialized from localStorage
+  const [authenticated, setAuthenticated] = React.useState(() => {
+    return localStorage.getItem('authenticated') === 'true';
+  });
 
   // Callback to set authentication state when login is successful
   const handleLoginSuccess = () => {
     setAuthenticated(true);
+    localStorage.setItem('authenticated', 'true');
   };
 
   return (
