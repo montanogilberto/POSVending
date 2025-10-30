@@ -76,7 +76,7 @@ const ProductListPage: React.FC = () => {
         <Header
           presentAlertPopover={presentAlertPopover}
           presentMailPopover={presentMailPopover}
-          screenTitle="Productos"
+          screenTitle=""
           showBackButton={true}
           backButtonText="Categorías"
           backButtonHref="/Category"
