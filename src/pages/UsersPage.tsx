@@ -50,7 +50,7 @@ const UsersPage: React.FC = () => {
       name: 'Admin User',
       email: 'admin@posgmo.com',
       role: 'admin',
-      avatar: 'https://via.placeholder.com/80',
+      avatar: 'logo192.png',
       status: 'active',
     },
     {
@@ -58,7 +58,7 @@ const UsersPage: React.FC = () => {
       name: 'Manager User',
       email: 'manager@posgmo.com',
       role: 'manager',
-      avatar: 'https://via.placeholder.com/80',
+      avatar: 'logo192.png',
       status: 'active',
     },
     {
@@ -66,7 +66,7 @@ const UsersPage: React.FC = () => {
       name: 'Employee User',
       email: 'employee@posgmo.com',
       role: 'employee',
-      avatar: 'https://via.placeholder.com/80',
+      avatar: 'logo192.png',
       status: 'inactive',
     },
   ]);

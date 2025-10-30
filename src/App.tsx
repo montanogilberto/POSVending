@@ -25,6 +25,7 @@ import {
 import Header from './components/Header';
 import { IonReactRouter } from '@ionic/react-router';
 import { cash, settings, barChart, shirt, qrCode, bulb, ellipsisHorizontal, menu, logOutOutline, people, cube, notifications, mail, grid, person } from 'ionicons/icons';
+import { menuController } from '@ionic/core';
 import POS from './pages/POS';
 import Setting from './pages/Setting';
 import Sells from './pages/Sells';
@@ -43,6 +44,7 @@ import AlertsPage from './pages/AlertsPage';
 import EmailsPage from './pages/EmailsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import UsersPage from './pages/UsersPage';
+import useInactivityTimer from './hooks/useInactivityTimer';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -80,6 +82,7 @@ setupIonicReact();
 
 const App: React.FC = () => {
   const location = useLocation();
+  useInactivityTimer();
 
   return (
     <IonApp>
@@ -93,7 +96,7 @@ const App: React.FC = () => {
           <IonContent>
             <div className="profile-section">
               <IonAvatar className="profile-avatar">
-                <img src="https://via.placeholder.com/80" alt="Profile" />
+                <img src="logo192.png" alt="Profile" />
               </IonAvatar>
               <div className="profile-info">
                 <h3>admin</h3>
@@ -102,47 +105,47 @@ const App: React.FC = () => {
             </div>
             <IonList>
               <IonItemDivider>Catalog</IonItemDivider>
-              <IonItem button routerLink="/clients">
+              <IonItem button routerLink="/clients" onClick={() => menuController.close()}>
                 <IonIcon icon={people} slot="start" />
                 <IonLabel>Clientes</IonLabel>
               </IonItem>
-              <IonItem button routerLink="/products-management">
+              <IonItem button routerLink="/products-management" onClick={() => menuController.close()}>
                 <IonIcon icon={cube} slot="start" />
                 <IonLabel>Productos</IonLabel>
               </IonItem>
-              <IonItem button routerLink="/categories">
+              <IonItem button routerLink="/categories" onClick={() => menuController.close()}>
                 <IonIcon icon={grid} slot="start" />
                 <IonLabel>Categorías</IonLabel>
               </IonItem>
 
               <IonItemDivider>Messages</IonItemDivider>
-              <IonItem button routerLink="/alerts">
+              <IonItem button routerLink="/alerts" onClick={() => menuController.close()}>
                 <IonIcon icon={notifications} slot="start" />
                 <IonLabel>Alertas</IonLabel>
               </IonItem>
-              <IonItem button routerLink="/emails">
+              <IonItem button routerLink="/emails" onClick={() => menuController.close()}>
                 <IonIcon icon={mail} slot="start" />
                 <IonLabel>Correos</IonLabel>
               </IonItem>
 
               <IonItemDivider>Administration</IonItemDivider>
-              <IonItem button routerLink="/users">
+              <IonItem button routerLink="/users" onClick={() => menuController.close()}>
                 <IonIcon icon={person} slot="start" />
                 <IonLabel>Usuarios</IonLabel>
               </IonItem>
 
               <IonItemDivider>IOT</IonItemDivider>
-              <IonItem button routerLink="/led-status">
+              <IonItem button routerLink="/led-status" onClick={() => menuController.close()}>
                 <IonIcon icon={bulb} slot="start" />
                 <IonLabel>LED Status</IonLabel>
               </IonItem>
 
               <IonItemDivider>System</IonItemDivider>
-              <IonItem button routerLink="/Setting">
+              <IonItem button routerLink="/Setting" onClick={() => menuController.close()}>
                 <IonIcon icon={settings} slot="start" />
                 <IonLabel>Setting</IonLabel>
               </IonItem>
-              <IonItem button routerLink="/Sells">
+              <IonItem button routerLink="/Sells" onClick={() => menuController.close()}>
                 <IonIcon icon={barChart} slot="start" />
                 <IonLabel>Sells</IonLabel>
               </IonItem>

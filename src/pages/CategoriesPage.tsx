@@ -44,13 +44,13 @@ const CategoriesPage: React.FC = () => {
       id: 1,
       name: 'Lavandería',
       description: 'Servicios de lavado y limpieza de prendas',
-      image: 'https://via.placeholder.com/150',
+      image: 'logo192.png',
     },
     {
       id: 2,
       name: 'Tintorería',
       description: 'Servicios especializados de limpieza en seco',
-      image: 'https://via.placeholder.com/150',
+      image: 'logo192.png',
     },
   ]);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);

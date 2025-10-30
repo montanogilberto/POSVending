@@ -274,7 +274,7 @@ const CartPage: React.FC = () => {
         onDidDismiss={() => {
           clearCart();
           setShowSuccessToast(false);
-          history.push('/tabs/home');
+          history.push('/Laundry');
           window.location.reload();
         }}
         message={`¡Pedido realizado! Método de pago: ${paymentMethod}${

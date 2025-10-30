@@ -6,17 +6,17 @@ import {
     IonContent,
     IonButton
   } from '@ionic/react';
-  import { useHistory } from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
   import { useOrder } from '../context/OrderContext';
   
-  const ConfirmationPage: React.FC = () => {
-    const history = useHistory();
-    const { clearOrder } = useOrder();
+const ConfirmationPage: React.FC = () => {
+  const history = useHistory();
+  const { clearOrder } = useOrder();
   
-    const handleReturn = () => {
-      clearOrder();
-      history.push('/');
-    };
+  const handleReturn = () => {
+    clearOrder();
+    history.push('/Laundry');
+  };
   
     return (
       <IonPage>

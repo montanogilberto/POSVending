@@ -69,7 +69,7 @@ const CategoryPage: React.FC = () => {
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle="Categorías"
+        screenTitle=""
         showBackButton={true}
         backButtonText="Dashboard"
         backButtonHref="/Laundry"

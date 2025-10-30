@@ -207,7 +207,7 @@ const ProductDetailPage: React.FC = () => {
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle={product.name}
+        screenTitle=""
         showBackButton={true}
         backButtonText="Productos"
         backButtonHref="/Products"

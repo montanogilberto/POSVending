@@ -1,9 +1,4 @@
-# TODO: Add Categories and Users Modules
-
-## Tasks to Complete
-
-- [x] Create CategoriesPage.tsx (CRUD with image input)
-- [x] Create UsersPage.tsx (CRUD with image input)
-- [x] Update App.tsx side menu to include new modules
-- [x] Add routes for new pages
-- [x] Test navigation and functionality (build successful)
+- [ ] Remove unused `useHistory` import from `useInactivityTimer.tsx`
+- [ ] Update `CartPage.tsx` to use `useNavigate` instead of `useHistory`
+- [ ] Update `ConfirmationPage.tsx` to use `useNavigate` instead of `useHistory`
+- [ ] Test navigation after checkout to ensure no errors
