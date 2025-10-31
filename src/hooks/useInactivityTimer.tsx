@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { toastController } from '@ionic/core';
 
-const useInactivityTimer = (timeoutDuration: number = 300000) => {
+const useInactivityTimer = (timeoutDuration: number = 300000, onTimeout?: () => void) => {
   const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
@@ -43,6 +43,11 @@ const useInactivityTimer = (timeoutDuration: number = 300000) => {
         duration: 10000
       });
       toast.present();
+      toast.onDidDismiss().then(() => {
+        if (!isActive && onTimeout) {
+          onTimeout();
+        }
+      });
     };
 
     // Add event listeners for user activity
