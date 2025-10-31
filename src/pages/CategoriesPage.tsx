@@ -208,7 +208,7 @@ const CategoriesPage: React.FC = () => {
           </IonRow>
         </IonGrid>
 
-        <IonFab vertical="bottom" horizontal="end" slot="fixed">
+        <IonFab vertical="bottom" horizontal="center" slot="fixed">
           <IonFabButton onClick={handleCreate}>
             <IonIcon icon={add} />
           </IonFabButton>
