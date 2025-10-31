@@ -26,6 +26,7 @@ import AlertPopover from '../components/PopOver/AlertPopover';
 import LogoutAlert from '../components/Alerts/LogoutAlert';
 import MailPopover from '../components/PopOver/MailPopover';
 import useInactivityTimer from '../hooks/useInactivityTimer';
+import { fetchAllLaundry } from '../api/laundryApi';
 
 interface Transaction {
   date: string;
@@ -74,17 +75,9 @@ const Laundry: React.FC = () => {
   const [authenticated, setAuthenticated] = useState(false);
 
   // 🔄 GET all_laundry
-  const fetchAllLaundry = async () => {
+  const loadAllLaundry = async () => {
     try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_income');
-      if (!response.ok) throw new Error(`Error al obtener datos del backend: ${response.status}`);
-
-      const data = await response.json();
-      console.log('Fetched all_income:', data);
-      // Sort by paymentDate descending (newest first)
-      const sortedIncome = (data.income || []).sort((a: Income, b: Income) =>
-        new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-      );
+      const sortedIncome = await fetchAllLaundry();
       setAllIncome(sortedIncome);
     } catch (error) {
       console.error(error);
@@ -94,10 +87,10 @@ const Laundry: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchAllLaundry();
+    loadAllLaundry();
   }, []);
 
-  useInactivityTimer(300000, fetchAllLaundry);
+  useInactivityTimer(300000, loadAllLaundry);
 
   useEffect(() => {
     const state = location.state as LocationState | undefined;
@@ -157,7 +150,7 @@ const Laundry: React.FC = () => {
       setShowToast(true);
       setCart([]);
       setShowCart(false);
-      fetchAllLaundry();
+      loadAllLaundry();
     } catch (error) {
       console.error(error);
       setToastMessage('Error al confirmar la venta.');

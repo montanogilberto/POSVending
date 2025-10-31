@@ -1,8 +1,7 @@
-# TODO: Update Income API with Product Details
+# TODO: Integrate fetchAllLaundry into CartPage onDidDismiss
 
-## Tasks
-- [x] Update CartItem interface in CartContext.tsx to include selectedChoices
-- [x] Modify ProductDetailPage.tsx to populate selectedChoices when adding to cart
-- [x] Update CartPage.tsx income payload to include productId and options
-- [ ] Provide SQL script for database schema update
-- [ ] Test the changes: run app, simulate purchase, verify payload
+## Steps to Complete:
+- [x] Create `src/api/laundryApi.ts` with extracted `fetchAllLaundry` function
+- [x] Update `src/pages/Laundry.tsx` to import and use the extracted function
+- [x] Update `src/pages/CartPage.tsx` to import and call `fetchAllLaundry` in `onDidDismiss` callback
+- [ ] Test the changes: Place an order, verify navigation and API call

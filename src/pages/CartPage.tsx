@@ -34,6 +34,7 @@ import CartItem from '../components/CartItem';
 import { submitOrder } from '../api/cartApi';
 import { addCircle, addCircleOutline } from 'ionicons/icons';
 import useInactivityTimer from '../hooks/useInactivityTimer';
+import { fetchAllLaundry } from '../api/laundryApi';
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
@@ -293,11 +294,12 @@ const CartPage: React.FC = () => {
 
       <IonToast
         isOpen={showSuccessToast}
-        onDidDismiss={() => {
+        onDidDismiss={async () => {
           clearCart();
           setShowSuccessToast(false);
+          await fetchAllLaundry();
           history.push('/Laundry');
-          
+
         }}
         message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
           paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total

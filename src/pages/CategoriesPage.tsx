@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   IonPage,
   IonContent,
@@ -25,13 +25,15 @@ import {
   IonGrid,
   IonRow,
   IonCol,
+  IonLoading,
 } from '@ionic/react';
 import { add, create, trash, pencil, camera, images } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
+import { fetchCategories, createCategory, updateCategory, deleteCategory, Category } from '../api/categoriesApi';
 
-interface Category {
+interface LocalCategory {
   id: number;
   name: string;
   description: string;
@@ -39,24 +41,12 @@ interface Category {
 }
 
 const CategoriesPage: React.FC = () => {
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      id: 1,
-      name: 'Lavandería',
-      description: 'Servicios de lavado y limpieza de prendas',
-      image: 'logo192.png',
-    },
-    {
-      id: 2,
-      name: 'Tintorería',
-      description: 'Servicios especializados de limpieza en seco',
-      image: 'logo192.png',
-    },
-  ]);
+  const [categories, setCategories] = useState<LocalCategory[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<LocalCategory | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingCategory, setEditingCategory] = useState<LocalCategory | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -80,15 +70,21 @@ const CategoriesPage: React.FC = () => {
 
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
-  const handleDelete = (category: Category) => {
+  const handleDelete = (category: LocalCategory) => {
     setSelectedCategory(category);
     setShowDeleteAlert(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedCategory) {
-      setCategories(categories.filter(c => c.id !== selectedCategory.id));
-      setSelectedCategory(null);
+      try {
+        await deleteCategory(selectedCategory.id);
+        setCategories(categories.filter(c => c.id !== selectedCategory.id));
+        setSelectedCategory(null);
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        // Handle error (e.g., show toast)
+      }
     }
     setShowDeleteAlert(false);
   };
@@ -99,7 +95,7 @@ const CategoriesPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleEdit = (category: Category) => {
+  const handleEdit = (category: LocalCategory) => {
     setEditingCategory(category);
     setFormData({
       name: category.name,
@@ -109,23 +105,33 @@ const CategoriesPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleSave = () => {
-    if (editingCategory) {
-      // Edit existing
-      setCategories(categories.map(cat =>
-        cat.id === editingCategory.id
-          ? { ...cat, ...formData }
-          : cat
-      ));
-    } else {
-      // Create new
-      const newCategory: Category = {
-        id: Math.max(...categories.map(c => c.id)) + 1,
-        ...formData,
-      };
-      setCategories([...categories, newCategory]);
+  const handleSave = async () => {
+    try {
+      if (editingCategory) {
+        // Update existing
+        await updateCategory(editingCategory.id, formData.name, formData.image, 1);
+        setCategories(categories.map(cat =>
+          cat.id === editingCategory.id
+            ? { ...cat, ...formData }
+            : cat
+        ));
+      } else {
+        // Create new
+        await createCategory(formData.name, formData.image, 1);
+        // Reload categories after create
+        const fetchedCategories = await fetchCategories('1');
+        setCategories(fetchedCategories.map(cat => ({
+          id: cat.categoryId,
+          name: cat.name,
+          description: '', // API doesn't provide description, so leave empty
+          image: cat.image,
+        })));
+      }
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error saving category:', error);
+      // Handle error (e.g., show toast)
     }
-    setShowModal(false);
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,6 +149,26 @@ const CategoriesPage: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const fetchedCategories = await fetchCategories('1'); // Assuming companyId is '1'
+        setCategories(fetchedCategories.map(cat => ({
+          id: cat.categoryId,
+          name: cat.name,
+          description: '', // API doesn't provide description, so leave empty
+          image: cat.image,
+        })));
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
   return (
     <IonPage>
       <Header
@@ -155,6 +181,7 @@ const CategoriesPage: React.FC = () => {
       />
 
       <IonContent>
+        <IonLoading isOpen={loading} message="Cargando categorías..." />
         <IonGrid>
           <IonRow>
             {categories.map((category) => (
