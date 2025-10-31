@@ -34,57 +34,52 @@ interface RouteParams {
   productId: string;
 }
 
+// ---- Type guard to ensure option.choices exists ----
+type Option = NonNullable<Product['options']>[number];
+type Choice = NonNullable<Option['choices']>[number];
+
+function hasChoices(o: Option): o is Option & { choices: Choice[] } {
+  return Array.isArray(o.choices);
+}
+
 const ProductDetailPage: React.FC = () => {
   const { productId } = useParams<RouteParams>();
   const history = useHistory();
   const location = useLocation();
   const { addToCart } = useCart();
+
   const [product, setProduct] = useState<Product | undefined>(undefined);
   const [quantity, setQuantity] = useState(1);
-  const [selectedOptions, setSelectedOptions] = useState<{ [key: string]: any }>({});
+  const [selectedOptions, setSelectedOptions] = useState<Record<number, string | string[]>>({});
   const [showAlert, setShowAlert] = useState(false);
   const [missingMessage, setMissingMessage] = useState('');
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
     showAlertPopover: false,
     showMailPopover: false,
   });
 
-  const presentAlertPopover = (e: React.MouseEvent) => {
+  const presentAlertPopover = (e: React.MouseEvent) =>
     setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  };
-
   const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-
-  const presentMailPopover = (e: React.MouseEvent) => {
+  const presentMailPopover = (e: React.MouseEvent) =>
     setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  };
-
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
   useEffect(() => {
-    // Check if product is passed in location state
     const stateProduct = (location.state as any)?.product;
     if (stateProduct) {
-      console.log("Product from state:", stateProduct);
+      console.log('Product from state:', stateProduct);
       setProduct(stateProduct);
     } else {
-      // Fallback: fetch all products (though this should not happen if navigation is correct)
-      console.warn("Product not found in state, this should not happen");
-      // Try to fetch products from the category to find the product
+      console.warn('Product not found in state, this should not happen');
       const fetchProduct = async () => {
         try {
           const categories = await fetchCategories();
           const category = categories.find(cat => cat.categoryId === parseInt(productId));
-          if (category) {
-            // If we have a category, we could fetch products for that category
-            // For now, just set product to undefined
-            setProduct(undefined);
-          } else {
-            setProduct(undefined);
-          }
+          if (category) setProduct(undefined);
+          else setProduct(undefined);
         } catch (error) {
-          console.error("Error fetching categories:", error);
+          console.error('Error fetching categories:', error);
           setProduct(undefined);
         }
       };
@@ -92,87 +87,95 @@ const ProductDetailPage: React.FC = () => {
     }
   }, [productId, location.state]);
 
-  if (!product) return <IonPage><IonContent><p>Producto no encontrado.</p></IonContent></IonPage>;
+  if (!product)
+    return (
+      <IonPage>
+        <IonContent>
+          <p>Producto no encontrado.</p>
+        </IonContent>
+      </IonPage>
+    );
 
-  const handleRadioChange = (optionId: string, value: string) => {
-    console.log(`Selected radio for ${optionId}:`, value);
-    setSelectedOptions((prev) => ({ ...prev, [optionId]: value }));
-  };
+  // ---- Handlers ----
+  const handleRadioChange = (optionId: number, value: string) =>
+    setSelectedOptions(prev => ({ ...prev, [optionId]: value }));
 
-  const handleCheckboxChange = (optionId: string, value: string) => {
-    console.log(`Toggled checkbox for ${optionId} value:`, value);
+  const handleCheckboxChange = (optionId: number, value: string) => {
     const currentValues = selectedOptions[optionId] || [];
-    const updatedValues = currentValues.includes(value)
-      ? currentValues.filter((v: string) => v !== value)
-      : [...currentValues, value];
-
-    setSelectedOptions((prev) => ({ ...prev, [optionId]: updatedValues }));
+    const updatedValues = Array.isArray(currentValues)
+      ? currentValues.includes(value)
+        ? currentValues.filter(v => v !== value)
+        : [...currentValues, value]
+      : [value];
+    setSelectedOptions(prev => ({ ...prev, [optionId]: updatedValues }));
   };
 
-  const handleSelectAll = (optionId: string, allIds: string[]) => {
-    console.log(`Select All clicked for ${optionId}`);
+  const handleSelectAll = (optionId: number, allIds: string[]) => {
     const current = selectedOptions[optionId] || [];
-    const isAllSelected = current.length === allIds.length;
-    setSelectedOptions((prev) => ({
+    const isAllSelected = Array.isArray(current) && current.length === allIds.length;
+    setSelectedOptions(prev => ({
       ...prev,
       [optionId]: isAllSelected ? [] : [...allIds],
     }));
   };
 
+  // ---- Option price calculation ----
   const calculateOptionPrice = () => {
     let extra = 0;
-    product.options?.forEach(option => {
-      const value = selectedOptions[option.id];
-      if (option.type === 'radio' && value) {
-        const selected = option.choices.find(c => c.id === value);
-        console.log(`Radio selected: ${selected?.name}, price: ${selected?.price}`);
-        extra += selected?.price || 0;
+    (product.options ?? []).forEach(option => {
+      if (!hasChoices(option)) return;
+      const value = selectedOptions[option.productOptionId];
+      if (option.type === 'radio' && value && hasChoices(option)) {
+        const selected = option.choices.find(c => c.productOptionChoiceId.toString() === value);
+        extra += selected?.price ?? 0;
       }
-      if (option.type === 'checkbox' && Array.isArray(value)) {
-        value.forEach((id: string) => {
-          const selected = option.choices.find(c => c.id === id);
-          console.log(`Checkbox selected: ${selected?.name}, price: ${selected?.price}`);
-          extra += selected?.price || 0;
+      if (option.type === 'checkbox' && Array.isArray(value) && hasChoices(option)) {
+        value.forEach(id => {
+          const selected = option.choices.find(c => c.productOptionChoiceId.toString() === id);
+          extra += selected?.price ?? 0;
         });
       }
     });
-    console.log("Total extra option price:", extra);
     return extra;
   };
 
+  // ---- Add to cart ----
   const handleAddToCart = () => {
-    console.log("Trying to add to cart with options:", selectedOptions);
-
-    const requiredOptions = product.options || [];
+    const requiredOptions = product.options ?? [];
     const missingGroups: string[] = [];
+
+    requiredOptions.forEach(option => {
+      const value = selectedOptions[option.productOptionId];
+      if (hasChoices(option) && (!value || (Array.isArray(value) && value.length === 0))) {
+        missingGroups.push(option.name);
+      }
+    });
 
     const selectedOptionLabels: { [key: string]: string[] | string } = {};
 
-    product.options?.forEach(option => {
-      const value = selectedOptions[option.id];
+    (product.options ?? []).forEach(option => {
+      if (!hasChoices(option)) return;
+      const value = selectedOptions[option.productOptionId];
 
-      if (option.type === 'radio' && value) {
-        const choice = option.choices.find(c => c.id === value);
-        if (choice) {
-          selectedOptionLabels[option.name] = choice.name;
-        }
+      if (option.type === 'radio' && value && hasChoices(option)) {
+        const choice = option.choices.find(c => c.productOptionChoiceId.toString() === value);
+        if (choice) selectedOptionLabels[option.name] = choice.name;
       }
 
-      if (option.type === 'checkbox' && Array.isArray(value)) {
-        const selectedLabels = value.map((id: string) => {
-          const choice = option.choices.find(c => c.id === id);
-          return choice?.name || id;
+      if (option.type === 'checkbox' && Array.isArray(value) && hasChoices(option)) {
+        const selectedLabels = value.map(id => {
+          const choice = option.choices.find(c => c.productOptionChoiceId.toString() === id);
+          return choice?.name ?? id;
         });
         selectedOptionLabels[option.name] = selectedLabels;
       }
-
     });
 
     if (missingGroups.length > 0) {
-      console.warn("Missing required options:", missingGroups);
       setMissingMessage(
-        `Falta seleccionar ${missingGroups.length === 1 ? 'la opción' : 'las opciones'}: ` +
-        `${missingGroups.map(name => `"${name}"`).join(', ')}.`
+        `Falta seleccionar ${missingGroups.length === 1 ? 'la opción' : 'las opciones'}: ${missingGroups
+          .map(name => `"${name}"`)
+          .join(', ')}.`
       );
       setShowAlert(true);
       return;
@@ -182,11 +185,24 @@ const ProductDetailPage: React.FC = () => {
     const optionPrice = calculateOptionPrice();
     const finalPrice = basePrice + optionPrice;
 
-    console.log("Final price to add:", finalPrice);
-    console.log("Product added to cart:", {
-      name: product.name,
-      quantity,
-      selectedOptions,
+    const selectedChoices: { [key: number]: { id: number; name: string; price: number }[] } = {};
+
+    (product.options ?? []).forEach(option => {
+      if (!hasChoices(option)) return;
+      const value = selectedOptions[option.productOptionId];
+      if (option.type === 'radio' && value && hasChoices(option)) {
+        const choice = option.choices.find(c => c.productOptionChoiceId.toString() === value);
+        if (choice) {
+          selectedChoices[option.productOptionId] = [
+            { id: choice.productOptionChoiceId, name: choice.name, price: choice.price },
+          ];
+        }
+      } else if (option.type === 'checkbox' && Array.isArray(value) && hasChoices(option)) {
+        selectedChoices[option.productOptionId] = value.map(id => {
+          const c = option.choices.find(ch => ch.productOptionChoiceId.toString() === id);
+          return { id: c?.productOptionChoiceId ?? 0, name: c?.name ?? '', price: c?.price ?? 0 };
+        });
+      }
     });
 
     addToCart({
@@ -197,11 +213,13 @@ const ProductDetailPage: React.FC = () => {
       price: finalPrice,
       selectedOptions,
       selectedOptionLabels,
+      selectedChoices,
     });
 
     history.push('/cart');
   };
 
+  // ---- UI ----
   return (
     <IonPage>
       <Header
@@ -227,50 +245,62 @@ const ProductDetailPage: React.FC = () => {
                 <IonCardContent>
                   <p>{product.description}</p>
 
-                  {product.options?.map((option) => (
-                    <IonList key={option.id}>
-                      <IonItem>
+                  {(product.options ?? []).map(option => (
+                    <IonList key={option.productOptionId}>
+                      <IonItem key={`label-${option.productOptionId}`}>
                         <IonLabel>{option.name}</IonLabel>
                       </IonItem>
 
-                      {option.type === 'checkbox' && (
+                      {option.type === 'checkbox' && hasChoices(option) && (
                         <>
-                          <IonItem>
+                          <IonItem key={`select-all-${option.productOptionId}`}>
                             <IonLabel>Seleccionar todos</IonLabel>
                             <IonCheckbox
                               slot="start"
                               checked={
-                                selectedOptions[option.id]?.length === option.choices.length
+                                (selectedOptions[option.productOptionId]?.length ?? 0) === option.choices.length
                               }
                               onIonChange={() =>
-                                handleSelectAll(option.id, option.choices.map((c) => c.id))
+                                handleSelectAll(
+                                  option.productOptionId,
+                                  option.choices.map(c => c.productOptionChoiceId.toString())
+                                )
                               }
                             />
                           </IonItem>
-                          {option.choices.map((choice) => (
-                            <IonItem key={choice.id}>
-                              <IonLabel>{choice.name} (+${choice.price})</IonLabel>
+
+                          {option.choices.map(choice => (
+                            <IonItem key={`checkbox-${option.productOptionId}-${choice.productOptionChoiceId}`}>
+                              <IonLabel>
+                                {choice.name} (+$
+                                {choice.price})
+                              </IonLabel>
                               <IonCheckbox
                                 slot="start"
-                                checked={selectedOptions[option.id]?.includes(choice.id)}
-                                onIonChange={() => handleCheckboxChange(option.id, choice.id)}
+                                checked={(selectedOptions[option.productOptionId] ?? []).includes(
+                                  choice.productOptionChoiceId.toString()
+                                )}
+                                onIonChange={() =>
+                                  handleCheckboxChange(option.productOptionId, choice.productOptionChoiceId.toString())
+                                }
                               />
                             </IonItem>
                           ))}
                         </>
                       )}
 
-                      {option.type === 'radio' && (
+                      {option.type === 'radio' && hasChoices(option) && (
                         <IonRadioGroup
-                          value={selectedOptions[option.id] || ''}
-                          onIonChange={(e) =>
-                            handleRadioChange(option.id, e.detail.value)
-                          }
+                          value={selectedOptions[option.productOptionId] ?? ''}
+                          onIonChange={e => handleRadioChange(option.productOptionId, e.detail.value)}
                         >
-                          {option.choices.map((choice) => (
-                            <IonItem key={choice.id}>
-                              <IonLabel>{choice.name} (+${choice.price})</IonLabel>
-                              <IonRadio slot="start" value={choice.id} />
+                          {option.choices.map(choice => (
+                            <IonItem key={`radio-${option.productOptionId}-${choice.productOptionChoiceId}`}>
+                              <IonLabel>
+                                {choice.name} (+$
+                                {choice.price})
+                              </IonLabel>
+                              <IonRadio slot="start" value={choice.productOptionChoiceId.toString()} />
                             </IonItem>
                           ))}
                         </IonRadioGroup>
@@ -282,7 +312,7 @@ const ProductDetailPage: React.FC = () => {
                     <IonLabel position="stacked">Cantidad</IonLabel>
                     <IonSelect
                       value={quantity}
-                      onIonChange={(e) => setQuantity(Number(e.detail.value))}
+                      onIonChange={e => setQuantity(Number(e.detail.value))}
                       interface="popover"
                     >
                       {[...Array(10)].map((_, i) => (

@@ -1,16 +1,16 @@
 //type_products.ts
 
 export interface Choice {
-    id: string;
+    productOptionChoiceId: number;
     name: string;
     price: number;
   }
-  
+
   export interface Option {
-    id: string;
+    productOptionId: number;
     name: string;
     type: 'radio' | 'checkbox';
-    choices: Choice[];
+    choices?: Choice[];
   }
   
   export interface Product {

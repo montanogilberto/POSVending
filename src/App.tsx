@@ -44,7 +44,7 @@ import AlertsPage from './pages/AlertsPage';
 import EmailsPage from './pages/EmailsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import UsersPage from './pages/UsersPage';
-import useInactivityTimer from './hooks/useInactivityTimer';
+
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -82,7 +82,6 @@ setupIonicReact();
 
 const App: React.FC = () => {
   const location = useLocation();
-  useInactivityTimer();
 
   return (
     <IonApp>

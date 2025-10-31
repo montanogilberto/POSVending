@@ -25,6 +25,7 @@ import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import LogoutAlert from '../components/Alerts/LogoutAlert';
 import MailPopover from '../components/PopOver/MailPopover';
+import useInactivityTimer from '../hooks/useInactivityTimer';
 
 interface Transaction {
   date: string;
@@ -95,6 +96,8 @@ const Laundry: React.FC = () => {
   useEffect(() => {
     fetchAllLaundry();
   }, []);
+
+  useInactivityTimer(300000, fetchAllLaundry);
 
   useEffect(() => {
     const state = location.state as LocationState | undefined;

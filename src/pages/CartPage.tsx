@@ -33,6 +33,7 @@ import { useHistory } from 'react-router-dom';
 import CartItem from '../components/CartItem';
 import { submitOrder } from '../api/cartApi';
 import { addCircle, addCircleOutline } from 'ionicons/icons';
+import useInactivityTimer from '../hooks/useInactivityTimer';
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
@@ -47,6 +48,8 @@ const CartPage: React.FC = () => {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+  useInactivityTimer(300000, () => window.location.reload());
 
   useEffect(() => {
     const cash = parseFloat(cashPaid);
@@ -109,25 +112,44 @@ const CartPage: React.FC = () => {
         if (response.ok) {
           // Call income endpoint
           try {
+            const payload = {
+              income: [
+                {
+                  action: 1,
+                  total: total,
+                  paymentMethod: paymentMethod,
+                  paymentDate: new Date().toISOString(),
+                  userId: 1,
+                  clientId: 1,
+                  companyId: 1,
+                  products: cart.map(item => ({
+                    productId: parseInt(item.productId),
+                    options: Object.entries(item.selectedChoices).map(([optionId, choices]) => ({
+                      productOptionId: parseInt(optionId),
+                      choices: choices.map(c => ({
+                        productOptionChoiceId: c.id,
+                        name: c.name,
+                        price: c.price
+                      }))
+                    }))[0]  // Assuming one option per product; adjust if multiple
+                  }))
+                }
+              ]
+            };
+            console.log('Income API payload:', payload);
             const incomeResponse = await fetch('https://smartloansbackend.azurewebsites.net/income', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                income: orderData.orders.map(order => ({
-                  action: 1,
-                  orderId: order.orderNumber,
-                  total: order.total,
-                  paymentMethod: order.paymentMethod,
-                  paymentDate: new Date().toISOString(),
-                  userId: order.userId,
-                  clientId: order.clientId,
-                  companyId: 1
-                }))
-              })
+              body: JSON.stringify(payload)
             });
             if (incomeResponse.ok) {
               const incomeData = await incomeResponse.json();
               console.log('Income response:', incomeData);
+              if (incomeData.result && incomeData.result[0] && incomeData.result[0].msg === 'Inserted Successfully') {
+                console.log('Income inserted successfully');
+              } else {
+                console.error('Income insertion failed:', incomeData.result[0]?.msg || 'Unknown error');
+              }
             } else {
               console.error('Income call failed:', incomeResponse.status);
             }
@@ -275,7 +297,7 @@ const CartPage: React.FC = () => {
           clearCart();
           setShowSuccessToast(false);
           history.push('/Laundry');
-          window.location.reload();
+          
         }}
         message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
           paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
