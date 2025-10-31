@@ -270,7 +270,7 @@ const CategoriesPage: React.FC = () => {
           isOpen={showDeleteAlert}
           onDidDismiss={() => setShowDeleteAlert(false)}
           header="Confirmar eliminación"
-          message={`¿Estás seguro de que quieres eliminar la categoría: ${selectedCategory?.name}?`}
+          message={`¿Estás seguro de que quieres eliminar la categoría ${selectedCategory?.name}?`}
           buttons={[
             {
               text: 'Cancelar',
