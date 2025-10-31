@@ -58,7 +58,7 @@ const CategoryPage: React.FC = () => {
     return (
       <IonPage>
         <IonContent className="ion-padding">
-          <IonLoading isOpen={loading} message="Cargando categorías..." />
+          <IonLoading isOpen={loading} message="Cargando categorías...." />
         </IonContent>
       </IonPage>
     );
