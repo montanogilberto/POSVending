@@ -6,11 +6,13 @@ export interface Category {
 }
 
 export const fetchCategories = async (companyId: string): Promise<Category[]> => {
+  console.log('companyId:' + companyId)
   try {
     const response = await fetch('https://smartloansbackend.azurewebsites.net/by_company_products_category', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'accept': 'application/json',
       },
       body: JSON.stringify({
         product_categories: [
@@ -20,6 +22,8 @@ export const fetchCategories = async (companyId: string): Promise<Category[]> =>
         ],
       }),
     });
+
+    console.log(response)
 
     if (!response.ok) {
       throw new Error(`Error fetching categories: ${response.status}`);
@@ -34,6 +38,7 @@ export const fetchCategories = async (companyId: string): Promise<Category[]> =>
 };
 
 export const createCategory = async (name: string, image: string, companyId: number): Promise<void> => {
+  console.log('name:' + name + 'path' + image)
   try {
     const response = await fetch('https://smartloansbackend.azurewebsites.net/product_categories', {
       method: 'POST',

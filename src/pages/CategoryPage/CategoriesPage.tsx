@@ -2,36 +2,32 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   IonPage,
   IonContent,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
-  IonButtons,
-  IonButton,
-  IonIcon,
-  IonList,
-  IonItem,
-  IonLabel,
   IonCard,
-  IonCardContent,
-  IonCardHeader,
   IonCardTitle,
-  IonFab,
-  IonFabButton,
-  IonAlert,
-  IonInput,
-  IonTextarea,
-  IonModal,
   IonImg,
   IonGrid,
   IonRow,
   IonCol,
   IonLoading,
+  IonHeader,
+  IonTitle,
+  IonToolbar,
+  IonButton,
+  IonIcon,
+  IonAlert,
+  IonFab,
+  IonFabButton,
+  IonModal,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonInput,
+  IonTextarea,
+  IonButtons,
 } from '@ionic/react';
-import { add, create, trash, pencil, camera, images } from 'ionicons/icons';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
-import { fetchCategories, createCategory, updateCategory, deleteCategory, Category } from '../api/categoriesApi';
+import { pencil, trash, add, camera } from 'ionicons/icons';
+import { fetchCategories, Category, createCategory, updateCategory, deleteCategory } from '../../api/categoriesApi';
+import { saveImage } from '../../api/saveImageApi';
 
 interface LocalCategory {
   id: number;
@@ -52,23 +48,27 @@ const CategoriesPage: React.FC = () => {
     description: '',
     image: '',
   });
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const presentAlertPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  };
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const fetchedCategories = await fetchCategories('1'); // Assuming companyId is '1'
+        setCategories(fetchedCategories.map((cat: Category) => ({
+          id: cat.categoryId,
+          name: cat.name,
+          description: '', // API doesn't provide description, so leave empty
+          image: cat.image,
+        })));
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-
-  const presentMailPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  };
-
-  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
+    loadCategories();
+  }, []);
 
   const handleDelete = (category: LocalCategory) => {
     setSelectedCategory(category);
@@ -83,7 +83,6 @@ const CategoriesPage: React.FC = () => {
         setSelectedCategory(null);
       } catch (error) {
         console.error('Error deleting category:', error);
-        // Handle error (e.g., show toast)
       }
     }
     setShowDeleteAlert(false);
@@ -107,20 +106,28 @@ const CategoriesPage: React.FC = () => {
 
   const handleSave = async () => {
     try {
+      let imagePath = formData.image;
+      if (formData.image.startsWith('data:image')) {
+        // Extract base64 data
+        const base64Data = formData.image.split(',')[1];
+        const filename = `category_${Date.now()}.png`;
+        imagePath = await saveImage(filename, base64Data);
+      }
+
       if (editingCategory) {
         // Update existing
-        await updateCategory(editingCategory.id, formData.name, formData.image, 1);
+        await updateCategory(editingCategory.id, formData.name, imagePath, 1);
         setCategories(categories.map(cat =>
           cat.id === editingCategory.id
-            ? { ...cat, ...formData }
+            ? { ...cat, name: formData.name, image: imagePath }
             : cat
         ));
       } else {
         // Create new
-        await createCategory(formData.name, formData.image, 1);
+        await createCategory(formData.name, imagePath, 1);
         // Reload categories after create
         const fetchedCategories = await fetchCategories('1');
-        setCategories(fetchedCategories.map(cat => ({
+        setCategories(fetchedCategories.map((cat: Category) => ({
           id: cat.categoryId,
           name: cat.name,
           description: '', // API doesn't provide description, so leave empty
@@ -149,66 +156,118 @@ const CategoriesPage: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const fetchedCategories = await fetchCategories('1'); // Assuming companyId is '1'
-        setCategories(fetchedCategories.map(cat => ({
-          id: cat.categoryId,
-          name: cat.name,
-          description: '', // API doesn't provide description, so leave empty
-          image: cat.image,
-        })));
-      } catch (error) {
-        console.error('Error loading categories:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCategories();
-  }, []);
-
   return (
-    <IonPage>
-      <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
-        screenTitle="Categorías"
-        showBackButton={true}
-        backButtonText="Menú"
-        backButtonHref="/Laundry"
-      />
+    <IonPage style={{ backgroundColor: '#f9fafb' }}>
+      <IonHeader>
+        <IonToolbar style={{ '--background': '#f9fafb' }}>
+          <IonTitle style={{ fontSize: '22px', fontWeight: '500', color: '#333', textAlign: 'center' }}>
+            Categorías Disponibles
+          </IonTitle>
+        </IonToolbar>
+      </IonHeader>
 
-      <IonContent>
+      <IonContent style={{ '--background': '#f9fafb' }}>
         <IonLoading isOpen={loading} message="Cargando categorías..." />
-        <IonGrid>
+        <IonGrid style={{ padding: '16px' }}>
           <IonRow>
             {categories.map((category) => (
-              <IonCol size="12" sizeMd="6" sizeLg="4" key={category.id}>
-                <IonCard>
-                  <IonCardHeader>
-                    <IonImg src={category.image} style={{ height: '150px', objectFit: 'cover' }} />
-                    <IonCardTitle>{category.name}</IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    <p>{category.description}</p>
-                    <IonButtons slot="end">
-                      <IonButton fill="clear" color="primary" onClick={() => handleEdit(category)}>
-                        <IonIcon icon={pencil} />
-                      </IonButton>
-                      <IonButton fill="clear" color="danger" onClick={() => handleDelete(category)}>
-                        <IonIcon icon={trash} />
-                      </IonButton>
-                    </IonButtons>
-                  </IonCardContent>
+              <IonCol size="6" sizeMd="4" sizeLg="3" key={category.id} style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                <IonCard
+                  style={{
+                    width: '180px',
+                    minHeight: '200px',
+                    borderRadius: '16px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                    backgroundColor: '#ffffff',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '20px 16px',
+                    transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+                  }}
+                >
+                  <IonImg
+                    src={category.image}
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      objectFit: 'contain',
+                      marginBottom: '16px',
+                    }}
+                  />
+                  <IonCardTitle
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      color: '#374151',
+                      textAlign: 'center',
+                      margin: '0 0 20px 0',
+                      lineHeight: '1.2',
+                    }}
+                  >
+                    {category.name}
+                  </IonCardTitle>
+                  <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'center' }}>
+                    <IonButton
+                      fill="outline"
+                      color="primary"
+                      size="small"
+                      style={{
+                        '--border-radius': '8px',
+                        '--padding-start': '12px',
+                        '--padding-end': '12px',
+                        '--padding-top': '8px',
+                        '--padding-bottom': '8px',
+                        '--border-color': '#3b82f6',
+                        '--color': '#3b82f6',
+                        flex: 1,
+                        maxWidth: '60px',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(category);
+                      }}
+                    >
+                      <IonIcon icon={pencil} style={{ fontSize: '16px' }} />
+                    </IonButton>
+                    <IonButton
+                      fill="outline"
+                      color="danger"
+                      size="small"
+                      style={{
+                        '--border-radius': '8px',
+                        '--padding-start': '12px',
+                        '--padding-end': '12px',
+                        '--padding-top': '8px',
+                        '--padding-bottom': '8px',
+                        '--border-color': '#ef4444',
+                        '--color': '#ef4444',
+                        flex: 1,
+                        maxWidth: '60px',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(category);
+                      }}
+                    >
+                      <IonIcon icon={trash} style={{ fontSize: '16px' }} />
+                    </IonButton>
+                  </div>
                 </IonCard>
               </IonCol>
             ))}
           </IonRow>
         </IonGrid>
 
-        <IonFab vertical="bottom" horizontal="center" slot="fixed">
+        <IonFab vertical="bottom" horizontal="end" slot="fixed">
           <IonFabButton onClick={handleCreate}>
             <IonIcon icon={add} />
           </IonFabButton>
@@ -285,17 +344,6 @@ const CategoriesPage: React.FC = () => {
           ]}
         />
       </IonContent>
-
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
     </IonPage>
   );
 };

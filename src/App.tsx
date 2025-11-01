@@ -42,7 +42,7 @@ import ClientsPage from './pages/ClientsPage';
 import ProductsManagementPage from './pages/ProductsManagementPage';
 import AlertsPage from './pages/AlertsPage';
 import EmailsPage from './pages/EmailsPage';
-import CategoriesPage from './pages/CategoriesPage';
+import CategoriesPage from './pages/CategoryPage/CategoriesPage';
 import UsersPage from './pages/UsersPage';
 
 
@@ -148,7 +148,7 @@ const App: React.FC = () => {
                 <IonIcon icon={barChart} slot="start" />
                 <IonLabel>Sells</IonLabel>
               </IonItem>
-              <IonItem button onClick={() => {}}>
+              <IonItem button onClick={() => menuController.close()}>
                 <IonIcon icon={logOutOutline} slot="start" />
                 <IonLabel>Sign Out</IonLabel>
               </IonItem>
