@@ -153,13 +153,20 @@ const CartPage: React.FC = () => {
             if (incomeResponse.ok) {
               const incomeData = await incomeResponse.json();
               console.log('Income response:', incomeData);
-              if (incomeData.result && incomeData.result[0] && incomeData.result[0].msg === 'Inserted Successfully') {
-                console.log('Income inserted successfully');
+            
+              const rec = Array.isArray(incomeData.result) ? incomeData.result[0] : null;
+            
+              if (rec && rec.msg === 'Inserted Successfully' && rec.value != null) {
+                const newId = Number(rec.value); // value is a string in the JSON
+                setLastIncomeId(newId);
+                console.log('Income inserted successfully, ID:', newId);
               } else {
-                console.error('Income insertion failed:', incomeData.result[0]?.msg || 'Unknown error');
+                console.error('Income insertion failed:', rec?.msg || 'Unknown error', rec);
               }
             } else {
               console.error('Income call failed:', incomeResponse.status);
+              const errorText = await incomeResponse.text();
+              console.error('Income error response:', errorText);
             }
           } catch (incomeError) {
             console.error('Income call error:', incomeError);
@@ -303,12 +310,11 @@ const CartPage: React.FC = () => {
         isOpen={showSuccessToast}
         onDidDismiss={async () => {
           setShowSuccessToast(false);
-          // Fetch ticket data using the last income ID or similar
-          // Assuming we can get the incomeId from the response or context
-          // For now, use a placeholder or fetch based on recent transaction
-          const ticket = await fetchTicket('1'); // Replace with actual incomeId
-          setTicketData(ticket);
-          setShowReceipt(true);
+          if (lastIncomeId) {
+            const ticket = await fetchTicket(lastIncomeId);
+            setTicketData(ticket);
+            setShowReceipt(true);
+          }
         }}
         message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
           paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total

@@ -9,8 +9,9 @@ import {
   IonCol,
   IonGrid,
   IonIcon,
+  IonButton,
 } from '@ionic/react';
-import { qrCodeOutline } from 'ionicons/icons';
+import { qrCodeOutline, printOutline } from 'ionicons/icons';
 
 interface Product {
   name: string;
@@ -62,7 +63,7 @@ const Receipt: React.FC<ReceiptProps> = ({
         fontFamily: 'Inter, Roboto, sans-serif',
       }}
     >
-      <IonCardContent style={{ padding: '20px' }}>
+      <IonCardContent style={{ padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
         {/* Encabezado */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#333' }}></div>
@@ -162,22 +163,6 @@ const Receipt: React.FC<ReceiptProps> = ({
           </div>
         </div>
 
-        {/* Confirmation Banner */}
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #1E6FBF, #0056D2)',
-            color: '#ffffff',
-            padding: '10px',
-            borderRadius: '8px',
-            textAlign: 'center',
-            marginBottom: '20px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-          }}
-        >
-          ¡Pedido realizado! Método de pago: {paymentMethod}. Cambio a devolver: ${change.toFixed(2)}.
-        </div>
-
         {/* Pie de página */}
         <div style={{ textAlign: 'center', fontSize: '12px', color: '#666' }}>
           <div>Gracias por su compra</div>
@@ -189,10 +174,16 @@ const Receipt: React.FC<ReceiptProps> = ({
           </div>
         </div>
 
-        {/* QR Code Placeholder */}
-        <div style={{ textAlign: 'right', marginTop: '20px' }}>
-          <IonIcon icon={qrCodeOutline} size="large" style={{ color: '#666' }} />
-          <div style={{ fontSize: '10px', color: '#666' }}>QR Placeholder</div>
+        {/* QR Code Placeholder and Print Button */}
+        <div style={{ textAlign: 'right', marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <IonButton fill="outline" color="primary" onClick={() => window.print()}>
+            <IonIcon icon={printOutline} slot="start" />
+            Imprimir
+          </IonButton>
+          <div>
+            <IonIcon icon={qrCodeOutline} size="large" style={{ color: '#666' }} />
+            <div style={{ fontSize: '10px', color: '#666' }}>QR Placeholder</div>
+          </div>
         </div>
       </IonCardContent>
     </IonCard>
