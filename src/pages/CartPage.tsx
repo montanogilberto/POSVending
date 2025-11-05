@@ -35,6 +35,8 @@ import { submitOrder } from '../api/cartApi';
 import { addCircle, addCircleOutline } from 'ionicons/icons';
 import useInactivityTimer from '../hooks/useInactivityTimer';
 import { fetchAllLaundry } from '../api/laundryApi';
+import Receipt from '../components/Receipt';
+import { fetchTicket } from '../api/ticketApi';
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
@@ -47,8 +49,13 @@ const CartPage: React.FC = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [ticketData, setTicketData] = useState<any>(null);
+  const [lastIncomeId, setLastIncomeId] = useState<string | null>(null);
 
   const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+  const isCheckoutEnabled = paymentMethod && (paymentMethod !== 'efectivo' || (cashPaid && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) >= total));
 
   useInactivityTimer(300000, () => window.location.reload());
 
@@ -179,7 +186,7 @@ const CartPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/tabs/home" />
+            <IonBackButton defaultHref="/Laundry" />
           </IonButtons>
           <IonTitle>Carrito</IonTitle>
         </IonToolbar>
@@ -246,7 +253,7 @@ const CartPage: React.FC = () => {
                         </IonItem>
                       )}
 
-                      <IonButton expand="block" color="primary" onClick={handleCheckout}>
+                      <IonButton expand="block" color="primary" onClick={handleCheckout} disabled={!isCheckoutEnabled}>
                         Proceder al pago
                       </IonButton>
 
@@ -295,11 +302,13 @@ const CartPage: React.FC = () => {
       <IonToast
         isOpen={showSuccessToast}
         onDidDismiss={async () => {
-          clearCart();
           setShowSuccessToast(false);
-          await fetchAllLaundry();
-          history.push('/Laundry');
-
+          // Fetch ticket data using the last income ID or similar
+          // Assuming we can get the incomeId from the response or context
+          // For now, use a placeholder or fetch based on recent transaction
+          const ticket = await fetchTicket('1'); // Replace with actual incomeId
+          setTicketData(ticket);
+          setShowReceipt(true);
         }}
         message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
           paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
@@ -316,6 +325,44 @@ const CartPage: React.FC = () => {
           },
         ]}
       />
+
+      {showReceipt && ticketData && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Receipt
+            transactionDate={new Date(ticketData.paymentDate).toLocaleDateString('es-ES')}
+            transactionTime={new Date(ticketData.paymentDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            clientName={ticketData.client.name}
+            clientPhone={ticketData.client.cellphone}
+            clientEmail={ticketData.client.email}
+            userName={ticketData.user.name}
+            products={ticketData.products.map((prod: any) => ({
+              name: prod.name,
+              quantity: prod.quantity,
+              unitPrice: prod.unitPrice,
+              subtotal: prod.subtotal,
+              options: prod.options.map((opt: any) => `${opt.optionName}: ${opt.choiceName}`),
+            }))}
+            subtotal={ticketData.totals.subtotal}
+            iva={ticketData.totals.iva}
+            total={ticketData.totals.total}
+            paymentMethod={ticketData.paymentMethod === 'efectivo' ? 'Efectivo' : 'Tarjeta'}
+            amountReceived={paymentMethod === 'efectivo' ? parseFloat(cashPaid) || ticketData.totals.total : ticketData.totals.total}
+            change={paymentMethod === 'efectivo' ? (parseFloat(cashPaid) || 0) - ticketData.totals.total : 0}
+          />
+          <IonButton
+            style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10000 }}
+            onClick={async () => {
+              setShowReceipt(false);
+              setTicketData(null);
+              clearCart();
+              await fetchAllLaundry();
+              history.push('/Laundry');
+            }}
+          >
+            Cerrar
+          </IonButton>
+        </div>
+      )}
     </IonPage>
   );
 };

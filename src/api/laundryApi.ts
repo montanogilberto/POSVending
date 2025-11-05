@@ -16,8 +16,10 @@ export const fetchAllLaundry = async (): Promise<Income[]> => {
 
     const data = await response.json();
     console.log('Fetched all_income:', data);
+    // Ensure data.income is an array, default to empty array if not
+    const incomeArray = Array.isArray(data.income) ? data.income : [];
     // Sort by paymentDate descending (newest first)
-    const sortedIncome = (data.income || []).sort((a: Income, b: Income) =>
+    const sortedIncome = incomeArray.sort((a: Income, b: Income) =>
       new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
     );
     return sortedIncome;
