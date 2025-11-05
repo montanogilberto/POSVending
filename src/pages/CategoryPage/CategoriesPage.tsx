@@ -9,9 +9,6 @@ import {
   IonRow,
   IonCol,
   IonLoading,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
   IonButton,
   IonIcon,
   IonAlert,
@@ -28,6 +25,7 @@ import {
 import { pencil, trash, add, camera } from 'ionicons/icons';
 import { fetchCategories, Category, createCategory, updateCategory, deleteCategory } from '../../api/categoriesApi';
 import { saveImage } from '../../api/saveImageApi';
+import Header from '../../components/Header';
 
 interface LocalCategory {
   id: number;
@@ -158,13 +156,11 @@ const CategoriesPage: React.FC = () => {
 
   return (
     <IonPage style={{ backgroundColor: '#f9fafb' }}>
-      <IonHeader>
-        <IonToolbar style={{ '--background': '#f9fafb' }}>
-          <IonTitle style={{ fontSize: '22px', fontWeight: '500', color: '#333', textAlign: 'center' }}>
-            Categorías Disponibles
-          </IonTitle>
-        </IonToolbar>
-      </IonHeader>
+      <Header
+        presentAlertPopover={() => {}}
+        presentMailPopover={() => {}}
+        screenTitle="Categorías Disponibles"
+      />
 
       <IonContent style={{ '--background': '#f9fafb' }}>
         <IonLoading isOpen={loading} message="Cargando categorías..." />
@@ -274,15 +270,13 @@ const CategoriesPage: React.FC = () => {
         </IonFab>
 
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
-          <IonHeader>
-            <IonToolbar>
-              <IonTitle>{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</IonTitle>
-              <IonButtons slot="end">
-                <IonButton onClick={() => setShowModal(false)}>Cancelar</IonButton>
-                <IonButton onClick={handleSave}>Guardar</IonButton>
-              </IonButtons>
-            </IonToolbar>
-          </IonHeader>
+          <div style={{ padding: '16px', textAlign: 'center', fontSize: '18px', fontWeight: '500' }}>
+            {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+          </div>
+          <div style={{ padding: '0 16px 16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <IonButton onClick={() => setShowModal(false)}>Cancelar</IonButton>
+            <IonButton onClick={handleSave}>Guardar</IonButton>
+          </div>
           <IonContent>
             <IonList>
               <IonItem>
