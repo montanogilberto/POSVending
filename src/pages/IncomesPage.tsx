@@ -108,13 +108,13 @@ const IncomesPage: React.FC = () => {
     setTimeout(() => {
       const nextItems = filteredIncome.slice(displayedIncome.length, displayedIncome.length + 3);
       setDisplayedIncome([...displayedIncome, ...nextItems]);
-      (event.target as HTMLIonInfiniteScrollElement).complete();
+      (event.target as any).complete();
     }, 500);
   };
 
   const handleShowReceipt = async (incomeId: number) => {
     try {
-      const ticket = await fetchTicket(incomeId);
+      const ticket = await fetchTicket(incomeId.toString());
       setReceiptData(ticket);
       setShowReceiptModal(true);
     } catch (error) {
@@ -127,8 +127,11 @@ const IncomesPage: React.FC = () => {
   return (
     <IonPage>
       <Header
-        title="Incomes"
+        screenTitle="Incomes"
+        showBackButton={true}
         backButtonHref="/Laundry"
+        presentAlertPopover={() => {}}
+        presentMailPopover={() => {}}
       />
       <IonContent fullscreen>
         <IonGrid className="ion-padding">
@@ -169,7 +172,23 @@ const IncomesPage: React.FC = () => {
         </IonGrid>
 
         <IonModal isOpen={showReceiptModal} onDidDismiss={() => setShowReceiptModal(false)}>
-          <Receipt data={receiptData} />
+          {receiptData && (
+            <Receipt
+              transactionDate={receiptData.transactionDate}
+              transactionTime={receiptData.transactionTime}
+              clientName={receiptData.clientName}
+              clientPhone={receiptData.clientPhone}
+              clientEmail={receiptData.clientEmail}
+              userName={receiptData.userName}
+              products={receiptData.products}
+              subtotal={receiptData.subtotal}
+              iva={receiptData.iva}
+              total={receiptData.total}
+              paymentMethod={receiptData.paymentMethod}
+              amountReceived={receiptData.amountReceived}
+              change={receiptData.change}
+            />
+          )}
           <IonButton expand="full" onClick={() => setShowReceiptModal(false)}>
             Cerrar
           </IonButton>
