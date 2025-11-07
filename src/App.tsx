@@ -44,6 +44,7 @@ import AlertsPage from './pages/AlertsPage';
 import EmailsPage from './pages/EmailsPage';
 import CategoriesPage from './pages/CategoryPage/CategoriesPage';
 import UsersPage from './pages/UsersPage';
+import IncomesPage from './pages/IncomesPage';
 
 
 /* Core CSS required for Ionic components to work properly */
@@ -132,6 +133,10 @@ const App: React.FC = () => {
                 <IonIcon icon={person} slot="start" />
                 <IonLabel>Usuarios</IonLabel>
               </IonItem>
+              <IonItem button routerLink="/ingresos" onClick={() => menuController.close()}>
+                <IonIcon icon={barChart} slot="start" />
+                <IonLabel>Ingresos</IonLabel>
+              </IonItem>
 
               <IonItemDivider>IOT</IonItemDivider>
               <IonItem button routerLink="/led-status" onClick={() => menuController.close()}>
@@ -196,6 +201,7 @@ const App: React.FC = () => {
               <Route exact path="/alerts" component={AlertsPage} />
               <Route exact path="/emails" component={EmailsPage} />
               <Route exact path="/users" component={UsersPage} />
+              <Route exact path="/ingresos" component={IncomesPage} />
               <Route exact path="/">
                 <Redirect to="/Laundry" />
               </Route>

@@ -15,6 +15,7 @@ import {
   IonCol,
   IonPage,
   IonIcon,
+  IonModal,
 } from '@ionic/react';
 import { waterOutline, receiptOutline, documentsOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
@@ -27,6 +28,8 @@ import LogoutAlert from '../components/Alerts/LogoutAlert';
 import MailPopover from '../components/PopOver/MailPopover';
 import useInactivityTimer from '../hooks/useInactivityTimer';
 import { fetchAllLaundry } from '../api/laundryApi';
+import Receipt from '../components/Receipt';
+import { fetchTicket } from '../api/ticketApi';
 
 interface Transaction {
   date: string;
@@ -73,6 +76,8 @@ const Laundry: React.FC = () => {
   const [showCart, setShowCart] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
 
   // 🔄 GET all_laundry
   const loadAllLaundry = async () => {
@@ -188,6 +193,44 @@ const Laundry: React.FC = () => {
     setAuthenticated(false);
     history.push('/Login');
     setShowLogoutAlert(false);
+  };
+
+  const handleShowReceipt = async (incomeId: number) => {
+    try {
+      const ticket = await fetchTicket(incomeId.toString());
+      if (ticket) {
+        const receiptProps = {
+          transactionDate: new Date(ticket.paymentDate).toLocaleDateString('es-ES'),
+          transactionTime: new Date(ticket.paymentDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+          clientName: ticket.client.name,
+          clientPhone: ticket.client.cellphone,
+          clientEmail: ticket.client.email,
+          userName: ticket.user.name,
+          products: ticket.products.map(p => ({
+            name: p.name,
+            quantity: p.quantity,
+            unitPrice: p.unitPrice,
+            subtotal: p.subtotal,
+            options: p.options.map(o => o.choiceName)
+          })),
+          subtotal: ticket.totals.subtotal,
+          iva: ticket.totals.iva,
+          total: ticket.totals.total,
+          paymentMethod: ticket.paymentMethod,
+          amountReceived: ticket.totals.total, // Assuming full payment
+          change: 0
+        };
+        setReceiptData(receiptProps);
+        setShowReceiptModal(true);
+      } else {
+        setToastMessage('Recibo no encontrado.');
+        setShowToast(true);
+      }
+    } catch (error) {
+      console.error('Error fetching ticket:', error);
+      setToastMessage('Error al obtener el recibo.');
+      setShowToast(true);
+    }
   };
 
   const getTitleFromPath = (pathname: string): string => {
@@ -309,7 +352,7 @@ const Laundry: React.FC = () => {
                         const icon = '💰';
                         const color = 'success';
                         return (
-                          <div key={i} className={`timeline-item ${color}`}>
+                          <div key={i} className={`timeline-item ${color}`} onClick={() => handleShowReceipt(income.incomeId)}>
                             <span className="timeline-icon">{icon}</span>
                             <div className="timeline-content">
                               <span>{status} — ${income.total.toFixed(2)} ({income.paymentMethod}, {date} {time})</span>
@@ -357,6 +400,12 @@ const Laundry: React.FC = () => {
           onDidDismiss={() => setShowLogoutAlert(false)}
           handleLogoutConfirm={handleLogoutConfirm}
         />
+
+        {/* Receipt Modal */}
+        <IonModal isOpen={showReceiptModal} onDidDismiss={() => setShowReceiptModal(false)}>
+          <Receipt {...receiptData} />
+          <IonButton expand="block" onClick={() => setShowReceiptModal(false)}>Cerrar</IonButton>
+        </IonModal>
       </IonContent>
     </IonPage>
   );

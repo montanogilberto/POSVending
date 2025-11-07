@@ -1,0 +1,182 @@
+.receipt-container {
+  maxWidth: 384px; /* 48mm at 8 dots/mm, approx 384px at 96 DPI */
+  margin: 0 auto;
+  backgroundColor: #ffffff;
+  borderRadius: 0; /* No radius for thermal print */
+  boxShadow: none; /* No shadow for print */
+  padding: 10px;
+  fontFamily: 'Courier New, monospace'; /* Monospace for fixed width */
+  color: #000;
+  position: relative;
+  overflow: hidden;
+}
+
+.receipt-header {
+  textAlign: center;
+  marginBottom: 10px;
+}
+
+.receipt-logo {
+  width: 40px;
+  height: 40px;
+  marginBottom: 5px;
+}
+
+.receipt-title {
+  fontSize: 14px;
+  fontWeight: bold;
+  color: #000;
+  margin: 0;
+}
+
+.receipt-date-time {
+  fontSize: 10px;
+  color: #000;
+  marginTop: 2px;
+}
+
+.receipt-section {
+  marginBottom: 10px;
+}
+
+.receipt-section-title {
+  fontSize: 12px;
+  fontWeight: bold;
+  color: #000;
+  marginBottom: 5px;
+  display: block;
+}
+
+.receipt-client-info {
+  fontSize: 10px;
+  color: #000;
+}
+
+.receipt-client-info div {
+  marginBottom: 2px;
+}
+
+.receipt-user-name {
+  fontSize: 10px;
+  color: #000;
+  fontWeight: bold;
+}
+
+.receipt-products-table {
+  border: none; /* No borders for thermal */
+  borderRadius: 0;
+  overflow: hidden;
+}
+
+.receipt-products-header {
+  backgroundColor: #fff;
+  borderBottom: 1px solid #000;
+}
+
+.receipt-products-header .receipt-col {
+  padding: 2px 4px;
+  fontSize: 6px;
+  fontWeight: bold;
+  color: #000;
+  textAlign: left;
+}
+
+.receipt-products-row {
+  borderBottom: none;
+}
+
+.receipt-products-row .receipt-col {
+  padding: 2px 4px;
+  fontSize: 10px;
+  color: #000;
+  textAlign: left;
+}
+
+.receipt-products-row .receipt-col:nth-child(3),
+.receipt-products-row .receipt-col:nth-child(4),
+.receipt-products-row .receipt-col:nth-child(5) {
+  textAlign: right;
+}
+
+.receipt-products-row .receipt-col:nth-child(4),
+.receipt-products-row .receipt-col:nth-child(5) {
+  fontWeight: bold;
+}
+
+.receipt-options {
+  color: #000;
+  fontSize: 9px;
+}
+
+.receipt-totals {
+  display: flex;
+  justifyContent: space-between;
+  fontSize: 10px;
+  marginBottom: 2px;
+}
+
+.receipt-totals-bold {
+  fontWeight: bold;
+  color: #000;
+}
+
+.receipt-payment-info {
+  fontSize: 10px;
+  color: #000;
+}
+
+.receipt-payment-info div {
+  marginBottom: 2px;
+}
+
+.receipt-footer {
+  textAlign: center;
+  fontSize: 9px;
+  color: #000;
+  marginTop: 10px;
+}
+
+.receipt-qr {
+  textAlign: center;
+  marginTop: 10px;
+}
+
+.receipt-confirmation-banner {
+  background: #000;
+  color: white;
+  textAlign: center;
+  padding: 5px;
+  fontSize: 12px;
+  fontWeight: bold;
+  borderRadius: 0;
+  margin: 0 0 10px 0;
+}
+
+.receipt-print-button {
+  display: none; /* Hide print button in print */
+}
+
+/* Print media query for thermal printer */
+@media print {
+  .receipt-container {
+    width: 48mm; /* Exact width for 58mm paper, 48mm effective */
+    maxWidth: none;
+    margin: 0;
+    padding: 5mm;
+    fontSize: 8pt; /* Adjust for DPI */
+  }
+  .receipt-content {
+    maxHeight: none;
+    overflow: visible;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.receipt-divider {
+  border: none;
+  borderTop: 1px solid #000;
+  margin: 10px 0;
+}

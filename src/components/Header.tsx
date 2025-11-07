@@ -26,13 +26,8 @@ const Header: React.FC<HeaderProps> = ({
           {showBackButton && (
             <IonBackButton text={backButtonText} defaultHref={backButtonHref} />
           )}
-          <div className="header-left">
-            <div className="logo-title">
-              <h2>POS GMO</h2>
-            </div>
-          </div>
         </IonButtons>
-        <IonTitle className="screen-title">{screenTitle}</IonTitle>
+        <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>{screenTitle}</IonTitle>
         <IonButtons slot="end">
           <IonButton onClick={presentAlertPopover} title="Help">
             <IonIcon icon={helpCircleOutline} />

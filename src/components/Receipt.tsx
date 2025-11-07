@@ -2,6 +2,7 @@ import React from 'react';
 import {
   IonCard,
   IonCardContent,
+  IonCardHeader,
   IonItem,
   IonLabel,
   IonText,
@@ -10,8 +11,84 @@ import {
   IonGrid,
   IonIcon,
   IonButton,
+  IonTitle,
 } from '@ionic/react';
 import { qrCodeOutline, printOutline } from 'ionicons/icons';
+import './Receipt.css';
+
+// ESC/POS Formatter for 58mm thermal printer (48mm effective, 203 DPI, 384 dots width)
+// Supports Font B (42 chars/line) as primary, Font A (32 chars/line) as fallback
+const generateEscPos = (receiptData: any) => {
+  const commands = [];
+
+  // Initialize printer
+  commands.push('\x1b\x40'); // ESC @ - Initialize
+
+  // Select Font B (default, 42 chars/line)
+  commands.push('\x1b\x4d\x01'); // ESC M 1 - Font B
+
+  // Center align
+  commands.push('\x1b\x61\x01'); // ESC a 1 - Center
+
+  // Header
+  commands.push('POS GMO\n');
+  commands.push(`${receiptData.transactionDate} ${receiptData.transactionTime}\n\n`);
+
+  // Left align
+  commands.push('\x1b\x61\x00'); // ESC a 0 - Left
+
+  // Client Info
+  commands.push('Cliente:\n');
+  commands.push(`${receiptData.clientName}\n`);
+  commands.push(`${receiptData.clientPhone}\n`);
+  commands.push(`${receiptData.clientEmail}\n\n`);
+
+  // User
+  commands.push(`Cajero: ${receiptData.userName}\n\n`);
+
+  // Products Header
+  commands.push('Producto          Opc  Cant  Unit  Sub\n');
+  commands.push('------------------------------------------\n'); // Approx 42 chars
+
+  // Products
+  receiptData.products.forEach((product: any) => {
+    const name = product.name.substring(0, 16).padEnd(16); // Truncate/pad to 16 chars
+    const options = (product.options?.join(', ') || '').substring(0, 4).padEnd(4); // 4 chars
+    const qty = product.quantity.toString().padStart(4);
+    const unit = `$${product.unitPrice.toFixed(2)}`.padStart(6);
+    const sub = `$${product.subtotal.toFixed(2)}`.padStart(6);
+    commands.push(`${name} ${options} ${qty} ${unit} ${sub}\n`);
+  });
+
+  commands.push('\n');
+
+  // Totals
+  const subtotal = `Subtotal: $${receiptData.subtotal.toFixed(2)}`.padStart(42);
+  const iva = `IVA (16%): $${receiptData.iva.toFixed(2)}`.padStart(42);
+  const total = `Total: $${receiptData.total.toFixed(2)}`.padStart(42);
+  commands.push(`${subtotal}\n`);
+  commands.push(`${iva}\n`);
+  commands.push(`${total}\n\n`);
+
+  // Payment
+  commands.push(`Pago: ${receiptData.paymentMethod}\n`);
+  commands.push(`Recibido: $${receiptData.amountReceived.toFixed(2)}\n`);
+  commands.push(`Cambio: $${receiptData.change.toFixed(2)}\n\n`);
+
+  // Footer
+  commands.push('Gracias por su compra\n');
+  commands.push('POS GMO\n');
+  commands.push('RFC: XXX123456XXX\n');
+  commands.push('www.posgmo.com\n\n');
+
+  // QR Placeholder (simple text)
+  commands.push('[QR Code Placeholder]\n\n');
+
+  // Cut paper
+  commands.push('\x1d\x56\x42\x00'); // GS V B 0 - Full cut
+
+  return commands.join('');
+};
 
 interface Product {
   name: string;
@@ -53,138 +130,126 @@ const Receipt: React.FC<ReceiptProps> = ({
   change,
 }) => {
   return (
-    <IonCard
-      style={{
-        maxWidth: '400px',
-        margin: 'auto',
-        backgroundColor: '#ffffff',
-        borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-        fontFamily: 'Inter, Roboto, sans-serif',
-      }}
-    >
-      <IonCardContent style={{ padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
-        {/* Encabezado */}
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#333' }}></div>
-          <IonText style={{ fontSize: '18px', fontWeight: 'bold', color: '#0056D2' }}>Ticket de Venta</IonText>
-          <div style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>
-            Fecha: {transactionDate} | Hora: {transactionTime}
-          </div>
-        </div>
+    <IonCard className="receipt-container">
+      <IonCardHeader>
+        <IonTitle>Recibo de Compra</IonTitle>
+      </IonCardHeader>
+      <IonCardContent className="receipt-content" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
 
-        <hr style={{ border: 'none', borderTop: '1px solid #e0e0e0', margin: '20px 0' }} />
+        {/* Encabezado */}
+        <IonItem className="receipt-header">
+          <IonIcon icon={qrCodeOutline} slot="start" size="large" style={{ color: '#007bff' }} />
+          <IonLabel>
+            <h1 className="receipt-title">POS GMO</h1>
+            <p className="receipt-date-time">Fecha: {transactionDate} | Hora: {transactionTime}</p>
+          </IonLabel>
+        </IonItem>
+
+        <hr className="receipt-divider" />
 
         {/* Información del cliente */}
-        <div style={{ marginBottom: '20px' }}>
-          <IonText style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>Información del Cliente</IonText>
-          <div style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>
-            <div>Nombre: {clientName}</div>
-            <div>Teléfono: {clientPhone}</div>
-            <div>Correo: {clientEmail}</div>
-          </div>
-        </div>
-
-        <hr style={{ border: 'none', borderTop: '1px solid #e0e0e0', margin: '20px 0' }} />
+        <IonItem>
+          <IonLabel>
+            <IonText className="receipt-section-title">Información del Cliente</IonText>
+            <p>Nombre: {clientName}</p>
+            <p>Teléfono: {clientPhone}</p>
+            <p>Correo: {clientEmail}</p>
+          </IonLabel>
+        </IonItem>
 
         {/* Información del usuario */}
-        <div style={{ marginBottom: '20px' }}>
-          <IonText style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>Usuario/Cajero</IonText>
-          <div style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>
-            {userName}
-          </div>
-        </div>
+        <IonItem>
+          <IonLabel>
+            <IonText className="receipt-section-title">Usuario/Cajero</IonText>
+            <p>{userName}</p>
+          </IonLabel>
+        </IonItem>
 
-        <hr style={{ border: 'none', borderTop: '1px solid #e0e0e0', margin: '20px 0' }} />
+        <hr className="receipt-divider" />
 
         {/* Lista de productos */}
-        <div style={{ marginBottom: '20px' }}>
-          <IonText style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>Productos/Servicios</IonText>
+        <IonItem>
+          <IonLabel>
+            <IonText className="receipt-section-title">Productos/Servicios</IonText>
+          </IonLabel>
+        </IonItem>
+        <IonGrid className="receipt-products-table">
+          {/* Header Row */}
+          <IonRow className="receipt-products-header">
+            <IonCol size="3" className="receipt-col">Producto</IonCol>
+            <IonCol size="3" className="receipt-col">Opciones</IonCol>
+            <IonCol size="3" className="receipt-col">Cantidad</IonCol>
+            <IonCol size="3" className="receipt-col">Precio Unit.</IonCol>
+            
+          </IonRow>
+          {/* Product Rows */}
           {products.map((product, index) => (
-            <div key={index} style={{ marginTop: '10px', fontSize: '14px' }}>
-              <div style={{ fontWeight: 'bold' }}>{product.name}</div>
-              {product.options && product.options.map((option, i) => (
-                <div key={i} style={{ color: '#666', marginLeft: '10px' }}>{option}</div>
-              ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Cantidad: {product.quantity}</span>
-                <span>Precio Unit.: ${product.unitPrice.toFixed(2)}</span>
-                <span>Subtotal: ${product.subtotal.toFixed(2)}</span>
-              </div>
-            </div>
+            <IonRow key={index} className="receipt-products-row">
+              <IonCol size="3" className="receipt-col">{product.name}</IonCol>
+              <IonCol size="3" className="receipt-col receipt-options">
+                {product.options && product.options.length > 0 ? product.options.join(', ') : 'Ninguna'}
+              </IonCol>
+              <IonCol size="3" className="receipt-col">{product.quantity}</IonCol>
+              <IonCol size="3" className="receipt-col">${product.subtotal.toFixed(2)}</IonCol>
+            </IonRow>
           ))}
-        </div>
+        </IonGrid>
 
-        <hr style={{ border: 'none', borderTop: '1px solid #e0e0e0', margin: '20px 0' }} />
+        <hr className="receipt-divider" />
 
         {/* Totales */}
-        <div style={{ marginBottom: '20px' }}>
-          <IonGrid>
-            <IonRow>
-              <IonCol size="6">
-                <IonText style={{ fontSize: '14px', color: '#666' }}>Subtotal:</IonText>
-              </IonCol>
-              <IonCol size="6" style={{ textAlign: 'right' }}>
-                <IonText style={{ fontSize: '14px', color: '#666' }}>${subtotal.toFixed(2)}</IonText>
-              </IonCol>
-            </IonRow>
-            <IonRow>
-              <IonCol size="6">
-                <IonText style={{ fontSize: '14px', color: '#666' }}>IVA (16%):</IonText>
-              </IonCol>
-              <IonCol size="6" style={{ textAlign: 'right' }}>
-                <IonText style={{ fontSize: '14px', color: '#666' }}>${iva.toFixed(2)}</IonText>
-              </IonCol>
-            </IonRow>
-            <IonRow>
-              <IonCol size="6">
-                <IonText style={{ fontSize: '16px', fontWeight: 'bold', color: '#0056D2' }}>Total:</IonText>
-              </IonCol>
-              <IonCol size="6" style={{ textAlign: 'right' }}>
-                <IonText style={{ fontSize: '16px', fontWeight: 'bold', color: '#0056D2' }}>${total.toFixed(2)}</IonText>
-              </IonCol>
-            </IonRow>
-          </IonGrid>
-        </div>
-
-        <hr style={{ border: 'none', borderTop: '1px solid #e0e0e0', margin: '20px 0' }} />
+        <IonItem>
+          <IonLabel>
+            <IonText className="receipt-section-title">Totales</IonText>
+            <p>Subtotal: ${subtotal.toFixed(2)}</p>
+            <p>IVA (16%): ${iva.toFixed(2)}</p>
+            <p className="receipt-totals-bold">Total: ${total.toFixed(2)}</p>
+          </IonLabel>
+        </IonItem>
 
         {/* Método de pago */}
-        <div style={{ marginBottom: '20px' }}>
-          <IonText style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>Método de Pago</IonText>
-          <div style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>
-            {paymentMethod}
-          </div>
-          <div style={{ fontSize: '14px', color: '#666' }}>
-            Monto Recibido: ${amountReceived.toFixed(2)}
-          </div>
-          <div style={{ fontSize: '14px', color: '#666' }}>
-            Cambio: ${change.toFixed(2)}
-          </div>
-        </div>
+        <IonItem>
+          <IonLabel>
+            <IonText className="receipt-section-title">Método de Pago</IonText>
+            <p>{paymentMethod}</p>
+            <p>Monto Recibido: ${amountReceived.toFixed(2)}</p>
+            <p>Cambio: ${change.toFixed(2)}</p>
+          </IonLabel>
+        </IonItem>
 
         {/* Pie de página */}
-        <div style={{ textAlign: 'center', fontSize: '12px', color: '#666' }}>
-          <div>Gracias por su compra</div>
-          <div style={{ marginTop: '10px' }}>
-            Empresa: POS GMO<br />
-            RFC: XXX123456XXX<br />
-            Dirección: Calle Ficticia 123, Ciudad, País<br />
-            Sitio Web: www.posgmo.com
-          </div>
-        </div>
+        <IonItem>
+          <IonLabel>
+            <IonText className="receipt-section-title"></IonText>
+            <p>Gracias por su compra</p>
+            <p>Empresa: POS GMO</p>
+            <p>RFC: XXX123456XXX</p>
+            <p>Dirección: Calle Ficticia 123, Ciudad, País</p>
+            <p>Sitio Web: www.posgmo.com</p>
+          </IonLabel>
+        </IonItem>
 
-        {/* QR Code Placeholder and Print Button */}
-        <div style={{ textAlign: 'right', marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <IonButton fill="outline" color="primary" onClick={() => window.print()}>
+        {/* QR Code Placeholder */}
+        <IonItem className="receipt-qr">
+          <IonIcon icon={qrCodeOutline} slot="start" size="large" style={{ color: '#666' }} />
+          <IonLabel>QR Placeholder</IonLabel>
+        </IonItem>
+
+        {/* Print Button */}
+        <IonItem>
+          <IonButton className="receipt-print-button" fill="outline" color="primary" expand="block" onClick={() => {
+            const printContent = document.querySelector('.receipt-container') as HTMLElement;
+            if (printContent) {
+              const originalBody = document.body.innerHTML;
+              document.body.innerHTML = printContent.outerHTML;
+              window.print();
+              document.body.innerHTML = originalBody;
+            }
+          }}>
             <IonIcon icon={printOutline} slot="start" />
             Imprimir
           </IonButton>
-          <div>
-            <IonIcon icon={qrCodeOutline} size="large" style={{ color: '#666' }} />
-            <div style={{ fontSize: '10px', color: '#666' }}>QR Placeholder</div>
-          </div>
-        </div>
+        </IonItem>
       </IonCardContent>
     </IonCard>
   );
