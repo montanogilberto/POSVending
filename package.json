@@ -21,9 +21,11 @@
     "@ionic/react": "^8.5.0",
     "@ionic/react-router": "^8.7.8",
     "@yudiel/react-qr-scanner": "^2.3.1",
+    "chart.js": "^4.5.1",
     "ionicons": "^7.4.0",
     "microsoft-cognitiveservices-speech-sdk": "^1.46.0",
     "react": "19.1.1",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "19.1.1",
     "react-native": "0.82.1",
     "react-router-dom": "^5.3.4"

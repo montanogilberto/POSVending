@@ -74,17 +74,30 @@ const CategoryPage: React.FC = () => {
         backButtonText="Dashboard"
         backButtonHref="/Laundry"
       />
-      <IonContent fullscreen style={{ background: '#f9fafb' }}>
-        <IonGrid style={{ padding: '16px' }}>
-          <IonRow>
-            {categories.map((category, index) => (
-              <IonCol size="6" sizeLg="4" key={category.categoryId || index} style={{ display: 'flex', justifyContent: 'center' }}>
-                <IonCard onClick={() => history.push(`/product/${category.categoryId}`)} style={{ background: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '16px', margin: '8px', width: '100%', maxWidth: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-                  <IonImg src={category.image} style={{ width: '128px', height: '128px', objectFit: 'contain', marginBottom: '12px' }} />
-                  <IonCardTitle style={{ color: '#444', fontSize: '18px', fontWeight: '500', textAlign: 'center', margin: 0 }}>{category.name}</IonCardTitle>
-                </IonCard>
-              </IonCol>
-            ))}
+      <IonContent fullscreen>
+        <IonGrid className="ion-padding">
+          <IonRow className="ion-justify-content-center">
+            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
+              <IonCard className="dashboard-card">
+                <IonCardHeader>
+                  <IonCardSubtitle>Categorias Disponibles</IonCardSubtitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  <IonGrid style={{ padding: '16px' }}>
+                    <IonRow className="ion-justify-content-center">
+                      {categories.map((category, index) => (
+                        <IonCol size="6" sizeLg="4" key={category.categoryId || index} style={{ display: 'flex', justifyContent: 'center' }}>
+                          <IonCard onClick={() => history.push(`/product/${category.categoryId}`)} style={{ background: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '16px', margin: '8px', width: '100%', maxWidth: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+                            <IonImg src={category.image} style={{ width: '128px', height: '128px', objectFit: 'contain', marginBottom: '12px' }} />
+                            <IonCardTitle style={{ color: '#444', fontSize: '18px', fontWeight: '500', textAlign: 'center', margin: 0 }}>{category.name}</IonCardTitle>
+                          </IonCard>
+                        </IonCol>
+                      ))}
+                    </IonRow>
+                  </IonGrid>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
           </IonRow>
         </IonGrid>
         <IonButtons slot="end" style={{ position: 'absolute', top: '10px', right: '10px' }}>

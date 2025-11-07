@@ -32,7 +32,7 @@ import { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import CartItem from '../components/CartItem';
 import { submitOrder } from '../api/cartApi';
-import { addCircle, addCircleOutline } from 'ionicons/icons';
+import { addCircle, addCircleOutline, printOutline } from 'ionicons/icons';
 import useInactivityTimer from '../hooks/useInactivityTimer';
 import { fetchAllLaundry } from '../api/laundryApi';
 import Receipt from '../components/Receipt';
@@ -366,6 +366,13 @@ const CartPage: React.FC = () => {
             }}
           >
             Cerrar
+          </IonButton>
+          <IonButton
+            style={{ position: 'absolute', top: '20px', right: '120px', zIndex: 10000 }}
+            onClick={() => window.print()}
+          >
+            <IonIcon icon={printOutline} slot="start" />
+            Imprimir
           </IonButton>
         </div>
       )}
