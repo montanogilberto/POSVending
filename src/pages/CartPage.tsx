@@ -155,9 +155,9 @@ const CartPage: React.FC = () => {
               console.log('Income response:', incomeData);
             
               const rec = Array.isArray(incomeData.result) ? incomeData.result[0] : null;
-            
+
               if (rec && rec.msg === 'Inserted Successfully' && rec.value != null) {
-                const newId = Number(rec.value); // value is a string in the JSON
+                const newId = String(rec.value); // value is a string in the JSON
                 setLastIncomeId(newId);
                 console.log('Income inserted successfully, ID:', newId);
               } else {
