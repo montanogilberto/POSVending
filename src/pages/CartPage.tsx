@@ -37,6 +37,7 @@ import useInactivityTimer from '../hooks/useInactivityTimer';
 import { fetchAllLaundry } from '../api/laundryApi';
 import Receipt from '../components/Receipt';
 import { fetchTicket } from '../api/ticketApi';
+import '../styles/dashboard.css';
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
@@ -199,89 +200,89 @@ const CartPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent>
-        <IonGrid className="ion-padding">
-          <IonRow className="ion-justify-content-center">
-            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonCard className="dashboard-card">
-                <IonCardHeader>
-                  <IonCardSubtitle>Carrito de Compras</IonCardSubtitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  {cart.length === 0 ? (
-                    <IonText>El carrito está vacío.</IonText>
-                  ) : (
-                    <>
-                      <IonList>
-                        {cart.map((item) => (
-                          <CartItem
-                            key={item.id}
-                            id={item.id}
-                            name={item.name}
-                            quantity={item.quantity}
-                            price={item.price}
-                            selectedOptionLabels={item.selectedOptionLabels}
-                            onRemove={removeFromCart}
-                          />
-                        ))}
-                      </IonList>
+      <IonContent fullscreen className="dashboard-content">
+        <div className="dashboard-container">
+          {/* Header */}
+          <div className="dashboard-header-section">
+            <h1 className="dashboard-title">Carrito de Compras</h1>
+          </div>
 
-                      <IonItem lines="none">
-                        <IonLabel>
-                          <h2>Total: ${total.toFixed(2)}</h2>
-                        </IonLabel>
-                      </IonItem>
+          {/* Cart Content */}
+          <div className="dashboard-card">
+            <IonCardHeader>
+              <IonCardSubtitle>Resumen del Carrito</IonCardSubtitle>
+            </IonCardHeader>
+            <IonCardContent>
+              {cart.length === 0 ? (
+                <IonText>El carrito está vacío.</IonText>
+              ) : (
+                <>
+                  <IonList>
+                    {cart.map((item) => (
+                      <CartItem
+                        key={item.id}
+                        id={item.id}
+                        name={item.name}
+                        quantity={item.quantity}
+                        price={item.price}
+                        selectedOptionLabels={item.selectedOptionLabels}
+                        onRemove={removeFromCart}
+                      />
+                    ))}
+                  </IonList>
 
-                      <IonItem>
-                        <IonLabel position="stacked">Método de pago</IonLabel>
-                        <IonSelect
-                          value={paymentMethod}
-                          onIonChange={(e) => {
-                            setPaymentMethod(e.detail.value);
-                            setCashPaid('');
-                          }}
-                          interface="popover"
-                        >
-                          <IonSelectOption value="efectivo">Efectivo</IonSelectOption>
-                          <IonSelectOption value="tarjeta">Tarjeta</IonSelectOption>
-                        </IonSelect>
-                      </IonItem>
+                  <IonItem lines="none">
+                    <IonLabel>
+                      <h2>Total: ${total.toFixed(2)}</h2>
+                    </IonLabel>
+                  </IonItem>
 
-                      {paymentMethod === 'efectivo' && (
-                        <IonItem>
-                          <IonLabel position="stacked">Efectivo recibido</IonLabel>
-                          <IonInput
-                            type="number"
-                            value={cashPaid}
-                            onIonChange={e => setCashPaid(e.detail.value!)}
-                            placeholder="Ingrese el efectivo recibido"
-                            min={total}
-                          />
-                        </IonItem>
-                      )}
+                  <IonItem>
+                    <IonLabel position="stacked">Método de pago</IonLabel>
+                    <IonSelect
+                      value={paymentMethod}
+                      onIonChange={(e) => {
+                        setPaymentMethod(e.detail.value);
+                        setCashPaid('');
+                      }}
+                      interface="popover"
+                    >
+                      <IonSelectOption value="efectivo">Efectivo</IonSelectOption>
+                      <IonSelectOption value="tarjeta">Tarjeta</IonSelectOption>
+                    </IonSelect>
+                  </IonItem>
 
-                      <IonButton expand="block" color="primary" onClick={handleCheckout} disabled={!isCheckoutEnabled}>
-                        Proceder al pago
-                      </IonButton>
-
-                      <IonButton expand="block" color="medium" onClick={clearCart}>
-                        Vaciar carrito
-                      </IonButton>
-                    </>
+                  {paymentMethod === 'efectivo' && (
+                    <IonItem>
+                      <IonLabel position="stacked">Efectivo recibido</IonLabel>
+                      <IonInput
+                        type="number"
+                        value={cashPaid}
+                        onIonChange={e => setCashPaid(e.detail.value!)}
+                        placeholder="Ingrese el efectivo recibido"
+                        min={total}
+                      />
+                    </IonItem>
                   )}
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
+
+                  <IonButton expand="block" color="primary" onClick={handleCheckout} disabled={!isCheckoutEnabled}>
+                    Proceder al pago
+                  </IonButton>
+
+                  <IonButton expand="block" color="medium" onClick={clearCart}>
+                    Vaciar carrito
+                  </IonButton>
+                </>
+              )}
+            </IonCardContent>
+          </div>
+        </div>
+
         <IonFab slot="fixed" horizontal="end" >
           <IonFabButton onClick={handleAddMoreProducts} aria-label="agregar mas productos">
             <IonIcon icon={addCircle} />
           </IonFabButton>
         </IonFab>
-
-
-
       </IonContent>
 
       <IonToast
@@ -335,8 +336,17 @@ const CartPage: React.FC = () => {
       {showReceipt && ticketData && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Receipt
-            transactionDate={new Date(ticketData.paymentDate).toLocaleDateString('es-ES')}
-            transactionTime={new Date(ticketData.paymentDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            // Parse date as UTC since database stores in UTC, then convert to Hermosillo timezone (UTC-7)
+            transactionDate={(() => {
+              const utcDate = new Date(ticketData.paymentDate + (ticketData.paymentDate.includes('Z') ? '' : 'Z'));
+              const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+              return hermosilloDate.toLocaleDateString('es-ES');
+            })()}
+            transactionTime={(() => {
+              const utcDate = new Date(ticketData.paymentDate + (ticketData.paymentDate.includes('Z') ? '' : 'Z'));
+              const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+              return hermosilloDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            })()}
             clientName={ticketData.client.name}
             clientPhone={ticketData.client.cellphone}
             clientEmail={ticketData.client.email}

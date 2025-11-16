@@ -29,6 +29,7 @@ import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
 import { fetchCategories } from '../../data/categories';
+import '../../styles/dashboard.css';
 
 interface RouteParams {
   productId: string;
@@ -225,112 +226,111 @@ const ProductDetailPage: React.FC = () => {
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle=""
-        showBackButton={true}
-        backButtonText="Productos"
-        backButtonHref="/Products"
+        screenTitle="Detalle del Producto"
       />
 
-      <IonContent>
-        <IonGrid className="ion-padding">
-          <IonRow className="ion-justify-content-center">
-            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonCard className="dashboard-card">
-                <IonCardHeader>
-                  <IonCardTitle>{product.name}</IonCardTitle>
-                  <IonCardSubtitle>
-                    {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
-                  </IonCardSubtitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <p>{product.description}</p>
+      <IonContent fullscreen className="dashboard-content">
+        <div className="dashboard-container">
+          {/* Header */}
+          <div className="dashboard-header-section">
+            <h1 className="dashboard-title">Detalle del Producto</h1>
+          </div>
 
-                  {(product.options ?? []).map(option => (
-                    <IonList key={option.productOptionId}>
-                      <IonItem key={`label-${option.productOptionId}`}>
-                        <IonLabel>{option.name}</IonLabel>
-                      </IonItem>
+          {/* Product Details */}
+          <div className="dashboard-card">
+            <IonCardHeader>
+              <IonCardTitle>{product.name}</IonCardTitle>
+              <IonCardSubtitle>
+                {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
+              </IonCardSubtitle>
+            </IonCardHeader>
+            <IonCardContent>
+              <p>{product.description}</p>
 
-                      {option.type === 'checkbox' && hasChoices(option) && (
-                        <>
-                          <IonItem key={`select-all-${option.productOptionId}`}>
-                            <IonLabel>Seleccionar todos</IonLabel>
-                            <IonCheckbox
-                              slot="start"
-                              checked={
-                                (selectedOptions[option.productOptionId]?.length ?? 0) === option.choices.length
-                              }
-                              onIonChange={() =>
-                                handleSelectAll(
-                                  option.productOptionId,
-                                  option.choices.map(c => c.productOptionChoiceId.toString())
-                                )
-                              }
-                            />
-                          </IonItem>
-
-                          {option.choices.map(choice => (
-                            <IonItem key={`checkbox-${option.productOptionId}-${choice.productOptionChoiceId}`}>
-                              <IonLabel>
-                                {choice.name} (+$
-                                {choice.price})
-                              </IonLabel>
-                              <IonCheckbox
-                                slot="start"
-                                checked={(selectedOptions[option.productOptionId] ?? []).includes(
-                                  choice.productOptionChoiceId.toString()
-                                )}
-                                onIonChange={() =>
-                                  handleCheckboxChange(option.productOptionId, choice.productOptionChoiceId.toString())
-                                }
-                              />
-                            </IonItem>
-                          ))}
-                        </>
-                      )}
-
-                      {option.type === 'radio' && hasChoices(option) && (
-                        <IonRadioGroup
-                          value={selectedOptions[option.productOptionId] ?? ''}
-                          onIonChange={e => handleRadioChange(option.productOptionId, e.detail.value)}
-                        >
-                          {option.choices.map(choice => (
-                            <IonItem key={`radio-${option.productOptionId}-${choice.productOptionChoiceId}`}>
-                              <IonLabel>
-                                {choice.name} (+$
-                                {choice.price})
-                              </IonLabel>
-                              <IonRadio slot="start" value={choice.productOptionChoiceId.toString()} />
-                            </IonItem>
-                          ))}
-                        </IonRadioGroup>
-                      )}
-                    </IonList>
-                  ))}
-
-                  <IonItem>
-                    <IonLabel position="stacked">Cantidad</IonLabel>
-                    <IonSelect
-                      value={quantity}
-                      onIonChange={e => setQuantity(Number(e.detail.value))}
-                      interface="popover"
-                    >
-                      {[...Array(10)].map((_, i) => (
-                        <IonSelectOption key={i + 1} value={i + 1}>
-                          {i + 1}
-                        </IonSelectOption>
-                      ))}
-                    </IonSelect>
+              {(product.options ?? []).map(option => (
+                <IonList key={option.productOptionId}>
+                  <IonItem key={`label-${option.productOptionId}`}>
+                    <IonLabel>{option.name}</IonLabel>
                   </IonItem>
 
-                  <IonButton expand="block" onClick={handleAddToCart}>
-                    Agregar al carrito
-                  </IonButton>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
+                  {option.type === 'checkbox' && hasChoices(option) && (
+                    <>
+                      <IonItem key={`select-all-${option.productOptionId}`}>
+                        <IonLabel>Seleccionar todos</IonLabel>
+                        <IonCheckbox
+                          slot="start"
+                          checked={
+                            (selectedOptions[option.productOptionId]?.length ?? 0) === option.choices.length
+                          }
+                          onIonChange={() =>
+                            handleSelectAll(
+                              option.productOptionId,
+                              option.choices.map(c => c.productOptionChoiceId.toString())
+                            )
+                          }
+                        />
+                      </IonItem>
+
+                      {option.choices.map(choice => (
+                        <IonItem key={`checkbox-${option.productOptionId}-${choice.productOptionChoiceId}`}>
+                          <IonLabel>
+                            {choice.name} (+$
+                            {choice.price})
+                          </IonLabel>
+                          <IonCheckbox
+                            slot="start"
+                            checked={(selectedOptions[option.productOptionId] ?? []).includes(
+                              choice.productOptionChoiceId.toString()
+                            )}
+                            onIonChange={() =>
+                              handleCheckboxChange(option.productOptionId, choice.productOptionChoiceId.toString())
+                            }
+                          />
+                        </IonItem>
+                      ))}
+                    </>
+                  )}
+
+                  {option.type === 'radio' && hasChoices(option) && (
+                    <IonRadioGroup
+                      value={selectedOptions[option.productOptionId] ?? ''}
+                      onIonChange={e => handleRadioChange(option.productOptionId, e.detail.value)}
+                    >
+                      {option.choices.map(choice => (
+                        <IonItem key={`radio-${option.productOptionId}-${choice.productOptionChoiceId}`}>
+                          <IonLabel>
+                            {choice.name} (+$
+                            {choice.price})
+                          </IonLabel>
+                          <IonRadio slot="start" value={choice.productOptionChoiceId.toString()} />
+                        </IonItem>
+                      ))}
+                    </IonRadioGroup>
+                  )}
+                </IonList>
+              ))}
+
+              <IonItem>
+                <IonLabel position="stacked">Cantidad</IonLabel>
+                <IonSelect
+                  value={quantity}
+                  onIonChange={e => setQuantity(Number(e.detail.value))}
+                  interface="popover"
+                >
+                  {[...Array(10)].map((_, i) => (
+                    <IonSelectOption key={i + 1} value={i + 1}>
+                      {i + 1}
+                    </IonSelectOption>
+                  ))}
+                </IonSelect>
+              </IonItem>
+
+              <IonButton expand="block" onClick={handleAddToCart}>
+                Agregar al carrito
+              </IonButton>
+            </IonCardContent>
+          </div>
+        </div>
 
         <IonAlert
           isOpen={showAlert}

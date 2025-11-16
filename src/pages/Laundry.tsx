@@ -199,9 +199,12 @@ const Laundry: React.FC = () => {
     try {
       const ticket = await fetchTicket(incomeId.toString());
       if (ticket) {
+        // Parse date as UTC since database stores in UTC, then convert to Hermosillo timezone (UTC-7)
+        const utcDate = new Date(ticket.paymentDate + (ticket.paymentDate.includes('Z') ? '' : 'Z'));
+        const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
         const receiptProps = {
-          transactionDate: new Date(ticket.paymentDate).toLocaleDateString('es-ES'),
-          transactionTime: new Date(ticket.paymentDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+          transactionDate: hermosilloDate.toLocaleDateString('es-ES'),
+          transactionTime: hermosilloDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
           clientName: ticket.client.name,
           clientPhone: ticket.client.cellphone,
           clientEmail: ticket.client.email,
@@ -257,124 +260,99 @@ const Laundry: React.FC = () => {
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
         screenTitle={getTitleFromPath(location.pathname)}
-
       />
-      <IonContent fullscreen>
-        <IonGrid className="ion-padding">
-          {/* 💧 Total de ingresos */}
-          <IonRow className="ion-justify-content-center">
-            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonCard className="dashboard-card">
-                <IonCardHeader>
-                  <IonIcon icon={waterOutline} size="large" color="primary" />
-                  <IonCardSubtitle className="secondary-text">Total de Ingresos</IonCardSubtitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <div className="total-number">${calculateTotal().toFixed(2)}</div>
-                  <div className="total-meta">
-                    <span className="secondary-text">{currentMonthYear}</span>
-                    <span className="secondary-text">• {currentUser}</span>
-                    <span className="percentage-change">{percentageChange}</span>
-                  </div>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
+      <IonContent fullscreen className="dashboard-content">
+        <div className="dashboard-container">
+          {/* Header */}
+          <div className="dashboard-header-section">
+            <h1 className="dashboard-title">Lavandería</h1>
+          </div>
 
-          {/* Iniciar Venta */}
-          <IonRow className="ion-justify-content-center">
-            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonCard className="dashboard-card">
-                <IonCardHeader>
-                  <IonLabel className="payment-label">Iniciar Venta</IonLabel>
-                </IonCardHeader>
-                <IonCardContent>
-                  <IonButton expand="block" className="start-seller-button" onClick={handleStartSeller}>
-                    Iniciar Selección de Productos
-                  </IonButton>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
+          {/* KPI Card - Total Ingresos */}
+          <div className="dashboard-kpi-card">
+            <div className="kpi-card-content">
+              <div className="kpi-icon">
+                <IonIcon icon={waterOutline} size="large" />
+              </div>
+              <div className="kpi-info">
+                <h3 className="kpi-label">Total de Ingresos</h3>
+                <div className="kpi-amount">${calculateTotal().toFixed(2)}</div>
+                <div className="kpi-meta">
+                  <span>{currentMonthYear}</span>
+                  <span>• {currentUser}</span>
+                  <span className="kpi-change">{percentageChange}</span>
+                </div>
+              </div>
+            </div>
+            <div className="kpi-action">
+              <IonButton expand="block" className="start-sale-button" onClick={handleStartSeller}>
+                Iniciar Venta
+              </IonButton>
+            </div>
+          </div>
 
           {/* Carrito Summary if showCart */}
           {showCart && cart.length > 0 && (
-            <IonRow className="ion-justify-content-center">
-              <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-                <IonCard className="dashboard-card">
-                  <IonCardHeader>
-                    <IonCardSubtitle>Carrito de Compra</IonCardSubtitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    {cart.map((item, i) => (
-                      <IonItem key={i} lines="full">
-                        <IonLabel>
-                          <h2>{item.name} x{item.quantity}</h2>
-                          <p>${item.subtotal.toFixed(2)}</p>
-                        </IonLabel>
-                      </IonItem>
-                    ))}
-                    <div className="cart-total">
-                      <strong>Total: ${cart.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2)}</strong>
-                    </div>
-                    <IonButton expand="block" className="confirm-sale-button" onClick={handleConfirmSale}>
-                      Confirmar Venta
-                    </IonButton>
-                    <IonButton expand="block" fill="clear" onClick={() => { setShowCart(false); setCart([]); }}>
-                      Cancelar
-                    </IonButton>
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
-            </IonRow>
+            <div className="dashboard-cart-card">
+              <h3>Carrito de Compra</h3>
+              <div className="cart-items">
+                {cart.map((item, i) => (
+                  <div key={i} className="cart-item">
+                    <span>{item.name} x{item.quantity}</span>
+                    <span>${item.subtotal.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="cart-total">
+                <strong>Total: ${cart.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2)}</strong>
+              </div>
+              <div className="cart-actions">
+                <IonButton expand="block" className="confirm-sale-button" onClick={handleConfirmSale}>
+                  Confirmar Venta
+                </IonButton>
+                <IonButton expand="block" fill="clear" onClick={() => { setShowCart(false); setCart([]); }}>
+                  Cancelar
+                </IonButton>
+              </div>
+            </div>
           )}
 
-
-          {/* Actividad */}
-          <IonRow className="ion-justify-content-center ion-margin-top">
-            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonCard className="dashboard-card">
-                <IonCardHeader>
-                  <IonCardSubtitle>Actividad Reciente</IonCardSubtitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  {allIncome.length === 0 ? (
-                    <div className="timeline-item secondary-text">
-                      ❌ Sin actividad — (ayer)
+          {/* Actividad Reciente */}
+          <div className="dashboard-activity-card">
+            <h3>Actividad Reciente</h3>
+            <div className="activity-timeline">
+              {allIncome.length === 0 ? (
+                <div className="activity-item no-activity">
+                  ❌ Sin actividad — (ayer)
+                </div>
+              ) : (
+                allIncome.slice(0, 10).map((income, i) => {
+                  // Parse date as UTC since database stores in UTC, then convert to Hermosillo timezone (UTC-7)
+                  const utcDate = new Date(income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z'));
+                  // Hermosillo is UTC-7, so subtract 7 hours from UTC
+                  const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+                  const time = hermosilloDate.toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+                  const date = hermosilloDate.toLocaleDateString('es-ES');
+                  return (
+                    <div key={i} className="activity-item" onClick={() => handleShowReceipt(income.incomeId)}>
+                      <span className="activity-icon">💰</span>
+                      <div className="activity-content">
+                        <span>Ingreso — ${income.total.toFixed(2)} ({income.paymentMethod}, {date} {time})</span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="timeline">
-                      {allIncome.slice(0, 10).map((income, i) => {
-                        const now = new Date(income.paymentDate);
-                        const time = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        const date = now.toLocaleDateString('es-ES');
-                        const status = 'Ingreso';
-                        const icon = '💰';
-                        const color = 'success';
-                        return (
-                          <div key={i} className={`timeline-item ${color}`} onClick={() => handleShowReceipt(income.incomeId)}>
-                            <span className="timeline-icon">{icon}</span>
-                            <div className="timeline-content">
-                              <span>{status} — ${income.total.toFixed(2)} ({income.paymentMethod}, {date} {time})</span>
-                            </div>
-                            <span className="timeline-dot" style={{backgroundColor: '#007BFF'}}></span>
-                          </div>
-                        );
-                      })}
-                      {allIncome.length > 10 && (
-                        <div className="timeline-item show-more">
-                          <IonButton fill="clear" size="small" onClick={() => history.push('/movements')}>
-                            Ver más movimientos
-                          </IonButton>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
+                  );
+                })
+              )}
+              {allIncome.length > 10 && (
+                <div className="activity-item show-more">
+                  <IonButton fill="clear" size="small" onClick={() => history.push('/movements')}>
+                    Ver más movimientos
+                  </IonButton>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Toast */}
         <IonToast

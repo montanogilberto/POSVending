@@ -1,10 +1,9 @@
-import { Redirect, Route, useHistory, useLocation } from 'react-router-dom';
+import { Redirect, Route } from 'react-router-dom';
 import {
   IonApp,
   IonCol,
   IonIcon,
   IonLabel,
-  IonPage,
   IonRouterOutlet,
   IonRow,
   IonTabBar,
@@ -20,16 +19,20 @@ import {
   IonToolbar,
   IonTitle,
   IonAvatar,
+  IonSplitPane,
+  IonPage,
   setupIonicReact
 } from '@ionic/react';
-import Header from './components/Header';
 import { IonReactRouter } from '@ionic/react-router';
-import { cash, settings, barChart, shirt, qrCode, bulb, ellipsisHorizontal, menu, logOutOutline, people, cube, notifications, mail, grid, person } from 'ionicons/icons';
-import { menuController } from '@ionic/core';
+import {
+  cash, settings, barChart, shirt, qrCode, bulb,
+  logOutOutline, people, cube, notifications, mail, grid, person, menu, water
+} from 'ionicons/icons';
+
 import POS from './pages/POS';
 import Setting from './pages/Setting';
 import Sells from './pages/Sells';
-import Laundry from './pages/Laundry'; // 👈 Importamos tu nueva página
+import Laundry from './pages/Laundry';
 import ScannerQR from './pages/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
 import ProductSelection from './pages/ProductSelection';
@@ -45,193 +48,171 @@ import EmailsPage from './pages/EmailsPage';
 import CategoriesPage from './pages/CategoryPage/CategoriesPage';
 import UsersPage from './pages/UsersPage';
 import IncomesPage from './pages/IncomesPage';
+import WaterTanksPage from './pages/WaterTanksPage';
+import WaterTanksHistoryPage from './pages/WaterTanksHistoryPage';
 
-
-/* Core CSS required for Ionic components to work properly */
+/* Core/Theme CSS */
 import '@ionic/react/css/core.css';
-
-/* Basic CSS for apps built with Ionic */
 import '@ionic/react/css/normalize.css';
 import '@ionic/react/css/structure.css';
 import '@ionic/react/css/typography.css';
-
-/* Optional CSS utils that can be commented out */
 import '@ionic/react/css/padding.css';
 import '@ionic/react/css/float-elements.css';
 import '@ionic/react/css/text-alignment.css';
 import '@ionic/react/css/text-transformation.css';
 import '@ionic/react/css/flex-utils.css';
 import '@ionic/react/css/display.css';
-
-/**
- * Ionic Dark Mode
- * -----------------------------------------------------
- * For more info, please see:
- * https://ionicframework.com/docs/theming/dark-mode
- */
-
-/* import '@ionic/react/css/palettes/dark.always.css'; */
-/* import '@ionic/react/css/palettes/dark.class.css'; */
 import '@ionic/react/css/palettes/dark.system.css';
-
-/* Theme variables */
 import './theme/variables.css';
-import React, { useState } from 'react';
 
-
+import React from 'react';
 setupIonicReact();
 
 const App: React.FC = () => {
-  const location = useLocation();
-
   return (
     <IonApp>
       <IonReactRouter>
-        <IonMenu menuId="main-menu" contentId="main-content">
-          <IonHeader className="menu-header">
-            <IonToolbar>
-              <IonTitle>POS GMO</IonTitle>
-            </IonToolbar>
-          </IonHeader>
-          <IonContent>
-            <div className="profile-section">
-              <IonAvatar className="profile-avatar">
-                <img src="logo192.png" alt="Profile" />
-              </IonAvatar>
-              <div className="profile-info">
-                <h3>admin</h3>
-                <p>Administrator</p>
+        {/* SplitPane pins the menu at ≥792px and keeps it as a drawer on phones */}
+        <IonSplitPane contentId="main" when="(min-width: 792px)">
+          {/* Left menu */}
+          <IonMenu menuId="main-menu" contentId="main" side="start">
+            <IonHeader className="menu-header">
+              <IonToolbar>
+                <IonTitle>POS GMO</IonTitle>
+              </IonToolbar>
+            </IonHeader>
+
+            <IonContent>
+              <div className="profile-section">
+                <IonAvatar className="profile-avatar">
+                  <img src="logo192.png" alt="Profile" />
+                </IonAvatar>
+                <div className="profile-info">
+                  <h3>admin</h3>
+                  <p>Administrator</p>
+                </div>
               </div>
-            </div>
-            <IonList>
-              <IonItemDivider>Catalog</IonItemDivider>
-              <IonItem button routerLink="/clients" onClick={() => menuController.close()}>
-                <IonIcon icon={people} slot="start" />
-                <IonLabel>Clientes</IonLabel>
-              </IonItem>
-              <IonItem button routerLink="/products-management" onClick={() => menuController.close()}>
-                <IonIcon icon={cube} slot="start" />
-                <IonLabel>Productos</IonLabel>
-              </IonItem>
-              <IonItem button routerLink="/categories" onClick={() => menuController.close()}>
-                <IonIcon icon={grid} slot="start" />
-                <IonLabel>Categorías</IonLabel>
-              </IonItem>
 
-              <IonItemDivider>Messages</IonItemDivider>
-              <IonItem button routerLink="/alerts" onClick={() => menuController.close()}>
-                <IonIcon icon={notifications} slot="start" />
-                <IonLabel>Alertas</IonLabel>
-              </IonItem>
-              <IonItem button routerLink="/emails" onClick={() => menuController.close()}>
-                <IonIcon icon={mail} slot="start" />
-                <IonLabel>Correos</IonLabel>
-              </IonItem>
+              <IonList>
+                <IonItemDivider>Catalog</IonItemDivider>
+                <IonItem button routerLink="/clients">
+                  <IonIcon icon={people} slot="start" />
+                  <IonLabel>Clientes</IonLabel>
+                </IonItem>
+                <IonItem button routerLink="/products-management">
+                  <IonIcon icon={cube} slot="start" />
+                  <IonLabel>Productos</IonLabel>
+                </IonItem>
+                <IonItem button routerLink="/categories">
+                  <IonIcon icon={grid} slot="start" />
+                  <IonLabel>Categorías</IonLabel>
+                </IonItem>
 
-              <IonItemDivider>Administration</IonItemDivider>
-              <IonItem button routerLink="/users" onClick={() => menuController.close()}>
-                <IonIcon icon={person} slot="start" />
-                <IonLabel>Usuarios</IonLabel>
-              </IonItem>
-              <IonItem button routerLink="/ingresos" onClick={() => menuController.close()}>
-                <IonIcon icon={barChart} slot="start" />
-                <IonLabel>Ingresos</IonLabel>
-              </IonItem>
+                <IonItemDivider>Messages</IonItemDivider>
+                <IonItem button routerLink="/alerts">
+                  <IonIcon icon={notifications} slot="start" />
+                  <IonLabel>Alertas</IonLabel>
+                </IonItem>
+                <IonItem button routerLink="/emails">
+                  <IonIcon icon={mail} slot="start" />
+                  <IonLabel>Correos</IonLabel>
+                </IonItem>
 
-              <IonItemDivider>IOT</IonItemDivider>
-              <IonItem button routerLink="/led-status" onClick={() => menuController.close()}>
-                <IonIcon icon={bulb} slot="start" />
-                <IonLabel>LED Status</IonLabel>
-              </IonItem>
+                <IonItemDivider>Administration</IonItemDivider>
+                <IonItem button routerLink="/users">
+                  <IonIcon icon={person} slot="start" />
+                  <IonLabel>Usuarios</IonLabel>
+                </IonItem>
+                <IonItem button routerLink="/ingresos">
+                  <IonIcon icon={barChart} slot="start" />
+                  <IonLabel>Ingresos</IonLabel>
+                </IonItem>
 
-              <IonItemDivider>System</IonItemDivider>
-              <IonItem button routerLink="/Setting" onClick={() => menuController.close()}>
-                <IonIcon icon={settings} slot="start" />
-                <IonLabel>Setting</IonLabel>
-              </IonItem>
-              <IonItem button routerLink="/Sells" onClick={() => menuController.close()}>
-                <IonIcon icon={barChart} slot="start" />
-                <IonLabel>Sells</IonLabel>
-              </IonItem>
-              <IonItem button onClick={() => menuController.close()}>
-                <IonIcon icon={logOutOutline} slot="start" />
-                <IonLabel>Sign Out</IonLabel>
-              </IonItem>
-            </IonList>
-          </IonContent>
-        </IonMenu>
-        <IonPage id="main-content">
-          <IonTabs>
-            <IonRouterOutlet>
-              <Route exact path="/POS">
-                <POS />
-              </Route>
-              <Route exact path="/Setting">
-                <Setting />
-              </Route>
-              <Route path="/Sells">
-                <Sells />
-              </Route>
-              <Route path="/Laundry">
-                <Laundry />
-              </Route>
-              <Route path="/ScannerQR">
-                <ScannerQR />
-              </Route>
-              <Route path="/product-selection">
-                <ProductSelection />
-              </Route>
-              <Route exact path="/category">
-                <Category />
-              </Route>
-              <Route exact path="/CategoryPage">
-                <Category />
-              </Route>
-              <Route exact path="/category">
-                <Category />
-              </Route>
-              <Route exact path="/product/:categoryId" component={ProductListPage} />
-              <Route exact path="/products/:productId" component={ProductDetailPage} />
-              <Route exact path="/cart" component={CartPage} />
-              <Route exact path="/movements" component={MovementsPage} />
-              <Route exact path="/led-status" component={LedStatusPage} />
-              <Route exact path="/clients" component={ClientsPage} />
-              <Route exact path="/products-management" component={ProductsManagementPage} />
-              <Route exact path="/categories" component={CategoriesPage} />
-              <Route exact path="/alerts" component={AlertsPage} />
-              <Route exact path="/emails" component={EmailsPage} />
-              <Route exact path="/users" component={UsersPage} />
-              <Route exact path="/ingresos" component={IncomesPage} />
-              <Route exact path="/">
-                <Redirect to="/Laundry" />
-              </Route>
-            </IonRouterOutlet>
-            <IonTabBar slot="bottom" className="custom-tabbar">
-              <IonTabButton tab="Laundry" href="/Laundry">
-                <IonIcon aria-hidden="true" icon={shirt} />
-                <IonLabel>Laundry</IonLabel>
-              </IonTabButton>
-              <IonTabButton tab="ScannerQR" href="/ScannerQR">
-                <IonIcon aria-hidden="true" icon={qrCode} />
-                <IonLabel>Lector QR</IonLabel>
-              </IonTabButton>
-              <IonTabButton tab="POS" href="/POS">
-                <IonIcon aria-hidden="true" icon={cash} />
-                <IonLabel>Vending POS</IonLabel>
-              </IonTabButton>
-              <IonTabButton tab="Menu" href="#" onClick={(e) => e.preventDefault()}>
-                <IonMenuToggle menu="main-menu">
-                  <IonIcon aria-hidden="true" icon={menu} />
-                  <IonLabel>Menu</IonLabel>
-                </IonMenuToggle>
-              </IonTabButton>
-            </IonTabBar>
-          </IonTabs>
-        </IonPage>
+                <IonItemDivider>IOT</IonItemDivider>
+                <IonItem button routerLink="/led-status">
+                  <IonIcon icon={bulb} slot="start" />
+                  <IonLabel>LED Status</IonLabel>
+                </IonItem>
+                <IonItem button routerLink="/water-tanks">
+                  <IonIcon icon={water} slot="start" />
+                  <IonLabel>Water Tanks</IonLabel>
+                </IonItem>
+
+                <IonItemDivider>System</IonItemDivider>
+                <IonItem button routerLink="/setting">
+                  <IonIcon icon={settings} slot="start" />
+                  <IonLabel>Setting</IonLabel>
+                </IonItem>
+                <IonItem button routerLink="/sells">
+                  <IonIcon icon={barChart} slot="start" />
+                  <IonLabel>Sells</IonLabel>
+                </IonItem>
+                <IonItem button>
+                  <IonIcon icon={logOutOutline} slot="start" />
+                  <IonLabel>Sign Out</IonLabel>
+                </IonItem>
+              </IonList>
+            </IonContent>
+          </IonMenu>
+
+          {/* Main content that the SplitPane controls */}
+          <IonPage id="main">
+            <IonTabs>
+              <IonRouterOutlet>
+                <Route exact path="/pos" component={POS} />
+                <Route exact path="/setting" component={Setting} />
+                <Route exact path="/sells" component={Sells} />
+                <Route exact path="/laundry" component={Laundry} />
+                <Route exact path="/scannerqr" component={ScannerQR} />
+
+                <Route exact path="/product-selection" component={ProductSelection} />
+                <Route exact path="/category" component={Category} />
+                <Route exact path="/products/:productId" component={ProductDetailPage} />
+                <Route exact path="/product/:categoryId" component={ProductListPage} />
+                <Route exact path="/cart" component={CartPage} />
+                <Route exact path="/movements" component={MovementsPage} />
+                <Route exact path="/led-status" component={LedStatusPage} />
+                <Route exact path="/clients" component={ClientsPage} />
+                <Route exact path="/products-management" component={ProductsManagementPage} />
+                <Route exact path="/categories" component={CategoriesPage} />
+                <Route exact path="/alerts" component={AlertsPage} />
+                <Route exact path="/emails" component={EmailsPage} />
+                <Route exact path="/users" component={UsersPage} />
+                <Route exact path="/ingresos" component={IncomesPage} />
+                <Route exact path="/water-tanks" component={WaterTanksPage} />
+                <Route exact path="/water-tanks-history/:tankId" component={WaterTanksHistoryPage} />
+
+                <Route exact path="/">
+                  <Redirect to="/laundry" />
+                </Route>
+              </IonRouterOutlet>
+
+              <IonTabBar slot="bottom" className="custom-tabbar">
+                <IonTabButton tab="laundry" href="/laundry">
+                  <IonIcon aria-hidden="true" icon={shirt} />
+                  <IonLabel>Laundry</IonLabel>
+                </IonTabButton>
+                <IonTabButton tab="scannerqr" href="/scannerqr">
+                  <IonIcon aria-hidden="true" icon={qrCode} />
+                  <IonLabel>Lector QR</IonLabel>
+                </IonTabButton>
+                <IonTabButton tab="pos" href="/pos">
+                  <IonIcon aria-hidden="true" icon={cash} />
+                  <IonLabel>Vending POS</IonLabel>
+                </IonTabButton>
+                <IonTabButton tab="menu" href="#" className="menu-tab" onClick={(e) => e.preventDefault()}>
+                  <IonMenuToggle menu="main-menu">
+                    <IonIcon aria-hidden="true" icon={menu} />
+                    <IonLabel>Menu</IonLabel>
+                  </IonMenuToggle>
+                </IonTabButton>
+              </IonTabBar>
+            </IonTabs>
+          </IonPage>
+        </IonSplitPane>
       </IonReactRouter>
     </IonApp>
   );
 };
+
 export default App;
-
-

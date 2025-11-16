@@ -21,3 +21,116 @@ http://ionicframework.com/docs/theming/ */
   --ion-color-primary-shade: #3171e0;
   --ion-color-primary-tint: #4c8dff;
 }
+
+/* ===== Responsive layout helpers ===== */
+
+/* Pinned left menu on desktop (IonSplitPane handles layout).
+   We just size & polish the menu here. */
+   ion-menu {
+    --width: 260px;                 /* comfy sidebar width */
+    --background: #ffffff;
+    --ion-safe-area-right: 0;       /* avoid odd gaps in some browsers */
+    border-right: 1px solid var(--divider);
+  }
+  
+  /* Hide the “Menu” tab and any hamburger you mark as .only-mobile on desktop */
+  @media (min-width: 792px) {
+    .menu-tab,
+    .only-mobile {
+      display: none !important;
+    }
+  }
+  
+  /* Optional: on phones, keep the menu as overlay (SplitPane does this automatically),
+     but a subtle shadow helps when it slides in */
+  @media (max-width: 991.98px) {
+    ion-menu {
+      box-shadow: 0 14px 28px rgba(0,0,0,0.08), 0 10px 10px rgba(0,0,0,0.06);
+    }
+  }
+  
+  /* ===== Sidebar header/profile polish ===== */
+  .menu-header ion-toolbar {
+    --background: #fff;
+    --color: var(--text-primary);
+    box-shadow: var(--header-shadow);
+  }
+  
+  .profile-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+  }
+  .profile-avatar { width: 56px; height: 56px; }
+  .profile-info h3 {
+    margin: 0;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text-primary);
+  }
+  .profile-info p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  
+  /* ===== Dashboard polish ===== */
+  .page-padding {
+    padding: 16px;
+  }
+  @media (min-width: 992px) {
+    .page-padding { padding: 24px 28px; }
+  }
+  
+  ion-card {
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  }
+  
+  /* KPI number look (apply className="kpi-amount" to the $0.00 element) */
+  .kpi-amount {
+    font-size: clamp(40px, 5vw, 56px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--ion-color-primary);
+  }
+  
+  /* Secondary text + subtle dividers inside cards */
+  .muted { color: var(--text-secondary); }
+  .card-divider {
+    height: 1px;
+    background: var(--divider);
+    margin: 12px 0;
+  }
+  
+  /* ===== Tabs ===== */
+  .custom-tabbar {
+    --background: var(--ion-tabbar-background);
+    border-top: 1px solid var(--ion-tabbar-border-color);
+  }
+  
+  /* ===== Buttons ===== */
+  ion-button.button-primary,
+  ion-button.button-primary::part(native) {
+    --background: var(--button-blue);
+    --background-hover: #1f5bd9;
+    --background-activated: #224fcc;
+    --border-radius: 14px;
+    font-weight: 700;
+  }
+  
+  /* ===== Icons/info chips (optional) ===== */
+  .badge-positive {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #e9f9ef;
+    color: #0a7a36;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  
