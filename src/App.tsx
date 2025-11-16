@@ -66,12 +66,14 @@ import '@ionic/react/css/palettes/dark.system.css';
 import './theme/variables.css';
 
 import React from 'react';
+import { IncomeProvider } from './context/IncomeContext';
 setupIonicReact();
 
 const App: React.FC = () => {
   return (
-    <IonApp>
-      <IonReactRouter>
+    <IncomeProvider>
+      <IonApp>
+        <IonReactRouter>
         {/* SplitPane pins the menu at ≥792px and keeps it as a drawer on phones */}
         <IonSplitPane contentId="main" when="(min-width: 792px)">
           {/* Left menu */}
@@ -212,6 +214,7 @@ const App: React.FC = () => {
         </IonSplitPane>
       </IonReactRouter>
     </IonApp>
+    </IncomeProvider>
   );
 };
 
