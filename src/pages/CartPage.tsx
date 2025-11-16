@@ -161,6 +161,14 @@ const CartPage: React.FC = () => {
                 const newId = String(rec.value); // value is a string in the JSON
                 setLastIncomeId(newId);
                 console.log('Income inserted successfully, ID:', newId);
+
+                // Reload all income list after successful insertion
+                try {
+                  await fetchAllLaundry();
+                  console.log('Income list reloaded successfully');
+                } catch (reloadError) {
+                  console.error('Error reloading income list:', reloadError);
+                }
               } else {
                 console.error('Income insertion failed:', rec?.msg || 'Unknown error', rec);
               }
