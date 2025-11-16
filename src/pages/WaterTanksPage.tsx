@@ -343,7 +343,7 @@ const WaterTanksPage: React.FC = () => {
           onDidDismiss={() => setShowToast(false)}
           message={toastMessage}
           duration={3000}
-          color="danger"
+          color={toastMessage === 'Datos actualizados' ? 'success' : 'danger'}
         />
       </IonContent>
     </IonPage>
