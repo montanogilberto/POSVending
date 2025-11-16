@@ -110,6 +110,16 @@ const WaterTanksPage: React.FC = () => {
         presentMailPopover={presentMailPopover}
         screenTitle="Tanques de Agua"
       />
+      <div style={{ padding: '16px', textAlign: 'right' }}>
+        <IonButton
+          fill="outline"
+          onClick={() => loadWaterTanks(true)}
+          disabled={refreshing}
+        >
+          <IonIcon icon={refresh} slot="start" />
+          Actualizar
+        </IonButton>
+      </div>
       <IonContent>
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent></IonRefresherContent>
