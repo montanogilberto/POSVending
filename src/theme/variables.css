@@ -20,6 +20,12 @@ http://ionicframework.com/docs/theming/ */
   --ion-color-primary-contrast-rgb: 255,255,255;
   --ion-color-primary-shade: #3171e0;
   --ion-color-primary-tint: #4c8dff;
+
+  /* Safe area support for status bar */
+  --ion-safe-area-top: env(safe-area-inset-top);
+  --ion-safe-area-bottom: env(safe-area-inset-bottom);
+  --ion-safe-area-left: env(safe-area-inset-left);
+  --ion-safe-area-right: env(safe-area-inset-right);
 }
 
 /* ===== Responsive layout helpers ===== */
@@ -133,4 +139,14 @@ http://ionicframework.com/docs/theming/ */
     font-size: 12px;
     font-weight: 600;
   }
+
+/* ===== Safe Area Support ===== */
+ion-header {
+  padding-top: var(--ion-safe-area-top);
+}
+
+ion-content {
+  --padding-top: var(--ion-safe-area-top);
+  --padding-bottom: var(--ion-safe-area-bottom);
+}
   
