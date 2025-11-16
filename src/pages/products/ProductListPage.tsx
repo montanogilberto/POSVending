@@ -18,6 +18,7 @@ import { useEffect, useState, useRef } from 'react';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
+import '../../styles/dashboard.css';
 
 interface RouteParams {
   categoryId: string;
@@ -93,70 +94,69 @@ const ProductListPage: React.FC = () => {
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle=""
-        showBackButton={true}
-        backButtonText="Categorías"
-        backButtonHref="/Category"
+        screenTitle="Productos"
       />
 
-      <IonContent>
-        <IonGrid className="ion-padding">
-          <IonRow className="ion-justify-content-center">
-            <IonCol sizeMd="6" sizeLg="4" sizeXs="12">
-              <IonCard className="dashboard-card">
-                <IonCardHeader>
-                  <IonCardSubtitle>Productos Disponibles</IonCardSubtitle>
-                </IonCardHeader>
-                <IonCardContent style={{ padding: '16px 24px' }}>
-                  {error && <p style={{ padding: '16px 0' }}>{error}</p>}
+      <IonContent fullscreen className="dashboard-content">
+        <div className="dashboard-container">
+          {/* Header */}
+          <div className="dashboard-header-section">
+            <h1 className="dashboard-title">Productos</h1>
+          </div>
 
-                  {filteredProducts.length > 0 ? (
-                    <div>
-                      {filteredProducts.map((product, index) => (
-                        <div
-                          key={product.id}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '16px 0',
-                            borderBottom: index < filteredProducts.length - 1 ? '1px solid #e5e7eb' : 'none',
+          {/* Products List */}
+          <div className="dashboard-card">
+            <IonCardHeader>
+              <IonCardSubtitle>Productos Disponibles</IonCardSubtitle>
+            </IonCardHeader>
+            <IonCardContent style={{ padding: '16px 24px' }}>
+              {error && <p style={{ padding: '16px 0' }}>{error}</p>}
+
+              {filteredProducts.length > 0 ? (
+                <div>
+                  {filteredProducts.map((product, index) => (
+                    <div
+                      key={product.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '16px 0',
+                        borderBottom: index < filteredProducts.length - 1 ? '1px solid #e5e7eb' : 'none',
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ margin: 0, color: '#111827', fontSize: '18px', fontWeight: 'bold' }}>
+                          {product.name}
+                        </h3>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                          {product.description}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <p style={{ margin: 0, color: '#2563eb', fontSize: '16px', fontWeight: 'bold' }}>
+                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
+                        </p>
+                        <IonButton
+                          fill="clear"
+                          color="primary"
+                          style={{ textTransform: 'uppercase', fontWeight: 'bold' }}
+                          onClick={() => {
+                            history.push(`/products/${product.id}`, { product });
                           }}
                         >
-                          <div style={{ flex: 1 }}>
-                            <h3 style={{ margin: 0, color: '#111827', fontSize: '18px', fontWeight: 'bold' }}>
-                              {product.name}
-                            </h3>
-                            <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
-                              {product.description}
-                            </p>
-                          </div>
-                          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                            <p style={{ margin: 0, color: '#2563eb', fontSize: '16px', fontWeight: 'bold' }}>
-                              {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
-                            </p>
-                            <IonButton
-                              fill="clear"
-                              color="primary"
-                              style={{ textTransform: 'uppercase', fontWeight: 'bold' }}
-                              onClick={() => {
-                                history.push(`/products/${product.id}`, { product });
-                              }}
-                            >
-                              Ver detalles
-                            </IonButton>
-                          </div>
-                        </div>
-                      ))}
+                          Ver detalles
+                        </IonButton>
+                      </div>
                     </div>
-                  ) : (
-                    <p style={{ padding: '16px 0' }}>No hay productos en esta categoría.</p>
-                  )}
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
-        </IonGrid>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ padding: '16px 0' }}>No hay productos en esta categoría.</p>
+              )}
+            </IonCardContent>
+          </div>
+        </div>
       </IonContent>
 
       <AlertPopover

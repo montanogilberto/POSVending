@@ -47,8 +47,11 @@ const IncomesList: React.FC<IncomesListProps> = ({
             <div className="timeline">
               {displayedIncome.map((income, i) => {
                 const now = new Date(income.paymentDate);
-                const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const date = now.toLocaleDateString('es-ES');
+                // Parse date as UTC since database stores in UTC, then convert to Hermosillo timezone (UTC-7)
+                const utcDate = new Date(income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z'));
+                const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+                const time = hermosilloDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                const date = hermosilloDate.toLocaleDateString('es-ES');
                 const status = 'Ingreso';
                 const icon = '💰';
                 const color = 'success';
