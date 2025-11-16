@@ -46,18 +46,9 @@ const WaterTanksPage: React.FC = () => {
 
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
-  useEffect(() => {
-    const stopPeriodicUpdate = startPeriodicWaterTanksUpdate((data) => {
-      setWaterTanks(data.waterTanks);
-      setLoading(false); // Set loading to false after first fetch
-    });
 
-    return () => {
-      stopPeriodicUpdate();
-    };
-  }, []);
-
-<<<<<<< HEAD
+>>>>>>> d78ff98a0f154efe4124c7cbb768de72ccf56f53
+=======
   const loadWaterTanks = async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
@@ -76,6 +67,17 @@ const WaterTanksPage: React.FC = () => {
       if (isRefresh) setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    const stopPeriodicUpdate = startPeriodicWaterTanksUpdate((data) => {
+      setWaterTanks(data.waterTanks);
+      setLoading(false); // Set loading to false after first fetch
+    });
+
+    return () => {
+      stopPeriodicUpdate();
+    };
+  }, []);
 =======
 
 >>>>>>> d78ff98a0f154efe4124c7cbb768de72ccf56f53
