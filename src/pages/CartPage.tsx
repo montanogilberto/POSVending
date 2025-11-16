@@ -37,10 +37,12 @@ import useInactivityTimer from '../hooks/useInactivityTimer';
 import { fetchAllLaundry } from '../api/laundryApi';
 import Receipt from '../components/Receipt';
 import { fetchTicket } from '../api/ticketApi';
+import { useIncome } from '../context/IncomeContext';
 import '../styles/dashboard.css';
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
+  const { loadIncomes } = useIncome();
   const history = useHistory();
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | ''>('');
   const [cashPaid, setCashPaid] = useState<string>('');
@@ -161,6 +163,14 @@ const CartPage: React.FC = () => {
                 const newId = String(rec.value); // value is a string in the JSON
                 setLastIncomeId(newId);
                 console.log('Income inserted successfully, ID:', newId);
+
+                // Reload all income list after successful insertion
+                try {
+                  await loadIncomes();
+                  console.log('Income list reloaded successfully');
+                } catch (reloadError) {
+                  console.error('Error reloading income list:', reloadError);
+                }
               } else {
                 console.error('Income insertion failed:', rec?.msg || 'Unknown error', rec);
               }
@@ -371,7 +381,7 @@ const CartPage: React.FC = () => {
               setShowReceipt(false);
               setTicketData(null);
               clearCart();
-              await fetchAllLaundry();
+              await loadIncomes();
               history.push('/Laundry');
             }}
           >

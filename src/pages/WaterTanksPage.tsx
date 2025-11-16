@@ -14,16 +14,19 @@ import {
   IonIcon,
   IonToast,
   IonButton,
+  IonRefresher,
+  IonRefresherContent,
 } from '@ionic/react';
-import { waterOutline, barChart } from 'ionicons/icons';
+import { waterOutline, barChart, refresh } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import Header from '../components/Header';
-import { fetchWaterTanks, WaterTank } from '../api/waterTanksApi';
+import { fetchWaterTanks, WaterTank, startPeriodicWaterTanksUpdate } from '../api/waterTanksApi';
 
 const WaterTanksPage: React.FC = () => {
   const history = useHistory();
   const [waterTanks, setWaterTanks] = useState<WaterTank[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
@@ -43,22 +46,35 @@ const WaterTanksPage: React.FC = () => {
 
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
-  useEffect(() => {
-    loadWaterTanks();
-  }, []);
-
-  const loadWaterTanks = async () => {
+  const loadWaterTanks = async (isRefresh = false) => {
     try {
+      if (isRefresh) setRefreshing(true);
       const response = await fetchWaterTanks();
       setWaterTanks(response.waterTanks);
+      if (isRefresh) {
+        setToastMessage('Datos actualizados');
+        setShowToast(true);
+      }
     } catch (error) {
       console.error('Error loading water tanks:', error);
       setToastMessage('Error al cargar los tanques de agua');
       setShowToast(true);
     } finally {
       setLoading(false);
+      if (isRefresh) setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    const stopPeriodicUpdate = startPeriodicWaterTanksUpdate((data) => {
+      setWaterTanks(data.waterTanks);
+      setLoading(false); // Set loading to false after first fetch
+    });
+
+    return () => {
+      stopPeriodicUpdate();
+    };
+  }, []);
 
   const getLevelColor = (percent: number): string => {
     if (percent >= 80) return 'success';
@@ -70,6 +86,11 @@ const WaterTanksPage: React.FC = () => {
     if (percent >= 80) return 'Alto';
     if (percent >= 50) return 'Medio';
     return 'Bajo';
+  };
+
+  const handleRefresh = (event: CustomEvent) => {
+    loadWaterTanks(true);
+    event.detail.complete();
   };
 
   if (loading) {
@@ -96,7 +117,20 @@ const WaterTanksPage: React.FC = () => {
         presentMailPopover={presentMailPopover}
         screenTitle="Tanques de Agua"
       />
+      <div style={{ padding: '16px', textAlign: 'right' }}>
+        <IonButton
+          fill="outline"
+          onClick={() => loadWaterTanks(true)}
+          disabled={refreshing}
+        >
+          <IonIcon icon={refresh} slot="start" />
+          Actualizar
+        </IonButton>
+      </div>
       <IonContent>
+        <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
+          <IonRefresherContent></IonRefresherContent>
+        </IonRefresher>
         <div style={{ padding: '16px' }}>
           <IonGrid>
             <IonRow>
@@ -316,7 +350,7 @@ const WaterTanksPage: React.FC = () => {
           onDidDismiss={() => setShowToast(false)}
           message={toastMessage}
           duration={3000}
-          color="danger"
+          color={toastMessage === 'Datos actualizados' ? 'success' : 'danger'}
         />
       </IonContent>
     </IonPage>

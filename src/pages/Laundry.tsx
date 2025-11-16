@@ -30,6 +30,7 @@ import useInactivityTimer from '../hooks/useInactivityTimer';
 import { fetchAllLaundry } from '../api/laundryApi';
 import Receipt from '../components/Receipt';
 import { fetchTicket } from '../api/ticketApi';
+import { useIncome } from '../context/IncomeContext';
 
 interface Transaction {
   date: string;
@@ -68,10 +69,10 @@ interface LocationState {
 const Laundry: React.FC = () => {
   // Remove the duplicate declaration of history
   const location = useLocation();
+  const { allIncome, loadIncomes } = useIncome();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [allIncome, setAllIncome] = useState<Income[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
@@ -79,23 +80,11 @@ const Laundry: React.FC = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
 
-  // 🔄 GET all_laundry
-  const loadAllLaundry = async () => {
-    try {
-      const sortedIncome = await fetchAllLaundry();
-      setAllIncome(sortedIncome);
-    } catch (error) {
-      console.error(error);
-      setToastMessage('Error al obtener ventas del backend.');
-      setShowToast(true);
-    }
-  };
-
   useEffect(() => {
-    loadAllLaundry();
-  }, []);
+    loadIncomes();
+  }, [loadIncomes]);
 
-  useInactivityTimer(300000, loadAllLaundry);
+  useInactivityTimer(300000, loadIncomes);
 
   useEffect(() => {
     const state = location.state as LocationState | undefined;
@@ -155,7 +144,7 @@ const Laundry: React.FC = () => {
       setShowToast(true);
       setCart([]);
       setShowCart(false);
-      loadAllLaundry();
+      loadIncomes();
     } catch (error) {
       console.error(error);
       setToastMessage('Error al confirmar la venta.');
