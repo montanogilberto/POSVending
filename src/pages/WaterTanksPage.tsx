@@ -46,9 +46,6 @@ const WaterTanksPage: React.FC = () => {
 
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
-
->>>>>>> d78ff98a0f154efe4124c7cbb768de72ccf56f53
-=======
   const loadWaterTanks = async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
@@ -78,9 +75,6 @@ const WaterTanksPage: React.FC = () => {
       stopPeriodicUpdate();
     };
   }, []);
-=======
-
->>>>>>> d78ff98a0f154efe4124c7cbb768de72ccf56f53
 
   const getLevelColor = (percent: number): string => {
     if (percent >= 80) return 'success';
