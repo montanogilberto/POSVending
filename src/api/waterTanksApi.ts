@@ -31,3 +31,23 @@ export const fetchWaterTanks = async (): Promise<WaterTanksResponse> => {
   }
   return response.json();
 };
+
+export const startPeriodicWaterTanksUpdate = (callback: (data: WaterTanksResponse) => void) => {
+  const fetchAndCallback = async () => {
+    try {
+      const data = await fetchWaterTanks();
+      callback(data);
+    } catch (error) {
+      console.error('Error fetching water tanks:', error);
+    }
+  };
+
+  // Initial fetch
+  fetchAndCallback();
+
+  // Set up periodic updates every hour (60 minutes * 60 seconds * 1000 ms)
+  const intervalId = setInterval(fetchAndCallback, 60 * 60 * 1000);
+
+  // Return cleanup function to stop the interval
+  return () => clearInterval(intervalId);
+};

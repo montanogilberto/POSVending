@@ -20,7 +20,7 @@ import {
 import { waterOutline, barChart, refresh } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import Header from '../components/Header';
-import { fetchWaterTanks, WaterTank } from '../api/waterTanksApi';
+import { fetchWaterTanks, WaterTank, startPeriodicWaterTanksUpdate } from '../api/waterTanksApi';
 
 const WaterTanksPage: React.FC = () => {
   const history = useHistory();
@@ -47,9 +47,17 @@ const WaterTanksPage: React.FC = () => {
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
   useEffect(() => {
-    loadWaterTanks();
+    const stopPeriodicUpdate = startPeriodicWaterTanksUpdate((data) => {
+      setWaterTanks(data.waterTanks);
+      setLoading(false); // Set loading to false after first fetch
+    });
+
+    return () => {
+      stopPeriodicUpdate();
+    };
   }, []);
 
+<<<<<<< HEAD
   const loadWaterTanks = async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
@@ -68,6 +76,9 @@ const WaterTanksPage: React.FC = () => {
       if (isRefresh) setRefreshing(false);
     }
   };
+=======
+
+>>>>>>> d78ff98a0f154efe4124c7cbb768de72ccf56f53
 
   const getLevelColor = (percent: number): string => {
     if (percent >= 80) return 'success';
