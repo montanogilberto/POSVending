@@ -302,7 +302,12 @@ const WaterTanksHistoryPage: React.FC = () => {
                   <IonItem key={record.tankWatersDetailId}>
                     <IonIcon icon={waterOutline} slot="start" />
                     <IonLabel>
-                      <h2>{record.quantityLiters} Litros</h2>
+                      <h2>
+                        {record.quantityLiters
+                          ? `${record.quantityLiters} Litros`
+                          : 'Lectura automática'
+                        }
+                      </h2>
                       <p>
                         {(() => {
                           // Parse date as UTC since database stores in UTC, then convert to Hermosillo timezone (UTC-7)
