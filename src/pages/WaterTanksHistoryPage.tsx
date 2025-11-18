@@ -195,7 +195,10 @@ const WaterTanksHistoryPage: React.FC = () => {
                         data: tank.history
                           .slice()
                           .reverse()
-                          .map((record) => record.quantityLiters || 0),
+                          .map((record) => {
+                            const liters = record.quantityLiters || (record.quantityLiter ? parseFloat(record.quantityLiter) : 0);
+                            return liters;
+                          }),
                         borderColor: '#007BFF',
                         backgroundColor: 'rgba(0, 123, 255, 0.1)',
                         tension: 0.4,
@@ -207,8 +210,9 @@ const WaterTanksHistoryPage: React.FC = () => {
                           .slice()
                           .reverse()
                           .map((record) => {
-                            if (record.quantityLiters) {
-                              return ((record.quantityLiters / tank.capacityLiters) * 100).toFixed(1);
+                            const liters = record.quantityLiters || (record.quantityLiter ? parseFloat(record.quantityLiter) : 0);
+                            if (liters > 0) {
+                              return parseFloat(((liters / tank.capacityLiters) * 100).toFixed(1));
                             }
                             return 0;
                           }),
@@ -303,8 +307,8 @@ const WaterTanksHistoryPage: React.FC = () => {
                     <IonIcon icon={waterOutline} slot="start" />
                     <IonLabel>
                       <h2>
-                        {record.quantityLiters
-                          ? `${record.quantityLiters} Litros`
+                        {record.quantityLiters || record.quantityLiter
+                          ? `${record.quantityLiters || (record.quantityLiter ? parseFloat(record.quantityLiter) : 0)} Litros`
                           : 'Lectura automática'
                         }
                       </h2>
@@ -319,7 +323,6 @@ const WaterTanksHistoryPage: React.FC = () => {
                     </IonLabel>
                   </IonItem>
                 ))}
-              </IonList>
             </IonCardContent>
           </IonCard>
         </div>
