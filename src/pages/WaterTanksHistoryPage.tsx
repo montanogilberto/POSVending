@@ -323,6 +323,7 @@ const WaterTanksHistoryPage: React.FC = () => {
                     </IonLabel>
                   </IonItem>
                 ))}
+              </IonList>
             </IonCardContent>
           </IonCard>
         </div>

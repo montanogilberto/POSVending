@@ -3,7 +3,7 @@
   "name": "POS GMO",
   "icons": [
     {
-      "src": "favicon.png",
+      "src": "assets/dry_machine_icon.png",
       "sizes": "48x48",
       "type": "image/png"
     }

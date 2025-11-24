@@ -38,7 +38,7 @@ import Category from './pages/CategoryPage/CategoryPage';
 import ProductSelection from './pages/ProductSelection';
 import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
-import CartPage from './pages/CartPage';
+import CartPage from './pages/CartPage/CartPage';
 import MovementsPage from './pages/MovementsPage';
 import LedStatusPage from './pages/LedStatusPage';
 import ClientsPage from './pages/ClientsPage';
