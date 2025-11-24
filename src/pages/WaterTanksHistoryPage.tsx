@@ -18,9 +18,31 @@ import {
   IonTitle,
   IonHeader,
 } from '@ionic/react';
-import { waterOutline, timeOutline } from 'ionicons/icons';
+import { waterOutline, timeOutline, barChartOutline } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { fetchWaterTanks, WaterTank, TankWaterDetail } from '../api/waterTanksApi';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const WaterTanksHistoryPage: React.FC = () => {
   const { tankId } = useParams<{ tankId: string }>();
@@ -142,6 +164,134 @@ const WaterTanksHistoryPage: React.FC = () => {
             </IonCardContent>
           </IonCard>
 
+          {/* Water Level Chart */}
+          <IonCard style={{ marginBottom: '16px' }}>
+            <IonCardHeader>
+              <IonCardTitle style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <IonIcon icon={barChartOutline} />
+                Gráfico de Niveles de Agua
+              </IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent>
+              <div style={{ height: '300px' }}>
+                <Line
+                  data={{
+                    labels: tank.history
+                      .slice()
+                      .reverse()
+                      .map((record) => {
+                        const utcDate = new Date(record.createdAt + (record.createdAt.includes('Z') ? '' : 'Z'));
+                        const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+                        return hermosilloDate.toLocaleTimeString('es-ES', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          day: '2-digit',
+                          month: '2-digit'
+                        });
+                      }),
+                    datasets: [
+                      {
+                        label: 'Litros',
+                        data: tank.history
+                          .slice()
+                          .reverse()
+                          .map((record) => {
+                            const liters = record.quantityLiters || (record.quantityLiter ? parseFloat(record.quantityLiter) : 0);
+                            return liters;
+                          }),
+                        borderColor: '#007BFF',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                      },
+                      {
+                        label: 'Porcentaje (%)',
+                        data: tank.history
+                          .slice()
+                          .reverse()
+                          .map((record) => {
+                            const liters = record.quantityLiters || (record.quantityLiter ? parseFloat(record.quantityLiter) : 0);
+                            if (liters > 0) {
+                              return parseFloat(((liters / tank.capacityLiters) * 100).toFixed(1));
+                            }
+                            return 0;
+                          }),
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1',
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                      mode: 'index',
+                      intersect: false,
+                    },
+                    plugins: {
+                      legend: {
+                        display: true,
+                        position: 'top',
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                              label += ': ';
+                            }
+                            if (context.datasetIndex === 0) {
+                              label += context.parsed.y + ' L';
+                            } else {
+                              label += context.parsed.y + ' %';
+                            }
+                            return label;
+                          }
+                        }
+                      },
+                    },
+                    scales: {
+                      x: {
+                        display: true,
+                        title: {
+                          display: true,
+                          text: 'Tiempo',
+                        },
+                      },
+                      y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                          display: true,
+                          text: 'Litros',
+                        },
+                        min: 0,
+                        max: tank.capacityLiters,
+                      },
+                      y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                          display: true,
+                          text: 'Porcentaje (%)',
+                        },
+                        min: 0,
+                        max: 100,
+                        grid: {
+                          drawOnChartArea: false,
+                        },
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </IonCardContent>
+          </IonCard>
+
           {/* History List */}
           <IonCard>
             <IonCardHeader>
@@ -156,7 +306,12 @@ const WaterTanksHistoryPage: React.FC = () => {
                   <IonItem key={record.tankWatersDetailId}>
                     <IonIcon icon={waterOutline} slot="start" />
                     <IonLabel>
-                      <h2>{record.quantityLiters} Litros</h2>
+                      <h2>
+                        {record.quantityLiters || record.quantityLiter
+                          ? `${record.quantityLiters || (record.quantityLiter ? parseFloat(record.quantityLiter) : 0)} Litros`
+                          : 'Lectura automática'
+                        }
+                      </h2>
                       <p>
                         {(() => {
                           // Parse date as UTC since database stores in UTC, then convert to Hermosillo timezone (UTC-7)

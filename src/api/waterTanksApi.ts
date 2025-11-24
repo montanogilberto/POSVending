@@ -1,6 +1,7 @@
 export interface TankWaterDetail {
   tankWatersDetailId: number;
-  quantityLiters: number;
+  quantityLiters?: number;
+  quantityLiter?: string;
   createdAt: string;
 }
 

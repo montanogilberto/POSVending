@@ -61,24 +61,74 @@ http://ionicframework.com/docs/theming/ */
     --color: var(--text-primary);
     box-shadow: var(--header-shadow);
   }
-  
-  .profile-section {
+
+  .profile-header {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 16px;
+    padding: 24px 16px;
+    background: linear-gradient(135deg, #007BFF 0%, #0056D2 100%);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: relative;
   }
-  .profile-avatar { width: 56px; height: 56px; }
-  .profile-info h3 {
+
+  .profile-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(1px);
+    border-radius: 0 0 16px 16px;
+  }
+
+  .profile-header > * {
+    position: relative;
+    z-index: 1;
+  }
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    margin-bottom: 12px;
+  }
+  .profile-info {
+    text-align: center;
+  }
+  .profile-name {
     margin: 0;
-    font-weight: 700;
-    font-size: 16px;
-    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 18px;
+    color: #fff;
   }
-  .profile-info p {
-    margin: 2px 0 0;
-    font-size: 12px;
-    color: var(--text-secondary);
+  .profile-role {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: rgba(255,255,255,0.85);
+  }
+
+  /* Menu sections styling */
+  ion-item-divider {
+    font-weight: 500;
+    font-size: 13px;
+    color: #777;
+    margin-top: 12px;
+    border: none;
+  }
+
+  /* Active item style */
+  ion-item.selected {
+    background-color: rgba(0, 123, 255, 0.08);
+    border-left: 4px solid #007BFF;
+  }
+
+  /* Hover effect for menu items on desktop */
+  ion-item:hover {
+    background-color: rgba(0,0,0,0.03);
   }
   
   /* ===== Dashboard polish ===== */
