@@ -17,7 +17,7 @@ import {
   IonIcon,
   IonModal,
 } from '@ionic/react';
-import { waterOutline, receiptOutline, documentsOutline } from 'ionicons/icons';
+import { waterOutline, receiptOutline, documentsOutline, calendarOutline, calendar } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 import { helpCircleOutline, notificationsOutline } from 'ionicons/icons';
@@ -155,6 +155,34 @@ const Laundry: React.FC = () => {
   const calculateTotal = (): number =>
     allIncome.reduce((sum, income) => sum + income.total, 0);
 
+  const calculateDailySales = (): number => {
+    const today = new Date();
+    const hermosilloToday = new Date(today.getTime() - (7 * 60 * 60 * 1000)); // UTC-7
+    const todayString = hermosilloToday.toISOString().split('T')[0]; // YYYY-MM-DD
+    return allIncome
+      .filter(income => {
+        const utcDate = new Date(income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z'));
+        const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+        const dateString = hermosilloDate.toISOString().split('T')[0];
+        return dateString === todayString;
+      })
+      .reduce((sum, income) => sum + income.total, 0);
+  };
+
+  const calculateMonthlyTotal = (): number => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - (7 * 60 * 60 * 1000));
+    const currentMonth = hermosilloNow.getMonth();
+    const currentYear = hermosilloNow.getFullYear();
+    return allIncome
+      .filter(income => {
+        const utcDate = new Date(income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z'));
+        const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+        return hermosilloDate.getMonth() === currentMonth && hermosilloDate.getFullYear() === currentYear;
+      })
+      .reduce((sum, income) => sum + income.total, 0);
+  };
+
   const currentMonthYear = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
   const currentUser = 'admin'; // From UserContext if available
   const percentageChange = '+0%'; // Mock; calculate from previous month if backend provides
@@ -257,28 +285,71 @@ const Laundry: React.FC = () => {
             <h1 className="dashboard-title">Lavandería</h1>
           </div>
 
-          {/* KPI Card - Total Ingresos */}
-          <div className="dashboard-kpi-card">
-            <div className="kpi-card-content">
-              <div className="kpi-icon">
-                <IonIcon icon={waterOutline} size="large" />
-              </div>
-              <div className="kpi-info">
-                <h3 className="kpi-label">Total de Ingresos</h3>
-                <div className="kpi-amount">${calculateTotal().toFixed(2)}</div>
-                <div className="kpi-meta">
-                  <span>{currentMonthYear}</span>
-                  <span>• {currentUser}</span>
-                  <span className="kpi-change">{percentageChange}</span>
+          {/* Metrics Grid */}
+          <IonGrid className="dashboard-metrics-grid">
+            <IonRow>
+              {/* Daily Sales Card */}
+              <IonCol size="12" size-md="6">
+                <div className="dashboard-small-kpi-card">
+                  <div className="kpi-card-content">
+                    <div className="kpi-icon">
+                      <IonIcon icon={calendarOutline} size="large" />
+                    </div>
+                    <div className="kpi-info">
+                      <h3 className="kpi-label">Ventas Diarias</h3>
+                      <div className="kpi-amount">${calculateDailySales().toFixed(2)}</div>
+                      <div className="kpi-meta">
+                        <span>{new Date().toLocaleDateString('es-ES')}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="kpi-action">
-              <IonButton expand="block" className="start-sale-button" onClick={handleStartSeller}>
-                Iniciar Venta
-              </IonButton>
-            </div>
-          </div>
+              </IonCol>
+              {/* Monthly Total Card */}
+              <IonCol size="12" size-md="6">
+                <div className="dashboard-small-kpi-card">
+                  <div className="kpi-card-content">
+                    <div className="kpi-icon">
+                      <IonIcon icon={calendar} size="large" />
+                    </div>
+                    <div className="kpi-info">
+                      <h3 className="kpi-label">Total Mensual</h3>
+                      <div className="kpi-amount">${calculateMonthlyTotal().toFixed(2)}</div>
+                      <div className="kpi-meta">
+                        <span>{currentMonthYear}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </IonCol>
+            </IonRow>
+            {/* Total Income Card */}
+            <IonRow>
+              <IonCol size="12">
+                <div className="dashboard-kpi-card">
+                  <div className="kpi-card-content">
+                    <div className="kpi-icon">
+                      <IonIcon icon={waterOutline} size="large" />
+                    </div>
+                    <div className="kpi-info">
+                      <h3 className="kpi-label">Total de Ingresos</h3>
+                      <div className="kpi-amount">${calculateTotal().toFixed(2)}</div>
+                      <div className="kpi-meta">
+                        <span>{currentMonthYear}</span>
+                        <span>• {currentUser}</span>
+                        <span className="kpi-change">{percentageChange}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="kpi-action">
+                    <IonButton expand="block" className="start-sale-button" onClick={handleStartSeller}>
+                      Iniciar Venta
+                    </IonButton>
+                  </div>
+                </div>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
 
           {/* Carrito Summary if showCart */}
           {showCart && cart.length > 0 && (
