@@ -1,8 +1,8 @@
-- [x] Redesign CartPage.tsx with centered rounded white card (20-24px radius, soft shadow)
-- [x] Update product blocks: title bold, delete icon right-aligned, details (quantity, price, options)
-- [x] Add section separator line
-- [x] Display 'Total: $15.00' in bold
-- [x] Add payment method dropdown with label
-- [x] Add three buttons: outline blue 'Agregar más productos', filled blue 'Proceder al pago', gray 'Vaciar carrito'
-- [x] Apply spacing 16-24px, subtle shadows, clean typography (Inter or SF Pro), light gray background
-- [x] Ensure compact, elegant, POS-friendly, mobile-responsive design
+# Laundry Dashboard Redesign TODO
+
+## Tasks
+- [ ] Update imports in Laundry.tsx for new icons (calendarOutline, calendar)
+- [ ] Add calculation functions for Daily Sales and Monthly Total
+- [ ] Modify JSX to add responsive grid with two small metric cards above the large KPI card
+- [ ] Update Laundry.css to add styles for small metric cards
+- [ ] Test layout responsiveness and visual consistency

@@ -108,6 +108,31 @@
   font-size: 1rem;
 }
 
+/* Small KPI Card */
+.dashboard-small-kpi-card {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Metrics Grid */
+.dashboard-metrics-grid {
+  padding: 0;
+  margin: 0;
+}
+
+.dashboard-metrics-grid ion-row {
+  margin-bottom: 16px;
+}
+
+.dashboard-metrics-grid ion-row:last-child {
+  margin-bottom: 0;
+}
+
 /* Cart Card */
 .dashboard-cart-card {
   background: #fff;
@@ -272,6 +297,10 @@
 
   .dashboard-kpi-card {
     padding: 24px;
+  }
+
+  .dashboard-small-kpi-card {
+    padding: 20px;
   }
 
   .kpi-card-content {
