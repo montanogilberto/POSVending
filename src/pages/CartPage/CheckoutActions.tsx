@@ -17,6 +17,9 @@ const CheckoutActions: React.FC<CheckoutActionsProps> = ({
 }) => {
   return (
     <>
+      <IonButton expand="block" color="primary" onClick={handleAddMoreProducts} >
+        Agregar mas productos
+      </IonButton>
       <IonButton expand="block" color="primary" onClick={handleCheckout} disabled={!isCheckoutEnabled}>
         Proceder al pago
       </IonButton>
@@ -25,11 +28,6 @@ const CheckoutActions: React.FC<CheckoutActionsProps> = ({
         Vaciar carrito
       </IonButton>
 
-      <IonFab slot="fixed" horizontal="end">
-        <IonFabButton onClick={handleAddMoreProducts} aria-label="agregar mas productos">
-          <IonIcon icon={addCircle} />
-        </IonFabButton>
-      </IonFab>
     </>
   );
 };

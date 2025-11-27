@@ -147,7 +147,7 @@ const ProductDetailPage: React.FC = () => {
 
     requiredOptions.forEach(option => {
       const value = selectedOptions[option.productOptionId];
-      if (hasChoices(option) && (!value || (Array.isArray(value) && value.length === 0))) {
+      if (option.type === 'radio' && hasChoices(option) && (!value || (Array.isArray(value) && value.length === 0))) {
         missingGroups.push(option.name);
       }
     });

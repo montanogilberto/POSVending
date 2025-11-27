@@ -1,7 +1,8 @@
-# TODO: Integrate fetchAllLaundry into CartPage onDidDismiss
-
-## Steps to Complete:
-- [x] Create `src/api/laundryApi.ts` with extracted `fetchAllLaundry` function
-- [x] Update `src/pages/Laundry.tsx` to import and use the extracted function
-- [x] Update `src/pages/CartPage.tsx` to import and call `fetchAllLaundry` in `onDidDismiss` callback
-- [ ] Test the changes: Place an order, verify navigation and API call
+- [x] Redesign CartPage.tsx with centered rounded white card (20-24px radius, soft shadow)
+- [x] Update product blocks: title bold, delete icon right-aligned, details (quantity, price, options)
+- [x] Add section separator line
+- [x] Display 'Total: $15.00' in bold
+- [x] Add payment method dropdown with label
+- [x] Add three buttons: outline blue 'Agregar más productos', filled blue 'Proceder al pago', gray 'Vaciar carrito'
+- [x] Apply spacing 16-24px, subtle shadows, clean typography (Inter or SF Pro), light gray background
+- [x] Ensure compact, elegant, POS-friendly, mobile-responsive design
