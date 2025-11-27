@@ -8,7 +8,10 @@ import {
   IonBackButton,
   IonToast,
   IonAlert,
+  IonButton,
+  IonIcon,
 } from '@ionic/react';
+import { addCircle, card, trash } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
 import { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
@@ -21,20 +24,19 @@ import '../../styles/dashboard.css';
 import CartSummary from './CartSummary';
 import CartItemsList from './CartItemsList';
 import CheckoutActions from './CheckoutActions';
-import ReceiptModal from './ReceiptModal';
+// Removed ReceiptModal import as it's no longer used
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
   const { loadIncomes } = useIncome();
   const history = useHistory();
-  const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | 'transferencia' | ''>('');
   const [cashPaid, setCashPaid] = useState<string>('');
   const [showAlert, setShowAlert] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
-  const [showReceipt, setShowReceipt] = useState(false);
   const [ticketData, setTicketData] = useState<any>(null);
   const [lastIncomeId, setLastIncomeId] = useState<string | null>(null);
 
@@ -42,7 +44,6 @@ const CartPage: React.FC = () => {
 
   const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
-  // ✅ FIX — versión corregida del isCheckoutEnabled
   const cashNumber = parseFloat(cashPaid);
 
   const isCheckoutEnabled: boolean =
@@ -181,30 +182,93 @@ const CartPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent fullscreen className="dashboard-content">
-        <div className="dashboard-container">
-          <div className="dashboard-header-section">
-            <h1 className="dashboard-title">Carrito de Compras</h1>
-          </div>
+      <IonContent fullscreen style={{ backgroundColor: '#f5f5f5', fontFamily: 'Inter, SF Pro, sans-serif' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '16px' }}>
+          <div className="cart-container">
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px', textAlign: 'center' }}>Carrito de Compras</h2>
 
-          <div className="dashboard-card">
-            <CartItemsList cart={cart} removeFromCart={removeFromCart} />
+            {cart.length === 0 ? (
+              <p style={{ color: '#666', textAlign: 'center' }}>El carrito está vacío.</p>
+            ) : (
+              <>
+                {cart.map((item) => (
+                  <div key={item.id} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <h3 style={{ fontWeight: 'bold', margin: 0 }}>{item.name}</h3>
+                      <button onClick={() => removeFromCart(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: '18px' }}>✕</button>
+                    </div>
+                    <p style={{ margin: '4px 0' }}>Cantidad: {item.quantity}</p>
+                    <p style={{ margin: '4px 0' }}>Precio: ${item.price.toFixed(2)}</p>
+                    {item.selectedOptionLabels && Object.entries(item.selectedOptionLabels).map(([key, value]) => (
+                      <p key={key} style={{ margin: '4px 0' }}>{key}: {Array.isArray(value) ? value.join(', ') : value}</p>
+                    ))}
+                  </div>
+                ))}
 
-            <CartSummary
-              total={total}
-              paymentMethod={paymentMethod}
-              setPaymentMethod={setPaymentMethod}
-              cashPaid={cashPaid}
-              setCashPaid={setCashPaid}
-              isCheckoutEnabled={isCheckoutEnabled}
-            />
+                <hr style={{ border: 'none', borderTop: '1px solid #e0e0e0', margin: '24px 0' }} />
 
-            <CheckoutActions
-              isCheckoutEnabled={isCheckoutEnabled}
-              handleCheckout={handleCheckout}
-              clearCart={clearCart}
-              handleAddMoreProducts={handleAddMoreProducts}
-            />
+                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '24px' }}>Total: ${total.toFixed(2)}</div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Método de pago</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as any)}
+                    style={{ width: '100%', padding: '12px', border: '1px solid #ccc', borderRadius: '8px', fontSize: '16px' }}
+                  >
+                    <option value="">Seleccionar método</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                  </select>
+                </div>
+
+                {paymentMethod === 'efectivo' && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Efectivo recibido</label>
+                    <input
+                      type="number"
+                      value={cashPaid}
+                      onChange={(e) => setCashPaid(e.target.value)}
+                      placeholder="Ingrese el efectivo recibido"
+                      min={total}
+                      style={{ width: '100%', padding: '12px', border: '1px solid #ccc', borderRadius: '8px', fontSize: '16px' }}
+                    />
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <IonButton
+                    
+                    fill="outline"
+                    color="primary"
+                    onClick={handleAddMoreProducts}
+                  >
+                    <IonIcon slot="start" icon={addCircle} />
+                    Agregar más productos
+                  </IonButton>
+                  <IonButton
+                    expand="block"
+                    fill="solid"
+                    color="primary"
+                    onClick={handleCheckout}
+                    disabled={!isCheckoutEnabled}
+                  >
+                    <IonIcon slot="start" icon={card} />
+                    Proceder al pago
+                  </IonButton>
+                  <IonButton
+                    expand="block"
+                    fill="solid"
+                    color="medium"
+                    onClick={clearCart}
+                  >
+                    <IonIcon slot="start" icon={trash} />
+                    Vaciar carrito
+                  </IonButton>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -240,7 +304,7 @@ const CartPage: React.FC = () => {
             if (lastIncomeId) {
               const ticket = await fetchTicket(lastIncomeId);
               setTicketData(ticket);
-              setShowReceipt(true);
+              // Removed setting showReceipt true, as modal is gone
             }
           }}
           message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
@@ -259,19 +323,6 @@ const CartPage: React.FC = () => {
               },
             },
           ]}
-        />
-
-        <ReceiptModal
-          showReceipt={showReceipt}
-          ticketData={ticketData}
-          receiptRef={receiptRef}
-          paymentMethod={paymentMethod}
-          cashPaid={cashPaid}
-          clearCart={clearCart}
-          loadIncomes={loadIncomes}
-          setShowReceipt={setShowReceipt}
-          setTicketData={setTicketData}
-          history={history}
         />
       </IonContent>
     </IonPage>

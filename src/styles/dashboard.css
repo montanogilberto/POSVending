@@ -36,6 +36,41 @@
   padding: 32px;
 }
 
+/* Cart Container for POS Interface */
+.cart-container {
+  width: 94%;
+  max-width: 480px;
+  margin: 20px auto;
+  padding: 24px;
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+/* Tablet */
+@media (min-width: 768px) {
+  .cart-container {
+    max-width: 700px;
+    padding: 32px;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .cart-container {
+    max-width: 1000px;
+    padding: 40px;
+    font-size: 1.05rem;
+  }
+}
+
+/* Large Desktop */
+@media (min-width: 1400px) {
+  .cart-container {
+    max-width: 1200px;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .dashboard-container {
