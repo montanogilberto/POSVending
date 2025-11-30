@@ -1,11 +1,11 @@
 .receipt-container {
-  max-width: 384px; /* 48mm at 8 dots/mm, approx 384px at 96 DPI */
+  max-width: 100%; /* Full width for screen display */
   margin: 0 auto;
   background-color: #ffffff;
-  border-radius: 0; /* No radius for thermal print */
-  box-shadow: none; /* No shadow for print */
-  padding: 10px;
-  font-family: 'Courier New, monospace'; /* Monospace for fixed width */
+  border-radius: 8px; /* Add radius for screen */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Add shadow for screen */
+  padding: 16px;
+  font-family: 'Inter, sans-serif'; /* Use Inter for screen */
   color: #000;
   position: relative;
   overflow: hidden;
@@ -48,7 +48,7 @@
 }
 
 .receipt-client-info {
-  font-size: 10px;
+  font-size: 14px;
   color: #000;
 }
 
@@ -86,8 +86,8 @@
 }
 
 .receipt-products-row .receipt-col {
-  padding: 2px 4px;
-  font-size: 10px;
+  padding: 8px 4px;
+  font-size: 14px;
   color: #000;
   text-align: left;
 }
@@ -111,8 +111,8 @@
 .receipt-totals {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
-  margin-bottom: 2px;
+  font-size: 14px;
+  margin-bottom: 8px;
 }
 
 .receipt-totals-bold {
@@ -131,9 +131,9 @@
 
 .receipt-footer {
   text-align: center;
-  font-size: 9px;
+  font-size: 12px;
   color: #000;
-  margin-top: 10px;
+  margin-top: 16px;
 }
 
 .receipt-qr {
@@ -152,8 +152,11 @@
   margin: 0 0 10px 0;
 }
 
-.receipt-print-button {
-  display: none; /* Hide print button in print */
+/* Hide print button only during printing */
+@media print {
+  .receipt-print-button {
+    display: none !important;
+  }
 }
 
 /* Print media query for thermal printer */

@@ -442,7 +442,10 @@ const Laundry: React.FC = () => {
         {/* Receipt Modal */}
         <IonModal isOpen={showReceiptModal} onDidDismiss={() => setShowReceiptModal(false)}>
           <Receipt {...receiptData} />
-          <IonButton expand="block" onClick={() => setShowReceiptModal(false)}>Cerrar</IonButton>
+          <div style={{ display: 'flex', gap: '12px', padding: '16px' }}>
+            <IonButton expand="block" onClick={() => window.print()}>Imprimir</IonButton>
+            <IonButton expand="block" fill="clear" onClick={() => setShowReceiptModal(false)}>Cerrar</IonButton>
+          </div>
         </IonModal>
       </IonContent>
     </IonPage>

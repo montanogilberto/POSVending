@@ -18,12 +18,15 @@ import { useHistory } from 'react-router-dom';
 import { submitOrder } from '../../api/cartApi';
 import useInactivityTimer from '../../hooks/useInactivityTimer';
 import { fetchTicket } from '../../api/ticketApi';
+import { postIncome } from '../../api/incomeApi';
 import { useIncome } from '../../context/IncomeContext';
 import '../../styles/dashboard.css';
+import Receipt from '../../components/Receipt';
 
 import CartSummary from './CartSummary';
 import CartItemsList from './CartItemsList';
 import CheckoutActions from './CheckoutActions';
+import ReceiptDisplay from './ReceiptDisplay';
 // Removed ReceiptModal import as it's no longer used
 
 const CartPage: React.FC = () => {
@@ -139,22 +142,15 @@ const CartPage: React.FC = () => {
               },
             ],
           };
-          const incomeResponse = await fetch('https://smartloansbackend.azurewebsites.net/income', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (incomeResponse.ok) {
-            const incomeData = await incomeResponse.json();
-            const rec = Array.isArray(incomeData.result) ? incomeData.result[0] : null;
+          const incomeData = await postIncome(payload);
+          const rec = Array.isArray(incomeData.result) ? incomeData.result[0] : null;
 
-            if (rec && rec.msg === 'Inserted Successfully' && rec.value != null) {
-              const newId = String(rec.value);
-              setLastIncomeId(newId);
-              try {
-                await loadIncomes();
-              } catch (reloadError) {}
-            }
+          if (rec && rec.msg === 'Inserted Successfully' && rec.value != null) {
+            const newId = String(rec.value);
+            setLastIncomeId(newId);
+            try {
+              await loadIncomes();
+            } catch (reloadError) {}
           }
         } catch (incomeError) {}
         setShowSuccessToast(true);
@@ -300,11 +296,21 @@ const CartPage: React.FC = () => {
         <IonToast
           isOpen={showSuccessToast}
           onDidDismiss={async () => {
+            console.log('Toast dismissed, lastIncomeId:', lastIncomeId);
             setShowSuccessToast(false);
             if (lastIncomeId) {
+              console.log('Fetching ticket for incomeId:', lastIncomeId);
               const ticket = await fetchTicket(lastIncomeId);
+              console.log('Fetched ticket:', ticket);
               setTicketData(ticket);
+              // Scroll to the receipt
+              setTimeout(() => {
+                const receiptEl = document.getElementById('receipt-container');
+                if (receiptEl) receiptEl.scrollIntoView({ behavior: 'smooth' });
+              }, 100);
               // Removed setting showReceipt true, as modal is gone
+            } else {
+              console.log('No lastIncomeId, cannot fetch ticket');
             }
           }}
           message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
@@ -324,6 +330,17 @@ const CartPage: React.FC = () => {
             },
           ]}
         />
+
+        {/* Receipt Display */}
+        {ticketData && (
+          <ReceiptDisplay
+            ticketData={ticketData}
+            paymentMethod={paymentMethod}
+            cashPaid={cashPaid}
+            clearCart={clearCart}
+            setTicketData={setTicketData}
+          />
+        )}
       </IonContent>
     </IonPage>
   );
