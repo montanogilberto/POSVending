@@ -16,80 +16,6 @@ import {
 import { qrCodeOutline, printOutline } from 'ionicons/icons';
 import './Receipt.css';
 
-// ESC/POS Formatter for 58mm thermal printer (48mm effective, 203 DPI, 384 dots width)
-// Supports Font B (42 chars/line) as primary, Font A (32 chars/line) as fallback
-const generateEscPos = (receiptData: any) => {
-  const commands = [];
-
-  // Initialize printer
-  commands.push('\x1b\x40'); // ESC @ - Initialize
-
-  // Select Font B (default, 42 chars/line)
-  commands.push('\x1b\x4d\x01'); // ESC M 1 - Font B
-
-  // Center align
-  commands.push('\x1b\x61\x01'); // ESC a 1 - Center
-
-  // Header
-  commands.push('POS GMO\n');
-  commands.push(`${receiptData.transactionDate} ${receiptData.transactionTime}\n\n`);
-
-  // Left align
-  commands.push('\x1b\x61\x00'); // ESC a 0 - Left
-
-  // Client Info
-  commands.push('Cliente:\n');
-  commands.push(`${receiptData.clientName}\n`);
-  commands.push(`${receiptData.clientPhone}\n`);
-  commands.push(`${receiptData.clientEmail}\n\n`);
-
-  // User
-  commands.push(`Cajero: ${receiptData.userName}\n\n`);
-
-  // Products Header
-  commands.push('Producto          Opc  Cant  Unit  Sub\n');
-  commands.push('------------------------------------------\n'); // Approx 42 chars
-
-  // Products
-  receiptData.products.forEach((product: any) => {
-    const name = product.name.substring(0, 16).padEnd(16); // Truncate/pad to 16 chars
-    const options = (product.options?.join(', ') || '').substring(0, 4).padEnd(4); // 4 chars
-    const qty = product.quantity.toString().padStart(4);
-    const unit = `$${product.unitPrice.toFixed(2)}`.padStart(6);
-    const sub = `$${product.subtotal.toFixed(2)}`.padStart(6);
-    commands.push(`${name} ${options} ${qty} ${unit} ${sub}\n`);
-  });
-
-  commands.push('\n');
-
-  // Totals
-  const subtotal = `Subtotal: $${receiptData.subtotal.toFixed(2)}`.padStart(42);
-  const iva = `IVA (16%): $${receiptData.iva.toFixed(2)}`.padStart(42);
-  const total = `Total: $${receiptData.total.toFixed(2)}`.padStart(42);
-  commands.push(`${subtotal}\n`);
-  commands.push(`${iva}\n`);
-  commands.push(`${total}\n\n`);
-
-  // Payment
-  commands.push(`Pago: ${receiptData.paymentMethod}\n`);
-  commands.push(`Recibido: $${receiptData.amountReceived.toFixed(2)}\n`);
-  commands.push(`Cambio: $${receiptData.change.toFixed(2)}\n\n`);
-
-  // Footer
-  commands.push('Gracias por su compra\n');
-  commands.push('POS GMO\n');
-  commands.push('RFC: XXX123456XXX\n');
-  commands.push('www.posgmo.com\n\n');
-
-  // QR Placeholder (simple text)
-  commands.push('[QR Code Placeholder]\n\n');
-
-  // Cut paper
-  commands.push('\x1d\x56\x42\x00'); // GS V B 0 - Full cut
-
-  return commands.join('');
-};
-
 interface Product {
   name: string;
   quantity: number;
@@ -112,6 +38,7 @@ interface ReceiptProps {
   paymentMethod: string;
   amountReceived: number;
   change: number;
+  onPrint?: () => void;
 }
 
 const Receipt: React.FC<ReceiptProps> = ({
@@ -128,7 +55,9 @@ const Receipt: React.FC<ReceiptProps> = ({
   paymentMethod,
   amountReceived,
   change,
+  onPrint,
 }) => {
+  console.log('Receipt component rendering with props:', { transactionDate, transactionTime, clientName, products, total });
   return (
     <IonCard className="receipt-container">
       <IonCardHeader>
@@ -144,6 +73,16 @@ const Receipt: React.FC<ReceiptProps> = ({
             <p className="receipt-date-time">Fecha: {transactionDate} | Hora: {transactionTime}</p>
           </IonLabel>
         </IonItem>
+
+        {/* Print Button - Moved to top for visibility */}
+        {onPrint && (
+          <IonItem>
+            <IonButton className="receipt-print-button" fill="outline" color="primary" expand="block" onClick={onPrint}>
+              <IonIcon icon={printOutline} slot="start" />
+              Imprimir Recibo
+            </IonButton>
+          </IonItem>
+        )}
 
         <hr className="receipt-divider" />
 
@@ -235,21 +174,7 @@ const Receipt: React.FC<ReceiptProps> = ({
           <IonLabel>QR Placeholder</IonLabel>
         </IonItem>
 
-        {/* Print Button */}
-        <IonItem>
-          <IonButton className="receipt-print-button" fill="outline" color="primary" expand="block" onClick={() => {
-            const printContent = document.querySelector('.receipt-container') as HTMLElement;
-            if (printContent) {
-              const originalBody = document.body.innerHTML;
-              document.body.innerHTML = printContent.outerHTML;
-              window.print();
-              document.body.innerHTML = originalBody;
-            }
-          }}>
-            <IonIcon icon={printOutline} slot="start" />
-            Imprimir
-          </IonButton>
-        </IonItem>
+
       </IonCardContent>
     </IonCard>
   );
