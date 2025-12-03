@@ -32,7 +32,7 @@ import {
 import POS from './pages/POS';
 import Setting from './pages/Setting';
 import Sells from './pages/Sells';
-import Laundry from './pages/Laundry';
+import Laundry from './pages/Laundry/Laundry';
 import ScannerQR from './pages/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
 import ProductSelection from './pages/ProductSelection';

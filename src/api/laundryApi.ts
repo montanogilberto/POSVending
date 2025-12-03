@@ -9,6 +9,16 @@ interface Income {
   companyId: number;
 }
 
+interface CartItem {
+  productId: number;
+  name: string;
+  description: string;
+  price: number;
+  quantity: number;
+  subtotal: number;
+  selectedOptions: { [optionId: number]: number };
+}
+
 export const fetchAllLaundry = async (): Promise<Income[]> => {
   try {
     const response = await fetch('https://smartloansbackend.azurewebsites.net/all_income');
@@ -23,6 +33,34 @@ export const fetchAllLaundry = async (): Promise<Income[]> => {
       new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
     );
     return sortedIncome;
+  } catch (error) {
+    console.error(error);
+    throw error; // Re-throw to allow caller to handle
+  }
+};
+
+export const createLaundrySale = async (cart: CartItem[], total: number): Promise<any> => {
+  try {
+    const response = await fetch('https://smartloansbackend.azurewebsites.net/pos_laundry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pos_laundry: {
+          details: cart.map(item => ({
+            productId: item.productId,
+            cantidad: item.quantity,
+            precio_unitario: item.price,
+            subtotal: item.subtotal
+          })),
+          total
+        }
+      }),
+    });
+
+    if (!response.ok) throw new Error(`Error al crear venta: ${response.status}`);
+    const data = await response.json();
+    console.log('Venta creada:', data);
+    return data;
   } catch (error) {
     console.error(error);
     throw error; // Re-throw to allow caller to handle

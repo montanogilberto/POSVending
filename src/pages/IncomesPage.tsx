@@ -39,6 +39,7 @@ const IncomesPage: React.FC = () => {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [chartData, setChartData] = useState<any>(null);
+  const [totalIncome, setTotalIncome] = useState<number>(0);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [showToast, setShowToast] = useState(false);
@@ -75,6 +76,10 @@ const IncomesPage: React.FC = () => {
   }, [searchText, filterPaymentMethod, filterDateFrom, filterDateTo, allIncome]);
 
   useEffect(() => {
+    // Calculate total income from allIncome
+    const total = allIncome.reduce((sum, income) => sum + income.total, 0);
+    setTotalIncome(total);
+
     if (filteredIncome.length > 0) {
       const dailyTotals: { [key: string]: number } = {};
       filteredIncome.forEach((income) => {
@@ -102,7 +107,7 @@ const IncomesPage: React.FC = () => {
     } else {
       setChartData(null);
     }
-  }, [filteredIncome]);
+  }, [filteredIncome, allIncome]);
 
   const loadMoreIncomes = (event: CustomEvent<void>) => {
     setTimeout(() => {
