@@ -12,6 +12,7 @@ import AlertPopover from '../../components/PopOver/AlertPopover';
 import LogoutAlert from '../../components/Alerts/LogoutAlert';
 import MailPopover from '../../components/PopOver/MailPopover';
 import Receipt from '../../components/Receipt';
+import LaundryChart from '../../components/LaundryChart';
 import { useLaundryDashboard } from './hooks/useLaundryDashboard';
 import MetricsGrid from './components/MetricsGrid';
 import CartSummary from './components/CartSummary';
@@ -35,6 +36,7 @@ const Laundry: React.FC = () => {
     setShowReceiptModal,
     receiptData,
     setReceiptData,
+    pieData,
     handleStartSeller,
     handleConfirmSale,
     calculateTotal,
@@ -77,6 +79,9 @@ const Laundry: React.FC = () => {
             percentageChange={percentageChange}
             handleStartSeller={handleStartSeller}
           />
+
+          {/* Laundry Chart */}
+          <LaundryChart pieData={pieData} />
 
           {/* Carrito Summary if showCart */}
           {showCart && cart.length > 0 && (

@@ -14,6 +14,7 @@ import {
   IonCardHeader,
   IonCardSubtitle,
   IonCardTitle,
+  IonLoading,
 } from '@ionic/react';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
@@ -60,9 +61,11 @@ const IncomesPage: React.FC = () => {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const loadIncomes = async () => {
+      setLoading(true);
       try {
         const incomes = await fetchAllLaundry();
         setAllIncome(incomes);
@@ -72,6 +75,8 @@ const IncomesPage: React.FC = () => {
         console.error('Error fetching incomes:', error);
         setToastMessage('Error al cargar ingresos');
         setShowToast(true);
+      } finally {
+        setLoading(false);
       }
     };
     loadIncomes();
@@ -148,6 +153,7 @@ const IncomesPage: React.FC = () => {
   };
 
   const handleShowReceipt = async (incomeId: number) => {
+    setLoading(true);
     try {
       const ticket = await fetchTicket(incomeId.toString());
       setReceiptData(ticket);
@@ -156,6 +162,8 @@ const IncomesPage: React.FC = () => {
       console.error('Error fetching ticket:', error);
       setToastMessage('Error al cargar el recibo');
       setShowToast(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -280,6 +288,11 @@ const IncomesPage: React.FC = () => {
           onDidDismiss={() => setShowToast(false)}
           message={toastMessage}
           duration={2000}
+        />
+
+        <IonLoading
+          isOpen={loading}
+          message="Cargando..."
         />
       </IonContent>
     </IonPage>

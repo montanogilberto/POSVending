@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { IonContent, IonPage, IonInput, IonGrid, IonRow, IonCol, IonLabel, IonToast, IonRouterLink, IonButton, IonIcon } from '@ionic/react';
+import { IonContent, IonPage, IonInput, IonGrid, IonRow, IonCol, IonLabel, IonToast, IonRouterLink, IonButton, IonIcon, IonLoading } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 //import './../../master.css';
 import './Login.css';
@@ -125,7 +125,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   disabled={loading}
                   style={{ width: '100%' }}
                 >
-                  {loading ? 'Logging in...' : 'Login'}
+                  Login
                 </IonButton>
               </form>
               <div className="ion-text-center">
@@ -136,6 +136,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </IonRow>
         </IonGrid>
       </IonContent>
+      <IonLoading
+        isOpen={loading}
+        message="Iniciando sesión..."
+      />
     </IonPage>
   );
 };
