@@ -10,6 +10,7 @@ import {
   IonAlert,
   IonButton,
   IonIcon,
+  IonLoading,
 } from '@ionic/react';
 import { addCircle, card, trash } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
@@ -42,6 +43,7 @@ const CartPage: React.FC = () => {
   const [changeAmount, setChangeAmount] = useState(0);
   const [ticketData, setTicketData] = useState<any>(null);
   const [lastIncomeId, setLastIncomeId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const receiptRef = useRef<HTMLDivElement | null>(null);
 
@@ -88,6 +90,7 @@ const CartPage: React.FC = () => {
       }
     }
 
+    setLoading(true);
     const orderData = {
       orders: cart.map((item) => {
         const selections = Object.entries(item.selectedOptions || {})
@@ -161,6 +164,8 @@ const CartPage: React.FC = () => {
       }
     } catch (error) {
       showErrorToast('No se pudo conectar con el servidor.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -342,6 +347,11 @@ const CartPage: React.FC = () => {
             setTicketData={setTicketData}
           />
         )}
+
+        <IonLoading
+          isOpen={loading}
+          message="Procesando pago..."
+        />
       </IonContent>
     </IonPage>
   );

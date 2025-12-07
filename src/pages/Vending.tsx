@@ -16,6 +16,7 @@ import {
   IonRow,
   IonCol,
   IonIcon,
+  IonLoading,
 } from '@ionic/react';
 import { waterOutline, receiptOutline, documentsOutline, helpCircleOutline, notificationsOutline, mailOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
@@ -37,6 +38,7 @@ const Vending: React.FC = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allVending, setAllVending] = useState<VendingData[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // 🔄 POST al backend para guardar un ingreso
   const sendToBackend = async (amount: number): Promise<boolean> => {
@@ -71,6 +73,7 @@ const Vending: React.FC = () => {
     }
   };
 const fetchAllVending = async () => {
+  setLoading(true);
   try {
     const response = await fetch('https://smartloansbackend.azurewebsites.net/all_vending');
     if (!response.ok) {
@@ -102,6 +105,8 @@ const fetchAllVending = async () => {
     console.error(error);
     setToastMessage('Error al obtener ingresos del backend.');
     setShowToast(true);
+  } finally {
+    setLoading(false);
   }
 };
 
@@ -306,6 +311,11 @@ const fetchAllVending = async () => {
           message={toastMessage}
           duration={2000}
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
+        />
+
+        <IonLoading
+          isOpen={loading}
+          message="Cargando..."
         />
       </IonContent>
     </IonPage>
