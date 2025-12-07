@@ -34,6 +34,7 @@ const Laundry: React.FC = () => {
     showReceiptModal,
     setShowReceiptModal,
     receiptData,
+    setReceiptData,
     handleStartSeller,
     handleConfirmSale,
     calculateTotal,
@@ -120,11 +121,17 @@ const Laundry: React.FC = () => {
         />
 
         {/* Receipt Modal */}
-        <IonModal isOpen={showReceiptModal} onDidDismiss={() => setShowReceiptModal(false)}>
+        <IonModal isOpen={showReceiptModal} onDidDismiss={() => {
+          setShowReceiptModal(false);
+          setReceiptData(null);
+        }}>
           <Receipt {...receiptData} />
           <div style={{ display: 'flex', gap: '12px', padding: '16px' }}>
             <IonButton expand="block" onClick={() => window.print()}>Imprimir</IonButton>
-            <IonButton expand="block" fill="clear" onClick={() => setShowReceiptModal(false)}>Cerrar</IonButton>
+            <IonButton expand="block" fill="clear" onClick={() => {
+              setShowReceiptModal(false);
+              setReceiptData(null);
+            }}>Cerrar</IonButton>
           </div>
         </IonModal>
       </IonContent>

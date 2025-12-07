@@ -153,6 +153,7 @@ const CartPage: React.FC = () => {
             } catch (reloadError) {}
           }
         } catch (incomeError) {}
+        clearCart();
         setShowSuccessToast(true);
       } else {
         const errorData = await response.json();

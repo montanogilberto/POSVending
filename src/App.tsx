@@ -29,7 +29,7 @@ import {
   logOutOutline, people, cube, notifications, mail, grid, person, menu, water
 } from 'ionicons/icons';
 
-import POS from './pages/POS';
+import Vending from './pages/Vending'
 import Setting from './pages/Setting';
 import Sells from './pages/Sells';
 import Laundry from './pages/Laundry/Laundry';
@@ -161,7 +161,7 @@ const App: React.FC = () => {
           <IonPage id="main">
             <IonTabs>
               <IonRouterOutlet>
-                <Route exact path="/pos" component={POS} />
+                <Route exact path="/pos" component={Vending} />
                 <Route exact path="/setting" component={Setting} />
                 <Route exact path="/sells" component={Sells} />
                 <Route exact path="/laundry" component={Laundry} />

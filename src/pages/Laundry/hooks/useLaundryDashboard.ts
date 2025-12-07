@@ -38,6 +38,13 @@ export const useLaundryDashboard = () => {
     }
   }, [location.state]);
 
+  // Clear cart when showCart becomes false
+  useEffect(() => {
+    if (!showCart) {
+      setCart([]);
+    }
+  }, [showCart, setCart]);
+
   useEffect(() => {
     if (allIncome.length > 0) {
       // Calculate pie data for payment distribution
@@ -255,6 +262,7 @@ export const useLaundryDashboard = () => {
     showReceiptModal,
     setShowReceiptModal,
     receiptData,
+    setReceiptData,
     pieData,
     handleStartSeller,
     handleConfirmSale,

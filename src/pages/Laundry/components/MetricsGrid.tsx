@@ -44,6 +44,11 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
                   <span>{new Date().toLocaleDateString('es-ES')}</span>
                 </div>
               </div>
+            <div className="kpi-action">
+              <IonButton expand="block" className="start-sale-button" onClick={handleStartSeller}>
+                Iniciar Venta
+              </IonButton>
+            </div>
             </div>
           </div>
         </IonCol>
@@ -65,32 +70,7 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
           </div>
         </IonCol>
       </IonRow>
-      {/* Total Income Card */}
-      <IonRow>
-        <IonCol size="12">
-          <div className="dashboard-kpi-card">
-            <div className="kpi-card-content">
-              <div className="kpi-icon">
-                <IonIcon icon={waterOutline} size="large" />
-              </div>
-              <div className="kpi-info">
-                <h3 className="kpi-label">Total de Ingresos</h3>
-                <div className="kpi-amount">${calculateTotal().toFixed(2)}</div>
-                <div className="kpi-meta">
-                  <span>{currentMonthYear}</span>
-                  <span>• {currentUser}</span>
-                  <span className="kpi-change">{percentageChange}</span>
-                </div>
-              </div>
-            </div>
-            <div className="kpi-action">
-              <IonButton expand="block" className="start-sale-button" onClick={handleStartSeller}>
-                Iniciar Venta
-              </IonButton>
-            </div>
-          </div>
-        </IonCol>
-      </IonRow>
+
     </IonGrid>
   );
 };
