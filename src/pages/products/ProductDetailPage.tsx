@@ -15,16 +15,13 @@ import {
   IonSelectOption,
   IonButton,
   IonAlert,
-  IonGrid,
-  IonRow,
-  IonCol,
   IonCardSubtitle,
 } from '@ionic/react';
 
 import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
-import { Product, CartItem } from '../../data/type_products';
+import { Product } from '../../data/type_products';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -43,6 +40,11 @@ function hasChoices(o: Option): o is Option & { choices: Choice[] } {
   return Array.isArray(o.choices);
 }
 
+// Value stored per option:
+// - radio  -> string (choiceId)
+// - checkbox -> string[] (choiceIds) OR Record<string, number> (choiceId -> quantity)
+type SelectedOptionValue = string | string[] | Record<string, number>;
+
 const ProductDetailPage: React.FC = () => {
   const { productId } = useParams<RouteParams>();
   const history = useHistory();
@@ -51,20 +53,26 @@ const ProductDetailPage: React.FC = () => {
 
   const [product, setProduct] = useState<Product | undefined>(undefined);
   const [quantity, setQuantity] = useState(1);
-  const [selectedOptions, setSelectedOptions] = useState<Record<number, string | string[]>>({});
+  const [selectedOptions, setSelectedOptions] = useState<Record<number, SelectedOptionValue>>({});
   const [showAlert, setShowAlert] = useState(false);
   const [missingMessage, setMissingMessage] = useState('');
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
+  const [popoverState, setPopoverState] = useState<{
+    showAlertPopover: boolean;
+    showMailPopover: boolean;
+    event?: Event;
+  }>({
     showAlertPopover: false,
     showMailPopover: false,
   });
 
   const presentAlertPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
+    setPopoverState(prev => ({ ...prev, showAlertPopover: true, event: e.nativeEvent }));
+  const dismissAlertPopover = () =>
+    setPopoverState(prev => ({ ...prev, showAlertPopover: false }));
   const presentMailPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
+    setPopoverState(prev => ({ ...prev, showMailPopover: true, event: e.nativeEvent }));
+  const dismissMailPopover = () =>
+    setPopoverState(prev => ({ ...prev, showMailPopover: false }));
 
   useEffect(() => {
     const stateProduct = (location.state as any)?.product;
@@ -97,46 +105,133 @@ const ProductDetailPage: React.FC = () => {
       </IonPage>
     );
 
+  // ---- Helpers for narrowing ----
+  const getArrayValue = (value: SelectedOptionValue | undefined): string[] => {
+    if (Array.isArray(value)) return value;
+    return [];
+  };
+
+  const getMapValue = (value: SelectedOptionValue | undefined): Record<string, number> => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, number>;
+    }
+    return {};
+  };
+
+  const isAllSelected = (optionId: number, totalChoices: number) => {
+    const value = selectedOptions[optionId];
+    if (Array.isArray(value)) return value.length === totalChoices;
+    if (value && typeof value === 'object') {
+      return Object.keys(value as Record<string, number>).length === totalChoices;
+    }
+    return false;
+  };
+
+  const isChoiceSelected = (optionId: number, choiceId: string) => {
+    const value = selectedOptions[optionId];
+    if (Array.isArray(value)) {
+      return value.includes(choiceId);
+    }
+    if (value && typeof value === 'object') {
+      return Boolean((value as Record<string, number>)[choiceId]);
+    }
+    return false;
+  };
+
   // ---- Handlers ----
   const handleRadioChange = (optionId: number, value: string) =>
     setSelectedOptions(prev => ({ ...prev, [optionId]: value }));
 
-  const handleCheckboxChange = (optionId: number, value: string) => {
-    const currentValues = selectedOptions[optionId] || [];
-    const updatedValues = Array.isArray(currentValues)
-      ? currentValues.includes(value)
-        ? currentValues.filter(v => v !== value)
-        : [...currentValues, value]
-      : [value];
+  const handleCheckboxChange = (optionId: number, value: string, checked: boolean) => {
+    const prevValue = selectedOptions[optionId];
+
+    // If we are using simple checkbox (array of ids)
+    if (!prevValue || Array.isArray(prevValue)) {
+      const currentArray = getArrayValue(prevValue);
+      let newArray: string[];
+      if (checked) {
+        newArray = currentArray.includes(value)
+          ? currentArray
+          : [...currentArray, value];
+      } else {
+        newArray = currentArray.filter(v => v !== value);
+      }
+      setSelectedOptions(prev => ({ ...prev, [optionId]: newArray }));
+      return;
+    }
+
+    // If we are using quantity map (Record<string, number>)
+    const currentMap = getMapValue(prevValue);
+    const updatedMap = { ...currentMap };
+    if (checked) {
+      updatedMap[value] = updatedMap[value] ?? 1;
+    } else {
+      delete updatedMap[value];
+    }
+    setSelectedOptions(prev => ({ ...prev, [optionId]: updatedMap }));
+  };
+
+  const handleCheckboxQuantityChange = (optionId: number, choiceId: string, qty: number) => {
+    const prevValue = selectedOptions[optionId];
+    const currentMap = getMapValue(prevValue);
+    const updatedValues = { ...currentMap };
+
+    if (qty > 0) {
+      updatedValues[choiceId] = qty;
+    } else {
+      delete updatedValues[choiceId];
+    }
+
     setSelectedOptions(prev => ({ ...prev, [optionId]: updatedValues }));
   };
 
   const handleSelectAll = (optionId: number, allIds: string[]) => {
-    const current = selectedOptions[optionId] || [];
-    const isAllSelected = Array.isArray(current) && current.length === allIds.length;
+    const prevValue = selectedOptions[optionId];
+    const currentArray = getArrayValue(prevValue);
+    const isAll = currentArray.length === allIds.length;
+
     setSelectedOptions(prev => ({
       ...prev,
-      [optionId]: isAllSelected ? [] : [...allIds],
+      [optionId]: isAll ? [] : [...allIds],
     }));
   };
 
   // ---- Option price calculation ----
   const calculateOptionPrice = () => {
     let extra = 0;
+
     (product.options ?? []).forEach(option => {
       if (!hasChoices(option)) return;
+
       const value = selectedOptions[option.productOptionId];
-      if (option.type === 'radio' && value && hasChoices(option)) {
-        const selected = option.choices.find(c => c.productOptionChoiceId.toString() === value);
+
+      if (option.type === 'radio' && typeof value === 'string') {
+        const selected = option.choices.find(
+          c => c.productOptionChoiceId.toString() === value
+        );
         extra += selected?.price ?? 0;
       }
-      if (option.type === 'checkbox' && Array.isArray(value) && hasChoices(option)) {
-        value.forEach(id => {
-          const selected = option.choices.find(c => c.productOptionChoiceId.toString() === id);
-          extra += selected?.price ?? 0;
-        });
+
+      if (option.type === 'checkbox') {
+        if (Array.isArray(value)) {
+          value.forEach(id => {
+            const selected = option.choices.find(
+              c => c.productOptionChoiceId.toString() === id
+            );
+            extra += selected?.price ?? 0;
+          });
+        } else if (value && typeof value === 'object') {
+          const map = value as Record<string, number>;
+          Object.entries(map).forEach(([id, qty]) => {
+            const selected = option.choices.find(
+              c => c.productOptionChoiceId.toString() === id
+            );
+            if (selected) extra += selected.price * qty;
+          });
+        }
       }
     });
+
     return extra;
   };
 
@@ -146,9 +241,18 @@ const ProductDetailPage: React.FC = () => {
     const missingGroups: string[] = [];
 
     requiredOptions.forEach(option => {
+      if (!hasChoices(option)) return;
       const value = selectedOptions[option.productOptionId];
-      if (option.type === 'radio' && hasChoices(option) && (!value || (Array.isArray(value) && value.length === 0))) {
-        missingGroups.push(option.name);
+
+      if (option.type === 'radio') {
+        const isEmpty =
+          !value ||
+          (Array.isArray(value) && value.length === 0) ||
+          (value && typeof value === 'object' && Object.keys(value as Record<string, number>).length === 0);
+
+        if (isEmpty) {
+          missingGroups.push(option.name);
+        }
       }
     });
 
@@ -158,17 +262,32 @@ const ProductDetailPage: React.FC = () => {
       if (!hasChoices(option)) return;
       const value = selectedOptions[option.productOptionId];
 
-      if (option.type === 'radio' && value && hasChoices(option)) {
-        const choice = option.choices.find(c => c.productOptionChoiceId.toString() === value);
+      if (option.type === 'radio' && typeof value === 'string') {
+        const choice = option.choices.find(
+          c => c.productOptionChoiceId.toString() === value
+        );
         if (choice) selectedOptionLabels[option.name] = choice.name;
       }
 
-      if (option.type === 'checkbox' && Array.isArray(value) && hasChoices(option)) {
-        const selectedLabels = value.map(id => {
-          const choice = option.choices.find(c => c.productOptionChoiceId.toString() === id);
-          return choice?.name ?? id;
-        });
-        selectedOptionLabels[option.name] = selectedLabels;
+      if (option.type === 'checkbox') {
+        if (Array.isArray(value)) {
+          const selectedLabels = value.map(id => {
+            const choice = option.choices.find(
+              c => c.productOptionChoiceId.toString() === id
+            );
+            return choice?.name ?? id;
+          });
+          selectedOptionLabels[option.name] = selectedLabels;
+        } else if (value && typeof value === 'object') {
+          const map = value as Record<string, number>;
+          const selectedLabels = Object.keys(map).map(id => {
+            const choice = option.choices.find(
+              c => c.productOptionChoiceId.toString() === id
+            );
+            return choice ? `${choice.name} (x${map[id]})` : id;
+          });
+          selectedOptionLabels[option.name] = selectedLabels;
+        }
       }
     });
 
@@ -186,23 +305,52 @@ const ProductDetailPage: React.FC = () => {
     const optionPrice = calculateOptionPrice();
     const finalPrice = basePrice + optionPrice;
 
-    const selectedChoices: { [key: number]: { id: number; name: string; price: number }[] } = {};
+    const selectedChoices: {
+      [key: number]: { id: number; name: string; price: number }[];
+    } = {};
 
     (product.options ?? []).forEach(option => {
       if (!hasChoices(option)) return;
       const value = selectedOptions[option.productOptionId];
-      if (option.type === 'radio' && value && hasChoices(option)) {
-        const choice = option.choices.find(c => c.productOptionChoiceId.toString() === value);
+
+      if (option.type === 'radio' && typeof value === 'string') {
+        const choice = option.choices.find(
+          c => c.productOptionChoiceId.toString() === value
+        );
         if (choice) {
           selectedChoices[option.productOptionId] = [
-            { id: choice.productOptionChoiceId, name: choice.name, price: choice.price },
+            {
+              id: choice.productOptionChoiceId,
+              name: choice.name,
+              price: choice.price,
+            },
           ];
         }
-      } else if (option.type === 'checkbox' && Array.isArray(value) && hasChoices(option)) {
-        selectedChoices[option.productOptionId] = value.map(id => {
-          const c = option.choices.find(ch => ch.productOptionChoiceId.toString() === id);
-          return { id: c?.productOptionChoiceId ?? 0, name: c?.name ?? '', price: c?.price ?? 0 };
-        });
+      } else if (option.type === 'checkbox') {
+        if (Array.isArray(value)) {
+          selectedChoices[option.productOptionId] = value.map(id => {
+            const c = option.choices.find(
+              ch => ch.productOptionChoiceId.toString() === id
+            );
+            return {
+              id: c?.productOptionChoiceId ?? 0,
+              name: c?.name ?? '',
+              price: c?.price ?? 0,
+            };
+          });
+        } else if (value && typeof value === 'object') {
+          const map = value as Record<string, number>;
+          selectedChoices[option.productOptionId] = Object.keys(map).map(id => {
+            const c = option.choices.find(
+              ch => ch.productOptionChoiceId.toString() === id
+            );
+            return {
+              id: c?.productOptionChoiceId ?? 0,
+              name: c?.name ?? '',
+              price: c?.price ?? 0,
+            };
+          });
+        }
       }
     });
 
@@ -241,7 +389,10 @@ const ProductDetailPage: React.FC = () => {
             <IonCardHeader>
               <IonCardTitle>{product.name}</IonCardTitle>
               <IonCardSubtitle>
-                {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
+                {new Intl.NumberFormat('es-MX', {
+                  style: 'currency',
+                  currency: 'MXN',
+                }).format(product.price)}
               </IonCardSubtitle>
             </IonCardHeader>
             <IonCardContent>
@@ -259,50 +410,106 @@ const ProductDetailPage: React.FC = () => {
                         <IonLabel>Seleccionar todos</IonLabel>
                         <IonCheckbox
                           slot="start"
-                          checked={
-                            (selectedOptions[option.productOptionId]?.length ?? 0) === option.choices.length
-                          }
+                          checked={isAllSelected(
+                            option.productOptionId,
+                            option.choices.length
+                          )}
                           onIonChange={() =>
                             handleSelectAll(
                               option.productOptionId,
-                              option.choices.map(c => c.productOptionChoiceId.toString())
+                              option.choices.map(c =>
+                                c.productOptionChoiceId.toString()
+                              )
                             )
                           }
                         />
                       </IonItem>
 
-                      {option.choices.map(choice => (
-                        <IonItem key={`checkbox-${option.productOptionId}-${choice.productOptionChoiceId}`}>
-                          <IonLabel>
-                            {choice.name} (+$
-                            {choice.price})
-                          </IonLabel>
-                          <IonCheckbox
-                            slot="start"
-                            checked={(selectedOptions[option.productOptionId] ?? []).includes(
-                              choice.productOptionChoiceId.toString()
-                            )}
-                            onIonChange={() =>
-                              handleCheckboxChange(option.productOptionId, choice.productOptionChoiceId.toString())
-                            }
-                          />
-                        </IonItem>
-                      ))}
+                      {option.choices.map(choice => {
+                        const choiceId = choice.productOptionChoiceId.toString();
+                        const map = getMapValue(
+                          selectedOptions[option.productOptionId]
+                        );
+                        const qty = map[choiceId] ?? 1;
+                        const checked = isChoiceSelected(
+                          option.productOptionId,
+                          choiceId
+                        );
+
+                        return (
+                          <IonItem
+                            key={`checkbox-${option.productOptionId}-${choice.productOptionChoiceId}`}
+                          >
+                            <IonCheckbox
+                              slot="start"
+                              checked={checked}
+                              onIonChange={e =>
+                                handleCheckboxChange(
+                                  option.productOptionId,
+                                  choiceId,
+                                  e.detail.checked
+                                )
+                              }
+                            />
+
+                            <IonLabel>
+                              {choice.name} (+${choice.price})
+                            </IonLabel>
+
+                            {/* ✅ Quantity select for this checkbox option */}
+                            <IonSelect
+                              value={qty}
+                              disabled={!checked}
+                              interface="popover"
+                              style={{ maxWidth: '80px' }}
+                              onIonChange={e =>
+                                handleCheckboxQuantityChange(
+                                  option.productOptionId,
+                                  choiceId,
+                                  Number(e.detail.value)
+                                )
+                              }
+                            >
+                              {[...Array(10)].map((_, i) => (
+                                <IonSelectOption key={i + 1} value={i + 1}>
+                                  {i + 1}
+                                </IonSelectOption>
+                              ))}
+                            </IonSelect>
+                          </IonItem>
+                        );
+                      })}
                     </>
                   )}
 
                   {option.type === 'radio' && hasChoices(option) && (
                     <IonRadioGroup
-                      value={selectedOptions[option.productOptionId] ?? ''}
-                      onIonChange={e => handleRadioChange(option.productOptionId, e.detail.value)}
+                      value={
+                        typeof selectedOptions[option.productOptionId] ===
+                        'string'
+                          ? (selectedOptions[
+                              option.productOptionId
+                            ] as string)
+                          : ''
+                      }
+                      onIonChange={e =>
+                        handleRadioChange(
+                          option.productOptionId,
+                          e.detail.value
+                        )
+                      }
                     >
                       {option.choices.map(choice => (
-                        <IonItem key={`radio-${option.productOptionId}-${choice.productOptionChoiceId}`}>
+                        <IonItem
+                          key={`radio-${option.productOptionId}-${choice.productOptionChoiceId}`}
+                        >
                           <IonLabel>
-                            {choice.name} (+$
-                            {choice.price})
+                            {choice.name} (+${choice.price})
                           </IonLabel>
-                          <IonRadio slot="start" value={choice.productOptionChoiceId.toString()} />
+                          <IonRadio
+                            slot="start"
+                            value={choice.productOptionChoiceId.toString()}
+                          />
                         </IonItem>
                       ))}
                     </IonRadioGroup>
@@ -310,6 +517,7 @@ const ProductDetailPage: React.FC = () => {
                 </IonList>
               ))}
 
+              {/* Global product quantity (unchanged) */}
               <IonItem>
                 <IonLabel position="stacked">Cantidad</IonLabel>
                 <IonSelect

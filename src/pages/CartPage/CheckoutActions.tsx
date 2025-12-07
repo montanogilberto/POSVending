@@ -1,6 +1,6 @@
 import React from 'react';
 import { IonButton, IonFab, IonFabButton, IonIcon } from '@ionic/react';
-import { addCircle } from 'ionicons/icons';
+import { trash } from 'ionicons/icons';
 
 interface CheckoutActionsProps {
   isCheckoutEnabled: boolean;
@@ -24,9 +24,11 @@ const CheckoutActions: React.FC<CheckoutActionsProps> = ({
         Proceder al pago
       </IonButton>
 
-      <IonButton expand="block" color="medium" onClick={clearCart}>
-        Vaciar carrito
-      </IonButton>
+      <IonFab vertical="bottom" horizontal="end" slot="fixed">
+        <IonFabButton color="danger" onClick={clearCart}>
+          <IonIcon icon={trash} />
+        </IonFabButton>
+      </IonFab>
 
     </>
   );

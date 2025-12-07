@@ -1,0 +1,284 @@
+import { useEffect, useState } from 'react';
+import { useHistory, useLocation } from 'react-router-dom';
+import { useIncome } from '../../../context/IncomeContext';
+import { fetchAllLaundry } from '../../../api/laundryApi';
+import { fetchTicket } from '../../../api/ticketApi';
+import useInactivityTimer from '../../../hooks/useInactivityTimer';
+import { Transaction, CartItem, LocationState } from '../types';
+
+export const useLaundryDashboard = () => {
+  const location = useLocation();
+  const history = useHistory();
+  const { allIncome, loadIncomes } = useIncome();
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [showCart, setShowCart] = useState(false);
+  const [showLogoutAlert, setShowLogoutAlert] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
+  const [pieData, setPieData] = useState<any>(null);
+
+  useEffect(() => {
+    loadIncomes();
+  }, [loadIncomes]);
+
+  useInactivityTimer(300000, loadIncomes);
+
+  useEffect(() => {
+    const state = location.state as LocationState | undefined;
+    if (state && state.from === 'product-selection' && state.item) {
+      const item = state.item;
+      setCart(prev => [...prev, item]);
+      setShowCart(true);
+      setToastMessage(`Producto "${item.name}" agregado al carrito.`);
+      setShowToast(true);
+    }
+  }, [location.state]);
+
+  // Clear cart when showCart becomes false
+  useEffect(() => {
+    if (!showCart) {
+      setCart([]);
+    }
+  }, [showCart, setCart]);
+
+  useEffect(() => {
+    if (allIncome.length > 0) {
+      // Calculate pie data for payment distribution
+      const paymentCounts = allIncome.reduce((acc, income) => {
+        acc[income.paymentMethod] = (acc[income.paymentMethod] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const colors = {
+        'Efectivo': '#FF6F6F',
+        'Transferencia': '#4CAF50',
+        'Tarjeta': '#3F51B5'
+      };
+
+      const data = {
+        labels: Object.keys(paymentCounts),
+        datasets: [{
+          data: Object.values(paymentCounts),
+          backgroundColor: Object.keys(paymentCounts).map(method => colors[method as keyof typeof colors] || '#ccc'),
+          borderWidth: 1,
+        }]
+      };
+
+      setPieData(data);
+    }
+  }, [allIncome]);
+
+  const handleStartSeller = () => {
+    history.push('/category');
+  };
+
+  const handleConfirmSale = async () => {
+    if (cart.length === 0) {
+      setToastMessage('El carrito está vacío.');
+      setShowToast(true);
+      return;
+    }
+
+    try {
+      const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+      const response = await fetch('https://smartloansbackend.azurewebsites.net/pos_laundry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pos_laundry: {
+            details: cart.map(item => ({
+              productId: item.productId,
+              cantidad: item.quantity,
+              precio_unitario: item.price,
+              subtotal: item.subtotal
+            })),
+            total
+          }
+        }),
+      });
+
+      if (!response.ok) throw new Error(`Error al crear venta: ${response.status}`);
+      const data = await response.json();
+      console.log('Venta creada:', data);
+
+      const now = new Date();
+      const newTransaction: Transaction = {
+        date: now.toLocaleDateString('es-ES') + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        amount: total,
+        user: 'admin',
+        productName: cart.map(item => item.name).join(', '),
+        quantity: cart.reduce((sum, item) => sum + item.quantity, 0)
+      };
+
+      setTransactions(prev => [newTransaction, ...prev].slice(0, 5));
+      setToastMessage(`Venta confirmada: $${total.toFixed(2)}`);
+      setShowToast(true);
+      setCart([]);
+      setShowCart(false);
+      loadIncomes();
+    } catch (error) {
+      console.error(error);
+      setToastMessage('Error al confirmar la venta.');
+      setShowToast(true);
+    }
+  };
+
+  const calculateTotal = (): number =>
+    allIncome.reduce((sum, income) => sum + income.total, 0);
+
+  const calculateDailySales = (): number => {
+    const today = new Date();
+    const hermosilloToday = new Date(today.getTime() - (7 * 60 * 60 * 1000)); // UTC-7
+    const todayString = hermosilloToday.toISOString().split('T')[0]; // YYYY-MM-DD
+    return allIncome
+      .filter(income => {
+        const utcDate = new Date(income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z'));
+        const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+        const dateString = hermosilloDate.toISOString().split('T')[0];
+        return dateString === todayString;
+      })
+      .reduce((sum, income) => sum + income.total, 0);
+  };
+
+  const calculateMonthlyTotal = (): number => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - (7 * 60 * 60 * 1000));
+    const currentMonth = hermosilloNow.getMonth();
+    const currentYear = hermosilloNow.getFullYear();
+    return allIncome
+      .filter(income => {
+        const utcDate = new Date(income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z'));
+        const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+        return hermosilloDate.getMonth() === currentMonth && hermosilloDate.getFullYear() === currentYear;
+      })
+      .reduce((sum, income) => sum + income.total, 0);
+  };
+
+  const currentMonthYear = new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+  const currentUser = 'admin'; // From UserContext if available
+  const percentageChange = '+0%'; // Mock; calculate from previous month if backend provides
+
+  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
+    showAlertPopover: false,
+    showMailPopover: false,
+  });
+
+  const presentAlertPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
+
+  const presentMailPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
+
+  const handleLogoutConfirm = () => {
+    setAuthenticated(false);
+    history.push('/Login');
+    setShowLogoutAlert(false);
+  };
+
+  const handleShowReceipt = async (incomeId: number) => {
+    try {
+      const ticket = await fetchTicket(incomeId.toString());
+      if (ticket) {
+        // Parse date as UTC since database stores in UTC, then convert to Hermosillo timezone (UTC-7)
+        const utcDate = new Date(ticket.paymentDate + (ticket.paymentDate.includes('Z') ? '' : 'Z'));
+        const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
+        const receiptProps = {
+          transactionDate: hermosilloDate.toLocaleDateString('es-ES'),
+          transactionTime: hermosilloDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+          clientName: ticket.client.name,
+          clientPhone: ticket.client.cellphone,
+          clientEmail: ticket.client.email,
+          userName: ticket.user.name,
+          products: ticket.products.map(p => ({
+            name: p.name,
+            quantity: p.quantity,
+            unitPrice: p.unitPrice,
+            subtotal: p.subtotal,
+            options: p.options.map(o => o.choiceName)
+          })),
+          subtotal: ticket.totals.subtotal,
+          iva: ticket.totals.iva,
+          total: ticket.totals.total,
+          paymentMethod: ticket.paymentMethod,
+          amountReceived: ticket.totals.total, // Assuming full payment
+          change: 0
+        };
+        setReceiptData(receiptProps);
+        setShowReceiptModal(true);
+      } else {
+        setToastMessage('Recibo no encontrado.');
+        setShowToast(true);
+      }
+    } catch (error) {
+      console.error('Error fetching ticket:', error);
+      setToastMessage('Error al obtener el recibo.');
+      setShowToast(true);
+    }
+  };
+
+  const getTitleFromPath = (pathname: string): string => {
+    switch (pathname) {
+      case '/POS':
+        return 'Lavandería';
+      case '/Laundry':
+        return 'Lavandería';
+      case '/ScannerQR':
+        return 'Lector QR';
+      case '/Setting':
+        return 'Configuración';
+      case '/Sells':
+        return 'Ventas';
+      default:
+        return 'POS GMO';
+    }
+  };
+
+  return {
+    location,
+    history,
+    allIncome,
+    showToast,
+    setShowToast,
+    toastMessage,
+    setToastMessage,
+    transactions,
+    cart,
+    setCart,
+    showCart,
+    setShowCart,
+    showLogoutAlert,
+    setShowLogoutAlert,
+    authenticated,
+    showReceiptModal,
+    setShowReceiptModal,
+    receiptData,
+    setReceiptData,
+    pieData,
+    handleStartSeller,
+    handleConfirmSale,
+    calculateTotal,
+    calculateDailySales,
+    calculateMonthlyTotal,
+    currentMonthYear,
+    currentUser,
+    percentageChange,
+    popoverState,
+    presentAlertPopover,
+    dismissAlertPopover,
+    presentMailPopover,
+    dismissMailPopover,
+    handleLogoutConfirm,
+    handleShowReceipt,
+    getTitleFromPath,
+  };
+};

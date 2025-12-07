@@ -19,7 +19,7 @@ const CartItem: React.FC<CartItemProps> = ({ id, name, quantity, price, selected
         <p>Quantity: {quantity}</p>
         <p>Price: ${price.toFixed(2)}</p>
         {selectedOptionLabels && Object.keys(selectedOptionLabels).length > 0 && (
-          <p>Options: {Object.entries(selectedOptionLabels).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`).join('; ')}</p>
+          <p>Options: {Object.entries(selectedOptionLabels).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.map(v => `${v} (x${quantity})`).join(', ') : value}`).join('; ')}</p>
         )}
       </IonLabel>
       <IonButton fill="clear" onClick={() => onRemove(id)}>

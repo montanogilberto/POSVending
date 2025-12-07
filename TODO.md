@@ -1,9 +1,11 @@
-# Laundry Dashboard Redesign TODO
+# Laundry.tsx Refactor Tasks
 
-## Tasks
-- [x] Update imports in Laundry.tsx for new icons (calendarOutline, calendar)
-- [x] Add calculation functions for Daily Sales and Monthly Total
-- [x] Modify JSX to add responsive grid with two small metric cards above the large KPI card
-- [x] Update Laundry.css to add styles for small metric cards
-- [x] Fix receipt modal to include print button
-- [ ] Test layout responsiveness and visual consistency
+- [x] Update useLaundryDashboard.ts with all logic from Laundry.tsx
+- [x] Update DailySalesCard.tsx to match Laundry.tsx rendering (not needed, using MetricsGrid)
+- [x] Update CartSummary.tsx to match Laundry.tsx (onClose logic)
+- [x] Update RecentActivity.tsx to match Laundry.tsx (no activity message)
+- [x] Create MetricsGrid.tsx component
+- [x] Move Laundry.css to src/pages/Laundry/Laundry.css
+- [x] Move and refactor Laundry.tsx to src/pages/Laundry/Laundry.tsx
+- [x] Update any imports referencing old Laundry.tsx path
+- [x] Test the refactored components (build successful)
