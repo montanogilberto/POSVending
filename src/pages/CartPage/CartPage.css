@@ -1,0 +1,328 @@
+
+
+.cart-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.cart-container {
+  /* Additional styles if needed */
+}
+
+.cart-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.empty-cart {
+  color: #666;
+  text-align: center;
+}
+
+.cart-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.cart-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cart-item-title {
+  font-weight: bold;
+  margin: 0;
+}
+
+.remove-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 18px;
+}
+
+.cart-item-detail {
+  margin: 4px 0;
+}
+
+.cart-separator {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 24px 0;
+}
+
+.cart-total {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 24px;
+}
+
+.payment-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.payment-select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.cash-input-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.cash-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.add-button {
+  --border-radius: 16px;
+  --background: #ffffff;
+  --border-color: #3b82f6;
+  --border-width: 2px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+}
+
+.add-icon {
+  color: #3b82f6;
+}
+
+.button-label {
+  font-size: 12px;
+  margin-top: 6px;
+  color: #555;
+}
+
+.pay-button {
+  --border-radius: 16px;
+  opacity: var(--pay-opacity, 1);
+  box-shadow: 0 10px 24px rgba(59,130,246,0.35);
+}
+
+.clear-button {
+  --border-radius: 16px;
+  --background: #ffffff;
+  --border-color: #4b5563;
+  --border-width: 2px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+}
+
+.clear-icon {
+  color: #4b5563;
+}
+
+.cart-content {
+  background-color: #f5f5f5;
+  font-family: 'Inter, SF Pro, sans-serif';
+}
+
+.cart-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.cart-container {
+  /* Additional styles if needed */
+}
+
+.cart-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.empty-cart {
+  color: #666;
+  text-align: center;
+}
+
+.cart-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.cart-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cart-item-title {
+  font-weight: bold;
+  margin: 0;
+}
+
+.remove-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 18px;
+}
+
+.cart-item-detail {
+  margin: 4px 0;
+}
+
+.cart-separator {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 24px 0;
+}
+
+.cart-total {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 24px;
+}
+
+.payment-section {
+  margin-bottom: 24px;
+}
+
+.payment-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.payment-select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.cash-input-section {
+  margin-bottom: 24px;
+}
+
+.cash-input-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.cash-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.cart-grid {
+  margin-bottom: 24px;
+}
+
+.add-button {
+  --border-radius: 16px;
+  --background: #ffffff;
+  --border-color: #3b82f6;
+  --border-width: 2px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+}
+
+.add-icon {
+  color: #3b82f6;
+}
+
+.button-label {
+  font-size: 12px;
+  margin-top: 6px;
+  color: #555;
+}
+
+.pay-button {
+  --border-radius: 16px;
+  opacity: var(--pay-opacity, 1);
+  box-shadow: 0 10px 24px rgba(59,130,246,0.35);
+}
+
+.clear-button {
+  --border-radius: 16px;
+  --background: #ffffff;
+  --border-color: #4b5563;
+  --border-width: 2px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+}
+
+.clear-icon {
+  color: #4b5563;
+}
+
+.cart-actions {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Desktop: put them side by side and align to the right */
+@media (min-width: 768px) {
+  .cart-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .cart-actions .cart-button {
+    min-width: 220px;
+  }
+}
+
+.cart-button {
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+}
+
+/* Primary “Pagar” button */
+.cart-button-primary {
+  --background: #2563eb;
+  --background-hover: #1d4ed8;
+  --color: #ffffff;
+}
+
+/* Disabled state for pagar */
+.cart-button-primary[disabled] {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+/* Secondary “Agregar” button */
+.cart-button-secondary {
+  --border-color: #d1d5db;
+  --color: #374151;
+  --background: #ffffff;
+  --background-hover: #f9fafb;
+}
+

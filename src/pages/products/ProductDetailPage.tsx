@@ -374,15 +374,14 @@ const ProductDetailPage: React.FC = () => {
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle="Detalle del Producto"
+        screenTitle=""
+        showBackButton={true}
+        backButtonText="Detalle Productos"
+        backButtonHref="/"
       />
 
       <IonContent fullscreen className="dashboard-content">
         <div className="dashboard-container">
-          {/* Header */}
-          <div className="dashboard-header-section">
-            <h1 className="dashboard-title">Detalle del Producto</h1>
-          </div>
 
           {/* Product Details */}
           <div className="dashboard-card">
