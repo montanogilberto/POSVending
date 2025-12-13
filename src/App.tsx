@@ -35,7 +35,6 @@ import Sells from './pages/Sells';
 import Laundry from './pages/Laundry/Laundry';
 import ScannerQR from './pages/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
-import ProductSelection from './pages/ProductSelection';
 import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/CartPage/CartPage';
@@ -167,7 +166,6 @@ const App: React.FC = () => {
                 <Route exact path="/laundry" component={Laundry} />
                 <Route exact path="/scannerqr" component={ScannerQR} />
 
-                <Route exact path="/product-selection" component={ProductSelection} />
                 <Route exact path="/category" component={Category} />
                 <Route exact path="/products/:productId" component={ProductDetailPage} />
                 <Route exact path="/product/:categoryId" component={ProductListPage} />

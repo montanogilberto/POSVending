@@ -12,7 +12,7 @@ import {
   IonIcon,
   IonLoading,
 } from '@ionic/react';
-import { addCircle, card, trash } from 'ionicons/icons';
+import { addCircle, card } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
 import { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
@@ -21,19 +21,21 @@ import useInactivityTimer from '../../hooks/useInactivityTimer';
 import { fetchTicket } from '../../api/ticketApi';
 import { postIncome } from '../../api/incomeApi';
 import { useIncome } from '../../context/IncomeContext';
+
 import '../../styles/dashboard.css';
+import './CartPage.css';
 import Receipt from '../../components/Receipt';
 
 import CartSummary from './CartSummary';
 import CartItemsList from './CartItemsList';
 import CheckoutActions from './CheckoutActions';
 import ReceiptDisplay from './ReceiptDisplay';
-// Removed ReceiptModal import as it's no longer used
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
   const { loadIncomes } = useIncome();
   const history = useHistory();
+
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | 'transferencia' | ''>('');
   const [cashPaid, setCashPaid] = useState<string>('');
   const [showAlert, setShowAlert] = useState(false);
@@ -48,18 +50,12 @@ const CartPage: React.FC = () => {
   const receiptRef = useRef<HTMLDivElement | null>(null);
 
   const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-
   const cashNumber = parseFloat(cashPaid);
 
-  const isCheckoutEnabled: boolean =
+  const isCheckoutEnabled =
     !!paymentMethod &&
-    (
-      paymentMethod !== 'efectivo' ||
-      (
-        !isNaN(cashNumber) &&
-        cashNumber >= total
-      )
-    );
+    (paymentMethod !== 'efectivo' ||
+      (!isNaN(cashNumber) && cashNumber >= total));
 
   useInactivityTimer(300000, () => window.location.reload());
 
@@ -67,8 +63,6 @@ const CartPage: React.FC = () => {
     const cash = parseFloat(cashPaid);
     if (paymentMethod === 'efectivo' && !isNaN(cash) && cash > total) {
       setChangeAmount(cash - total);
-    } else {
-      setShowToast(false);
     }
   }, [cashPaid, paymentMethod, total]);
 
@@ -82,6 +76,7 @@ const CartPage: React.FC = () => {
       setShowAlert(true);
       return;
     }
+
     if (paymentMethod === 'efectivo') {
       const cash = parseFloat(cashPaid);
       if (isNaN(cash) || cash < total) {
@@ -91,15 +86,16 @@ const CartPage: React.FC = () => {
     }
 
     setLoading(true);
+
     const orderData = {
       orders: cart.map((item) => {
         const selections = Object.entries(item.selectedOptions || {})
-          .map(([optionType, optionValues]) => {
-            return (Array.isArray(optionValues) ? optionValues : [optionValues]).map((value: string) => ({
+          .map(([optionType, optionValues]) =>
+            (Array.isArray(optionValues) ? optionValues : [optionValues]).map((value: string) => ({
               productOptionId: optionType,
               productOptionChoiceId: value,
-            }));
-          })
+            }))
+          )
           .flat();
 
         return {
@@ -119,6 +115,7 @@ const CartPage: React.FC = () => {
 
     try {
       const response = await submitOrder(orderData);
+
       if (response.ok) {
         try {
           const payload = {
@@ -145,21 +142,22 @@ const CartPage: React.FC = () => {
               },
             ],
           };
+
           const incomeData = await postIncome(payload);
-          const rec = Array.isArray(incomeData.result) ? incomeData.result[0] : null;
+          const rec = Array.isArray(incomeData.result)
+            ? incomeData.result[0]
+            : null;
 
           if (rec && rec.msg === 'Inserted Successfully' && rec.value != null) {
             const newId = String(rec.value);
             setLastIncomeId(newId);
-            try {
-              await loadIncomes();
-            } catch (reloadError) {}
+            await loadIncomes();
           }
         } catch (incomeError) {}
+
         clearCart();
         setShowSuccessToast(true);
       } else {
-        const errorData = await response.json();
         showErrorToast('Ocurrió un error al procesar el pedido.');
       }
     } catch (error) {
@@ -184,39 +182,51 @@ const CartPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent fullscreen style={{ backgroundColor: '#f5f5f5', fontFamily: 'Inter, SF Pro, sans-serif' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '16px' }}>
+      <IonContent fullscreen className="cart-content">
+        <div className="cart-wrapper">
           <div className="cart-container">
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px', textAlign: 'center' }}>Carrito de Compras</h2>
+            <h2 className="cart-title">Carrito de Compras</h2>
 
             {cart.length === 0 ? (
-              <p style={{ color: '#666', textAlign: 'center' }}>El carrito está vacío.</p>
+              <p className="empty-cart">El carrito está vacío.</p>
             ) : (
               <>
                 {cart.map((item) => (
-                  <div key={item.id} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <h3 style={{ fontWeight: 'bold', margin: 0 }}>{item.name}</h3>
-                      <button onClick={() => removeFromCart(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: '18px' }}>✕</button>
+                  <div key={item.id} className="cart-item">
+                    <div className="cart-item-header">
+                      <h3 className="cart-item-title">{item.name}</h3>
+                      <button
+                        onClick={() => removeFromCart(item.id)}
+                        className="remove-button"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <p style={{ margin: '4px 0' }}>Cantidad: {item.quantity}</p>
-                    <p style={{ margin: '4px 0' }}>Precio: ${item.price.toFixed(2)}</p>
-                    {item.selectedOptionLabels && Object.entries(item.selectedOptionLabels).map(([key, value]) => (
-                      <p key={key} style={{ margin: '4px 0' }}>{key}: {Array.isArray(value) ? value.join(', ') : value}</p>
-                    ))}
+                    <p className="cart-item-detail">Cantidad: {item.quantity}</p>
+                    <p className="cart-item-detail">Precio: ${item.price.toFixed(2)}</p>
+
+                    {item.selectedOptionLabels &&
+                      Object.entries(item.selectedOptionLabels).map(
+                        ([key, value]) => (
+                          <p key={key} className="cart-item-detail">
+                            {key}:{' '}
+                            {Array.isArray(value) ? value.join(', ') : value}
+                          </p>
+                        )
+                      )}
                   </div>
                 ))}
 
-                <hr style={{ border: 'none', borderTop: '1px solid #e0e0e0', margin: '24px 0' }} />
+                <hr className="cart-separator" />
 
-                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '24px' }}>Total: ${total.toFixed(2)}</div>
+                <div className="cart-total">Total: ${total.toFixed(2)}</div>
 
-                <div style={{ marginBottom: '24px' }}>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Método de pago</label>
+                <div className="payment-section">
+                  <label className="payment-label">Método de pago</label>
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    style={{ width: '100%', padding: '12px', border: '1px solid #ccc', borderRadius: '8px', fontSize: '16px' }}
+                    className="payment-select"
                   >
                     <option value="">Seleccionar método</option>
                     <option value="efectivo">Efectivo</option>
@@ -226,47 +236,41 @@ const CartPage: React.FC = () => {
                 </div>
 
                 {paymentMethod === 'efectivo' && (
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Efectivo recibido</label>
+                  <div className="cash-input-section">
+                    <label className="cash-input-label">Efectivo recibido</label>
                     <input
                       type="number"
                       value={cashPaid}
                       onChange={(e) => setCashPaid(e.target.value)}
                       placeholder="Ingrese el efectivo recibido"
                       min={total}
-                      style={{ width: '100%', padding: '12px', border: '1px solid #ccc', borderRadius: '8px', fontSize: '16px' }}
+                      className="cash-input"
                     />
                   </div>
                 )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* --------------------------- */}
+                {/*     NEW BUTTON SECTION      */}
+                {/* --------------------------- */}
+                <div className="cart-actions">
+
                   <IonButton
-                    
                     fill="outline"
-                    color="primary"
                     onClick={handleAddMoreProducts}
+                    className="cart-button cart-button-secondary"
                   >
                     <IonIcon slot="start" icon={addCircle} />
                     Agregar más productos
                   </IonButton>
+
                   <IonButton
                     expand="block"
-                    fill="solid"
-                    color="primary"
                     onClick={handleCheckout}
                     disabled={!isCheckoutEnabled}
+                    className="cart-button cart-button-primary"
                   >
                     <IonIcon slot="start" icon={card} />
-                    Proceder al pago
-                  </IonButton>
-                  <IonButton
-                    expand="block"
-                    fill="solid"
-                    color="medium"
-                    onClick={clearCart}
-                  >
-                    <IonIcon slot="start" icon={trash} />
-                    Vaciar carrito
+                    Pagar ${total.toFixed(2)}
                   </IonButton>
                 </div>
               </>
@@ -280,15 +284,6 @@ const CartPage: React.FC = () => {
           message={toastMessage}
           color="danger"
           position="bottom"
-          buttons={[
-            {
-              text: 'Cerrar',
-              role: 'cancel',
-              handler: () => {
-                setShowToast(false);
-              },
-            },
-          ]}
         />
 
         <IonAlert
@@ -302,42 +297,22 @@ const CartPage: React.FC = () => {
         <IonToast
           isOpen={showSuccessToast}
           onDidDismiss={async () => {
-            console.log('Toast dismissed, lastIncomeId:', lastIncomeId);
             setShowSuccessToast(false);
             if (lastIncomeId) {
-              console.log('Fetching ticket for incomeId:', lastIncomeId);
               const ticket = await fetchTicket(lastIncomeId);
-              console.log('Fetched ticket:', ticket);
               setTicketData(ticket);
-              // Scroll to the receipt
+
               setTimeout(() => {
                 const receiptEl = document.getElementById('receipt-container');
                 if (receiptEl) receiptEl.scrollIntoView({ behavior: 'smooth' });
               }, 100);
-              // Removed setting showReceipt true, as modal is gone
-            } else {
-              console.log('No lastIncomeId, cannot fetch ticket');
             }
           }}
-          message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
-            paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
-              ? ` : Cambio a devolver: $${(parseFloat(cashPaid) - total).toFixed(2)}`
-              : ''
-          }`}
+          message={`¡Pedido realizado! Método de pago: ${paymentMethod}`}
           color="success"
           position="bottom"
-          buttons={[
-            {
-              text: 'OK',
-              role: 'cancel',
-              handler: () => {
-                setShowSuccessToast(false);
-              },
-            },
-          ]}
         />
 
-        {/* Receipt Display */}
         {ticketData && (
           <ReceiptDisplay
             ticketData={ticketData}
@@ -348,10 +323,7 @@ const CartPage: React.FC = () => {
           />
         )}
 
-        <IonLoading
-          isOpen={loading}
-          message="Procesando pago..."
-        />
+        <IonLoading isOpen={loading} message="Procesando pago..." />
       </IonContent>
     </IonPage>
   );

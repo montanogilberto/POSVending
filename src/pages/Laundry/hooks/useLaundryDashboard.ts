@@ -78,17 +78,7 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
   // Timer de inactividad para refrescar
   useInactivityTimer(300000, loadIncomes);
 
-  // Recibir item desde ProductSelection
-  useEffect(() => {
-    const state = location.state as LocationState | undefined;
-    if (state && state.from === 'product-selection' && state.item) {
-      const item = state.item;
-      setCart((prev) => [...prev, item]);
-      setShowCart(true);
-      setToastMessage(`Producto "${item.name}" agregado al carrito.`);
-      setShowToast(true);
-    }
-  }, [location.state]);
+
 
   // Limpiar carrito cuando se oculta
   useEffect(() => {
