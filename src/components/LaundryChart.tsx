@@ -2,9 +2,15 @@ import React from 'react';
 import {
   IonCard,
   IonCardHeader,
-  IonCardSubtitle,
+  IonCardTitle,
   IonCardContent,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonList,
+  IonItem,
   IonIcon,
+  IonLabel,
 } from '@ionic/react';
 import { Pie } from 'react-chartjs-2';
 import {
@@ -21,14 +27,26 @@ import {
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+interface PieDataset {
+  data: number[];
+  backgroundColor?: string[];
+}
+
+interface PieData {
+  labels: string[];
+  datasets: PieDataset[];
+}
+
 interface LaundryChartProps {
-  pieData: any;
+  pieData: PieData | null;
 }
 
 const LaundryChart: React.FC<LaundryChartProps> = ({ pieData }) => {
   if (!pieData) return null;
 
-  const values: number[] = pieData.datasets[0].data;
+  const values: number[] = pieData.datasets[0]?.data ?? [];
+  const colors: string[] = (pieData.datasets[0]?.backgroundColor as string[]) || [];
+
   const total = values.reduce((sum: number, value: number) => sum + value, 0);
 
   // Si TOTAL = 0, mostramos mensaje
@@ -36,7 +54,7 @@ const LaundryChart: React.FC<LaundryChartProps> = ({ pieData }) => {
     return (
       <IonCard className="dashboard-card">
         <IonCardHeader>
-          <IonCardSubtitle>Distribución de Pagos</IonCardSubtitle>
+          <IonCardTitle>Distribución de Pagos</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
           <p>No hay datos de pagos para este mes.</p>
@@ -58,43 +76,54 @@ const LaundryChart: React.FC<LaundryChartProps> = ({ pieData }) => {
   return (
     <IonCard className="dashboard-card">
       <IonCardHeader>
-        <IonCardSubtitle>Distribución de Pagos</IonCardSubtitle>
+        <IonCardTitle>Distribución de Pagos</IonCardTitle>
       </IonCardHeader>
       <IonCardContent>
-        <div className="chart-container">
-          <Pie
-            data={pieData}
-            options={{
-              plugins: { legend: { display: false } },
-              maintainAspectRatio: false,
-            }}
-          />
-          <div className="chart-labels">
-            {pieData.labels.map((label: string, index: number) => {
-              const percentage = percentages[index];
-              const amount = values[index];
-              const amountFormatted = amount.toLocaleString('es-MX', {
-                style: 'currency',
-                currency: 'MXN',
-              });
-
-              return (
-                <div key={index} className="chart-label">
-                  {label.toLowerCase()} — {percentage}% · {amountFormatted}
+        <IonGrid>
+          <IonRow>
+            {/* Gráfica Pie */}
+            <IonCol size="12" size-md="7">
+              <div className="chart-container">
+                <div className="chart-pie">
+                  <Pie
+                    data={pieData}
+                    options={{
+                      plugins: { legend: { display: false } },
+                      maintainAspectRatio: false,
+                    }}
+                  />
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              </div>
+            </IonCol>
 
-        <div className="chart-legend">
-          {legendItems.map((item, index) => (
-            <div key={index} className="legend-item">
-              <IonIcon icon={item.icon} />
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </div>
+            {/* Leyenda con iconos + montos + porcentaje */}
+            <IonCol size="12" size-md="5">
+              <IonList className="chart-legend-list">
+                {legendItems.map((item, index) => {
+                  const value = values[index] ?? 0;
+                  const percentage = percentages[index] ?? '0';
+                  const color = colors[index] || '#999'; // color de respaldo
+
+                  return (
+                    <IonItem key={item.label} lines="none">
+                      <IonIcon
+                        slot="start"
+                        icon={item.icon}
+                        style={{ color, fontSize: '22px' }}
+                      />
+                      <IonLabel>
+                        <h3>{item.label}</h3>
+                        <p>
+                          ${value.toFixed(2)} • {percentage}%
+                        </p>
+                      </IonLabel>
+                    </IonItem>
+                  );
+                })}
+              </IonList>
+            </IonCol>
+          </IonRow>
+        </IonGrid>
       </IonCardContent>
     </IonCard>
   );

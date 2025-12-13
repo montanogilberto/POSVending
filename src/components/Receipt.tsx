@@ -42,19 +42,19 @@ interface ReceiptProps {
 }
 
 const Receipt: React.FC<ReceiptProps> = ({
-  transactionDate,
-  transactionTime,
-  clientName,
-  clientPhone,
-  clientEmail,
-  userName,
-  products,
-  subtotal,
-  iva,
-  total,
-  paymentMethod,
-  amountReceived,
-  change,
+  transactionDate = '',
+  transactionTime = '',
+  clientName = '',
+  clientPhone = '',
+  clientEmail = '',
+  userName = '',
+  products = [],
+  subtotal = 0,
+  iva = 0,
+  total = 0,
+  paymentMethod = '',
+  amountReceived = 0,
+  change = 0,
   onPrint,
 }) => {
   console.log('Receipt component rendering with props:', { transactionDate, transactionTime, clientName, products, total });
@@ -122,7 +122,7 @@ const Receipt: React.FC<ReceiptProps> = ({
             
           </IonRow>
           {/* Product Rows */}
-          {products.map((product, index) => (
+          {products?.map((product, index) => (
             <IonRow key={index} className="receipt-products-row">
               <IonCol size="3" className="receipt-col">{product.name}</IonCol>
               <IonCol size="3" className="receipt-col receipt-options">

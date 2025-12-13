@@ -64,10 +64,6 @@ const Laundry: React.FC = () => {
       />
       <IonContent fullscreen className="dashboard-content">
         <div className="dashboard-container">
-          {/* Header */}
-          <div className="dashboard-header-section">
-            <h1 className="dashboard-title">Lavandería</h1>
-          </div>
 
           {/* Metrics Grid */}
           <MetricsGrid
