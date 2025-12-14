@@ -284,6 +284,15 @@ const CartPage: React.FC = () => {
           message={toastMessage}
           color="danger"
           position="bottom"
+          buttons={[
+            {
+              text: 'OK',
+              role: 'cancel',
+              handler: () => {
+                setShowToast(false);
+              },
+            },
+          ]}
         />
 
         <IonAlert
@@ -308,9 +317,22 @@ const CartPage: React.FC = () => {
               }, 100);
             }
           }}
-          message={`¡Pedido realizado! Método de pago: ${paymentMethod}`}
+          message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
+            paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
+              ? ` : Cambio a devolver: $${(parseFloat(cashPaid) - total).toFixed(2)}`
+              : ''
+          }`}
           color="success"
           position="bottom"
+          buttons={[
+            {
+              text: 'OK',
+              role: 'cancel',
+              handler: () => {
+                setShowSuccessToast(false);
+              },
+            },
+          ]}
         />
 
         {ticketData && (

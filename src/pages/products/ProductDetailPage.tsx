@@ -516,21 +516,7 @@ const ProductDetailPage: React.FC = () => {
                 </IonList>
               ))}
 
-              {/* Global product quantity (unchanged) */}
-              <IonItem>
-                <IonLabel position="stacked">Cantidad</IonLabel>
-                <IonSelect
-                  value={quantity}
-                  onIonChange={e => setQuantity(Number(e.detail.value))}
-                  interface="popover"
-                >
-                  {[...Array(10)].map((_, i) => (
-                    <IonSelectOption key={i + 1} value={i + 1}>
-                      {i + 1}
-                    </IonSelectOption>
-                  ))}
-                </IonSelect>
-              </IonItem>
+ 
 
               <IonButton expand="block" onClick={handleAddToCart}>
                 Agregar al carrito
