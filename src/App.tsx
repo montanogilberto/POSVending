@@ -47,6 +47,7 @@ import EmailsPage from './pages/EmailsPage';
 import CategoriesPage from './pages/CategoryPage/CategoriesPage';
 import UsersPage from './pages/UsersPage';
 import IncomesPage from './pages/IncomesPage';
+import ExpensesPage from './pages/ExpensesPage';
 import WaterTanksPage from './pages/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/WaterTanksHistoryPage';
 
@@ -128,6 +129,10 @@ const App: React.FC = () => {
                   <IonIcon icon={barChart} slot="start" />
                   <IonLabel>Ingresos</IonLabel>
                 </IonItem>
+                <IonItem button routerLink="/egresos">
+                  <IonIcon icon={barChart} slot="start" />
+                  <IonLabel>Egresos</IonLabel>
+                </IonItem>
 
                 <IonItemDivider>IOT</IonItemDivider>
                 <IonItem button routerLink="/led-status">
@@ -179,6 +184,7 @@ const App: React.FC = () => {
                 <Route exact path="/emails" component={EmailsPage} />
                 <Route exact path="/users" component={UsersPage} />
                 <Route exact path="/ingresos" component={IncomesPage} />
+                <Route exact path="/egresos" component={ExpensesPage} />
                 <Route exact path="/water-tanks" component={WaterTanksPage} />
                 <Route exact path="/water-tanks-history/:tankId" component={WaterTanksHistoryPage} />
 

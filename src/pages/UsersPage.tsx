@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import './UsersPage.css';
 import {
   IonPage,
   IonContent,
@@ -19,17 +20,20 @@ import {
   IonFab,
   IonFabButton,
   IonAlert,
-  IonInput,
-  IonSelect,
-  IonSelectOption,
+  IonToast,
   IonModal,
-  IonImg,
-  IonAvatar,
+  IonInput,
+  IonNote,
+  IonText,
   IonGrid,
   IonRow,
   IonCol,
+  IonAvatar,
+  IonImg,
+  IonSelect,
+  IonSelectOption,
 } from '@ionic/react';
-import { add, create, trash, pencil, camera, person } from 'ionicons/icons';
+import { add, create, trash, pencil, camera, person, checkmarkCircle, closeCircle, mail, save, arrowBack } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
@@ -70,21 +74,47 @@ const UsersPage: React.FC = () => {
       status: 'inactive',
     },
   ]);
+  const [loading, setLoading] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    role: 'employee' as 'admin' | 'manager' | 'employee',
-    avatar: '',
-    status: 'active' as 'active' | 'inactive',
-  });
   const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
     showAlertPopover: false,
     showMailPopover: false,
   });
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newUser, setNewUser] = useState<Partial<User>>({
+    name: '',
+    email: '',
+    role: 'employee',
+    avatar: '',
+    status: 'active',
+  });
+  const [createErrors, setCreateErrors] = useState({
+    name: '',
+    email: { isValid: true, message: '' },
+    role: '',
+  });
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
+  const [editErrors, setEditErrors] = useState({
+    name: '',
+    email: { isValid: true, message: '' },
+    role: '',
+  });
+
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState<Partial<User>>({
+    name: '',
+    email: '',
+    role: 'employee',
+    avatar: '',
+    status: 'active',
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const presentAlertPopover = (e: React.MouseEvent) => {
@@ -152,7 +182,11 @@ const UsersPage: React.FC = () => {
       // Create new
       const newUser: User = {
         id: Math.max(...users.map(u => u.id)) + 1,
-        ...formData,
+        name: formData.name || '',
+        email: formData.email || '',
+        role: formData.role || 'employee',
+        avatar: formData.avatar || '',
+        status: formData.status || 'active',
       };
       setUsers([...users, newUser]);
     }
