@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import { IonModal, IonContent, IonGrid, IonRow, IonCol, IonIcon, IonLabel, IonButton } from '@ionic/react';
-import { documentTextOutline, peopleOutline, cashOutline, barChartOutline, closeOutline } from 'ionicons/icons';
+import { documentTextOutline, peopleOutline, cashOutline, barChartOutline, closeOutline, walletOutline } from 'ionicons/icons';
 
 import './MenuPopover.css'
 
@@ -55,6 +55,10 @@ const MenuModal: React.FC<MenuModalProps> = ({ isOpen, onDidDismiss }) => {
 
           </IonRow>
           <IonRow>
+            <IonCol className="icon-button" onClick={() => navigate('/departaments')}>
+              <IonIcon icon={barChartOutline} />
+              <IonLabel>Departaments</IonLabel>
+            </IonCol>
           <IonCol className="icon-button" onClick={() => navigate('/employeeProjectAssignments')}>
               <IonIcon icon={barChartOutline} />
               <IonLabel>Project Assignments</IonLabel>
@@ -63,11 +67,13 @@ const MenuModal: React.FC<MenuModalProps> = ({ isOpen, onDidDismiss }) => {
               <IonIcon icon={barChartOutline} />
               <IonLabel>Employment Types</IonLabel>
             </IonCol>
+
+          </IonRow>
+          <IonRow>
             <IonCol className="icon-button" onClick={() => navigate('/createProjects')}>
               <IonIcon icon={barChartOutline} />
               <IonLabel>Create Projects</IonLabel>
             </IonCol>
-
           </IonRow>
           <IonRow>
             <IonCol className="icon-button" onClick={onDidDismiss}>

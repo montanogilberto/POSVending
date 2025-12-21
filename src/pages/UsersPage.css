@@ -1,0 +1,184 @@
+/* Professional Modal Styles for UsersPage */
+
+.user-modal {
+  --border-radius: 12px;
+  --background: #ffffff;
+}
+
+.modal-toolbar {
+  --background: linear-gradient(135deg, #0056D2 0%, #007BFF 100%);
+  --color: white;
+  padding: 16px;
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-title {
+  font-weight: 600;
+  font-size: 20px;
+  color: white;
+}
+
+.modal-subtitle {
+  background: #f8f9fa;
+  padding: 12px 16px;
+  text-align: center;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.modal-subtitle ion-text {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.modal-content {
+  --background: #f8f9fa;
+}
+
+.form-container {
+  padding: 24px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.form-item {
+  margin-bottom: 20px;
+  --border-radius: 8px;
+  --border-color: #dee2e6;
+  --background: white;
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.form-item.outline {
+  --border-color: #007bff;
+  --border-width: 2px;
+}
+
+.form-item:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.form-item ion-icon[slot="start"] {
+  margin-right: 8px;
+  color: #0056D2;
+}
+
+.form-item ion-icon[slot="end"] {
+  color: inherit;
+}
+
+.modern-input {
+  --placeholder-color: #adb5bd;
+  --color: #495057;
+  font-weight: 500;
+}
+
+.button-container {
+  margin-top: 32px;
+  padding: 0 8px;
+}
+
+.primary-button {
+  --background: linear-gradient(135deg, #0056D2 0%, #007BFF 100%);
+  --border-radius: 8px;
+  --color: white;
+  font-weight: 600;
+  font-size: 16px;
+  height: 48px;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.primary-button:hover:not(:disabled) {
+  --background: linear-gradient(135deg, #004085 0%, #003366 100%);
+  box-shadow: 0 6px 16px rgba(0, 86, 210, 0.4);
+  transform: translateY(-2px);
+}
+
+.primary-button:disabled {
+  --background: #6c757d;
+  --color: #adb5bd;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.primary-button ion-icon {
+  margin-right: 8px;
+}
+
+/* Validation Styles */
+.form-item ion-note[slot="helper"] {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Success States */
+.form-item:has(.ion-color-success) {
+  --border-color: #28a745;
+}
+
+.form-item:has(.ion-color-success) ion-icon[slot="start"] {
+  color: #28a745;
+}
+
+/* Error States */
+.form-item:has(.ion-color-danger) {
+  --border-color: #dc3545;
+  animation: shake 0.5s ease-in-out;
+}
+
+.form-item:has(.ion-color-danger) ion-icon[slot="start"] {
+  color: #dc3545;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Responsive Design */
+@media (max-width: 576px) {
+  .form-container {
+    padding: 16px;
+  }
+
+  .modal-toolbar {
+    padding: 12px;
+  }
+
+  .modal-title {
+    font-size: 18px;
+  }
+
+  .modal-subtitle {
+    padding: 8px 16px;
+  }
+
+  .button-container {
+    margin-top: 24px;
+  }
+}
+
+/* Enterprise-grade subtle animations */
+.form-item ion-input {
+  transition: all 0.3s ease;
+}
+
+.form-item ion-input:focus-within {
+  --border-color: #0056D2;
+  box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.1);
+}
+
+/* Professional spacing */
+.form-container > .form-item:first-child {
+  margin-top: 0;
+}
+
+.form-container > .form-item:last-child {
+  margin-bottom: 0;
+}
