@@ -29,6 +29,8 @@ import {
   logOutOutline, people, cube, notifications, mail, grid, person, menu, water
 } from 'ionicons/icons';
 
+//test
+
 import Vending from './pages/Vending'
 import Setting from './pages/Setting';
 import Sells from './pages/Sells';
