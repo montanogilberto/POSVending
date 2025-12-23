@@ -301,7 +301,9 @@ const ProductDetailPage: React.FC = () => {
       return;
     }
 
-    const basePrice = product.price;
+    const basePrice = product.details && product.details.length > 0 
+      ? product.details[0].salePrice 
+      : 0;
     const optionPrice = calculateOptionPrice();
     const finalPrice = basePrice + optionPrice;
 
@@ -355,8 +357,8 @@ const ProductDetailPage: React.FC = () => {
     });
 
     addToCart({
-      id: String(product.id),
-      productId: String(product.id),
+      id: String(product.productId),
+      productId: String(product.productId),
       name: product.name,
       quantity,
       price: finalPrice,
@@ -391,7 +393,11 @@ const ProductDetailPage: React.FC = () => {
                 {new Intl.NumberFormat('es-MX', {
                   style: 'currency',
                   currency: 'MXN',
-                }).format(product.price)}
+                }).format(
+                  product.details && product.details.length > 0 
+                    ? product.details[0].salePrice 
+                    : 0
+                )}
               </IonCardSubtitle>
             </IonCardHeader>
             <IonCardContent>

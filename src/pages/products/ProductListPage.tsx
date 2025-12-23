@@ -115,9 +115,9 @@ const ProductListPage: React.FC = () => {
               {filteredProducts.length > 0 ? (
                 <IonGrid style={{ padding: 0 }}>
                   {filteredProducts.map((product) => (
-                    <IonRow key={product.id}>
+                    <IonRow key={product.productId}>
                       <IonCol>
-                        <IonCard button={true} onClick={() => history.push(`/products/${product.id}`, { product })}>
+                        <IonCard button={true} onClick={() => history.push(`/products/${product.productId}`, { product })}>
                           <IonCardContent style={{ padding: '16px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div style={{ flex: 1 }}>
@@ -130,7 +130,11 @@ const ProductListPage: React.FC = () => {
                               </div>
                               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                 <p style={{ margin: 0, color: '#2563eb', fontSize: '16px', fontWeight: 'bold' }}>
-                                  {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
+                                  {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(
+                                    product.details && product.details.length > 0 
+                                      ? product.details[0].salePrice 
+                                      : 0
+                                  )}
                                 </p>
                                 <IonText color="primary" style={{ textTransform: 'uppercase', fontWeight: 'bold' }}>
                                   Ver detalles

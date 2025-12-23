@@ -1,27 +1,44 @@
-# Receipt Text Size Reduction - COMPLETED
+# Product TypeScript Errors Fix Plan
 
-## Task: Reduce text size in RECEIPT_STYLES by at least 2x
+## Issues Identified:
 
-### ✅ Completed Changes:
-- **General text**: 13px → 6px (53% reduction)
-- **Title**: 18px → 9px (50% reduction)
-- **Row text**: 13px → 6px (53% reduction)
-- **Total**: 16px → 8px (50% reduction)
-- **Footer**: 12px → 6px (50% reduction)
-- **QR code**: 8px → 4px (50% reduction)
-- **QR validation**: 9px → 4px (56% reduction)
+1. **Missing Files**: Import paths are correct, files exist
+2. **Type Mismatches**: Product interface expects `productId` but code uses `id`
+3. **Price Property**: Product interface has `details[]` with `salePrice` but code expects direct `price` property
+4. **Data Mapping**: products.ts incorrectly maps API response to Product interface
 
-### ✅ Additional Optimizations:
-- Line height: 1.3 → 1.1
-- Container padding: 2mm → 1mm
-- Margins: Reduced by 40-50%
-- Padding: Reduced by 40-50%
-- Letter spacing: 0.2px → 0.1px
+## Information Gathered:
 
-### ✅ Results:
-- Text is now approximately 2x smaller
-- Receipt is more compact while maintaining functionality
-- All styling preserved and optimized
-- File modified: `/src/pages/Receipt/receiptTemplate.ts`
+- Current Product interface in `type_products.ts` has `productId`, not `id`
+- Product interface has `details` array with `unitPrice` and `salePrice`, not direct `price` property
+- Products API response mapping is incorrect in `products.ts`
+- Product pages are using wrong property names (`id` vs `productId`, `price` vs accessing details)
 
-### Status: ✅ COMPLETED
+## Plan:
+
+### ✅ Step 1: Fix Product Interface & Data Mapping
+- ✅ Update `products.ts` to correctly map API response to Product interface
+- ✅ Ensure all Product-related code uses correct property names
+
+### ✅ Step 2: Fix Product Pages
+- ✅ Update `ProductListPage.tsx` to use `productId` instead of `id`
+- ✅ Update `ProductDetailPage.tsx` to use `productId` instead of `id` and proper price calculation
+- ✅ Update `ProductsManagementPage.tsx` if needed (No issues found)
+
+### ✅ Step 3: Update Cart Context Integration
+- ✅ Ensure cart operations work with the corrected Product interface
+- ✅ Update cart item creation to match corrected product structure
+
+### ✅ Step 4: Test All Changes
+- ✅ Verify no more TypeScript errors (Build completed successfully)
+- ✅ Ensure products display and function correctly
+
+## Files Edited:
+1. `src/data/products.ts` - ✅ Fix API response mapping
+2. `src/pages/Products/ProductListPage.tsx` - ✅ Fix property access
+3. `src/pages/Products/ProductDetailPage.tsx` - ✅ Fix property access and price calculation
+
+## ✅ Expected Outcome ACHIEVED:
+- ✅ All TypeScript errors resolved
+- ✅ Products display correctly with proper IDs and prices
+- ✅ Cart functionality preserved

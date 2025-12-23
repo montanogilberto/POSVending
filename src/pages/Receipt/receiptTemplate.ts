@@ -194,7 +194,7 @@ const RECEIPT_QR = `
     █ ▀▀▀ █ ▀ ▀ █ ▀▀▀ █<br/>
     ▀▀▀▀▀▀▀ ▀ ▀ ▀▀▀▀▀▀▀
   </div>
-  <div style="font-size: 9px; margin-top: 5px;">
+  <div style="font-size: 4px; margin-top: 2px;">
     Escanea para validar
   </div>
 </div>
