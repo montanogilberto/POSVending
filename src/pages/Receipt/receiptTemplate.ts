@@ -1,5 +1,5 @@
 /* =========================
-   RECEIPT STYLES
+   RECEIPT STYLES (58mm FIT)
 ========================= */
 const RECEIPT_STYLES = `
 <style>
@@ -8,94 +8,107 @@ const RECEIPT_STYLES = `
     padding: 0;
     width: 58mm;
     font-family: Arial, sans-serif !important;
-    font-size: 6px !important;
+    font-size: 7px !important;
     color: #000 !important;
     background: white;
-    line-height: 1.1;
+    line-height: 1.05;
   }
 
   * {
+    box-sizing: border-box;
     color: #000 !important;
     -webkit-font-smoothing: none !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
+  /* Narrower than paper to avoid clipping */
   .receipt-container {
-    width: 48mm;
-    max-width: 48mm;
+    width: 46mm;
+    max-width: 46mm;
     margin: 0 auto;
-    padding: 1mm 0;
-    box-sizing: border-box;
+    padding: 0.5mm 0;
   }
 
   .receipt-title {
-    font-size: 9px !important;
+    font-size: 10px !important;
     font-weight: 900 !important;
     text-align: center;
     border-bottom: 1px dashed #000;
     padding-bottom: 2px;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
 
   .receipt-section {
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
 
+  /* FIXED COLUMNS — NO OVERFLOW */
   .receipt-row {
     display: flex;
+    align-items: baseline;
     justify-content: space-between;
-    margin-bottom: 1px;
-    padding: 0px 0;
-    font-size: 6px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.1px;
+    gap: 1mm;
+    margin-bottom: 0.5px;
+    padding: 0;
+    white-space: nowrap;
   }
 
-  .receipt-label,
-  .receipt-value {
+  .receipt-label {
+    width: 58%;
     font-weight: 900 !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .receipt-value {
+    width: 42%;
+    font-weight: 900 !important;
     text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .receipt-products {
+    margin: 3px 0;
   }
 
   .receipt-total {
     border-top: 1px solid #000;
     border-bottom: 1px solid #000;
-    padding: 2px 0;
-    font-size: 8px !important;
-    margin: 3px 0;
-  }
-
-  .receipt-products {
-    margin: 4px 0;
+    padding: 1px 0;
+    font-size: 9px !important;
+    margin: 2px 0;
   }
 
   .receipt-qr {
     text-align: center;
-    margin: 4px 0;
-    padding: 4px 0;
+    margin: 3px 0;
+    padding: 3px 0;
     border-top: 1px dashed #000;
     border-bottom: 1px dashed #000;
   }
 
   .qr-code {
     font-family: monospace;
-    font-size: 4px;
-    line-height: 0.7;
+    font-size: 3px;
+    line-height: 0.65;
     white-space: pre;
-    margin: 2px 0;
+    margin: 1px 0;
   }
 
   .receipt-footer {
     text-align: center;
-    font-size: 6px !important;
-    margin-top: 4px;
+    font-size: 7px !important;
+    margin-top: 3px;
     padding-top: 2px;
     border-top: 1px dashed #000;
     font-weight: 700 !important;
+  }
+
+  .template-id {
+    font-size: 6px;
+    margin-top: 2px;
   }
 
   @page {
@@ -106,7 +119,7 @@ const RECEIPT_STYLES = `
 `;
 
 /* =========================
-   HEADER (DATE / TIME)
+   HEADER
 ========================= */
 const RECEIPT_HEADER = `
 <div class="receipt-title">RECIBO</div>
@@ -124,7 +137,7 @@ const RECEIPT_HEADER = `
 `;
 
 /* =========================
-   CLIENT & USER
+   CLIENT / USER
 ========================= */
 const RECEIPT_CLIENT = `
 <div class="receipt-section">
@@ -180,23 +193,17 @@ const RECEIPT_PAYMENT = `
 `;
 
 /* =========================
-   QR CODE
+   QR
 ========================= */
 const RECEIPT_QR = `
 <div class="receipt-qr">
   <div class="qr-code" id="qr-code">
-    █▀▀▀▀▀█ ▀ █▀▀▀▀▀█<br/>
-    █ ███ █ █ █ ███ █<br/>
-    █ ▀▀▀ █ ███ █ ▀▀▀ █<br/>
-    ▀▀▀▀▀▀▀ █▄█ ▀▀▀▀▀▀▀<br/>
-    █▀█▀▀▀█ █ ▀ █▀█▀▀▀█<br/>
-    █ █ ▀ █ █▄█ █ █ ▀ █<br/>
-    █ ▀▀▀ █ ▀ ▀ █ ▀▀▀ █<br/>
-    ▀▀▀▀▀▀▀ ▀ ▀ ▀▀▀▀▀▀▀
+    █▀▀▀▀▀█ ▀ █▀▀▀▀█<br/>
+    █ ███ █ █ ███ █<br/>
+    █ ▀▀▀ █ █ ▀▀▀ █<br/>
+    ▀▀▀▀▀▀▀ ▀ ▀▀▀▀▀
   </div>
-  <div style="font-size: 4px; margin-top: 2px;">
-    Escanea para validar
-  </div>
+  <div style="font-size: 5px;">Escanea para validar</div>
 </div>
 `;
 
@@ -207,6 +214,7 @@ const RECEIPT_FOOTER = `
 <div class="receipt-footer">
   ¡Gracias por tu compra!<br/>
   https://www.gmolavanderia.com/
+  <div class="template-id">TEMPLATE_ID: GMO-58MM-FIT-v5</div>
 </div>
 `;
 
@@ -227,7 +235,7 @@ export const RECEIPT_TEMPLATE = `
     ${RECEIPT_PRODUCTS}
     ${RECEIPT_TOTALS}
     ${RECEIPT_PAYMENT}
-    ${RECEIPT_QR}
+   
     ${RECEIPT_FOOTER}
   </div>
 </body>
