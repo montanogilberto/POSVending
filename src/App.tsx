@@ -35,13 +35,13 @@ import Sells from './pages/Sells';
 import Laundry from './pages/Laundry/Laundry';
 import ScannerQR from './pages/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
-import ProductListPage from './pages/products/ProductListPage';
-import ProductDetailPage from './pages/products/ProductDetailPage';
+import ProductListPage from './pages/Products/ProductListPage';
+import ProductDetailPage from './pages/Products/ProductDetailPage';
 import CartPage from './pages/CartPage/CartPage';
 import MovementsPage from './pages/MovementsPage';
 import LedStatusPage from './pages/LedStatusPage';
 import ClientsPage from './pages/ClientsPage';
-import ProductsManagementPage from './pages/ProductsManagementPage';
+import ProductsManagementPage from './pages/Products/ProductsManagementPage';
 import AlertsPage from './pages/AlertsPage';
 import EmailsPage from './pages/EmailsPage';
 import CategoriesPage from './pages/CategoryPage/CategoriesPage';
@@ -67,12 +67,14 @@ import './theme/variables.css';
 
 import React from 'react';
 import { IncomeProvider } from './context/IncomeContext';
+import { ProductProvider } from './context/ProductContext';
 setupIonicReact();
 
 const App: React.FC = () => {
   return (
     <IncomeProvider>
-      <IonApp>
+      <ProductProvider>
+        <IonApp>
         <IonReactRouter>
         {/* SplitPane pins the menu at ≥792px and keeps it as a drawer on phones */}
         <IonSplitPane contentId="main" when="(min-width: 792px)">
@@ -217,7 +219,8 @@ const App: React.FC = () => {
           </IonPage>
         </IonSplitPane>
       </IonReactRouter>
-    </IonApp>
+        </IonApp>
+      </ProductProvider>
     </IncomeProvider>
   );
 };
