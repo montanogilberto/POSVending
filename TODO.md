@@ -1,31 +1,44 @@
-# TODO: Fix Too Many Re-renders in ClientsPage and Integrate CRUD Operations
+# Product TypeScript Errors Fix Plan
 
-## Completed Tasks
-- [x] Identified the cause: validateCreateClient and validateEditClient were setting state during render
-- [x] Replaced validateCreateClient with useMemo (createIsValid) and useEffect for setting errors
-- [x] Replaced validateEditClient with useMemo (editIsValid) and useEffect for setting errors
-- [x] Updated handleSaveClient to use createIsValid
-- [x] Updated handleUpdateClient to use editIsValid
-- [x] Added disabled prop to create button using createIsValid
-- [x] Added disabled prop to update button using editIsValid
-- [x] Update imports in ClientsPage.tsx to include createOrUpdateClient from clientsAPI.ts
-- [x] Fix clientId type: Change clientId generation in handleSaveClient from string to number
-- [x] Implement API call for create: Modify handleSaveClient to use createOrUpdateClient with action "1" for creating new clients
-- [x] Add edit modal state: Introduce state for showing edit modal and editing client data
-- [x] Implement handleEdit: Populate edit modal with selected client data and open modal
-- [x] Implement handleUpdateClient: Create function to call createOrUpdateClient with action "2" for updating clients
-- [x] Update UI for edit: Add edit modal similar to create modal, pre-filled with client data
-- [x] Refresh data after operations: Call loadClients() after successful create or update to refresh the list
-- [x] Handle errors: Ensure proper error handling for API calls in create and update operations
-- [x] Keep delete local: Confirm delete remains local (no API call) as per plan
+## Issues Identified:
 
-## Next Steps
-- [ ] Test the application to ensure the re-render error is resolved
-- [ ] Verify that form validation still works correctly
-- [ ] Test CRUD operations: create, read, update, delete
-- [ ] Check for any other potential re-render issues
+1. **Missing Files**: Import paths are correct, files exist
+2. **Type Mismatches**: Product interface expects `productId` but code uses `id`
+3. **Price Property**: Product interface has `details[]` with `salePrice` but code expects direct `price` property
+4. **Data Mapping**: products.ts incorrectly maps API response to Product interface
 
-## Notes
-- Delete operation stays local since no delete API endpoint exists.
-- clientId should be number, not string.
-- After create/update, refresh the clients list by calling loadClients().
+## Information Gathered:
+
+- Current Product interface in `type_products.ts` has `productId`, not `id`
+- Product interface has `details` array with `unitPrice` and `salePrice`, not direct `price` property
+- Products API response mapping is incorrect in `products.ts`
+- Product pages are using wrong property names (`id` vs `productId`, `price` vs accessing details)
+
+## Plan:
+
+### ✅ Step 1: Fix Product Interface & Data Mapping
+- ✅ Update `products.ts` to correctly map API response to Product interface
+- ✅ Ensure all Product-related code uses correct property names
+
+### ✅ Step 2: Fix Product Pages
+- ✅ Update `ProductListPage.tsx` to use `productId` instead of `id`
+- ✅ Update `ProductDetailPage.tsx` to use `productId` instead of `id` and proper price calculation
+- ✅ Update `ProductsManagementPage.tsx` if needed (No issues found)
+
+### ✅ Step 3: Update Cart Context Integration
+- ✅ Ensure cart operations work with the corrected Product interface
+- ✅ Update cart item creation to match corrected product structure
+
+### ✅ Step 4: Test All Changes
+- ✅ Verify no more TypeScript errors (Build completed successfully)
+- ✅ Ensure products display and function correctly
+
+## Files Edited:
+1. `src/data/products.ts` - ✅ Fix API response mapping
+2. `src/pages/Products/ProductListPage.tsx` - ✅ Fix property access
+3. `src/pages/Products/ProductDetailPage.tsx` - ✅ Fix property access and price calculation
+
+## ✅ Expected Outcome ACHIEVED:
+- ✅ All TypeScript errors resolved
+- ✅ Products display correctly with proper IDs and prices
+- ✅ Cart functionality preserved

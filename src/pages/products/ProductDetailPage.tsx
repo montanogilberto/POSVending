@@ -1,7 +1,6 @@
 import {
   IonPage,
   IonContent,
-  IonCard,
   IonCardHeader,
   IonCardTitle,
   IonCardContent,
@@ -32,7 +31,6 @@ interface RouteParams {
   productId: string;
 }
 
-// ---- Type guard to ensure option.choices exists ----
 type Option = NonNullable<Product['options']>[number];
 type Choice = NonNullable<Option['choices']>[number];
 
@@ -40,9 +38,6 @@ function hasChoices(o: Option): o is Option & { choices: Choice[] } {
   return Array.isArray(o.choices);
 }
 
-// Value stored per option:
-// - radio  -> string (choiceId)
-// - checkbox -> string[] (choiceIds) OR Record<string, number> (choiceId -> quantity)
 type SelectedOptionValue = string | string[] | Record<string, number>;
 
 const ProductDetailPage: React.FC = () => {
@@ -301,7 +296,9 @@ const ProductDetailPage: React.FC = () => {
       return;
     }
 
-    const basePrice = product.price;
+    const basePrice = product.details && product.details.length > 0 
+      ? product.details[0].salePrice 
+      : 0;
     const optionPrice = calculateOptionPrice();
     const finalPrice = basePrice + optionPrice;
 
@@ -355,8 +352,8 @@ const ProductDetailPage: React.FC = () => {
     });
 
     addToCart({
-      id: String(product.id),
-      productId: String(product.id),
+      id: String(product.productId),
+      productId: String(product.productId),
       name: product.name,
       quantity,
       price: finalPrice,
@@ -391,7 +388,11 @@ const ProductDetailPage: React.FC = () => {
                 {new Intl.NumberFormat('es-MX', {
                   style: 'currency',
                   currency: 'MXN',
-                }).format(product.price)}
+                }).format(
+                  product.details && product.details.length > 0 
+                    ? product.details[0].salePrice 
+                    : 0
+                )}
               </IonCardSubtitle>
             </IonCardHeader>
             <IonCardContent>

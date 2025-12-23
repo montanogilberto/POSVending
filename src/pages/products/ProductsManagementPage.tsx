@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonPage,
   IonContent,
@@ -19,32 +19,30 @@ import {
   IonFab,
   IonFabButton,
   IonAlert,
+  IonLoading,
 } from '@ionic/react';
-import { add, create, trash, pencil } from 'ionicons/icons';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
-
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  categoryId: number;
-  categoryName: string;
-}
+import { add, trash, pencil } from 'ionicons/icons';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import ProductForm from '../../components/ProductForm';
+import { useProduct } from '../../context/ProductContext';
+import { Product } from '../../data/type_products';
 
 const ProductsManagementPage: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([
-    { id: 1, name: 'Producto A', description: 'Descripción del producto A', price: 50, categoryId: 1, categoryName: 'Categoría 1' },
-    { id: 2, name: 'Producto B', description: 'Descripción del producto B', price: 75, categoryId: 2, categoryName: 'Categoría 2' },
-  ]);
+  const { productsList, loading, error, fetchProducts, removeProduct } = useProduct();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
     showAlertPopover: false,
     showMailPopover: false,
   });
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const presentAlertPopover = (e: React.MouseEvent) => {
     setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
@@ -63,22 +61,27 @@ const ProductsManagementPage: React.FC = () => {
     setShowDeleteAlert(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedProduct) {
-      setProducts(products.filter(p => p.id !== selectedProduct.id));
+      await removeProduct(selectedProduct.productId);
       setSelectedProduct(null);
     }
     setShowDeleteAlert(false);
   };
 
   const handleCreate = () => {
-    // TODO: Implement create product modal/form
-    console.log('Create new product');
+    setEditingProduct(null);
+    setShowForm(true);
   };
 
   const handleEdit = (product: Product) => {
-    // TODO: Implement edit product modal/form
-    console.log('Edit product:', product);
+    setEditingProduct(product);
+    setShowForm(true);
+  };
+
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingProduct(null);
   };
 
   return (
@@ -93,18 +96,19 @@ const ProductsManagementPage: React.FC = () => {
       />
 
       <IonContent>
+        {loading && <IonLoading isOpen={loading} message="Cargando productos..." />}
+        {error && <IonItem color="danger"><IonLabel>{error}</IonLabel></IonItem>}
         <IonList>
-          {products.map((product) => (
-            <IonCard key={product.id}>
+          {productsList.map((product) => (
+            <IonCard key={product.productId}>
               <IonCardHeader>
                 <IonCardTitle>{product.name}</IonCardTitle>
-                <IonCardSubtitle>
-                  {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(product.price)}
-                </IonCardSubtitle>
+                <IonCardSubtitle>Código: {product.code}</IonCardSubtitle>
               </IonCardHeader>
               <IonCardContent>
                 <p>{product.description}</p>
-                <p><strong>Categoría:</strong> {product.categoryName}</p>
+                <p><strong>Código de barras:</strong> {product.barCode}</p>
+                <p><strong>Categoría ID:</strong> {product.categoryId}</p>
                 <IonButtons slot="end">
                   <IonButton fill="clear" color="primary" onClick={() => handleEdit(product)}>
                     <IonIcon icon={pencil} />
@@ -141,6 +145,12 @@ const ProductsManagementPage: React.FC = () => {
               handler: confirmDelete,
             },
           ]}
+        />
+
+        <ProductForm
+          isOpen={showForm}
+          onClose={handleFormClose}
+          product={editingProduct}
         />
       </IonContent>
 

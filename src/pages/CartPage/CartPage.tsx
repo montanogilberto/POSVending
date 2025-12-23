@@ -14,6 +14,7 @@ import {
 } from '@ionic/react';
 import { addCircle, card } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
+import { useProduct } from '../../context/ProductContext';
 import { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import { submitOrder } from '../../api/cartApi';
@@ -29,10 +30,11 @@ import Receipt from '../../components/Receipt';
 import CartSummary from './CartSummary';
 import CartItemsList from './CartItemsList';
 import CheckoutActions from './CheckoutActions';
-import ReceiptDisplay from './ReceiptDisplay';
+import ReceiptDisplay from '../Receipt/ReceiptDisplay';
 
 const CartPage: React.FC = () => {
   const { cart, removeFromCart, clearCart } = useCart();
+  const { clearAllProducts } = useProduct();
   const { loadIncomes } = useIncome();
   const history = useHistory();
 
@@ -156,6 +158,7 @@ const CartPage: React.FC = () => {
         } catch (incomeError) {}
 
         clearCart();
+        clearAllProducts();
         setShowSuccessToast(true);
       } else {
         showErrorToast('Ocurrió un error al procesar el pedido.');
