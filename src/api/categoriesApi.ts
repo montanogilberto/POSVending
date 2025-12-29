@@ -6,35 +6,11 @@ export interface Category {
 }
 
 export const fetchCategories = async (companyId: string): Promise<Category[]> => {
-  console.log('companyId:' + companyId)
-  try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/by_company_products_category', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'accept': 'application/json',
-      },
-      body: JSON.stringify({
-        product_categories: [
-          {
-            companyId: companyId,
-          },
-        ],
-      }),
-    });
-
-    console.log(response)
-
-    if (!response.ok) {
-      throw new Error(`Error fetching categories: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.product_categories || [];
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    throw error;
-  }
+  console.log('companyId:' + companyId);
+  
+  // Use the shared utility function for consistent error handling and API calls
+  const { fetchCategoriesByCompany } = await import('../utils/apiUtils');
+  return await fetchCategoriesByCompany(companyId);
 };
 
 export const createCategory = async (name: string, image: string, companyId: number): Promise<void> => {

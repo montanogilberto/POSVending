@@ -1,0 +1,354 @@
+/* Unified Receipt Component Styles */
+
+.unified-receipt-card {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+}
+
+.receipt-modal {
+  --width: 600px;
+  --height: 90vh;
+}
+
+.unified-receipt-content {
+  padding: 16px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* Header Styles */
+.receipt-header {
+  text-align: center;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 8px 8px 0 0;
+  padding: 20px 16px;
+  margin-bottom: 16px;
+}
+
+.receipt-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.receipt-subtitle {
+  font-size: 14px;
+  color: #7f8c8d;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Section Styles */
+.receipt-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+  --inner-padding-top: 12px;
+  --inner-padding-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.receipt-field {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #495057;
+}
+
+.receipt-field strong {
+  color: #2c3e50;
+}
+
+/* Products Table */
+.products-table {
+  background: white;
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.products-header {
+  background: #e9ecef;
+  border-radius: 4px;
+  font-weight: bold;
+  color: #495057;
+}
+
+.products-header .col-product {
+  text-align: left;
+}
+
+.products-header .col-qty,
+.products-header .col-price,
+.products-header .col-total {
+  text-align: center;
+}
+
+.product-row {
+  border-bottom: 1px solid #dee2e6;
+  padding: 4px 0;
+}
+
+.product-row:last-child {
+  border-bottom: none;
+}
+
+.product-name {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 4px;
+}
+
+.product-options {
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.option-text {
+  margin: 1px 0;
+}
+
+.col-product,
+.col-qty,
+.col-price,
+.col-total {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.col-product {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.col-qty {
+  width: 100%;
+  justify-content: center;
+}
+
+.col-price,
+.col-total {
+  justify-content: flex-end;
+}
+
+/* Totals Section */
+.totals-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+}
+
+.totals-section .section-title {
+  color: white;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.grand-total {
+  font-size: 20px;
+  font-weight: bold;
+  border-top: 2px solid rgba(255,255,255,0.3);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+/* Payment Section */
+.payment-section {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+}
+
+.payment-section .section-title {
+  color: #856404;
+}
+
+/* Footer Section */
+.footer-section {
+  background: #e8f4fd;
+  border: 1px solid #b3d7ff;
+}
+
+.footer-section .section-title {
+  color: #0c5460;
+}
+
+/* Action Buttons */
+.receipt-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding: 20px 0;
+  border-top: 1px solid #dee2e6;
+  margin-top: 16px;
+}
+
+.receipt-button {
+  min-width: 120px;
+  font-weight: 600;
+}
+
+.receipt-button ion-icon {
+  margin-right: 4px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .unified-receipt-content {
+    padding: 12px;
+  }
+  
+  .receipt-title {
+    font-size: 20px;
+  }
+  
+  .products-table {
+    font-size: 12px;
+  }
+  
+  .product-name {
+    font-size: 13px;
+  }
+  
+  .receipt-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .receipt-button {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .unified-receipt-content {
+    padding: 8px;
+  }
+  
+  .receipt-section {
+    --padding-start: 12px;
+    --inner-padding-end: 12px;
+  }
+  
+  .products-table {
+    padding: 4px;
+  }
+  
+  .products-header {
+    font-size: 11px;
+  }
+  
+  .product-row {
+    font-size: 11px;
+  }
+  
+  .product-name {
+    font-size: 12px;
+  }
+  
+  .product-options {
+    font-size: 10px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .unified-receipt-card {
+    box-shadow: none;
+    border: none;
+  }
+  
+  .receipt-actions,
+  .receipt-modal .ion-toolbar {
+    display: none !important;
+  }
+  
+  .unified-receipt-content {
+    padding: 0;
+    max-height: none;
+    overflow: visible;
+  }
+  
+  .receipt-section {
+    break-inside: avoid;
+    margin-bottom: 8px;
+  }
+  
+  .products-table {
+    break-inside: avoid;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .unified-receipt-content {
+    background: #1a1a1a;
+    color: #ffffff;
+  }
+  
+  .receipt-section {
+    background: #2d2d2d;
+    color: #ffffff;
+  }
+  
+  .products-table {
+    background: #1a1a1a;
+  }
+  
+  .products-header {
+    background: #404040;
+  }
+  
+  .product-row {
+    border-bottom-color: #404040;
+  }
+  
+  .receipt-header {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  }
+  
+  .receipt-title {
+    color: #ffffff;
+  }
+  
+  .receipt-subtitle {
+    color: #bdc3c7;
+  }
+  
+  .totals-section {
+    background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
+  }
+  
+  .payment-section {
+    background: #3d3d3d;
+    border-color: #666666;
+  }
+  
+  .footer-section {
+    background: #2d3e50;
+    border-color: #4a5f7a;
+  }
+}
+

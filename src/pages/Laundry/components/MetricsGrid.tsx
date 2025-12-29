@@ -11,6 +11,7 @@ import {
   IonCardTitle,
 } from '@ionic/react';
 import { waterOutline, calendarOutline, calendar } from 'ionicons/icons';
+import { formatCurrencyWithSymbol, formatDate } from '../../../utils/formatters';
 
 interface MetricsGridProps {
   calculateDailySales: () => number;
@@ -43,9 +44,9 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
               </div>
               <div className="kpi-info">
                 <IonCardTitle className="kpi-label">Ventas Diarias</IonCardTitle>
-                <div className="kpi-amount">${calculateDailySales().toFixed(2)}</div>
+                <div className="kpi-amount">{formatCurrencyWithSymbol(calculateDailySales())}</div>
                 <div className="kpi-meta">
-                  <span>{new Date().toLocaleDateString('es-ES')}</span>
+                  <span>{formatDate(new Date())}</span>
                 </div>
               </div>
             </IonCardContent>
@@ -60,7 +61,7 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
               </div>
               <div className="kpi-info">
                 <IonCardTitle className="kpi-label">Total Mensual</IonCardTitle>
-                <div className="kpi-amount">${calculateMonthlyTotal().toFixed(2)}</div>
+                <div className="kpi-amount">{formatCurrencyWithSymbol(calculateMonthlyTotal())}</div>
                 <div className="kpi-meta">
                   <span>{currentMonthYear}</span>
                 </div>

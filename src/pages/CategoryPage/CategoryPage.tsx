@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { fetchCategories, Categories } from '../../data/categories';
 import { cartOutline } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
+import { useLocation } from 'react-router-dom';
 import { IonLoading } from '@ionic/react';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
@@ -12,6 +13,7 @@ import '../../styles/dashboard.css';
 
 const CategoryPage: React.FC = () => {
   const history = useHistory();
+  const location = useLocation();
   const { cart } = useCart();
   const [categories, setCategories] = useState<Categories[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,9 @@ const CategoryPage: React.FC = () => {
     showAlertPopover: false,
     showMailPopover: false,
   });
+
+  // Check if we're in expense mode based on the route
+  const isExpenseMode = location.pathname.startsWith('/expense-');
 
   const presentAlertPopover = (e: React.MouseEvent) => {
     setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
@@ -76,20 +81,25 @@ const CategoryPage: React.FC = () => {
         <div className="dashboard-container">
           {/* Header */}
           <div className="dashboard-header-section">
-            <h1 className="dashboard-title">Categorías</h1>
+            <h1 className="dashboard-title">{isExpenseMode ? 'Categorías de Egresos' : 'Categorías'}</h1>
           </div>
 
           {/* Categories Grid */}
           <div className="dashboard-card">
             <IonCardHeader>
-              <IonCardSubtitle>Categorías Disponibles</IonCardSubtitle>
+              <IonCardSubtitle>{isExpenseMode ? 'Categorías de Egresos Disponibles' : 'Categorías Disponibles'}</IonCardSubtitle>
             </IonCardHeader>
             <IonCardContent>
               <IonGrid style={{ padding: '16px' }}>
                 <IonRow className="ion-justify-content-center">
                   {categories.map((category, index) => (
                     <IonCol size="6" sizeLg="4" key={category.categoryId || index} style={{ display: 'flex', justifyContent: 'center' }}>
-                      <IonCard onClick={() => history.push(`/product/${category.categoryId}`)} style={{ background: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '16px', margin: '8px', width: '100%', maxWidth: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+                      <IonCard onClick={() => {
+                        const route = isExpenseMode 
+                          ? `/expense-products/${category.categoryId}` 
+                          : `/product/${category.categoryId}`;
+                        history.push(route);
+                      }} style={{ background: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '16px', margin: '8px', width: '100%', maxWidth: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
                         <IonImg src={category.image} style={{ width: '128px', height: '128px', objectFit: 'contain', marginBottom: '12px' }} />
                         <IonCardTitle style={{ color: '#444', fontSize: '18px', fontWeight: '500', textAlign: 'center', margin: 0 }}>{category.name}</IonCardTitle>
                       </IonCard>
@@ -102,7 +112,10 @@ const CategoryPage: React.FC = () => {
         </div>
 
         <IonButtons slot="end" style={{ position: 'absolute', top: '10px', right: '10px' }}>
-          <IonButton onClick={() => history.push('/cart')} aria-label="Go to Cart" style={{ position: 'relative' }}>
+          <IonButton onClick={() => {
+            const cartRoute = isExpenseMode ? '/expense-cart' : '/cart';
+            history.push(cartRoute);
+          }} aria-label="Go to Cart" style={{ position: 'relative' }}>
             <IonIcon icon={cartOutline} size="large"/>
             {totalQuantity > 0 && (
               <IonBadge color="danger" >
