@@ -46,6 +46,7 @@ const ExpensesPage: React.FC = () => {
       setLoading(true);
       try {
         const expenses = await fetchAllExpenses();
+        console.log(expenses);
         setAllExpenses(expenses);
         setFilteredExpenses(expenses);
         setDisplayedExpenses(expenses.slice(0, 3));

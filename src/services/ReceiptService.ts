@@ -13,7 +13,7 @@ export class ReceiptService {
   private static readonly COMPANY_INFO = {
     name: 'POS GMO',
     rfc: 'XXX123456XXX',
-    address: 'Calle Ficticia 123, Ciudad, País',
+    address: 'Codorniz 1B Gavilan, Musaro, Nuevo Hermosillo, CP. 83296 ',
     website: 'www.posgmo.com'
   };
 
@@ -167,40 +167,51 @@ export class ReceiptService {
   static generatePrintHTML(data: UnifiedReceiptData, options: PrintOptions = {}): string {
     const width = options.width || '58mm';
     const isThermal = options.thermal !== false;
+    const isUltraCompact = width === '46mm';
 
     return `
 <!DOCTYPE html>
 <html>
 <head>
   <title>Recibo - ${data.type === 'income' ? 'Ingreso' : 'Egreso'}</title>
-  ${this.generatePrintStyles(width, isThermal)}
+  ${this.generatePrintStyles(width, isThermal, isUltraCompact)}
 </head>
 <body>
   <div class="receipt-container">
-    ${this.generateHeader(data)}
-    ${this.generateClientInfo(data)}
-    ${this.generateProducts(data)}
-    ${this.generateTotals(data)}
-    ${this.generatePaymentInfo(data)}
-    ${this.generateFooter(data)}
+    ${this.generateHeader(data, isUltraCompact)}
+    ${this.generateClientInfo(data, isUltraCompact)}
+    ${this.generateProducts(data, isUltraCompact)}
+    ${this.generateTotals(data, isUltraCompact)}
+    ${this.generatePaymentInfo(data, isUltraCompact)}
+    ${this.generateFooter(data, isUltraCompact)}
   </div>
 </body>
 </html>`;
   }
 
   // Generate CSS styles for printing
-  private static generatePrintStyles(width: string, isThermal: boolean): string {
+  private static generatePrintStyles(width: string, isThermal: boolean, isUltraCompact: boolean): string {
+    // Define sizes based on width mode
+    const baseFontSize = isUltraCompact ? '6px' : (isThermal ? '9px' : '12px');
+    const smallFontSize = isUltraCompact ? '5px' : (isThermal ? '7px' : '10px');
+    const titleFontSize = isUltraCompact ? '10px' : (isThermal ? '14px' : '18px');
+    const totalFontSize = isUltraCompact ? '9px' : (isThermal ? '11px' : '14px');
+    const padding = isUltraCompact ? '1px' : (isThermal ? '2mm' : '10px');
+    const margin = isUltraCompact ? '1px' : (isThermal ? '3px' : '10px');
+    const lineHeight = isUltraCompact ? '1.0' : '1.1';
+    const borderStyle = isUltraCompact ? 'none' : (isThermal ? '1px dashed' : '2px solid');
+    
     return `
 <style>
   html, body {
     margin: 0;
     padding: 0;
     width: ${width};
-    font-family: Arial, sans-serif;
-    font-size: ${isThermal ? '9px' : '12px'};
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: ${baseFontSize};
     color: #000;
     background: white;
-    line-height: 1.1;
+    line-height: ${lineHeight};
   }
 
   * {
@@ -212,27 +223,33 @@ export class ReceiptService {
     width: 100%;
     max-width: ${width};
     margin: 0 auto;
-    padding: ${isThermal ? '2mm' : '10px'};
+    padding: ${padding};
   }
 
   .receipt-title {
-    font-size: ${isThermal ? '14px' : '18px'};
+    font-size: ${titleFontSize};
     font-weight: bold;
     text-align: center;
-    border-bottom: ${isThermal ? '1px dashed' : '2px solid'} #000;
-    padding-bottom: ${isThermal ? '2px' : '5px'};
-    margin-bottom: ${isThermal ? '3px' : '10px'};
+    border-bottom: ${borderStyle} #000;
+    padding-bottom: ${isUltraCompact ? '1px' : '5px'};
+    margin-bottom: ${margin};
+  }
+
+  .receipt-subtitle {
+    font-size: ${smallFontSize};
+    text-align: center;
+    margin-bottom: ${margin};
   }
 
   .receipt-section {
-    margin-bottom: ${isThermal ? '2px' : '8px'};
+    margin-bottom: ${margin};
   }
 
   .receipt-row {
     display: flex;
     justify-content: space-between;
-    margin-bottom: ${isThermal ? '1px' : '3px'};
-    font-size: ${isThermal ? '8px' : '11px'};
+    margin-bottom: ${isUltraCompact ? '0px' : '3px'};
+    font-size: ${baseFontSize};
   }
 
   .receipt-label {
@@ -244,84 +261,144 @@ export class ReceiptService {
   }
 
   .receipt-products {
-    margin: ${isThermal ? '3px' : '8px'} 0;
+    margin: ${margin} 0;
+  }
+
+  .product-header {
+    display: flex;
+    font-weight: bold;
+    font-size: ${smallFontSize};
+    border-bottom: ${borderStyle} #000;
+    padding-bottom: ${isUltraCompact ? '0px' : '2px'};
+    margin-bottom: ${isUltraCompact ? '1px' : '3px'};
+  }
+
+  .product-header-name {
+    flex: 1;
+  }
+
+  .product-header-qty {
+    width: 15%;
+    text-align: center;
+  }
+
+  .product-header-price {
+    width: 25%;
+    text-align: right;
   }
 
   .product-row {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: ${isThermal ? '1px' : '3px'};
-    font-size: ${isThermal ? '7px' : '10px'};
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+    font-size: ${baseFontSize};
   }
 
   .product-name {
     flex: 1;
     font-weight: bold;
+    word-wrap: break-word;
   }
 
   .product-qty {
-    width: ${isThermal ? '15%' : '20%'};
+    width: 15%;
     text-align: center;
   }
 
   .product-price {
-    width: ${isThermal ? '20%' : '25%'};
+    width: 25%;
     text-align: right;
   }
 
+  .product-options {
+    font-size: ${smallFontSize};
+    margin-left: 10px;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+  }
+
   .receipt-totals {
-    border-top: ${isThermal ? '1px dashed' : '2px solid'} #000;
-    border-bottom: ${isThermal ? '1px dashed' : '2px solid'} #000;
-    padding: ${isThermal ? '2px' : '5px'} 0;
-    margin: ${isThermal ? '3px' : '8px'} 0;
+    border-top: ${borderStyle} #000;
+    border-bottom: ${borderStyle} #000;
+    padding: ${isUltraCompact ? '1px' : '5px'} 0;
+    margin: ${margin} 0;
   }
 
   .total-row {
     display: flex;
     justify-content: space-between;
     font-weight: bold;
-    font-size: ${isThermal ? '9px' : '12px'};
+    font-size: ${baseFontSize};
   }
 
   .grand-total {
-    font-size: ${isThermal ? '11px' : '14px'};
+    font-size: ${totalFontSize};
     font-weight: bold;
-    border-top: ${isThermal ? '1px solid' : '2px solid'} #000;
-    padding-top: ${isThermal ? '2px' : '5px'};
+    border-top: ${isUltraCompact ? '1px solid' : borderStyle} #000;
+    padding-top: ${isUltraCompact ? '1px' : '5px'};
+    margin-top: ${isUltraCompact ? '1px' : '3px'};
   }
 
   .receipt-footer {
     text-align: center;
-    font-size: ${isThermal ? '6px' : '9px'};
-    margin-top: ${isThermal ? '5px' : '15px'};
-    padding-top: ${isThermal ? '3px' : '8px'};
-    border-top: ${isThermal ? '1px dashed' : '1px solid'} #000;
+    font-size: ${smallFontSize};
+    margin-top: ${margin};
+    padding-top: ${isUltraCompact ? '1px' : '8px'};
+    border-top: ${borderStyle} #000;
   }
 
   .payment-method {
     font-weight: bold;
     text-align: center;
-    margin: ${isThermal ? '2px' : '5px'} 0;
+    margin: ${isUltraCompact ? '1px' : '5px'} 0;
+  }
+
+  .company-info {
+    font-size: ${smallFontSize};
+    margin-top: ${isUltraCompact ? '1px' : '3px'};
   }
 
   @page {
     size: ${width} auto;
     margin: 0;
   }
+
+  @media print {
+    body {
+      width: ${width};
+    }
+    .receipt-container {
+      width: ${width};
+      max-width: ${width};
+    }
+  }
 </style>`;
   }
 
   // Generate header section
-  private static generateHeader(data: UnifiedReceiptData): string {
+  private static generateHeader(data: UnifiedReceiptData, isUltraCompact: boolean): string {
     return `
     <div class="receipt-title">${data.company.name}</div>
-    <div style="text-align: center; font-size: 8px; margin-bottom: 5px;">
+    ${!isUltraCompact ? `
+    <div class="receipt-subtitle">
       RECIBO - ${data.type === 'income' ? 'INGRESO' : 'EGRESO'}
-    </div>`;
+    </div>` : ''}`;
   }
 
   // Generate client and user info
-  private static generateClientInfo(data: UnifiedReceiptData): string {
+  private static generateClientInfo(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    if (isUltraCompact) {
+      return `
+    <div class="receipt-section">
+      <div class="receipt-row">
+        <span>${data.date}</span>
+        <span>${data.time}</span>
+      </div>
+      <div class="receipt-row">
+        <span>${data.client.name}</span>
+        <span>$${data.totals.total.toFixed(2)}</span>
+      </div>
+    </div>`;
+    }
+    
     return `
     <div class="receipt-section">
       <div class="receipt-row">
@@ -344,29 +421,44 @@ export class ReceiptService {
   }
 
   // Generate products section
-  private static generateProducts(data: UnifiedReceiptData): string {
-    const productRows = data.products.map(product => `
+  private static generateProducts(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    const productRows = data.products.map(product => {
+      const optionsText = product.options && product.options.length > 0 
+        ? product.options.map(opt => `${opt.name}: ${opt.choices.map(c => c.name).join(', ')}`).join('; ')
+        : '';
+      
+      return `
       <div class="product-row">
-        <div class="product-name">${product.name}</div>
-        <div class="product-qty">${product.quantity}</div>
+        <div class="product-name">${product.quantity}x ${product.name}</div>
         <div class="product-price">$${product.subtotal.toFixed(2)}</div>
       </div>
-      ${product.options ? `<div style="font-size: 6px; margin-left: 10px; margin-bottom: 2px;">${product.options.map(opt => `${opt.name}: ${opt.choices.map(c => c.name).join(', ')}`).join('; ')}</div>` : ''}
-    `).join('');
+      ${optionsText && !isUltraCompact ? `<div class="product-options">${optionsText}</div>` : ''}`;
+    }).join('');
 
     return `
     <div class="receipt-products">
-      <div class="receipt-row" style="font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 2px;">
-        <div class="product-name">Producto</div>
-        <div class="product-qty">Cant</div>
-        <div class="product-price">Total</div>
-      </div>
+      ${!isUltraCompact ? `
+      <div class="product-header">
+        <div class="product-header-name">Producto</div>
+        <div class="product-header-qty">Cant</div>
+        <div class="product-header-price">Total</div>
+      </div>` : ''}
       ${productRows}
     </div>`;
   }
 
   // Generate totals section
-  private static generateTotals(data: UnifiedReceiptData): string {
+  private static generateTotals(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    if (isUltraCompact) {
+      return `
+    <div class="receipt-section receipt-totals">
+      <div class="total-row grand-total">
+        <span>TOTAL:</span>
+        <span>$${data.totals.total.toFixed(2)}</span>
+      </div>
+    </div>`;
+    }
+    
     return `
     <div class="receipt-section receipt-totals">
       <div class="total-row">
@@ -385,8 +477,20 @@ export class ReceiptService {
   }
 
   // Generate payment information
-  private static generatePaymentInfo(data: UnifiedReceiptData): string {
+  private static generatePaymentInfo(data: UnifiedReceiptData, isUltraCompact: boolean): string {
     const paymentMethodText = this.getPaymentMethodText(data.payment.method);
+    
+    if (isUltraCompact) {
+      return `
+    <div class="receipt-section">
+      <div class="receipt-row">
+        <span>${paymentMethodText}</span>
+        ${data.payment.method === 'efectivo' ? `
+        <span>Cambio: $${data.payment.change.toFixed(2)}</span>` : ''}
+      </div>
+    </div>`;
+    }
+    
     return `
     <div class="receipt-section">
       <div class="payment-method">Pago: ${paymentMethodText}</div>
@@ -403,12 +507,19 @@ export class ReceiptService {
   }
 
   // Generate footer
-  private static generateFooter(data: UnifiedReceiptData): string {
+  private static generateFooter(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    if (isUltraCompact) {
+      return `
+    <div class="receipt-footer">
+      ¡Gracias!
+    </div>`;
+    }
+    
     return `
     <div class="receipt-footer">
       ¡Gracias por su ${data.type === 'income' ? 'compra' : 'pago'}!<br/>
       ${data.company.website}<br/>
-      <div style="font-size: 6px; margin-top: 3px;">
+      <div class="company-info">
         ${data.company.name} - RFC: ${data.company.rfc}<br/>
         ${data.company.address}
       </div>

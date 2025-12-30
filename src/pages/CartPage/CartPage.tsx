@@ -25,7 +25,6 @@ import { useIncome } from '../../context/IncomeContext';
 
 import '../../styles/dashboard.css';
 import './CartPage.css';
-import Receipt from '../../components/Receipt';
 
 import CartSummary from './CartSummary';
 import CartItemsList from './CartItemsList';
