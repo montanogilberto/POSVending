@@ -16,7 +16,8 @@ import {
   IonButtons,
   IonToolbar,
   IonTitle,
-  IonHeader
+  IonHeader,
+  IonContent
 } from '@ionic/react';
 import { printOutline, closeOutline, downloadOutline } from 'ionicons/icons';
 import { UnifiedReceiptData, PrintOptions } from '../types/receipt';
