@@ -1,4 +1,4 @@
-interface Ticket {
+export interface Ticket {
   incomeId: number;
   companyId: number;
   paymentDate: string;

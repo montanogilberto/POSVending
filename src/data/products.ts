@@ -6,7 +6,7 @@ export async function getProducts(categoryId?: number): Promise<Product[]> {
   const body = JSON.stringify({
     products: [
       {
-        companyId: 1,
+        companyId: 1,  // Keep as number - this is correct
         ...(categoryId !== undefined && { categoryId })
       }
     ]

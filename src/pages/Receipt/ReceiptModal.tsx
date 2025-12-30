@@ -1,7 +1,9 @@
 import React, { RefObject } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { printOutline } from 'ionicons/icons';
-import Receipt from '../../components/Receipt';
+import UnifiedReceipt from '../../components/UnifiedReceipt';
+import { ReceiptService } from '../../services/ReceiptService';
+import { LegacyCartData } from '../../types/receipt';
 
 interface ReceiptModalProps {
   showReceipt: boolean;
@@ -31,56 +33,15 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({
   if (!showReceipt || !ticketData) return null;
 
   const handlePrint = () => {
-    if (!receiptRef.current) {
-      console.log('Receipt content not found');
-      return;
-    }
-
-    const receiptHtml = receiptRef.current.innerHTML;
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-
-    if (!printWindow) {
-      console.error('Unable to open print window (popup blocked?)');
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Ticket</title>
-          <style>
-            @page {
-              size: 58mm auto;
-              margin: 0;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-              font-family: monospace;
-              font-size: 11px;
-            }
-            #ticket-root {
-              width: 58mm;
-              padding: 4px 2px;
-            }
-          </style>
-        </head>
-        <body>
-          <div id="ticket-root">
-            ${receiptHtml}
-          </div>
-          <script>
-            window.onload = function() {
-              window.focus();
-              window.print();
-              window.close();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    // Transform ticket data to unified format
+    const unifiedReceiptData = ReceiptService.transformCartData(ticketData as LegacyCartData);
+    
+    // Use the new unified print system
+    ReceiptService.printReceipt(unifiedReceiptData, {
+      width: '58mm',
+      thermal: true,
+      autoPrint: true
+    });
   };
 
   const transactionDate = (() => {
@@ -122,35 +83,17 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({
           fontSize: '11px',
         }}
       >
-        <Receipt
-          transactionDate={transactionDate}
-          transactionTime={transactionTime}
-          clientName={ticketData.client.name}
-          clientPhone={ticketData.client.cellphone}
-          clientEmail={ticketData.client.email}
-          userName={ticketData.user.name}
-          products={ticketData.products.map((prod: any) => ({
-            name: prod.name,
-            quantity: prod.quantity,
-            unitPrice: prod.unitPrice,
-            subtotal: prod.subtotal,
-            options: prod.options.map((opt: any) => `${opt.optionName}: ${opt.choiceName}`),
-          }))}
-          subtotal={ticketData.totals.subtotal}
-          iva={ticketData.totals.iva}
-          total={ticketData.totals.total}
-          paymentMethod={ticketData.paymentMethod === 'efectivo' ? 'Efectivo' : 'Tarjeta'}
-          amountReceived={
-            paymentMethod === 'efectivo'
-              ? parseFloat(cashPaid) || ticketData.totals.total
-              : ticketData.totals.total
-          }
-          change={
-            paymentMethod === 'efectivo'
-              ? (parseFloat(cashPaid) || 0) - ticketData.totals.total
-              : 0
-          }
-        />
+        {(() => {
+          // Transform ticket data to unified format
+          const unifiedReceiptData = ReceiptService.transformCartData(ticketData as LegacyCartData);
+          
+          return (
+            <UnifiedReceipt
+              data={unifiedReceiptData}
+              options={{ width: '58mm', thermal: true }}
+            />
+          );
+        })()}
       </div>
 
       <IonButton

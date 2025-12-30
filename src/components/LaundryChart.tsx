@@ -24,6 +24,7 @@ import {
   swapHorizontalOutline,
   cardOutline,
 } from 'ionicons/icons';
+import { formatCurrencyWithSymbol } from '../utils/formatters';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -114,7 +115,7 @@ const LaundryChart: React.FC<LaundryChartProps> = ({ pieData }) => {
                       <IonLabel>
                         <h3>{item.label}</h3>
                         <p>
-                          ${value.toFixed(2)} • {percentage}%
+                          {formatCurrencyWithSymbol(value)} • {percentage}%
                         </p>
                       </IonLabel>
                     </IonItem>

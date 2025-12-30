@@ -24,7 +24,9 @@ import IncomesFilters from '../components/IncomesFilters';
 import IncomesList from '../components/IncomesList';
 import { fetchAllLaundry } from '../api/laundryApi';
 import { fetchTicket } from '../api/ticketApi';
-import Receipt from '../components/Receipt';
+import UnifiedReceipt from '../components/UnifiedReceipt';
+import { ReceiptService } from '../services/ReceiptService';
+import { LegacyIncomeData, UnifiedReceiptData } from '../types/receipt';
 import { waterOutline } from 'ionicons/icons';
 
 interface Income {
@@ -58,7 +60,7 @@ const IncomesPage: React.FC = () => {
   const [chartData, setChartData] = useState<any>(null);
   const [totalIncome, setTotalIncome] = useState<number>(0);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [receiptData, setReceiptData] = useState<any>(null);
+  const [unifiedReceiptData, setUnifiedReceiptData] = useState<UnifiedReceiptData | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -156,7 +158,18 @@ const IncomesPage: React.FC = () => {
     setLoading(true);
     try {
       const ticket = await fetchTicket(incomeId.toString());
-      setReceiptData(ticket);
+      
+      if (!ticket) {
+        setToastMessage('No se encontró el ticket');
+        setShowToast(true);
+        return;
+      }
+
+      // Use adapter to convert Ticket to LegacyIncomeData format
+      const legacyIncomeData = ReceiptService.adaptTicketToLegacyIncome(ticket);
+      const unifiedData = ReceiptService.transformIncomeData(legacyIncomeData);
+      
+      setUnifiedReceiptData(unifiedData);
       setShowReceiptModal(true);
     } catch (error) {
       console.error('Error fetching ticket:', error);
@@ -261,26 +274,14 @@ const IncomesPage: React.FC = () => {
           isOpen={showReceiptModal}
           onDidDismiss={() => setShowReceiptModal(false)}
         >
-          {receiptData && (
-            <Receipt
-              transactionDate={receiptData.transactionDate}
-              transactionTime={receiptData.transactionTime}
-              clientName={receiptData.clientName}
-              clientPhone={receiptData.clientPhone}
-              clientEmail={receiptData.clientEmail}
-              userName={receiptData.userName}
-              products={receiptData.products}
-              subtotal={receiptData.subtotal}
-              iva={receiptData.iva}
-              total={receiptData.total}
-              paymentMethod={receiptData.paymentMethod}
-              amountReceived={receiptData.amountReceived}
-              change={receiptData.change}
+          {unifiedReceiptData && (
+            <UnifiedReceipt
+              data={unifiedReceiptData}
+              showModal={true}
+              onClose={() => setShowReceiptModal(false)}
+              options={{ width: '58mm', thermal: true }}
             />
           )}
-          <IonButton expand="full" onClick={() => setShowReceiptModal(false)}>
-            Cerrar
-          </IonButton>
         </IonModal>
 
         <IonToast

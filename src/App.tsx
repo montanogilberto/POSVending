@@ -179,6 +179,11 @@ const App: React.FC = () => {
                 <Route exact path="/products/:productId" component={ProductDetailPage} />
                 <Route exact path="/product/:categoryId" component={ProductListPage} />
                 <Route exact path="/cart" component={CartPage} />
+                
+                {/* Expense Logistics Routes */}
+                <Route exact path="/expense-categories" component={Category} />
+                <Route exact path="/expense-products/:categoryId" component={ProductListPage} />
+                <Route exact path="/expense-cart" component={CartPage} />
                 <Route exact path="/movements" component={MovementsPage} />
                 <Route exact path="/led-status" component={LedStatusPage} />
                 <Route exact path="/clients" component={ClientsPage} />

@@ -6,9 +6,9 @@ const RECEIPT_STYLES = `
   html, body {
     margin: 0;
     padding: 0;
-    width: 58mm;
+    width: 46mm;
     font-family: Arial, sans-serif !important;
-    font-size: 7px !important;
+    font-size: 9px !important;
     color: #000 !important;
     background: white;
     line-height: 1.05;
@@ -31,6 +31,15 @@ const RECEIPT_STYLES = `
   }
 
   .receipt-title {
+    font-size: 12px !important;
+    font-weight: 900 !important;
+    text-align: center;
+    border-bottom: 1px dashed #000;
+    padding-bottom: 2px;
+    margin-bottom: 3px;
+  }
+
+  .receipt-sub-title {
     font-size: 10px !important;
     font-weight: 900 !important;
     text-align: center;
@@ -122,7 +131,9 @@ const RECEIPT_STYLES = `
    HEADER
 ========================= */
 const RECEIPT_HEADER = `
-<div class="receipt-title">RECIBO</div>
+<div class="receipt-title">Lavanderia GMO</div>
+
+<div class="receipt-sub-title">RECIBO</div>
 
 <div class="receipt-section">
   <div class="receipt-row">
