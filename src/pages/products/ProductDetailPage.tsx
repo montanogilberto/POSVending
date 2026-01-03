@@ -303,7 +303,7 @@ const ProductDetailPage: React.FC = () => {
     const finalPrice = basePrice + optionPrice;
 
     const selectedChoices: {
-      [key: number]: { id: number; name: string; price: number }[];
+      [key: number]: { id: number; name: string; price: number; quantity: number }[];
     } = {};
 
     (product.options ?? []).forEach(option => {
@@ -320,6 +320,7 @@ const ProductDetailPage: React.FC = () => {
               id: choice.productOptionChoiceId,
               name: choice.name,
               price: choice.price,
+              quantity: 1,
             },
           ];
         }
@@ -333,6 +334,7 @@ const ProductDetailPage: React.FC = () => {
               id: c?.productOptionChoiceId ?? 0,
               name: c?.name ?? '',
               price: c?.price ?? 0,
+              quantity: 1,
             };
           });
         } else if (value && typeof value === 'object') {
@@ -345,6 +347,7 @@ const ProductDetailPage: React.FC = () => {
               id: c?.productOptionChoiceId ?? 0,
               name: c?.name ?? '',
               price: c?.price ?? 0,
+              quantity: map[id] ?? 1,
             };
           });
         }

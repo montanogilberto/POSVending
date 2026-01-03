@@ -72,11 +72,17 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
 
   // Cargar ingresos al entrar
   useEffect(() => {
-    loadIncomes();
+    const controller = new AbortController();
+    loadIncomes(controller.signal);
+    
+    return () => controller.abort();
   }, [loadIncomes]);
 
   // Timer de inactividad para refrescar
-  useInactivityTimer(300000, loadIncomes);
+  useInactivityTimer(300000, () => {
+    const controller = new AbortController();
+    loadIncomes(controller.signal);
+  });
 
 
 
@@ -313,47 +319,24 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
 
   const handleShowReceipt = async (incomeId: number) => {
     try {
+      console.log('Fetching ticket for incomeId:', incomeId);
       const ticket = await fetchTicket(incomeId.toString());
+      console.log('Fetched ticket result:', ticket);
+      
       if (ticket) {
-        const utcDate = new Date(
-          ticket.paymentDate + (ticket.paymentDate.includes('Z') ? '' : 'Z')
-        );
-        const hermosilloDate = new Date(
-          utcDate.getTime() - 7 * 60 * 60 * 1000
-        );
-        const receiptProps = {
-          transactionDate: hermosilloDate.toLocaleDateString('es-ES'),
-          transactionTime: hermosilloDate.toLocaleTimeString('es-ES', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          clientName: ticket.client.name,
-          clientPhone: ticket.client.cellphone,
-          clientEmail: ticket.client.email,
-          userName: ticket.user.name,
-          products: ticket.products.map((p: any) => ({
-            name: p.name,
-            quantity: p.quantity,
-            unitPrice: p.unitPrice,
-            subtotal: p.subtotal,
-            options: p.options.map((o: any) => o.choiceName),
-          })),
-          subtotal: ticket.totals.subtotal,
-          iva: ticket.totals.iva,
-          total: ticket.totals.total,
-          paymentMethod: ticket.paymentMethod,
-          amountReceived: ticket.totals.total,
-          change: 0,
-        };
-        setReceiptData(receiptProps);
-        setShowReceiptModal(true);
+        // Navigate to ReceiptPage instead of showing modal
+        history.push({
+          pathname: '/receipt',
+          state: { ticketData: ticket }
+        });
       } else {
-        setToastMessage('Recibo no encontrado.');
+        console.warn('Ticket is null for incomeId:', incomeId);
+        setToastMessage('No se encontró el ticket para este ingreso.');
         setShowToast(true);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching ticket:', error);
-      setToastMessage('Error al obtener el recibo.');
+      setToastMessage('Error al obtener el recibo: ' + (error.message || 'Error desconocido'));
       setShowToast(true);
     }
   };

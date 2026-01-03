@@ -1,6 +1,6 @@
 import React, { RefObject } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
-import { printOutline } from 'ionicons/icons';
+import { printOutline, closeOutline } from 'ionicons/icons';
 import UnifiedReceipt from '../../components/UnifiedReceipt';
 import { ReceiptService } from '../../services/ReceiptService';
 import { LegacyCartData } from '../../types/receipt';
@@ -9,7 +9,7 @@ interface ReceiptModalProps {
   showReceipt: boolean;
   ticketData: any;
   receiptRef: RefObject<HTMLDivElement | null>;
-  paymentMethod: 'efectivo' | 'tarjeta' | '';
+  paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia' | '';
   cashPaid: string;
   clearCart: () => void;
   loadIncomes: () => Promise<void>;
@@ -22,8 +22,6 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({
   showReceipt,
   ticketData,
   receiptRef,
-  paymentMethod,
-  cashPaid,
   clearCart,
   loadIncomes,
   setShowReceipt,
@@ -33,88 +31,120 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({
   if (!showReceipt || !ticketData) return null;
 
   const handlePrint = () => {
-    // Transform ticket data to unified format
-    const unifiedReceiptData = ReceiptService.transformCartData(ticketData as LegacyCartData);
-    
-    // Use the new unified print system
+    const unifiedReceiptData =
+      ReceiptService.transformCartData(ticketData as LegacyCartData);
+
     ReceiptService.printReceipt(unifiedReceiptData, {
-      width: '58mm',
+      width: '46mm',
       thermal: true,
-      autoPrint: true
+      autoPrint: true,
     });
   };
 
-  const transactionDate = (() => {
-    const utcDate = new Date(ticketData.paymentDate + (ticketData.paymentDate.includes('Z') ? '' : 'Z'));
-    const hermosilloDate = new Date(utcDate.getTime() - 7 * 60 * 60 * 1000);
-    return hermosilloDate.toLocaleDateString('es-ES');
-  })();
-
-  const transactionTime = (() => {
-    const utcDate = new Date(ticketData.paymentDate + (ticketData.paymentDate.includes('Z') ? '' : 'Z'));
-    const hermosilloDate = new Date(utcDate.getTime() - 7 * 60 * 60 * 1000);
-    return hermosilloDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  })();
+  const handleClose = async () => {
+    setShowReceipt(false);
+    setTicketData(null);
+    clearCart();
+    await loadIncomes();
+    history.push('/Laundry');
+  };
 
   return (
     <div
       className="print-overlay"
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        zIndex: 9999,
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        zIndex: 99999,
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'center',
+        alignItems: 'center',
+        padding: '16px',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
       }}
     >
+      {/* TOP RIGHT CLOSE BUTTON */}
+      <IonButton
+        onClick={(e) => {
+          e.stopPropagation();
+          handleClose();
+        }}
+        color="danger"
+        fill="solid"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          width: '44px',
+          height: '44px',
+          '--border-radius': '50%',
+          zIndex: 100001,
+        }}
+      >
+        <IonIcon icon={closeOutline} />
+      </IonButton>
+
+      {/* RECEIPT PREVIEW (RESPONSIVE) */}
       <div
         ref={receiptRef}
         id="receipt-content"
         style={{
           backgroundColor: '#fff',
-          padding: '8px',
-          width: '58mm',
-          fontFamily: 'monospace',
-          fontSize: '11px',
+          padding: '12px',
+          width: 'min(520px, 92vw)',
+          maxHeight: '78vh',
+          overflow: 'auto',
+          borderRadius: '8px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          marginTop: '64px',
+          marginBottom: '96px',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {(() => {
-          // Transform ticket data to unified format
-          const unifiedReceiptData = ReceiptService.transformCartData(ticketData as LegacyCartData);
-          
-          return (
-            <UnifiedReceipt
-              data={unifiedReceiptData}
-              options={{ width: '58mm', thermal: true }}
-            />
-          );
-        })()}
+        <UnifiedReceipt
+          data={ReceiptService.transformCartData(ticketData as LegacyCartData)}
+          options={{ width: '46mm', thermal: true }}
+        />
       </div>
 
-      <IonButton
-        style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10000 }}
-        onClick={async () => {
-          setShowReceipt(false);
-          setTicketData(null);
-          clearCart();
-          await loadIncomes();
-          history.push('/Laundry');
+      {/* BOTTOM ACTION BAR */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '16px',
+          left: '16px',
+          right: '16px',
+          display: 'flex',
+          gap: '12px',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          zIndex: 100001,
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        Cerrar
-      </IonButton>
-      <IonButton
-        style={{ position: 'absolute', top: '20px', right: '120px', zIndex: 10000 }}
-        onClick={handlePrint}
-      >
-        <IonIcon icon={printOutline} slot="start" />
-        Imprimir
-      </IonButton>
+        <IonButton
+          size="large"
+          onClick={handlePrint}
+          style={{ flex: '1 1 180px', maxWidth: '260px' }}
+        >
+          <IonIcon icon={printOutline} slot="start" />
+          Imprimir
+        </IonButton>
+
+        <IonButton
+          size="large"
+          fill="outline"
+          onClick={handleClose}
+          style={{ flex: '1 1 180px', maxWidth: '260px' }}
+        >
+          <IonIcon icon={closeOutline} slot="start" />
+          Cerrar
+        </IonButton>
+      </div>
     </div>
   );
 };

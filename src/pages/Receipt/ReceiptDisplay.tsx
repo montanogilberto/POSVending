@@ -1,6 +1,7 @@
 import React from 'react';
-import { IonButton } from '@ionic/react';
+import { IonButton, IonIcon, IonLoading } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
+import { printOutline, closeOutline } from 'ionicons/icons';
 import UnifiedReceipt from '../../components/UnifiedReceipt';
 import { ReceiptService } from '../../services/ReceiptService';
 import { LegacyCartData } from '../../types/receipt';
@@ -21,10 +22,12 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
   setTicketData,
 }) => {
   const history = useHistory();
+  const [closing, setClosing] = React.useState(false);
 
-  // Transform ticket data to unified format
+  // ✅ Guard: if parent already cleared ticketData, don't render (prevents crashes)
+  if (!ticketData) return null;
+
   const unifiedReceiptData = React.useMemo(() => {
-    // Adapt ticket data to LegacyCartData format
     const legacyCartData: LegacyCartData = {
       paymentDate: ticketData.paymentDate,
       client: {
@@ -41,13 +44,10 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
         quantity: prod.quantity,
         price: prod.unitPrice,
         subtotal: prod.subtotal,
-        selectedOptions: prod.options?.reduce(
-          (acc: any, opt: any) => {
-            acc[opt.optionName || 'Opción'] = opt.choiceName;
-            return acc;
-          },
-          {}
-        ),
+        selectedOptions: prod.options?.reduce((acc: any, opt: any) => {
+          acc[opt.optionName || 'Opción'] = opt.choiceName;
+          return acc;
+        }, {}),
       })),
       totals: {
         subtotal: ticketData.totals.subtotal,
@@ -60,15 +60,34 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
     return ReceiptService.transformCartData(legacyCartData);
   }, [ticketData]);
 
-  const handleClose = () => {
-    setTicketData(null);
-    clearCart();
-    history.push('/Laundry');
+  const handlePrint = () => {
+    ReceiptService.printReceipt(unifiedReceiptData, {
+      width: '46mm',
+      thermal: true,
+      autoPrint: true,
+    });
   };
 
-  // Calculate amount received and change for cash payments
-  const cashAmount = parseFloat(cashPaid) || ticketData.totals.total;
-  const showCashDetails = paymentMethod === 'efectivo';
+  const handleClose = async () => {
+    if (closing) return; // ✅ prevent double click
+    setClosing(true);
+
+    try {
+      // ✅ Do NOT clear ticketData before navigation (prevents render crash)
+      clearCart();
+
+      // Navigate first
+      history.replace('/Laundry');
+
+      // Then clear ticket data after route change (next tick)
+      setTimeout(() => {
+        setTicketData(null);
+      }, 0);
+    } finally {
+      // ✅ Always stop loader even if something fails
+      setTimeout(() => setClosing(false), 250);
+    }
+  };
 
   return (
     <div
@@ -85,15 +104,40 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
         data={unifiedReceiptData}
         options={{ width: '46mm', thermal: true }}
       />
-      <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: '12px',
+          marginTop: '16px',
+          justifyContent: 'center',
+          flexWrap: 'wrap', // ✅ wrap on mobile
+        }}
+      >
+        <IonButton
+          expand="block"
+          fill="outline"
+          onClick={handlePrint}
+          style={{ flex: '1 1 180px', minWidth: '160px' }}
+        >
+          <IonIcon icon={printOutline} slot="start" />
+          Imprimir
+        </IonButton>
+
         <IonButton
           expand="block"
           fill="clear"
           onClick={handleClose}
+          disabled={closing}
+          style={{ flex: '1 1 180px', minWidth: '160px' }}
         >
+          <IonIcon icon={closeOutline} slot="start" />
           Cerrar
         </IonButton>
       </div>
+
+      {/* ✅ Loader that ALWAYS ends */}
+      <IonLoading isOpen={closing} message="Cerrando..." />
     </div>
   );
 };

@@ -55,20 +55,27 @@ export class ReceiptService {
 
   // Transform legacy income data to unified format
   static transformIncomeData(apiData: LegacyIncomeData): UnifiedReceiptData {
-    const products: UnifiedProduct[] = apiData.products.map(product => ({
-      id: 0, // Income data doesn't include product ID
-      name: product.name,
-      quantity: product.quantity,
-      unitPrice: product.unitPrice,
-      subtotal: product.subtotal,
-      options: product.options && product.options.length > 0 ? [{
-        name: 'Opciones',
-        choices: product.options.map(option => ({
-          name: option,
-          price: 0
-        }))
-      }] : undefined
-    }));
+    const products: UnifiedProduct[] = apiData.products.map((product, index) => {
+      // Use pre-calculated subtotal if available, otherwise calculate it
+      const quantity = product.quantity || 1;
+      const unitPrice = product.unitPrice || 0;
+      const subtotal = product.subtotal !== undefined ? product.subtotal : (unitPrice * quantity);
+      
+      return {
+        id: index,
+        name: product.name,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        subtotal: subtotal,
+        options: product.options && product.options.length > 0 ? [{
+          name: 'Opciones',
+          choices: product.options.map(option => ({
+            name: option,
+            price: 0
+          }))
+        }] : undefined
+      };
+    });
 
     return {
       id: `income_${Date.now()}`,
@@ -101,14 +108,21 @@ export class ReceiptService {
 
   // Transform legacy cart data to unified format
   static transformCartData(cartData: LegacyCartData): UnifiedReceiptData {
-    const products: UnifiedProduct[] = cartData.products.map((product: any, index: number) => ({
-      id: index, // Use array index as fallback ID
-      name: product.name,
-      quantity: product.quantity || 1,
-      unitPrice: product.price || 0,
-      subtotal: (product.price || 0) * (product.quantity || 1),
-      options: product.selectedOptions ? this.parseSelectedOptions(product.selectedOptions) : undefined
-    }));
+    const products: UnifiedProduct[] = cartData.products.map((product: any, index: number) => {
+      // Use pre-calculated subtotal if available, otherwise calculate it
+      const quantity = product.quantity || 1;
+      const unitPrice = product.price || product.unitPrice || 0;
+      const subtotal = product.subtotal !== undefined ? product.subtotal : (unitPrice * quantity);
+      
+      return {
+        id: index, // Use array index as fallback ID
+        name: product.name,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        subtotal: subtotal,
+        options: product.selectedOptions ? this.parseSelectedOptions(product.selectedOptions) : undefined
+      };
+    });
 
     return {
       id: `cart_${Date.now()}`,

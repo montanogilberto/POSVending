@@ -19,20 +19,43 @@ interface CartItem {
   selectedOptions: { [optionId: number]: number };
 }
 
-export const fetchAllLaundry = async (): Promise<Income[]> => {
+export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_income');
-    if (!response.ok) throw new Error(`Error al obtener datos del backend: ${response.status}`);
+    const controller = new AbortController();
+    const abortSignal = signal || controller.signal;
 
-    const data = await response.json();
-    console.log('Fetched all_income:', data);
-    // Ensure data.income is an array, default to empty array if not
-    const incomeArray = Array.isArray(data.income) ? data.income : [];
-    // Sort by paymentDate descending (newest first)
-    const sortedIncome = incomeArray.sort((a: Income, b: Income) =>
-      new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-    );
-    return sortedIncome;
+    // Set timeout to prevent hanging requests
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_income', {
+        signal: abortSignal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) throw new Error(`Error al obtener datos del backend: ${response.status}`);
+
+      const data = await response.json();
+      console.log('Fetched all_income:', data);
+      // Ensure data.income is an array, default to empty array if not
+      const incomeArray = Array.isArray(data.income) ? data.income : [];
+      // Sort by paymentDate descending (newest first)
+      const sortedIncome = incomeArray.sort((a: Income, b: Income) =>
+        new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+      );
+      return sortedIncome;
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      
+      // Handle abort errors gracefully
+      if (fetchError.name === 'AbortError') {
+        console.log('Laundry fetch aborted');
+        return [];
+      }
+      
+      throw fetchError;
+    }
   } catch (error) {
     console.error(error);
     throw error; // Re-throw to allow caller to handle

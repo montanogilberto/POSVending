@@ -1,9 +1,7 @@
-import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonButtons, IonButton, IonIcon, IonBadge, IonImg, IonCardTitle } from '@ionic/react';
+import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonButtons, IonButton, IonIcon, IonImg, IonCardTitle } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { fetchCategories, Categories } from '../../data/categories';
-import { cartOutline } from 'ionicons/icons';
-import { useCart } from '../../context/CartContext';
 import { useLocation } from 'react-router-dom';
 import { IonLoading } from '@ionic/react';
 import Header from '../../components/Header';
@@ -14,7 +12,6 @@ import '../../styles/dashboard.css';
 const CategoryPage: React.FC = () => {
   const history = useHistory();
   const location = useLocation();
-  const { cart } = useCart();
   const [categories, setCategories] = useState<Categories[]>([]);
   const [loading, setLoading] = useState(true);
   const hasFetched = useRef(false);
@@ -37,9 +34,6 @@ const CategoryPage: React.FC = () => {
   };
 
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
-
-  // Calculate total quantity of products in cart
-  const totalQuantity = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   useEffect(() => {
     if (hasFetched.current) return;
@@ -110,20 +104,6 @@ const CategoryPage: React.FC = () => {
             </IonCardContent>
           </div>
         </div>
-
-        <IonButtons slot="end" style={{ position: 'absolute', top: '10px', right: '10px' }}>
-          <IonButton onClick={() => {
-            const cartRoute = isExpenseMode ? '/expense-cart' : '/cart';
-            history.push(cartRoute);
-          }} aria-label="Go to Cart" style={{ position: 'relative' }}>
-            <IonIcon icon={cartOutline} size="large"/>
-            {totalQuantity > 0 && (
-              <IonBadge color="danger" >
-                {totalQuantity}
-              </IonBadge>
-            )}
-          </IonButton>
-        </IonButtons>
       </IonContent>
 
       <AlertPopover

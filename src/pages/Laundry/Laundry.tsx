@@ -3,7 +3,6 @@ import {
   IonContent,
   IonToast,
   IonPage,
-  IonModal,
   IonButton,
 } from '@ionic/react';
 import './Laundry.css';
@@ -11,7 +10,6 @@ import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import LogoutAlert from '../../components/Alerts/LogoutAlert';
 import MailPopover from '../../components/PopOver/MailPopover';
-import UnifiedReceipt from '../../components/UnifiedReceipt';
 import LaundryChart from '../../components/LaundryChart';
 import { useLaundryDashboard } from './hooks/useLaundryDashboard';
 import MetricsGrid from './components/MetricsGrid';
@@ -33,10 +31,6 @@ const Laundry: React.FC = () => {
     setShowCart,
     showLogoutAlert,
     setShowLogoutAlert,
-    showReceiptModal,
-    setShowReceiptModal,
-    receiptData,
-    setReceiptData,
     pieData,
     handleStartSeller,
     handleConfirmSale,
@@ -56,35 +50,13 @@ const Laundry: React.FC = () => {
     getTitleFromPath,
   } = useLaundryDashboard();
 
-  // Transform legacy receipt data to unified format
-  const unifiedReceiptData = React.useMemo(() => {
-    if (!receiptData) return null;
-    
-    // Adapt to LegacyIncomeData format for transformation
-    const legacyIncomeData = {
-      transactionDate: receiptData.transactionDate,
-      transactionTime: receiptData.transactionTime,
-      clientName: receiptData.clientName,
-      clientPhone: receiptData.clientPhone,
-      clientEmail: receiptData.clientEmail,
-      userName: receiptData.userName,
-      products: receiptData.products.map((p: any) => ({
-        name: p.name,
-        quantity: p.quantity,
-        unitPrice: p.unitPrice,
-        subtotal: p.subtotal,
-        options: p.options || [],
-      })),
-      subtotal: receiptData.subtotal,
-      iva: receiptData.iva,
-      total: receiptData.total,
-      paymentMethod: receiptData.paymentMethod,
-      amountReceived: receiptData.amountReceived || receiptData.total,
-      change: receiptData.change || 0,
-    };
-    
-    return ReceiptService.transformIncomeData(legacyIncomeData);
-  }, [receiptData]);
+  // Navigate to ReceiptPage instead of showing modal
+  const handleViewReceipt = (receiptData: any) => {
+    history.push({
+      pathname: '/receipt',
+      state: { ticketData: receiptData }
+    });
+  };
 
   return (
     <IonPage>
@@ -136,7 +108,7 @@ const Laundry: React.FC = () => {
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
         />
 
-        <AlertPopover
+<AlertPopover
           isOpen={popoverState.showAlertPopover}
           event={popoverState.event}
           onDidDismiss={dismissAlertPopover}
@@ -151,27 +123,6 @@ const Laundry: React.FC = () => {
           onDidDismiss={() => setShowLogoutAlert(false)}
           handleLogoutConfirm={handleLogoutConfirm}
         />
-
-        {/* Receipt Modal */}
-        <IonModal isOpen={showReceiptModal} onDidDismiss={() => {
-          setShowReceiptModal(false);
-          setReceiptData(null);
-        }}>
-          {unifiedReceiptData && (
-            <UnifiedReceipt
-              data={unifiedReceiptData}
-              showModal={true}
-              options={{ width: '46mm', thermal: true }}
-            />
-          )}
-          <div style={{ display: 'flex', gap: '12px', padding: '16px' }}>
-            <IonButton expand="block" onClick={() => window.print()}>Imprimir</IonButton>
-            <IonButton expand="block" fill="clear" onClick={() => {
-              setShowReceiptModal(false);
-              setReceiptData(null);
-            }}>Cerrar</IonButton>
-          </div>
-        </IonModal>
       </IonContent>
     </IonPage>
   );
