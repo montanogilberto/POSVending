@@ -380,7 +380,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
               >
                 <IonSelectOption value="Efectivo">Efectivo</IonSelectOption>
                 <IonSelectOption value="Tarjeta">Tarjeta</IonSelectOption>
-                <IonSelectOption value="Transferencia">Transferencia</IonSelectOption>
+                <IonSelectOption value="Transferencia">Transferir</IonSelectOption>
               </IonSelect>
             </IonItem>
 

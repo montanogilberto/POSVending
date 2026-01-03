@@ -12,10 +12,10 @@ import {
   IonIcon,
   IonLoading,
 } from '@ionic/react';
-import { addCircle, card } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
 import { useProduct } from '../../context/ProductContext';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import { submitOrder } from '../../api/cartApi';
 import useInactivityTimer from '../../hooks/useInactivityTimer';
@@ -25,15 +25,12 @@ import { useIncome } from '../../context/IncomeContext';
 
 import '../../styles/dashboard.css';
 import './CartPage.css';
-import Receipt from '../../components/Receipt';
 
-import CartSummary from './CartSummary';
-import CartItemsList from './CartItemsList';
-import CheckoutActions from './CheckoutActions';
+import CartItemCard from '../../components/CartItemCard';
 import ReceiptDisplay from '../Receipt/ReceiptDisplay';
 
 const CartPage: React.FC = () => {
-  const { cart, removeFromCart, clearCart } = useCart();
+  const { cart: cartItems, removeFromCart, clearCart } = useCart();
   const { clearAllProducts } = useProduct();
   const { loadIncomes } = useIncome();
   const history = useHistory();
@@ -49,9 +46,8 @@ const CartPage: React.FC = () => {
   const [lastIncomeId, setLastIncomeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const receiptRef = useRef<HTMLDivElement | null>(null);
-
-  const total = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  // Calculate total
+  const total = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const cashNumber = parseFloat(cashPaid);
 
   const isCheckoutEnabled =
@@ -65,12 +61,21 @@ const CartPage: React.FC = () => {
     const cash = parseFloat(cashPaid);
     if (paymentMethod === 'efectivo' && !isNaN(cash) && cash > total) {
       setChangeAmount(cash - total);
+    } else {
+      setChangeAmount(0);
     }
   }, [cashPaid, paymentMethod, total]);
 
   const showErrorToast = (message: string) => {
     setToastMessage(message);
     setShowToast(true);
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+    }).format(price);
   };
 
   const handleCheckout = async () => {
@@ -90,7 +95,7 @@ const CartPage: React.FC = () => {
     setLoading(true);
 
     const orderData = {
-      orders: cart.map((item) => {
+      orders: cartItems.map((item) => {
         const selections = Object.entries(item.selectedOptions || {})
           .map(([optionType, optionValues]) =>
             (Array.isArray(optionValues) ? optionValues : [optionValues]).map((value: string) => ({
@@ -120,6 +125,39 @@ const CartPage: React.FC = () => {
 
       if (response.ok) {
         try {
+          const products = cartItems.map((item) => {
+            const flatOptions: Array<{
+              productOptionId: number;
+              optionName?: string;
+              productOptionChoiceId: number;
+              choiceName: string;
+              price: number;
+              quantity: number;
+            }> = [];
+
+            Object.entries(item.selectedChoices).forEach(([optionId, choices]) => {
+              const optId = parseInt(optionId);
+              choices.forEach((choice) => {
+                flatOptions.push({
+                  productOptionId: optId,
+                  productOptionChoiceId: choice.id,
+                  choiceName: choice.name,
+                  price: choice.price,
+                  quantity: choice.quantity,
+                });
+              });
+            });
+
+            return {
+              productId: parseInt(item.productId),
+              name: item.name,
+              unitPrice: item.price,
+              subtotal: item.price * item.quantity,
+              quantity: item.quantity,
+              options: flatOptions,
+            };
+          });
+
           const payload = {
             income: [
               {
@@ -130,17 +168,7 @@ const CartPage: React.FC = () => {
                 userId: 1,
                 clientId: 1,
                 companyId: 1,
-                products: cart.map((item) => ({
-                  productId: parseInt(item.productId),
-                  options: Object.entries(item.selectedChoices).map(([optionId, choices]) => ({
-                    productOptionId: parseInt(optionId),
-                    choices: choices.map((c) => ({
-                      productOptionChoiceId: c.id,
-                      name: c.name,
-                      price: c.price,
-                    })),
-                  }))[0],
-                })),
+                products: products,
               },
             ],
           };
@@ -174,6 +202,13 @@ const CartPage: React.FC = () => {
     history.push('/category');
   };
 
+  const handlePaymentMethodSelect = (method: 'efectivo' | 'tarjeta' | 'transferencia') => {
+    setPaymentMethod(method);
+    if (method !== 'efectivo') {
+      setCashPaid('');
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -182,120 +217,157 @@ const CartPage: React.FC = () => {
             <IonBackButton defaultHref="/Laundry" />
           </IonButtons>
           <IonTitle>Carrito</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={handleAddMoreProducts}>
+              <IonIcon icon={cart} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
 
       <IonContent fullscreen className="cart-content">
         <div className="cart-wrapper">
           <div className="cart-container">
-            <h2 className="cart-title">Carrito de Compras</h2>
+            {/* Header */}
+            <div className="cart-header">
+              <h1 className="cart-title">Resumen</h1>
+              <p className="cart-subtitle">
+                {cartItems.length > 0 
+                  ? `${cartItems.length} producto${cartItems.length !== 1 ? 's' : ''}`
+                  : 'Tu carrito está vacío'
+                }
+              </p>
+            </div>
 
-            {cart.length === 0 ? (
-              <p className="empty-cart">El carrito está vacío.</p>
+            {cartItems.length === 0 ? (
+              <div className="empty-cart">
+                <div className="empty-cart-icon">🛒</div>
+                <p className="empty-cart-text">Tu carrito está vacío</p>
+                <IonButton
+                  fill="outline"
+                  onClick={handleAddMoreProducts}
+                  className="cart-button-secondary"
+                >
+                  <IonIcon slot="start" icon={addCircle} />
+                  Ver productos
+                </IonButton>
+              </div>
             ) : (
               <>
-                {cart.map((item) => (
-                  <div key={item.id} className="cart-item">
-                    <div className="cart-item-header">
-                      <h3 className="cart-item-title">{item.name}</h3>
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="remove-button"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <p className="cart-item-detail">Cantidad: {item.quantity}</p>
-                    <p className="cart-item-detail">Precio: ${item.price.toFixed(2)}</p>
-
-                    {item.selectedOptionLabels &&
-                      Object.entries(item.selectedOptionLabels).map(
-                        ([key, value]) => (
-                          <p key={key} className="cart-item-detail">
-                            {key}:{' '}
-                            {Array.isArray(value) ? value.join(', ') : value}
-                          </p>
-                        )
-                      )}
+                {/* Cart Items List */}
+                <div className="cart-items-list">
+                  <div className="cart-items-scroll">
+                    {cartItems.map((item) => (
+                      <CartItemCard
+                        key={item.id}
+                        id={item.id}
+                        name={item.name}
+                        quantity={item.quantity}
+                        unitPrice={item.price}
+                        totalPrice={item.price * item.quantity}
+                        selectedChoices={item.selectedChoices}
+                        onRemove={removeFromCart}
+                      />
+                    ))}
                   </div>
-                ))}
-
-                <hr className="cart-separator" />
-
-                <div className="cart-total">Total: ${total.toFixed(2)}</div>
-
-                <div className="payment-section">
-                  <label className="payment-label">Método de pago</label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    className="payment-select"
-                  >
-                    <option value="">Seleccionar método</option>
-                    <option value="efectivo">Efectivo</option>
-                    <option value="tarjeta">Tarjeta</option>
-                    <option value="transferencia">Transferencia</option>
-                  </select>
                 </div>
 
-                {paymentMethod === 'efectivo' && (
-                  <div className="cash-input-section">
-                    <label className="cash-input-label">Efectivo recibido</label>
-                    <input
-                      type="number"
-                      value={cashPaid}
-                      onChange={(e) => setCashPaid(e.target.value)}
-                      placeholder="Ingrese el efectivo recibido"
-                      min={total}
-                      className="cash-input"
-                    />
+                {/* Footer */}
+                <div className="cart-footer">
+                  {/* Total */}
+                  <div className="cart-total-section">
+                    <span className="cart-total-label">Total</span>
+                    <span className="cart-total-amount">{formatPrice(total)}</span>
                   </div>
-                )}
 
-                {/* --------------------------- */}
-                {/*     NEW BUTTON SECTION      */}
-                {/* --------------------------- */}
-                <div className="cart-actions">
+                  {/* Payment Method */}
+                  <div className="payment-section">
+                    <label className="payment-label">Método de pago</label>
+                    <div className="payment-method-selector">
+                      <button
+                        className={`payment-method-btn ${paymentMethod === 'efectivo' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('efectivo')}
+                      >
+                        <IonIcon icon={wallet} className="icon" />
+                        Efectivo
+                      </button>
+                      <button
+                        className={`payment-method-btn ${paymentMethod === 'tarjeta' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('tarjeta')}
+                      >
+                        <IonIcon icon={card} className="icon" />
+                        Tarjeta
+                      </button>
+                      <button
+                        className={`payment-method-btn ${paymentMethod === 'transferencia' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('transferencia')}
+                      >
+                        <IonIcon icon={business} className="icon" />
+                        Transferir
+                      </button>
+                    </div>
+                  </div>
 
-                  <IonButton
-                    fill="outline"
-                    onClick={handleAddMoreProducts}
-                    className="cart-button cart-button-secondary"
-                  >
-                    <IonIcon slot="start" icon={addCircle} />
-                    Agregar más productos
-                  </IonButton>
+                  {/* Cash Input */}
+                  {paymentMethod === 'efectivo' && (
+                    <div className="cash-input-section">
+                      <div className="cash-input-wrapper">
+                        <span className="currency-symbol">$</span>
+                        <input
+                          type="number"
+                          value={cashPaid}
+                          onChange={(e) => setCashPaid(e.target.value)}
+                          placeholder="0.00"
+                          min={0}
+                          step="0.01"
+                          className="cash-input"
+                        />
+                      </div>
+                      {changeAmount > 0 && (
+                        <div className="change-display">
+                          <span className="change-amount">
+                            Cambio: {formatPrice(changeAmount)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                  <IonButton
-                    expand="block"
-                    onClick={handleCheckout}
-                    disabled={!isCheckoutEnabled}
-                    className="cart-button cart-button-primary"
-                  >
-                    <IonIcon slot="start" icon={card} />
-                    Pagar ${total.toFixed(2)}
-                  </IonButton>
+                  {/* Action Buttons */}
+                  <div className="cart-actions">
+                    <IonButton
+                      fill="outline"
+                      onClick={handleAddMoreProducts}
+                      className="cart-button-secondary"
+                    >
+                      <IonIcon slot="start" icon={addCircle} className="add-icon" />
+                      Agregar más
+                    </IonButton>
+
+                    <IonButton
+                      expand="block"
+                      onClick={handleCheckout}
+                      disabled={!isCheckoutEnabled}
+                      className="cart-button-primary"
+                    >
+                      <IonIcon slot="start" icon={receipt} className="pay-icon" />
+                      PAGAR {formatPrice(total)}
+                    </IonButton>
+                  </div>
                 </div>
               </>
             )}
           </div>
         </div>
 
+        {/* Toasts */}
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
           message={toastMessage}
           color="danger"
           position="bottom"
-          buttons={[
-            {
-              text: 'OK',
-              role: 'cancel',
-              handler: () => {
-                setShowToast(false);
-              },
-            },
-          ]}
+          buttons={[{ text: 'OK', role: 'cancel' }]}
         />
 
         <IonAlert
@@ -320,22 +392,14 @@ const CartPage: React.FC = () => {
               }, 100);
             }
           }}
-          message={`¡Pedido realizado! Método de pago: ${paymentMethod}${
+          message={`¡Pedido realizado! ${paymentMethod}${
             paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
-              ? ` : Cambio a devolver: $${(parseFloat(cashPaid) - total).toFixed(2)}`
+              ? ` | Cambio: ${formatPrice(parseFloat(cashPaid) - total)}`
               : ''
           }`}
           color="success"
           position="bottom"
-          buttons={[
-            {
-              text: 'OK',
-              role: 'cancel',
-              handler: () => {
-                setShowSuccessToast(false);
-              },
-            },
-          ]}
+          buttons={[{ text: 'OK', role: 'cancel' }]}
         />
 
         {ticketData && (
@@ -348,10 +412,11 @@ const CartPage: React.FC = () => {
           />
         )}
 
-        <IonLoading isOpen={loading} message="Procesando pago..." />
+        <IonLoading isOpen={loading} message="Procesando..." />
       </IonContent>
     </IonPage>
   );
 };
 
 export default CartPage;
+

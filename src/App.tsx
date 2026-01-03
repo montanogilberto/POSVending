@@ -52,6 +52,7 @@ import IncomesPage from './pages/IncomesPage';
 import ExpensesPage from './pages/ExpensesPage';
 import WaterTanksPage from './pages/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/WaterTanksHistoryPage';
+import ReceiptPage from './pages/Receipt/ReceiptPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -194,8 +195,10 @@ const App: React.FC = () => {
                 <Route exact path="/users" component={UsersPage} />
                 <Route exact path="/ingresos" component={IncomesPage} />
                 <Route exact path="/egresos" component={ExpensesPage} />
-                <Route exact path="/water-tanks" component={WaterTanksPage} />
+<Route exact path="/water-tanks" component={WaterTanksPage} />
                 <Route exact path="/water-tanks-history/:tankId" component={WaterTanksHistoryPage} />
+                <Route exact path="/receipt" component={ReceiptPage} />
+                <Route exact path="/receipt/:incomeId" component={ReceiptPage} />
 
                 <Route exact path="/">
                   <Redirect to="/laundry" />

@@ -3,7 +3,6 @@ import {
   IonContent,
   IonToast,
   IonPage,
-  IonModal,
   IonButton,
 } from '@ionic/react';
 import './Laundry.css';
@@ -11,12 +10,12 @@ import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import LogoutAlert from '../../components/Alerts/LogoutAlert';
 import MailPopover from '../../components/PopOver/MailPopover';
-import Receipt from '../../components/Receipt';
 import LaundryChart from '../../components/LaundryChart';
 import { useLaundryDashboard } from './hooks/useLaundryDashboard';
 import MetricsGrid from './components/MetricsGrid';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
+import { ReceiptService } from '../../services/ReceiptService';
 
 const Laundry: React.FC = () => {
   const {
@@ -32,10 +31,6 @@ const Laundry: React.FC = () => {
     setShowCart,
     showLogoutAlert,
     setShowLogoutAlert,
-    showReceiptModal,
-    setShowReceiptModal,
-    receiptData,
-    setReceiptData,
     pieData,
     handleStartSeller,
     handleConfirmSale,
@@ -54,6 +49,14 @@ const Laundry: React.FC = () => {
     handleShowReceipt,
     getTitleFromPath,
   } = useLaundryDashboard();
+
+  // Navigate to ReceiptPage instead of showing modal
+  const handleViewReceipt = (receiptData: any) => {
+    history.push({
+      pathname: '/receipt',
+      state: { ticketData: receiptData }
+    });
+  };
 
   return (
     <IonPage>
@@ -105,7 +108,7 @@ const Laundry: React.FC = () => {
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
         />
 
-        <AlertPopover
+<AlertPopover
           isOpen={popoverState.showAlertPopover}
           event={popoverState.event}
           onDidDismiss={dismissAlertPopover}
@@ -120,21 +123,6 @@ const Laundry: React.FC = () => {
           onDidDismiss={() => setShowLogoutAlert(false)}
           handleLogoutConfirm={handleLogoutConfirm}
         />
-
-        {/* Receipt Modal */}
-        <IonModal isOpen={showReceiptModal} onDidDismiss={() => {
-          setShowReceiptModal(false);
-          setReceiptData(null);
-        }}>
-          <Receipt {...receiptData} />
-          <div style={{ display: 'flex', gap: '12px', padding: '16px' }}>
-            <IonButton expand="block" onClick={() => window.print()}>Imprimir</IonButton>
-            <IonButton expand="block" fill="clear" onClick={() => {
-              setShowReceiptModal(false);
-              setReceiptData(null);
-            }}>Cerrar</IonButton>
-          </div>
-        </IonModal>
       </IonContent>
     </IonPage>
   );

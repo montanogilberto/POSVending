@@ -5,7 +5,6 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonModal,
   IonButton,
   IonToast,
   IonIcon,
@@ -16,6 +15,7 @@ import {
   IonCardTitle,
   IonLoading,
 } from '@ionic/react';
+import { useHistory } from 'react-router-dom';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
@@ -24,7 +24,6 @@ import IncomesFilters from '../components/IncomesFilters';
 import IncomesList from '../components/IncomesList';
 import { fetchAllLaundry } from '../api/laundryApi';
 import { fetchTicket } from '../api/ticketApi';
-import UnifiedReceipt from '../components/UnifiedReceipt';
 import { ReceiptService } from '../services/ReceiptService';
 import { LegacyIncomeData, UnifiedReceiptData } from '../types/receipt';
 import { waterOutline } from 'ionicons/icons';
@@ -50,6 +49,7 @@ interface Income {
 // }
 
 const IncomesPage: React.FC = () => {
+  const history = useHistory();
   const [allIncome, setAllIncome] = useState<Income[]>([]);
   const [filteredIncome, setFilteredIncome] = useState<Income[]>([]);
   const [displayedIncome, setDisplayedIncome] = useState<Income[]>([]);
@@ -59,8 +59,6 @@ const IncomesPage: React.FC = () => {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [chartData, setChartData] = useState<any>(null);
   const [totalIncome, setTotalIncome] = useState<number>(0);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [unifiedReceiptData, setUnifiedReceiptData] = useState<UnifiedReceiptData | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -157,23 +155,28 @@ const IncomesPage: React.FC = () => {
   const handleShowReceipt = async (incomeId: number) => {
     setLoading(true);
     try {
+      console.log('Fetching ticket for incomeId:', incomeId);
       const ticket = await fetchTicket(incomeId.toString());
+      console.log('API returned ticket:', ticket);
       
       if (!ticket) {
-        setToastMessage('No se encontró el ticket');
+        console.warn('Ticket is null for incomeId:', incomeId);
+        setToastMessage('No se encontró el ticket para este ingreso');
         setShowToast(true);
         return;
       }
 
       // Use adapter to convert Ticket to LegacyIncomeData format
       const legacyIncomeData = ReceiptService.adaptTicketToLegacyIncome(ticket);
-      const unifiedData = ReceiptService.transformIncomeData(legacyIncomeData);
       
-      setUnifiedReceiptData(unifiedData);
-      setShowReceiptModal(true);
-    } catch (error) {
+      // Navigate to ReceiptPage with ticket data
+      history.push({
+        pathname: '/receipt',
+        state: { ticketData: ticket }
+      });
+    } catch (error: any) {
       console.error('Error fetching ticket:', error);
-      setToastMessage('Error al cargar el recibo');
+      setToastMessage('Error al cargar el recibo: ' + (error.message || 'Error desconocido'));
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -270,20 +273,6 @@ const IncomesPage: React.FC = () => {
           </IonRow>
         </IonGrid>
 
-        <IonModal
-          isOpen={showReceiptModal}
-          onDidDismiss={() => setShowReceiptModal(false)}
-        >
-          {unifiedReceiptData && (
-            <UnifiedReceipt
-              data={unifiedReceiptData}
-              showModal={true}
-              onClose={() => setShowReceiptModal(false)}
-              options={{ width: '58mm', thermal: true }}
-            />
-          )}
-        </IonModal>
-
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
@@ -301,3 +290,4 @@ const IncomesPage: React.FC = () => {
 };
 
 export default IncomesPage;
+
