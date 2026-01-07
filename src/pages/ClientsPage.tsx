@@ -24,8 +24,9 @@ import {
   IonInput,
   IonNote,
   IonText,
+  IonSearchbar,
 } from '@ionic/react';
-import { add, create, trash, pencil, arrowBack, person, mail, checkmarkCircle, closeCircle, call, save } from 'ionicons/icons';
+import { add, create, trash, pencil, arrowBack, person, mail, checkmarkCircle, closeCircle, call, save, personCircle, time } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
@@ -71,6 +72,9 @@ const ClientsPage: React.FC = () => {
     cellphone: '',
   });
 
+  // Search functionality
+  const [searchTerm, setSearchTerm] = useState('');
+
   const presentAlertPopover = (e: React.MouseEvent) => {
     setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
   };
@@ -100,6 +104,20 @@ const ClientsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Filter clients based on search term
+  const filteredClients = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return clients;
+    }
+    const term = searchTerm.toLowerCase().trim();
+    return clients.filter(client => 
+      client.first_name?.toLowerCase().includes(term) ||
+      client.last_name?.toLowerCase().includes(term) ||
+      client.cellphone?.includes(term) ||
+      client.email?.toLowerCase().includes(term)
+    );
+  }, [clients, searchTerm]);
 
   const handleDelete = (client: Client) => {
     setSelectedClient(client);
@@ -279,6 +297,17 @@ const ClientsPage: React.FC = () => {
     }
   };
 
+  // Format date helper
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
   return (
     <IonPage>
       <Header
@@ -291,31 +320,103 @@ const ClientsPage: React.FC = () => {
       />
 
       <IonContent>
-        <IonList>
-          {clients.map((client) => (
-            <IonCard key={client.clientId}>
-              <IonCardHeader>
-                <IonCardTitle>{client.first_name} {client.last_name}</IonCardTitle>
-              </IonCardHeader>
-              <IonCardContent>
-                <p><strong>Email:</strong> {client.email}</p>
-                <p><strong>Teléfono:</strong> {client.cellphone}</p>
-                <p><strong>Creado:</strong> {client.created_At ? new Date(client.created_At).toLocaleDateString() : 'N/A'}</p>
-                <IonButtons slot="end">
-                  <IonButton fill="clear" color="primary" onClick={() => handleEdit(client)}>
-                    <IonIcon icon={pencil} />
+        {/* Search Bar */}
+        <div className="search-container">
+          <IonSearchbar
+            value={searchTerm}
+            onIonInput={(e) => setSearchTerm(e.detail.value!)}
+            placeholder="Buscar por nombre, teléfono o email..."
+            className="clients-searchbar"
+          />
+        </div>
+
+        <IonList className="clients-list">
+          {filteredClients.map((client) => (
+            <IonCard key={client.clientId} className="client-card">
+              <IonCardContent className="client-card-content">
+                {/* Client Name - Main Element */}
+                <div className="client-header">
+                  <IonIcon icon={personCircle} className="client-avatar" />
+                  <IonCardTitle className="client-name">
+                    {client.first_name} {client.last_name}
+                  </IonCardTitle>
+                </div>
+
+                {/* Metadata */}
+                <div className="client-metadata">
+                  {/* Phone - Primary */}
+                  <div className="metadata-row">
+                    <IonIcon icon={call} className="metadata-icon phone-icon" />
+                    <IonText className="metadata-value">{client.cellphone}</IonText>
+                  </div>
+
+                  {/* Email - Secondary */}
+                  <div className="metadata-row">
+                    <IonIcon icon={mail} className="metadata-icon email-icon" />
+                    <IonText className={`metadata-value ${!client.email ? 'text-muted' : ''}`}>
+                      {client.email || 'No registrado'}
+                    </IonText>
+                  </div>
+
+                  {/* Created Date - Small, Muted */}
+                  <div className="metadata-row date-row">
+                    <IonIcon icon={time} className="metadata-icon date-icon" />
+                    <IonText className="metadata-value date-value">
+                      Creado: {formatDate(client.created_At)}
+                    </IonText>
+                  </div>
+                </div>
+
+                {/* Action Buttons - Bottom Right */}
+                <div className="client-actions">
+                  <IonButton 
+                    fill="outline" 
+                    size="small" 
+                    color="primary" 
+                    onClick={() => handleEdit(client)}
+                    className="action-button edit-button"
+                  >
+                    <IonIcon icon={pencil} slot="start" />
+                    Editar
                   </IonButton>
-                  <IonButton fill="clear" color="danger" onClick={() => handleDelete(client)}>
-                    <IonIcon icon={trash} />
+                  <IonButton 
+                    fill="outline" 
+                    size="small" 
+                    color="danger" 
+                    onClick={() => handleDelete(client)}
+                    className="action-button delete-button"
+                  >
+                    <IonIcon icon={trash} slot="start" />
+                    Eliminar
                   </IonButton>
-                </IonButtons>
+                </div>
               </IonCardContent>
             </IonCard>
           ))}
         </IonList>
 
+        {/* Empty State */}
+        {filteredClients.length === 0 && !loading && (
+          <div className="empty-state">
+            <IonIcon icon={person} className="empty-icon" />
+            <IonText color="medium">
+              <p>{searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}</p>
+            </IonText>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="loading-state">
+            <IonText color="medium">
+              <p>Cargando clientes...</p>
+            </IonText>
+          </div>
+        )}
+
+        {/* Floating Action Button with Tooltip */}
         <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={handleCreate}>
+          <IonFabButton onClick={handleCreate} aria-label="Nuevo cliente">
             <IonIcon icon={add} />
           </IonFabButton>
         </IonFab>
@@ -522,3 +623,4 @@ const ClientsPage: React.FC = () => {
 };
 
 export default ClientsPage;
+

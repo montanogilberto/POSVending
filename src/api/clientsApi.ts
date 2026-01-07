@@ -48,6 +48,9 @@ export interface GetOneClientResponse {
 }
 
 export const createOrUpdateClient = async (data: CreateClientRequest): Promise<CreateClientResponse> => {
+  console.log('[CLIENTS_API] Sending POST request to:', `${API_BASE_URL}/clients`);
+  console.log('[CLIENTS_API] Request payload:', JSON.stringify(data, null, 2));
+  
   const response = await fetch(`${API_BASE_URL}/clients`, {
     method: 'POST',
     headers: {
@@ -56,11 +59,18 @@ export const createOrUpdateClient = async (data: CreateClientRequest): Promise<C
     body: JSON.stringify(data),
   });
 
+  console.log('[CLIENTS_API] Response status:', response.status, response.statusText);
+  
   if (!response.ok) {
-    throw new Error('Failed to create or update client');
+    const errorText = await response.text();
+    console.error('[CLIENTS_API] Error response:', errorText);
+    throw new Error(`Failed to create or update client: ${response.status} ${response.statusText}`);
   }
 
-  return response.json();
+  const responseData = await response.json();
+  console.log('[CLIENTS_API] Response data:', JSON.stringify(responseData, null, 2));
+  
+  return responseData;
 };
 
 export const getAllClients = async (): Promise<Client[]> => {

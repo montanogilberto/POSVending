@@ -1,4 +1,305 @@
-/* Professional Modal Styles for ClientsPage */
+/* ==========================================================================
+   ClientsPage - Enhanced UI/UX Styling
+   ========================================================================== */
+
+/* Search Bar Styles */
+.search-container {
+  padding: 16px;
+  background: var(--ion-background-color, #ffffff);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.clients-searchbar {
+  --border-radius: 12px;
+  --background: var(--ion-item-background, #f4f5f8);
+  --placeholder-color: var(--ion-color-medium, #6c757d);
+  --icon-color: var(--ion-color-primary, #0056D2);
+  padding: 0;
+}
+
+.clients-searchbar ion-searchbar {
+  border-radius: 12px;
+}
+
+/* Client List Container */
+.clients-list {
+  padding: 16px;
+  background: var(--ion-background-color, #ffffff);
+}
+
+/* ==========================================================================
+   Client Card Redesign
+   ========================================================================== */
+
+.client-card {
+  margin: 0 0 20px 0 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid var(--ion-border-color, #e0e0e0);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.client-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+.client-card:active {
+  transform: translateY(0);
+}
+
+.client-card-content {
+  padding: 20px !important;
+}
+
+/* Client Header - Name and Avatar */
+.client-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ion-border-color, #e0e0e0);
+}
+
+.client-avatar {
+  font-size: 40px;
+  color: var(--ion-color-primary, #0056D2);
+  background: rgba(0, 86, 210, 0.1);
+  border-radius: 50%;
+  padding: 4px;
+}
+
+.client-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ion-text-color, #1a1a1a);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Client Metadata */
+.client-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.metadata-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.metadata-icon {
+  font-size: 18px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.phone-icon {
+  color: var(--ion-color-success, #28a745);
+}
+
+.email-icon {
+  color: var(--ion-color-primary, #0056D2);
+}
+
+.date-icon {
+  color: var(--ion-color-medium, #6c757d);
+}
+
+.metadata-value {
+  font-size: 15px;
+  color: var(--ion-text-color, #333333);
+  word-break: break-word;
+}
+
+.metadata-value.text-muted {
+  color: var(--ion-color-medium, #6c757d);
+  font-style: italic;
+}
+
+/* Date Row - Smaller and more muted */
+.date-row {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--ion-border-color, #e0e0e0);
+}
+
+.date-row .metadata-icon {
+  font-size: 16px;
+}
+
+.date-value {
+  font-size: 13px !important;
+  color: var(--ion-color-medium, #6c757d) !important;
+}
+
+/* ==========================================================================
+   Action Buttons
+   ========================================================================== */
+
+.client-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ion-border-color, #e0e0e0);
+}
+
+.action-button {
+  --border-radius: 8px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.3px;
+}
+
+.edit-button {
+  --border-color: var(--ion-color-primary, #0056D2);
+  --color: var(--ion-color-primary, #0056D2);
+}
+
+.delete-button {
+  --border-color: var(--ion-color-danger, #dc3545);
+  --color: var(--ion-color-danger, #dc3545);
+}
+
+.action-button ion-icon {
+  margin-right: 6px;
+}
+
+/* ==========================================================================
+   Empty State & Loading State
+   ========================================================================== */
+
+.empty-state,
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 64px;
+  color: var(--ion-color-medium, #6c757d);
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state p,
+.loading-state p {
+  font-size: 16px;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+/* Tablet (768px and up) */
+@media (min-width: 768px) {
+  .search-container {
+    padding: 20px 24px;
+  }
+  
+  .clients-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    padding: 20px 24px;
+  }
+  
+  .client-card {
+    margin: 0 !important;
+  }
+  
+  .client-name {
+    font-size: 22px;
+  }
+}
+
+/* Desktop (1024px and up) */
+@media (min-width: 1024px) {
+  .search-container {
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .clients-list {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .client-card-content {
+    padding: 24px !important;
+  }
+  
+  .client-name {
+    font-size: 24px;
+  }
+  
+  .client-avatar {
+    font-size: 48px;
+  }
+}
+
+/* Large Desktop (1400px and up) */
+@media (min-width: 1400px) {
+  .clients-list {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Mobile - Single column */
+@media (max-width: 767px) {
+  .search-container {
+    padding: 12px;
+  }
+  
+  .clients-list {
+    padding: 12px;
+  }
+  
+  .client-card-content {
+    padding: 16px !important;
+  }
+  
+  .client-name {
+    font-size: 18px;
+  }
+  
+  .client-avatar {
+    font-size: 36px;
+  }
+  
+  .client-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .action-button {
+    width: 100%;
+    margin: 0;
+  }
+}
+
+/* ==========================================================================
+   Professional Modal Styles (Existing - Keep for reference)
+   ========================================================================== */
 
 .client-modal {
   --border-radius: 12px;
@@ -52,7 +353,6 @@
 }
 
 .form-item.outline {
-  --border-color: #007bff;
   --border-width: 2px;
 }
 
@@ -141,7 +441,7 @@
   75% { transform: translateX(5px); }
 }
 
-/* Responsive Design */
+/* Responsive Modal */
 @media (max-width: 576px) {
   .form-container {
     padding: 16px;
@@ -182,3 +482,4 @@
 .form-container > .form-item:last-child {
   margin-bottom: 0;
 }
+
