@@ -38,17 +38,37 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
       user: {
         name: ticketData.user.name,
       },
-      products: ticketData.products.map((prod: any, index: number) => ({
-        id: prod.id || index,
-        name: prod.name,
-        quantity: prod.quantity,
-        price: prod.unitPrice,
-        subtotal: prod.subtotal,
-        selectedOptions: prod.options?.reduce((acc: any, opt: any) => {
-          acc[opt.optionName || 'Opción'] = opt.choiceName;
-          return acc;
-        }, {}),
-      })),
+      products: ticketData.products.map((prod: any, index: number) => {
+        // Handle both old format (options as array with optionName/choiceName) 
+        // and new format (options with nested choices)
+        let selectedOptions: any = {};
+        
+        if (prod.options && Array.isArray(prod.options)) {
+          // New format: options with nested choices structure
+          if (prod.options[0]?.choices) {
+            prod.options.forEach((option: any) => {
+              if (option.choices && Array.isArray(option.choices)) {
+                const choiceNames = option.choices.map((c: any) => c.name).join(', ');
+                selectedOptions[option.optionName || 'Opción'] = choiceNames;
+              }
+            });
+          } else {
+            // Old format: options as array of objects with optionName/choiceName
+            prod.options.forEach((opt: any) => {
+              selectedOptions[opt.optionName || 'Opción'] = opt.choiceName;
+            });
+          }
+        }
+
+        return {
+          id: prod.id || index,
+          name: prod.name,
+          quantity: prod.quantity,
+          price: prod.unitPrice,
+          subtotal: prod.subtotal,
+          selectedOptions: selectedOptions,
+        };
+      }),
       totals: {
         subtotal: ticketData.totals.subtotal,
         iva: ticketData.totals.iva,
@@ -72,21 +92,20 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
     if (closing) return; // ✅ prevent double click
     setClosing(true);
 
-    try {
-      // ✅ Do NOT clear ticketData before navigation (prevents render crash)
+    // Small delay to allow the loader to show, then navigate and cleanup
+    setTimeout(() => {
+      // Clear cart first
       clearCart();
-
-      // Navigate first
+      
+      // Clear ticket data
+      setTicketData(null);
+      
+      // Navigate away
       history.replace('/Laundry');
-
-      // Then clear ticket data after route change (next tick)
-      setTimeout(() => {
-        setTicketData(null);
-      }, 0);
-    } finally {
-      // ✅ Always stop loader even if something fails
-      setTimeout(() => setClosing(false), 250);
-    }
+      
+      // Dismiss loader after navigation
+      setClosing(false);
+    }, 300);
   };
 
   return (

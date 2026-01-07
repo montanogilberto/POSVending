@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton, IonIcon, IonLoading, IonToast } from '@ionic/react';
+import { IonPage, IonContent, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonLoading, IonToast } from '@ionic/react';
 import { printOutline, closeOutline } from 'ionicons/icons';
 import UnifiedReceipt from '../../components/UnifiedReceipt';
 import { ReceiptService } from '../../services/ReceiptService';
-import { fetchTicket } from '../../api/ticketApi';
 
 interface LocationState {
-  incomeId?: number;
   ticketData?: any;
 }
 
@@ -15,70 +13,42 @@ const ReceiptPage: React.FC = () => {
   const history = useHistory();
   const location = useLocation<LocationState>();
   const [receiptData, setReceiptData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // Initialize loading based on whether ticketData exists
+  const [loading, setLoading] = useState(() => !location.state?.ticketData);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Get incomeId from state or params
-  const incomeId = location.state?.incomeId;
+  // Get ticketData from route state only
   const ticketData = location.state?.ticketData;
 
   useEffect(() => {
-    console.log('ReceiptPage - incomeId:', incomeId);
     console.log('ReceiptPage - ticketData:', ticketData);
     
     const loadReceipt = async () => {
       try {
-        let unifiedData;
-        let sourceTicketData = ticketData;
-        
-        if (ticketData) {
-          // Direct ticket data provided
-          console.log('Using direct ticketData');
-          const legacyIncomeData = ReceiptService.adaptTicketToLegacyIncome(ticketData);
-          unifiedData = ReceiptService.transformIncomeData(legacyIncomeData);
-          setLoading(false);
-          return;
-        } else if (incomeId) {
-          // Fetch from API
-          console.log('Fetching ticket from API for incomeId:', incomeId);
-          setLoading(true);
-          const ticket = await fetchTicket(incomeId.toString());
-          console.log('API returned ticket:', ticket);
-          
-          if (!ticket) {
-            setError('No se encontró el ticket');
-            setToastMessage('No se encontró el ticket para este ingreso');
-            setShowToast(true);
-            setLoading(false);
-            return;
-          }
-          sourceTicketData = ticket;
-          const legacyIncomeData = ReceiptService.adaptTicketToLegacyIncome(ticket);
-          unifiedData = ReceiptService.transformIncomeData(legacyIncomeData);
-        } else {
+        if (!ticketData) {
           setError('No hay datos de recibo');
-          setToastMessage('No hay datos disponibles para mostrar el recibo');
-          setShowToast(true);
-          setLoading(false);
           return;
         }
-
+        
+        console.log('Processing ticketData');
+        const legacyIncomeData = ReceiptService.adaptTicketToLegacyIncome(ticketData);
+        const unifiedData = ReceiptService.transformIncomeData(legacyIncomeData);
+        
         console.log('Final unified receipt data:', unifiedData);
         setReceiptData(unifiedData);
       } catch (err: any) {
         console.error('Error loading receipt:', err);
         setError('Error al cargar el recibo: ' + err.message);
         setToastMessage('Error al cargar el recibo');
-        setShowToast(true);
       } finally {
         setLoading(false);
       }
     };
 
     loadReceipt();
-  }, [incomeId, ticketData]);
+  }, [ticketData]);
 
   const handlePrint = () => {
     if (receiptData) {
@@ -95,39 +65,10 @@ const ReceiptPage: React.FC = () => {
     history.goBack();
   };
 
-  if (loading) {
-    return (
-      <IonPage>
-        <IonContent>
-          <IonLoading isOpen={loading} message="Cargando recibo..." />
-        </IonContent>
-      </IonPage>
-    );
-  }
-
-  if (error || !receiptData) {
-    return (
-      <IonPage>
-        <IonHeader>
-          <IonToolbar>
-            <IonButtons slot="start">
-              <IonBackButton defaultHref="/laundry" />
-            </IonButtons>
-            <IonTitle>Recibo</IonTitle>
-          </IonToolbar>
-        </IonHeader>
-        <IonContent className="ion-padding">
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <p style={{ color: 'var(--ion-color-danger)' }}>{error || 'Error al cargar el recibo'}</p>
-            <IonButton onClick={handleClose}>Volver</IonButton>
-          </div>
-        </IonContent>
-      </IonPage>
-    );
-  }
-
   return (
     <IonPage>
+      {/* Global loader overlay */}
+      <IonLoading isOpen={loading} message="Cargando recibo..." backdropDismiss={false} />
       {/* Header with Close Button */}
       <IonHeader>
         <IonToolbar>
@@ -160,10 +101,16 @@ const ReceiptPage: React.FC = () => {
             fontSize: '11px',
           }}
         >
-          <UnifiedReceipt
-            data={receiptData}
-            options={{ width: '46mm', thermal: true }}
-          />
+          {!!receiptData ? (
+            <UnifiedReceipt
+              data={receiptData}
+              options={{ width: '46mm', thermal: true }}
+            />
+          ) : (
+            <div style={{ textAlign: 'center', padding: 16, color: 'var(--ion-color-danger)' }}>
+              {error || 'No hay datos disponibles'}
+            </div>
+          )}
         </div>
 
         {/* Action Buttons - Bottom Fixed */}
@@ -189,6 +136,7 @@ const ReceiptPage: React.FC = () => {
             fill="solid"
             color="primary"
             onClick={handlePrint}
+            disabled={loading || !receiptData}
             style={{
               minWidth: '140px',
               flex: '1 1 140px',
@@ -205,6 +153,7 @@ const ReceiptPage: React.FC = () => {
             fill="outline"
             color="medium"
             onClick={handleClose}
+            disabled={loading}
             style={{
               minWidth: '140px',
               flex: '1 1 140px',
