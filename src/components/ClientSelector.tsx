@@ -214,7 +214,17 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           }]
         };
 
-        await createOrUpdateClient(requestData);
+        console.log('[CLIENT_CREATION] Request to create client:', JSON.stringify(requestData, null, 2));
+
+        const response = await createOrUpdateClient(requestData);
+        
+        console.log('[CLIENT_CREATION] Response from API:', JSON.stringify(response, null, 2));
+        console.log('[CLIENT_CREATION] API msg:', response.result?.[0]?.msg);
+        console.log('[CLIENT_CREATION] API error:', response.result?.[0]?.error);
+        
+        if (response.result?.[0]?.error) {
+          throw new Error(response.result[0].error);
+        }
         
         // Create the new client object
         const createdClient: Client = {
@@ -245,6 +255,15 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         
         // Refresh client list
         setHasLoaded(false);
+        
+        // Load clients again to verify the new client exists in database
+        console.log('[CLIENT_CREATION] Refreshing client list to verify...');
+        const updatedClients = await getAllClients();
+        console.log('[CLIENT_CREATION] Updated clients count:', updatedClients.length);
+        const newClientExists = updatedClients.some(c => c.clientId === clientId);
+        console.log('[CLIENT_CREATION] New client exists in database:', newClientExists);
+        setClients(updatedClients);
+        setHasLoaded(true);
         
       } catch (error) {
         console.error('Error creating client:', error);
