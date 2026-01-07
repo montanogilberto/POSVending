@@ -104,6 +104,13 @@ export interface ApiResponse {
   products: Product[];
 }
 
+// Piezas interface for "Servicio Completo" product tracking
+export interface Piezas {
+  pantalones: number;
+  prendas: number;
+  otros: number;
+}
+
 // types.ts or inside CartContext if it's defined there
 export interface CartItem {
   id: string;
@@ -113,4 +120,5 @@ export interface CartItem {
   price: number;
   selectedOptions: { [key: string]: string | string[] };
   selectedOptionLabels?: { [key: string]: string | string[] }; // 👈 add this line
+  pieces?: Piezas; // For "Servicio Completo" product
 }

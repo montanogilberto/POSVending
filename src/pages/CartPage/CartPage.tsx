@@ -51,6 +51,7 @@ const CartPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
+  const [showPiecesValidationToast, setShowPiecesValidationToast] = useState(false);
 
   // Calculate total - item.price already includes option prices with quantity factored in
   const total = cartItems.reduce((acc, item) => acc + item.price, 0);
@@ -60,6 +61,18 @@ const CartPage: React.FC = () => {
     !!paymentMethod &&
     (paymentMethod !== 'efectivo' ||
       (!isNaN(cashNumber) && cashNumber >= total));
+
+  // Helper to check if item is "Servicio Completo" with valid pieces
+  const hasValidServicioCompleto = cartItems.every(item => {
+    const isServicioCompleto = item.name?.toLowerCase().includes('servicio completo');
+    if (!isServicioCompleto) return true;
+    if (!item.pieces) return false;
+    const totalPieces = item.pieces.pantalones + item.pieces.prendas + item.pieces.otros;
+    return totalPieces > 0;
+  });
+
+  // Update isCheckoutEnabled to include pieces validation
+  const isCheckoutEnabledFinal = isCheckoutEnabled && hasValidServicioCompleto;
 
   useInactivityTimer(300000, () => window.location.reload());
 
@@ -85,6 +98,20 @@ const CartPage: React.FC = () => {
   };
 
   const handleCheckout = async () => {
+    // Check for valid pieces on "Servicio Completo" items
+    const invalidItems = cartItems.filter(item => {
+      const isServicioCompleto = item.name?.toLowerCase().includes('servicio completo');
+      if (!isServicioCompleto) return false;
+      if (!item.pieces) return true;
+      const totalPieces = item.pieces.pantalones + item.pieces.prendas + item.pieces.otros;
+      return totalPieces === 0;
+    });
+
+    if (invalidItems.length > 0) {
+      setShowPiecesValidationToast(true);
+      return;
+    }
+
     if (!paymentMethod) {
       setShowAlert(true);
       return;
@@ -279,6 +306,8 @@ const CartPage: React.FC = () => {
                         unitPrice={item.price / item.quantity}
                         totalPrice={item.price}
                         selectedChoices={item.selectedChoices}
+                        selectedOptionLabels={item.selectedOptionLabels}
+                        pieces={item.pieces}
                         onRemove={removeFromCart}
                       />
                     ))}
@@ -393,7 +422,7 @@ const CartPage: React.FC = () => {
                     <IonButton
                       expand="block"
                       onClick={handleCheckout}
-                      disabled={!isCheckoutEnabled}
+                      disabled={!isCheckoutEnabledFinal}
                       className="cart-button-primary"
                     >
                       <IonIcon slot="start" icon={receipt} className="pay-icon" />
@@ -422,6 +451,17 @@ const CartPage: React.FC = () => {
           header="Validación"
           message="Debe seleccionar un método de pago."
           buttons={['OK']}
+        />
+
+        {/* Toast for pieces validation error */}
+        <IonToast
+          isOpen={showPiecesValidationToast}
+          onDidDismiss={() => setShowPiecesValidationToast(false)}
+          message="Captura las piezas (Pantalones/Prendas/Otros). Al menos una debe ser mayor a 0."
+          color="warning"
+          position="bottom"
+          duration={4000}
+          buttons={[{ text: 'OK', role: 'cancel' }]}
         />
 
         <IonToast

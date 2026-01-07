@@ -1,0 +1,271 @@
+/* ClientSelector Modal Styles */
+
+/* Modal container */
+.client-selector-modal {
+  --height: 85vh;
+  --border-radius: 16px 16px 0 0;
+}
+
+/* Header styles */
+.client-selector-header {
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.client-selector-toolbar {
+  --background: #fff;
+  --padding-start: 8px;
+  --padding-end: 8px;
+}
+
+.client-selector-title {
+  font-weight: 600;
+  font-size: 18px;
+  color: #333;
+}
+
+.close-button {
+  --color: #666;
+}
+
+.mostrador-button {
+  --color: #666;
+  font-size: 14px;
+}
+
+/* Create client button */
+.create-client-btn {
+  --border-radius: 8px;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+/* Searchbar container */
+.client-searchbar-container {
+  padding: 8px 16px;
+  background: #fff;
+}
+
+.client-searchbar {
+  --background: #f5f5f5;
+  --border-radius: 8px;
+  --placeholder-color: #999;
+  --color: #333;
+  --clear-button-color: #666;
+  height: 44px;
+}
+
+/* Create client form */
+.create-client-form {
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  padding: 12px 16px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.form-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.form-item {
+  --background: transparent;
+  --border-color: #ddd;
+  --border-radius: 8px;
+  --border-style: solid;
+  --border-width: 1px;
+  --padding-start: 8px;
+  margin-bottom: 4px;
+  min-height: 56px;
+}
+
+.form-item:focus-within {
+  --border-color: var(--ion-color-primary);
+  --border-width: 2px;
+}
+
+.form-input {
+  --padding-start: 8px;
+  font-size: 14px;
+}
+
+.error-text {
+  font-size: 12px;
+  margin-left: 40px;
+  margin-top: -4px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.form-actions ion-button {
+  flex: 1;
+  height: 44px;
+  font-weight: 500;
+}
+
+/* Content styles */
+.client-selector-content {
+  --background: #f5f5f5;
+}
+
+.selected-client-chip {
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 64px;
+  color: #ccc;
+  margin-bottom: 16px;
+}
+
+.empty-state ion-text {
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+
+.create-from-empty {
+  margin-top: 16px;
+  --border-radius: 8px;
+}
+
+/* Client list */
+.client-list {
+  background: transparent;
+  padding: 0;
+}
+
+.client-item {
+  --background: #fff;
+  --border-bottom: 1px solid #f0f0f0;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --inner-padding-top: 12px;
+  --inner-padding-bottom: 12px;
+  margin-bottom: 1px;
+}
+
+.client-item.selected {
+  --background: #e8f5e9;
+}
+
+.client-item-content {
+  width: 100%;
+}
+
+.client-name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.client-name {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+}
+
+.small-chip {
+  --background: #e8f5e9;
+  --color: #2e7d32;
+  font-size: 12px;
+  height: 24px;
+}
+
+.client-contact-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.client-phone,
+.client-email {
+  font-size: 14px;
+}
+
+/* Footer styles */
+.client-selector-footer {
+  background: #fff;
+  padding: 12px 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.mostrador-footer-btn {
+  --border-radius: 8px;
+  --background: transparent;
+  --background-activated: #f5f5f5;
+  --color: #666;
+  font-weight: 500;
+}
+
+/* Toast styling */
+ion-toast {
+  --border-radius: 8px;
+  --text-align: center;
+  font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .create-client-form {
+    padding: 12px;
+  }
+  
+  .form-header h3 {
+    font-size: 14px;
+  }
+  
+  .client-name {
+    font-size: 14px;
+  }
+  
+  .client-phone,
+  .client-email {
+    font-size: 12px;
+  }
+}
+

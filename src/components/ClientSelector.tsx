@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import './ClientSelector.css';
 import {
   IonModal,
   IonHeader,
@@ -16,9 +17,14 @@ import {
   IonText,
   IonLoading,
   IonFooter,
+  IonInput,
+  IonNote,
+  IonToast,
+  IonRow,
+  IonCol,
 } from '@ionic/react';
-import { person, close, checkmarkCircle, business } from 'ionicons/icons';
-import { Client, getAllClients } from '../api/clientsApi';
+import { person, close, checkmarkCircle, business, add, mail, call, save, arrowBack } from 'ionicons/icons';
+import { Client, getAllClients, createOrUpdateClient } from '../api/clientsApi';
 
 interface ClientSelectorProps {
   isOpen: boolean;
@@ -39,6 +45,30 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   const [hasLoaded, setHasLoaded] = useState(false);
   const searchbarRef = useRef<HTMLIonSearchbarElement>(null);
 
+  // Create client form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newClient, setNewClient] = useState<Partial<Client>>({
+    first_name: '',
+    last_name: '',
+    cellphone: '',
+    email: '',
+  });
+  const [createErrors, setCreateErrors] = useState<{
+    first_name: string;
+    last_name: string;
+    email: { isValid: boolean; message: string };
+    cellphone: string;
+  }>({
+    first_name: '',
+    last_name: '',
+    email: { isValid: true, message: '' },
+    cellphone: '',
+  });
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
+
   // Load clients only when modal opens
   useEffect(() => {
     if (isOpen && !hasLoaded) {
@@ -53,7 +83,16 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         searchbarRef.current?.setFocus();
       }, 100);
     } else {
+      // Reset states when modal closes
       setSearchText('');
+      setShowCreateForm(false);
+      setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
+      setCreateErrors({
+        first_name: '',
+        last_name: '',
+        email: { isValid: true, message: '' },
+        cellphone: '',
+      });
     }
   }, [isOpen]);
 
@@ -107,6 +146,128 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     return `${client.first_name} ${client.last_name}`.trim();
   };
 
+  // Validation functions
+  const validateEmail = (email: string) => {
+    if (!email.trim()) return { isValid: true, message: '' };
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return {
+        isValid: false,
+        message: 'Email inválido (ej. nombre@dominio.com)'
+      };
+    }
+    return { isValid: true, message: '' };
+  };
+
+  const validateCellphone = (cellphone: string) => {
+    if (!cellphone) return 'El teléfono es obligatorio';
+    const digitsOnly = cellphone.replace(/\D/g, '');
+    if (digitsOnly.length < 10) return 'El teléfono debe tener al menos 10 dígitos';
+    return '';
+  };
+
+  // Computed validation for create form
+  const createIsValid = useMemo(() => {
+    const emailValidation = validateEmail(newClient.email || '');
+    const errors: any = {
+      first_name: newClient.first_name ? '' : 'El nombre es obligatorio',
+      last_name: newClient.last_name ? '' : 'El apellido es obligatorio',
+      email: emailValidation,
+      cellphone: validateCellphone(newClient.cellphone || ''),
+    };
+    return !Object.values(errors).some((error: any) =>
+      typeof error === 'string' ? error !== '' : !error.isValid
+    );
+  }, [newClient.first_name, newClient.last_name, newClient.email, newClient.cellphone]);
+
+  // Update errors when form fields change
+  useEffect(() => {
+    const emailValidation = validateEmail(newClient.email || '');
+    const errors = {
+      first_name: newClient.first_name ? '' : 'El nombre es obligatorio',
+      last_name: newClient.last_name ? '' : 'El apellido es obligatorio',
+      email: emailValidation,
+      cellphone: validateCellphone(newClient.cellphone || ''),
+    };
+    setCreateErrors(errors);
+  }, [newClient.first_name, newClient.last_name, newClient.email, newClient.cellphone]);
+
+  const handleEmailChange = (value: string) => {
+    const validation = validateEmail(value);
+    setCreateErrors((prev) => ({ ...prev, email: validation }));
+    setNewClient((prev) => ({ ...prev, email: value }));
+  };
+
+  const handleSaveClient = async () => {
+    if (createIsValid) {
+      setIsCreating(true);
+      try {
+        const clientId = Date.now(); // Generate unique ID
+        const requestData = {
+          clients: [{
+            clientId,
+            first_name: newClient.first_name!,
+            last_name: newClient.last_name!,
+            cellphone: newClient.cellphone!,
+            email: newClient.email!,
+            action: "1" // "1" for create
+          }]
+        };
+
+        await createOrUpdateClient(requestData);
+        
+        // Create the new client object
+        const createdClient: Client = {
+          clientId,
+          first_name: newClient.first_name!,
+          last_name: newClient.last_name!,
+          cellphone: newClient.cellphone!,
+          email: newClient.email!,
+        };
+
+        setToastMessage('Cliente creado exitosamente');
+        setToastColor('success');
+        setShowToast(true);
+        
+        // Select the newly created client and close modal
+        onChange(createdClient);
+        onClose();
+        
+        // Reset form
+        setShowCreateForm(false);
+        setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
+        setCreateErrors({
+          first_name: '',
+          last_name: '',
+          email: { isValid: true, message: '' },
+          cellphone: '',
+        });
+        
+        // Refresh client list
+        setHasLoaded(false);
+        
+      } catch (error) {
+        console.error('Error creating client:', error);
+        setToastMessage('Error al crear el cliente');
+        setToastColor('danger');
+        setShowToast(true);
+      } finally {
+        setIsCreating(false);
+      }
+    }
+  };
+
+  const handleCancelCreate = () => {
+    setShowCreateForm(false);
+    setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
+    setCreateErrors({
+      first_name: '',
+      last_name: '',
+      email: { isValid: true, message: '' },
+      cellphone: '',
+    });
+  };
+
   return (
     <IonModal
       isOpen={isOpen}
@@ -124,10 +285,25 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           </IonButtons>
           <IonTitle className="client-selector-title">Seleccionar Cliente</IonTitle>
           <IonButtons slot="end">
-            <IonButton fill="clear" onClick={handleSelectMostrador} className="mostrador-button">
+            <IonButton 
+              fill="clear" 
+              onClick={handleSelectMostrador} 
+              className="mostrador-button"
+            >
               <IonIcon icon={business} slot="start" />
               Mostrador
             </IonButton>
+            {!showCreateForm && (
+              <IonButton 
+                fill="solid" 
+                color="primary" 
+                onClick={() => setShowCreateForm(true)}
+                className="create-client-btn"
+              >
+                <IonIcon icon={add} slot="start" />
+                Crear cliente
+              </IonButton>
+            )}
           </IonButtons>
         </IonToolbar>
         <div className="client-searchbar-container">
@@ -141,6 +317,120 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
             className="client-searchbar"
           />
         </div>
+        
+        {/* Create Client Form - Collapsible */}
+        {showCreateForm && (
+          <div className="create-client-form">
+            <div className="form-header">
+              <IonText color="primary">
+                <h3>Nuevo Cliente</h3>
+              </IonText>
+              <IonButton fill="clear" size="small" onClick={handleCancelCreate}>
+                <IonIcon icon={close} />
+              </IonButton>
+            </div>
+            
+            <IonRow>
+              <IonCol size="6">
+                <IonItem className="form-item">
+                  <IonIcon icon={person} slot="start" color="primary" />
+                  <IonLabel position="floating">Nombre *</IonLabel>
+                  <IonInput
+                    value={newClient.first_name}
+                    onIonChange={(e) => setNewClient(prev => ({ ...prev, first_name: e.detail.value! }))}
+                    color={createErrors.first_name ? 'danger' : 'primary'}
+                    className="form-input"
+                  />
+                </IonItem>
+                {createErrors.first_name && (
+                  <IonText color="danger" className="error-text">
+                    {createErrors.first_name}
+                  </IonText>
+                )}
+              </IonCol>
+              <IonCol size="6">
+                <IonItem className="form-item">
+                  <IonIcon icon={person} slot="start" color="primary" />
+                  <IonLabel position="floating">Apellido *</IonLabel>
+                  <IonInput
+                    value={newClient.last_name}
+                    onIonChange={(e) => setNewClient(prev => ({ ...prev, last_name: e.detail.value! }))}
+                    color={createErrors.last_name ? 'danger' : 'primary'}
+                    className="form-input"
+                  />
+                </IonItem>
+                {createErrors.last_name && (
+                  <IonText color="danger" className="error-text">
+                    {createErrors.last_name}
+                  </IonText>
+                )}
+              </IonCol>
+            </IonRow>
+            
+            <IonRow>
+              <IonCol size="6">
+                <IonItem className="form-item">
+                  <IonIcon icon={call} slot="start" color="primary" />
+                  <IonLabel position="floating">Teléfono *</IonLabel>
+                  <IonInput
+                    value={newClient.cellphone}
+                    onIonChange={(e) => setNewClient(prev => ({ ...prev, cellphone: e.detail.value! }))}
+                    color={createErrors.cellphone ? 'danger' : 'primary'}
+                    className="form-input"
+                    type="tel"
+                  />
+                </IonItem>
+                {createErrors.cellphone && (
+                  <IonText color="danger" className="error-text">
+                    {createErrors.cellphone}
+                  </IonText>
+                )}
+              </IonCol>
+              <IonCol size="6">
+                <IonItem className="form-item">
+                  <IonIcon icon={mail} slot="start" color="primary" />
+                  <IonLabel position="floating">Email</IonLabel>
+                  <IonInput
+                    value={newClient.email}
+                    onIonChange={(e) => handleEmailChange(e.detail.value!)}
+                    color={createErrors.email.isValid ? (newClient.email ? 'success' : 'primary') : 'danger'}
+                    className="form-input"
+                  />
+                </IonItem>
+                {newClient.email && !createErrors.email.isValid && (
+                  <IonText color="danger" className="error-text">
+                    {createErrors.email.message}
+                  </IonText>
+                )}
+              </IonCol>
+            </IonRow>
+            
+            <div className="form-actions">
+              <IonButton 
+                fill="outline" 
+                onClick={handleCancelCreate}
+                disabled={isCreating}
+              >
+                Cancelar
+              </IonButton>
+              <IonButton 
+                fill="solid" 
+                color="success"
+                onClick={handleSaveClient}
+                disabled={!createIsValid || isCreating}
+              >
+                {isCreating ? (
+                  <IonLoading isOpen={true} message="Guardando..." />
+                ) : (
+                  <>
+                    <IonIcon icon={save} slot="start" />
+                    Guardar
+                  </>
+                )}
+              </IonButton>
+            </div>
+          </div>
+        )}
       </IonHeader>
 
       <IonContent className="client-selector-content">
@@ -166,6 +456,17 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                 ? 'No se encontraron clientes'
                 : 'No hay clientes disponibles'}
             </IonText>
+            {!searchText && !showCreateForm && (
+              <IonButton 
+                fill="solid" 
+                color="primary" 
+                onClick={() => setShowCreateForm(true)}
+                className="create-from-empty"
+              >
+                <IonIcon icon={add} slot="start" />
+                Crear nuevo cliente
+              </IonButton>
+            )}
           </div>
         ) : (
           <IonList className="client-list">
@@ -218,6 +519,15 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           Usar "Mostrador" (sin cliente)
         </IonButton>
       </IonFooter>
+
+      {/* Toast Notifications */}
+      <IonToast
+        isOpen={showToast}
+        onDidDismiss={() => setShowToast(false)}
+        message={toastMessage}
+        duration={2000}
+        color={toastColor}
+      />
     </IonModal>
   );
 };

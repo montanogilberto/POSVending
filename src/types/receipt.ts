@@ -40,6 +40,11 @@ export interface UnifiedProduct {
   unitPrice: number;
   subtotal: number;
   options?: ProductOption[];
+  pieces?: {
+    pantalones: number;
+    prendas: number;
+    otros: number;
+  };
 }
 
 export interface ProductOption {
