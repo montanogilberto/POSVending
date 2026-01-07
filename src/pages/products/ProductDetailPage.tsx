@@ -15,12 +15,19 @@ import {
   IonButton,
   IonAlert,
   IonCardSubtitle,
+  IonCard,
+  IonGrid,
+  IonRow,
+  IonCol,
+  IonInput,
+  IonText,
+  IonToast,
 } from '@ionic/react';
 
 import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
-import { Product } from '../../data/type_products';
+import { Product, Piezas } from '../../data/type_products';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -59,6 +66,19 @@ const ProductDetailPage: React.FC = () => {
     showAlertPopover: false,
     showMailPopover: false,
   });
+
+  // Pieces state for "Servicio Completo" product
+  const [pieces, setPieces] = useState<Piezas>({
+    pantalones: 0,
+    prendas: 0,
+    otros: 0,
+  });
+
+  const [showPiecesToast, setShowPiecesToast] = useState(false);
+  const [piecesToastMessage, setPiecesToastMessage] = useState('');
+
+  // Helper to check if product is "Servicio Completo"
+  const isServicioCompleto = product?.name?.toLowerCase().includes('servicio completo');
 
   const presentAlertPopover = (e: React.MouseEvent) =>
     setPopoverState(prev => ({ ...prev, showAlertPopover: true, event: e.nativeEvent }));
@@ -189,6 +209,16 @@ const ProductDetailPage: React.FC = () => {
       ...prev,
       [optionId]: isAll ? [] : [...allIds],
     }));
+  };
+
+  // Handler for pieces input changes
+  const handlePieceChange = (field: keyof Piezas, value: string) => {
+    const numValue = parseInt(value, 10);
+    if (isNaN(numValue) || numValue < 0) {
+      // Don't update if invalid or negative
+      return;
+    }
+    setPieces(prev => ({ ...prev, [field]: numValue }));
   };
 
   // ---- Option price calculation ----
@@ -354,6 +384,12 @@ const ProductDetailPage: React.FC = () => {
       }
     });
 
+    // Add pieces label for "Servicio Completo" product
+    if (isServicioCompleto) {
+      const piecesLabel = `Piezas: Pantalones ${pieces.pantalones}, Prendas ${pieces.prendas}, Otros ${pieces.otros}`;
+      selectedOptionLabels['Piezas'] = piecesLabel;
+    }
+
     addToCart({
       id: String(product.productId),
       productId: String(product.productId),
@@ -363,6 +399,7 @@ const ProductDetailPage: React.FC = () => {
       selectedOptions,
       selectedOptionLabels,
       selectedChoices,
+      pieces: isServicioCompleto ? pieces : undefined,
     });
 
     history.push('/cart');
@@ -459,7 +496,7 @@ const ProductDetailPage: React.FC = () => {
                               {choice.name} (+${choice.price})
                             </IonLabel>
 
-                            {/* ✅ Quantity select for this checkbox option */}
+                            {/* Quantity select for this checkbox option */}
                             <IonSelect
                               value={qty}
                               disabled={!checked}
@@ -520,7 +557,72 @@ const ProductDetailPage: React.FC = () => {
                 </IonList>
               ))}
 
- 
+              {/* Piezas section for "Servicio Completo" product */}
+              {isServicioCompleto && (
+                <IonCard className="piezas-card">
+                  <IonCardHeader>
+                    <IonCardTitle className="piezas-title">Piezas</IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    <IonGrid>
+                      {/* Header row */}
+                      <IonRow className="piezas-header-row">
+                        <IonCol className="piezas-col-header">
+                          <IonText className="piezas-header-text">Pantalones</IonText>
+                        </IonCol>
+                        <IonCol className="piezas-col-header">
+                          <IonText className="piezas-header-text">Prendas</IonText>
+                        </IonCol>
+                        <IonCol className="piezas-col-header">
+                          <IonText className="piezas-header-text">Otros</IonText>
+                        </IonCol>
+                      </IonRow>
+                      {/* Values row */}
+                      <IonRow className="piezas-values-row">
+                        <IonCol className="piezas-col-input">
+                          <IonInput
+                            type="number"
+                            inputmode="numeric"
+                            value={String(pieces.pantalones)}
+                            placeholder="0"
+                            min="0"
+                            step="1"
+                            onIonChange={(e: any) => handlePieceChange('pantalones', e.detail.value || '0')}
+                            className="piezas-input"
+                          />
+                        </IonCol>
+                        <IonCol className="piezas-col-input">
+                          <IonInput
+                            type="number"
+                            inputmode="numeric"
+                            value={String(pieces.prendas)}
+                            placeholder="0"
+                            min="0"
+                            step="1"
+                            onIonChange={(e: any) => handlePieceChange('prendas', e.detail.value || '0')}
+                            className="piezas-input"
+                          />
+                        </IonCol>
+                        <IonCol className="piezas-col-input">
+                          <IonInput
+                            type="number"
+                            inputmode="numeric"
+                            value={String(pieces.otros)}
+                            placeholder="0"
+                            min="0"
+                            step="1"
+                            onIonChange={(e: any) => handlePieceChange('otros', e.detail.value || '0')}
+                            className="piezas-input"
+                          />
+                        </IonCol>
+                      </IonRow>
+                    </IonGrid>
+                    <IonText className="piezas-total">
+                      Total piezas: {pieces.pantalones + pieces.prendas + pieces.otros}
+                    </IonText>
+                  </IonCardContent>
+                </IonCard>
+              )}
 
               <IonButton expand="block" onClick={handleAddToCart}>
                 Agregar al carrito
@@ -536,6 +638,16 @@ const ProductDetailPage: React.FC = () => {
           message={missingMessage}
           buttons={['OK']}
           translucent={true}
+        />
+
+        <IonToast
+          isOpen={showPiecesToast}
+          onDidDismiss={() => setShowPiecesToast(false)}
+          message={piecesToastMessage}
+          color="warning"
+          position="bottom"
+          duration={3000}
+          buttons={[{ text: 'OK', role: 'cancel' }]}
         />
       </IonContent>
 
@@ -554,3 +666,4 @@ const ProductDetailPage: React.FC = () => {
 };
 
 export default ProductDetailPage;
+

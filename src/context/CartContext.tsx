@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { Piezas } from '../data/type_products';
 
 export interface CartItem {
   id: string;
@@ -9,6 +10,7 @@ export interface CartItem {
   selectedOptions: { [optionId: string]: any };
   selectedOptionLabels?: { [optionId: string]: any };
   selectedChoices: { [key: number]: { id: number; name: string; price: number; quantity: number }[] };
+  pieces?: Piezas; // For "Servicio Completo" product
 }
 
 interface CartContextType {

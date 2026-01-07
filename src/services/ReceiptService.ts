@@ -145,7 +145,8 @@ export class ReceiptService {
         quantity: quantity,
         unitPrice: unitPrice,
         subtotal: subtotal,
-        options: product.selectedOptions ? this.parseSelectedOptions(product.selectedOptions) : undefined
+        options: product.selectedOptions ? this.parseSelectedOptions(product.selectedOptions) : undefined,
+        pieces: product.pieces
       };
     });
 
@@ -354,6 +355,13 @@ export class ReceiptService {
     margin-bottom: ${isUltraCompact ? '0px' : '2px'};
   }
 
+  .product-pieces {
+    font-size: ${smallFontSize};
+    margin-left: 10px;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+    font-style: italic;
+  }
+
   .receipt-totals {
     border-top: ${borderStyle} #000;
     border-bottom: ${borderStyle} #000;
@@ -466,12 +474,18 @@ export class ReceiptService {
         ? product.options.map(opt => `${opt.name}: ${opt.choices.map(c => c.name).join(', ')}`).join('; ')
         : '';
       
+      // Generate pieces text for "Servicio Completo" products
+      const piecesText = product.pieces 
+        ? `Piezas: Pantalones ${product.pieces.pantalones}, Prendas ${product.pieces.prendas}, Otros ${product.pieces.otros}`
+        : '';
+      
       return `
       <div class="product-row">
         <div class="product-name">${product.quantity}x ${product.name}</div>
         <div class="product-price">$${product.subtotal.toFixed(2)}</div>
       </div>
-      ${optionsText && !isUltraCompact ? `<div class="product-options">${optionsText}</div>` : ''}`;
+      ${optionsText && !isUltraCompact ? `<div class="product-options">${optionsText}</div>` : ''}
+      ${piecesText && !isUltraCompact ? `<div class="product-pieces">${piecesText}</div>` : ''}`;
     }).join('');
 
     return `

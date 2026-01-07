@@ -121,6 +121,28 @@
   margin: 1px 0;
 }
 
+.product-pieces {
+  font-size: 12px;
+  color: #495057;
+  font-style: italic;
+  margin-top: 4px;
+  background: #f1f3f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border-left: 3px solid #667eea;
+}
+
+.pieces-label {
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 2px;
+}
+
+.pieces-values {
+  font-size: 11px;
+  color: #495057;
+}
+
 .col-product,
 .col-qty,
 .col-price,
@@ -271,6 +293,15 @@
   .product-options {
     font-size: 10px;
   }
+  
+  .product-pieces {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+  
+  .pieces-values {
+    font-size: 10px;
+  }
 }
 
 /* Print Styles */
@@ -349,6 +380,20 @@
   .footer-section {
     background: #2d3e50;
     border-color: #4a5f7a;
+  }
+  
+  .product-pieces {
+    background: #2d2d2d;
+    border-left-color: #9b59b6;
+    color: #ffffff;
+  }
+  
+  .pieces-label {
+    color: #9b59b6;
+  }
+  
+  .pieces-values {
+    color: #bdc3c7;
   }
 }
 

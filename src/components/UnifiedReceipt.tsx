@@ -138,6 +138,14 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
                         ))}
                       </div>
                     )}
+                    {product.pieces && (
+                      <div className="product-pieces">
+                        <div className="pieces-label">Piezas:</div>
+                        <div className="pieces-values">
+                          Pantalones: {product.pieces.pantalones}, Prendas: {product.pieces.prendas}, Otros: {product.pieces.otros}
+                        </div>
+                      </div>
+                    )}
                   </IonCol>
                   <IonCol size="2" className="col-qty">{product.quantity}</IonCol>
                   <IonCol size="3" className="col-price">${product.unitPrice.toFixed(2)}</IonCol>
