@@ -28,13 +28,38 @@ export class ReceiptService {
     });
 
     // Convert Ticket products to LegacyProduct format
-    const legacyProducts: any[] = ticket.products.map((product: any) => ({
-      name: product.name,
-      quantity: product.quantity,
-      unitPrice: product.unitPrice,
-      subtotal: product.subtotal,
-      options: product.options?.map((option: any) => option.choiceName) || []
-    }));
+    const legacyProducts: any[] = ticket.products.map((product: any) => {
+      // Calculate quantity if not provided by API
+      const unitPrice = product.unitPrice || 0;
+      const subtotal = product.subtotal || 0;
+      const quantity = product.quantity || (unitPrice > 0 ? Math.round(subtotal / unitPrice) : 1);
+
+      // Handle both old format (options as array of choiceNames) and new format (options with nested choices)
+      let options: string[] = [];
+      if (product.options && Array.isArray(product.options)) {
+        // New format: options with nested choices structure
+        if (product.options[0]?.choices) {
+          product.options.forEach((option: any) => {
+            if (option.choices && Array.isArray(option.choices)) {
+              option.choices.forEach((choice: any) => {
+                options.push(choice.name);
+              });
+            }
+          });
+        } else {
+          // Old format: options as array of choice names
+          options = product.options.map((option: any) => option.choiceName || option);
+        }
+      }
+
+      return {
+        name: product.name,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        subtotal: subtotal,
+        options: options
+      };
+    });
 
     return {
       transactionDate,

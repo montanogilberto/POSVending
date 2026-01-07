@@ -17,10 +17,12 @@ export interface IncomePayload {
       quantity: number;
       options: Array<{
         productOptionId: number;
-        productOptionChoiceId: number;
-        choiceName: string;
-        price: number;
-        quantity: number;
+        choices: Array<{
+          productOptionChoiceId: number;
+          name: string;
+          price: number;
+          quantity: number;
+        }>;
       }>;
     }>;
   }>;

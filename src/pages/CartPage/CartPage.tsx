@@ -11,8 +11,10 @@ import {
   IonButton,
   IonIcon,
   IonLoading,
+  IonLabel,
+  IonChip,
 } from '@ionic/react';
-import { addCircle, card, wallet, business, receipt, cart } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
 import { useProduct } from '../../context/ProductContext';
 import { useState, useEffect } from 'react';
@@ -22,11 +24,13 @@ import useInactivityTimer from '../../hooks/useInactivityTimer';
 import { fetchTicket } from '../../api/ticketApi';
 import { postIncome } from '../../api/incomeApi';
 import { useIncome } from '../../context/IncomeContext';
+import { Client } from '../../api/clientsApi';
 
 import '../../styles/dashboard.css';
 import './CartPage.css';
 
 import CartItemCard from '../../components/CartItemCard';
+import ClientSelector from '../../components/ClientSelector';
 import ReceiptDisplay from '../Receipt/ReceiptDisplay';
 
 const CartPage: React.FC = () => {
@@ -45,9 +49,11 @@ const CartPage: React.FC = () => {
   const [ticketData, setTicketData] = useState<any>(null);
   const [lastIncomeId, setLastIncomeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [showClientSelector, setShowClientSelector] = useState(false);
 
-  // Calculate total
-  const total = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  // Calculate total - item.price already includes option prices with quantity factored in
+  const total = cartItems.reduce((acc, item) => acc + item.price, 0);
   const cashNumber = parseFloat(cashPaid);
 
   const isCheckoutEnabled =
@@ -112,8 +118,8 @@ const CartPage: React.FC = () => {
           orderNumber: Math.floor(Math.random() * 10000),
           tableNumber: 5,
           userId: 1,
-          total: item.price * item.quantity,
-          clientId: 1,
+          total: item.price, // item.price already includes quantity
+          clientId: selectedClient?.clientId ?? 1,
           comments: '',
           selections: selections,
         };
@@ -126,35 +132,42 @@ const CartPage: React.FC = () => {
       if (response.ok) {
         try {
           const products = cartItems.map((item) => {
-            const flatOptions: Array<{
-              productOptionId: number;
-              optionName?: string;
+            // Group choices by productOptionId
+            const optionsByOptionId: { [optionId: number]: Array<{
               productOptionChoiceId: number;
-              choiceName: string;
+              name: string;
               price: number;
               quantity: number;
-            }> = [];
+            }> } = {};
 
             Object.entries(item.selectedChoices).forEach(([optionId, choices]) => {
               const optId = parseInt(optionId);
               choices.forEach((choice) => {
-                flatOptions.push({
-                  productOptionId: optId,
+                if (!optionsByOptionId[optId]) {
+                  optionsByOptionId[optId] = [];
+                }
+                optionsByOptionId[optId].push({
                   productOptionChoiceId: choice.id,
-                  choiceName: choice.name,
+                  name: choice.name,
                   price: choice.price,
                   quantity: choice.quantity,
                 });
               });
             });
 
+            // Build the new nested structure
+            const productOptions = Object.entries(optionsByOptionId).map(([productOptionId, choices]) => ({
+              productOptionId: parseInt(productOptionId),
+              choices: choices,
+            }));
+
             return {
               productId: parseInt(item.productId),
               name: item.name,
-              unitPrice: item.price,
-              subtotal: item.price * item.quantity,
+              unitPrice: item.price / item.quantity, // Derive unit price from total
+              subtotal: item.price, // item.price already includes quantity
               quantity: item.quantity,
-              options: flatOptions,
+              options: productOptions,
             };
           });
 
@@ -166,7 +179,7 @@ const CartPage: React.FC = () => {
                 paymentMethod: paymentMethod,
                 paymentDate: new Date().toISOString(),
                 userId: 1,
-                clientId: 1,
+                clientId: selectedClient?.clientId ?? 1,
                 companyId: 1,
                 products: products,
               },
@@ -263,8 +276,8 @@ const CartPage: React.FC = () => {
                         id={item.id}
                         name={item.name}
                         quantity={item.quantity}
-                        unitPrice={item.price}
-                        totalPrice={item.price * item.quantity}
+                        unitPrice={item.price / item.quantity}
+                        totalPrice={item.price}
                         selectedChoices={item.selectedChoices}
                         onRemove={removeFromCart}
                       />
@@ -278,6 +291,39 @@ const CartPage: React.FC = () => {
                   <div className="cart-total-section">
                     <span className="cart-total-label">Total</span>
                     <span className="cart-total-amount">{formatPrice(total)}</span>
+                  </div>
+
+                  {/* Client Selector */}
+                  <div className="client-section">
+                    <div className="client-label">CLIENTE</div>
+                    <div className="client-row">
+                      <div className="client-info">
+                        {selectedClient ? (
+                          <>
+                            <div className="client-name">
+                              {selectedClient.first_name} {selectedClient.last_name}
+                            </div>
+                            <div className="client-contact">
+                              {selectedClient.cellphone}
+                              {selectedClient.email && ` • ${selectedClient.email}`}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="client-name">Mostrador / Desconocido</div>
+                            <div className="client-contact">Sin cliente seleccionado</div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <IonButton
+                      fill="outline"
+                      onClick={() => setShowClientSelector(true)}
+                      className="client-change-btn"
+                    >
+                      <IonIcon icon={person} slot="start" />
+                      Cambiar cliente
+                    </IonButton>
                   </div>
 
                   {/* Payment Method */}
@@ -413,6 +459,14 @@ const CartPage: React.FC = () => {
         )}
 
         <IonLoading isOpen={loading} message="Procesando..." />
+
+        {/* Client Selector Modal */}
+        <ClientSelector
+          isOpen={showClientSelector}
+          onClose={() => setShowClientSelector(false)}
+          onChange={setSelectedClient}
+          selectedClient={selectedClient}
+        />
       </IonContent>
     </IonPage>
   );
