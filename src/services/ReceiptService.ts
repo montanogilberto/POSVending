@@ -274,14 +274,14 @@ export class ReceiptService {
 
   // Generate CSS styles for printing
   private static generatePrintStyles(width: string, isThermal: boolean, isUltraCompact: boolean): string {
-    // Define sizes based on width mode
-    const baseFontSize = isUltraCompact ? '6px' : (isThermal ? '9px' : '12px');
-    const smallFontSize = isUltraCompact ? '5px' : (isThermal ? '7px' : '10px');
-    const titleFontSize = isUltraCompact ? '10px' : (isThermal ? '14px' : '18px');
-    const totalFontSize = isUltraCompact ? '9px' : (isThermal ? '11px' : '14px');
+    // Define sizes based on width mode - IMPROVED: larger fonts, tighter spacing
+    const baseFontSize = isUltraCompact ? '8px' : (isThermal ? '9px' : '12px');
+    const smallFontSize = isUltraCompact ? '7px' : (isThermal ? '7px' : '10px');
+    const titleFontSize = isUltraCompact ? '12px' : (isThermal ? '14px' : '18px');
+    const totalFontSize = isUltraCompact ? '11px' : (isThermal ? '11px' : '14px');
     const padding = isUltraCompact ? '1px' : (isThermal ? '2mm' : '10px');
-    const margin = isUltraCompact ? '1px' : (isThermal ? '3px' : '10px');
-    const lineHeight = isUltraCompact ? '1.0' : '1.1';
+    const margin = isUltraCompact ? '0px' : (isThermal ? '3px' : '10px');
+    const lineHeight = isUltraCompact ? '0.9' : '1.1';
     const borderStyle = isUltraCompact ? 'none' : (isThermal ? '1px dashed' : '2px solid');
     
     return `
@@ -516,16 +516,12 @@ export class ReceiptService {
     const clientName = this.formatClientName(data.client.name);
     
     if (isUltraCompact) {
-      // Compact format with all essential info
+      // IMPROVED: Compact format - combined Fecha+Hora, tighter spacing
       return `
     <div class="receipt-section">
       <div class="receipt-row">
         <span class="receipt-label">Fecha:</span>
-        <span class="receipt-value">${data.date}</span>
-      </div>
-      <div class="receipt-row">
-        <span class="receipt-label">Hora:</span>
-        <span class="receipt-value">${data.time}</span>
+        <span class="receipt-value">${data.date} ${data.time}</span>
       </div>
       <div class="receipt-row">
         <span class="receipt-label">Cliente:</span>
@@ -543,11 +539,7 @@ export class ReceiptService {
     <div class="receipt-section">
       <div class="receipt-row">
         <span class="receipt-label">Fecha:</span>
-        <span class="receipt-value">${data.date}</span>
-      </div>
-      <div class="receipt-row">
-        <span class="receipt-label">Hora:</span>
-        <span class="receipt-value">${data.time}</span>
+        <span class="receipt-value">${data.date} ${data.time}</span>
       </div>
       <div class="receipt-row">
         <span class="receipt-label">Cliente:</span>
@@ -577,18 +569,18 @@ export class ReceiptService {
       
       // Generate pieces text for "Servicio Completo" products
       const piecesText = product.pieces 
-        ? `Piezas: Pantalones ${product.pieces.pantalones}, Prendas ${product.pieces.prendas}, Otros ${product.pieces.otros}`
+        ? `Piezas: P:${product.pieces.pantalones} Pr:${product.pieces.prendas} O:${product.pieces.otros}`
         : '';
       
       if (isUltraCompact) {
-        // Compact format - show product name, quantity, ciclo, and total
+        // IMPROVED: Ultra-compact single-line product format
+        let productLine = `${product.quantity}x ${product.name}`;
+        if (ciclo) productLine += ` (${ciclo})`;
         return `
       <div class="product-row">
-        <div class="product-name">${product.name}</div>
+        <div class="product-name">${productLine}</div>
         <div class="product-price">$${product.subtotal.toFixed(2)}</div>
-      </div>
-      ${ciclo ? `<div class="product-ciclo">Ciclo: ${ciclo}</div>` : ''}
-      <div class="product-quantity">Cantidad: ${product.quantity}</div>`;
+      </div>`;
       }
       
       // Full format with:
@@ -662,14 +654,14 @@ export class ReceiptService {
     const paymentMethodText = this.getPaymentMethodText(data.payment.method);
     
     if (isUltraCompact) {
-      // Compact format with payment details
-      return `
+      // IMPROVED: Compact format - combine payment fields
+      if (data.payment.method === 'efectivo') {
+        return `
     <div class="receipt-section payment-section">
       <div class="receipt-row">
         <span class="receipt-label">Pago:</span>
         <span class="receipt-value">${paymentMethodText}</span>
       </div>
-      ${data.payment.method === 'efectivo' ? `
       <div class="receipt-row">
         <span class="receipt-label">Recibido:</span>
         <span class="receipt-value">$${data.payment.amountReceived.toFixed(2)}</span>
@@ -677,7 +669,16 @@ export class ReceiptService {
       <div class="receipt-row">
         <span class="receipt-label">Cambio:</span>
         <span class="receipt-value">$${data.payment.change.toFixed(2)}</span>
-      </div>` : ''}
+      </div>
+    </div>
+    <div class="section-divider"></div>`;
+      }
+      return `
+    <div class="receipt-section payment-section">
+      <div class="receipt-row">
+        <span class="receipt-label">Pago:</span>
+        <span class="receipt-value">${paymentMethodText}</span>
+      </div>
     </div>
     <div class="section-divider"></div>`;
     }
@@ -702,13 +703,12 @@ export class ReceiptService {
   // Generate footer
   private static generateFooter(data: UnifiedReceiptData, isUltraCompact: boolean): string {
     if (isUltraCompact) {
-      // Compact footer with essential info
+      // IMPROVED: Ultra-compact footer - minimal info
       return `
     <div class="receipt-footer">
-      <div>¡Gracias por tu ${data.type === 'income' ? 'compra' : 'pago'}!</div>
-      <div>${data.company.website}</div>
+      <div>¡Gracias!</div>
       <div class="company-info">${data.company.name}</div>
-      <div class="section-divider"></div>
+      <div>${data.company.website}</div>
       <div class="template-id">TEMPLATE_ID: GMO-46MM-FIT-v5</div>
     </div>`;
     }
