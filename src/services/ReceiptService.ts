@@ -11,11 +11,54 @@ import { Ticket } from '../api/ticketApi';
 
 export class ReceiptService {
   private static readonly COMPANY_INFO = {
-    name: 'POS GMO',
+    name: 'Lavanderia GMO',
     rfc: 'XXX123456XXX',
-    address: 'Codorniz 1B Gavilan, Musaro, Nuevo Hermosillo, CP. 83296 ',
-    website: 'www.posgmo.com'
+    address: 'Codorniz 1B Gavilan, Musaro, Nuevo Hermosillo, CP. 83296',
+    website: 'https://www.gmolavanderia.com'
   };
+
+  // Format client name for display - shows truncated form for "Desconocido"
+  private static formatClientName(name: string): string {
+    if (!name) return 'Desconocido -…';
+    const lowerName = name.toLowerCase().trim();
+    if (lowerName === 'desconocido' || 
+        lowerName === 'mostrador' || 
+        lowerName === 'mostrador / desconocido' ||
+        lowerName.includes('desconocido')) {
+      return 'Desconocido -…';
+    }
+    return name;
+  }
+
+  // Extract Ciclo value from product options
+  private static extractCiclo(options: any[]): string | null {
+    if (!options || !Array.isArray(options)) return null;
+    
+    for (const option of options) {
+      // Check for "Ciclo" in option name
+      if (option.name && option.name.toLowerCase().includes('ciclo')) {
+        // Get the choice name
+        if (option.choices && Array.isArray(option.choices) && option.choices.length > 0) {
+          return option.choices[0].name;
+        }
+        if (option.choiceName) {
+          return option.choiceName;
+        }
+      }
+      // Also check in choices for ciclo
+      if (option.choices) {
+        for (const choice of option.choices) {
+          if (choice.name && (choice.name.toLowerCase().includes('carga alta') || 
+                             choice.name.toLowerCase().includes('basico') ||
+                             choice.name.toLowerCase().includes('carga baja') ||
+                             choice.name.toLowerCase().includes('medio'))) {
+            return choice.name;
+          }
+        }
+      }
+    }
+    return null;
+  }
 
   // Adapter function to convert Ticket to LegacyIncomeData format
   static adaptTicketToLegacyIncome(ticket: Ticket): LegacyIncomeData {
@@ -362,6 +405,25 @@ export class ReceiptService {
     font-style: italic;
   }
 
+  .product-quantity {
+    font-size: ${baseFontSize};
+    margin-left: 10px;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+  }
+
+  .product-ciclo {
+    font-size: ${baseFontSize};
+    margin-left: 10px;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+    font-weight: bold;
+  }
+
+  .payment-section {
+    border-top: ${borderStyle} #000;
+    padding-top: ${isUltraCompact ? '1px' : '5px'};
+    margin-top: ${margin};
+  }
+
   .receipt-totals {
     border-top: ${borderStyle} #000;
     border-bottom: ${borderStyle} #000;
@@ -403,6 +465,24 @@ export class ReceiptService {
     margin-top: ${isUltraCompact ? '1px' : '3px'};
   }
 
+  .template-id {
+    font-size: ${smallFontSize};
+    font-weight: bold;
+    margin-top: ${isUltraCompact ? '1px' : '3px'};
+    text-align: center;
+  }
+
+  .section-divider {
+    border-top: 1px dashed #000;
+    margin: ${isUltraCompact ? '1px' : '5px'} 0;
+  }
+
+  .section-divider-short {
+    border-top: 1px dashed #000;
+    margin: ${isUltraCompact ? '1px' : '3px'} auto;
+    width: 50%;
+  }
+
   @page {
     size: ${width} auto;
     margin: 0;
@@ -426,24 +506,37 @@ export class ReceiptService {
     <div class="receipt-title">${data.company.name}</div>
     ${!isUltraCompact ? `
     <div class="receipt-subtitle">
-      RECIBO - ${data.type === 'income' ? 'INGRESO' : 'EGRESO'}
-    </div>` : ''}`;
+      RECIBO
+    </div>
+    <div class="section-divider"></div>` : ''}`;
   }
 
   // Generate client and user info
   private static generateClientInfo(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    const clientName = this.formatClientName(data.client.name);
+    
     if (isUltraCompact) {
+      // Compact format with all essential info
       return `
     <div class="receipt-section">
       <div class="receipt-row">
-        <span>${data.date}</span>
-        <span>${data.time}</span>
+        <span class="receipt-label">Fecha:</span>
+        <span class="receipt-value">${data.date}</span>
       </div>
       <div class="receipt-row">
-        <span>${data.client.name}</span>
-        <span>$${data.totals.total.toFixed(2)}</span>
+        <span class="receipt-label">Hora:</span>
+        <span class="receipt-value">${data.time}</span>
       </div>
-    </div>`;
+      <div class="receipt-row">
+        <span class="receipt-label">Cliente:</span>
+        <span class="receipt-value">${clientName}</span>
+      </div>
+      <div class="receipt-row">
+        <span class="receipt-label">Usuario:</span>
+        <span class="receipt-value">${data.user.name}</span>
+      </div>
+    </div>
+    <div class="section-divider"></div>`;
     }
     
     return `
@@ -458,20 +551,28 @@ export class ReceiptService {
       </div>
       <div class="receipt-row">
         <span class="receipt-label">Cliente:</span>
-        <span class="receipt-value">${data.client.name}</span>
+        <span class="receipt-value">${clientName}</span>
       </div>
       <div class="receipt-row">
         <span class="receipt-label">Usuario:</span>
         <span class="receipt-value">${data.user.name}</span>
       </div>
-    </div>`;
+    </div>
+    <div class="section-divider"></div>`;
   }
 
   // Generate products section
   private static generateProducts(data: UnifiedReceiptData, isUltraCompact: boolean): string {
     const productRows = data.products.map(product => {
+      // Extract Ciclo from options
+      const ciclo = product.options ? this.extractCiclo(product.options) : null;
+      
+      // Build options text (excluding Ciclo which is shown separately)
       const optionsText = product.options && product.options.length > 0 
-        ? product.options.map(opt => `${opt.name}: ${opt.choices.map(c => c.name).join(', ')}`).join('; ')
+        ? product.options
+            .filter(opt => !opt.name?.toLowerCase().includes('ciclo'))
+            .map(opt => `${opt.name}: ${opt.choices.map(c => c.name).join(', ')}`)
+            .join('; ')
         : '';
       
       // Generate pieces text for "Servicio Completo" products
@@ -479,25 +580,48 @@ export class ReceiptService {
         ? `Piezas: Pantalones ${product.pieces.pantalones}, Prendas ${product.pieces.prendas}, Otros ${product.pieces.otros}`
         : '';
       
-      return `
+      if (isUltraCompact) {
+        // Compact format - show product name, quantity, ciclo, and total
+        return `
       <div class="product-row">
-        <div class="product-name">${product.quantity}x ${product.name}</div>
+        <div class="product-name">${product.name}</div>
         <div class="product-price">$${product.subtotal.toFixed(2)}</div>
       </div>
-      ${optionsText && !isUltraCompact ? `<div class="product-options">${optionsText}</div>` : ''}
-      ${piecesText && !isUltraCompact ? `<div class="product-pieces">${piecesText}</div>` : ''}`;
+      ${ciclo ? `<div class="product-ciclo">Ciclo: ${ciclo}</div>` : ''}
+      <div class="product-quantity">Cantidad: ${product.quantity}</div>`;
+      }
+      
+      // Full format with:
+      // - Product name on its own line
+      // - "Cantidad: 1 × $0.00 = $180.00" format
+      // - "Ciclo: Carga Alta" displayed after the product
+      return `
+      <div class="product-name">${product.name}</div>
+      <div class="product-quantity">Cantidad: ${product.quantity} × $${product.unitPrice.toFixed(2)} = $${product.subtotal.toFixed(2)}</div>
+      ${ciclo ? `<div class="product-ciclo">Ciclo: ${ciclo}</div>` : ''}
+      ${optionsText ? `<div class="product-options">${optionsText}</div>` : ''}
+      ${piecesText ? `<div class="product-pieces">${piecesText}</div>` : ''}`;
     }).join('');
 
-    return `
+    if (isUltraCompact) {
+      return `
+    <div class="section-divider"></div>
     <div class="receipt-products">
-      ${!isUltraCompact ? `
+      ${productRows}
+    </div>`;
+    }
+
+    return `
+    <div class="section-divider"></div>
+    <div class="receipt-products">
       <div class="product-header">
         <div class="product-header-name">Producto</div>
         <div class="product-header-qty">Cant</div>
         <div class="product-header-price">Total</div>
-      </div>` : ''}
+      </div>
       ${productRows}
-    </div>`;
+    </div>
+    <div class="section-divider"></div>`;
   }
 
   // Generate totals section
@@ -509,10 +633,12 @@ export class ReceiptService {
         <span>TOTAL:</span>
         <span>$${data.totals.total.toFixed(2)}</span>
       </div>
-    </div>`;
+    </div>
+    <div class="section-divider"></div>`;
     }
     
     return `
+    <div class="section-divider"></div>
     <div class="receipt-section receipt-totals">
       <div class="total-row">
         <span>Subtotal:</span>
@@ -522,11 +648,13 @@ export class ReceiptService {
         <span>IVA:</span>
         <span>$${data.totals.iva.toFixed(2)}</span>
       </div>
+      <div class="section-divider"></div>
       <div class="total-row grand-total">
         <span>TOTAL:</span>
         <span>$${data.totals.total.toFixed(2)}</span>
       </div>
-    </div>`;
+    </div>
+    <div class="section-divider"></div>`;
   }
 
   // Generate payment information
@@ -534,18 +662,29 @@ export class ReceiptService {
     const paymentMethodText = this.getPaymentMethodText(data.payment.method);
     
     if (isUltraCompact) {
+      // Compact format with payment details
       return `
-    <div class="receipt-section">
+    <div class="receipt-section payment-section">
       <div class="receipt-row">
-        <span>${paymentMethodText}</span>
-        ${data.payment.method === 'efectivo' ? `
-        <span>Cambio: $${data.payment.change.toFixed(2)}</span>` : ''}
+        <span class="receipt-label">Pago:</span>
+        <span class="receipt-value">${paymentMethodText}</span>
       </div>
-    </div>`;
+      ${data.payment.method === 'efectivo' ? `
+      <div class="receipt-row">
+        <span class="receipt-label">Recibido:</span>
+        <span class="receipt-value">$${data.payment.amountReceived.toFixed(2)}</span>
+      </div>
+      <div class="receipt-row">
+        <span class="receipt-label">Cambio:</span>
+        <span class="receipt-value">$${data.payment.change.toFixed(2)}</span>
+      </div>` : ''}
+    </div>
+    <div class="section-divider"></div>`;
     }
     
     return `
     <div class="receipt-section">
+      <div class="section-divider"></div>
       <div class="payment-method">Pago: ${paymentMethodText}</div>
       ${data.payment.method === 'efectivo' ? `
       <div class="receipt-row">
@@ -556,26 +695,35 @@ export class ReceiptService {
         <span class="receipt-label">Cambio:</span>
         <span class="receipt-value">$${data.payment.change.toFixed(2)}</span>
       </div>` : ''}
+      <div class="section-divider"></div>
     </div>`;
   }
 
   // Generate footer
   private static generateFooter(data: UnifiedReceiptData, isUltraCompact: boolean): string {
     if (isUltraCompact) {
+      // Compact footer with essential info
       return `
     <div class="receipt-footer">
-      ¡Gracias!
+      <div>¡Gracias por tu ${data.type === 'income' ? 'compra' : 'pago'}!</div>
+      <div>${data.company.website}</div>
+      <div class="company-info">${data.company.name}</div>
+      <div class="section-divider"></div>
+      <div class="template-id">TEMPLATE_ID: GMO-46MM-FIT-v5</div>
     </div>`;
     }
     
     return `
     <div class="receipt-footer">
-      ¡Gracias por su ${data.type === 'income' ? 'compra' : 'pago'}!<br/>
+      <div class="section-divider"></div>
+      ¡Gracias por tu ${data.type === 'income' ? 'compra' : 'pago'}!<br/>
       ${data.company.website}<br/>
       <div class="company-info">
         ${data.company.name} - RFC: ${data.company.rfc}<br/>
         ${data.company.address}
       </div>
+      <div class="section-divider"></div>
+      <div class="template-id">TEMPLATE_ID: GMO-46MM-FIT-v5</div>
     </div>`;
   }
 

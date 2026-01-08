@@ -24,6 +24,49 @@ import { UnifiedReceiptData, PrintOptions } from '../types/receipt';
 import { ReceiptService } from '../services/ReceiptService';
 import './UnifiedReceipt.css';
 
+// Format client name for display - shows truncated form for "Desconocido"
+const formatClientName = (name: string): string => {
+  if (!name) return 'Desconocido -…';
+  const lowerName = name.toLowerCase().trim();
+  if (lowerName === 'desconocido' || 
+      lowerName === 'mostrador' || 
+      lowerName === 'mostrador / desconocido' ||
+      lowerName.includes('desconocido')) {
+    return 'Desconocido -…';
+  }
+  return name;
+};
+
+// Extract Ciclo value from product options
+const extractCiclo = (options: any[]): string | null => {
+  if (!options || !Array.isArray(options)) return null;
+  
+  for (const option of options) {
+    // Check for "Ciclo" in option name
+    if (option.name && option.name.toLowerCase().includes('ciclo')) {
+      // Get the choice name
+      if (option.choices && Array.isArray(option.choices) && option.choices.length > 0) {
+        return option.choices[0].name;
+      }
+      if (option.choiceName) {
+        return option.choiceName;
+      }
+    }
+    // Also check in choices for ciclo
+    if (option.choices) {
+      for (const choice of option.choices) {
+        if (choice.name && (choice.name.toLowerCase().includes('carga alta') || 
+                           choice.name.toLowerCase().includes('basico') ||
+                           choice.name.toLowerCase().includes('carga baja') ||
+                           choice.name.toLowerCase().includes('medio'))) {
+          return choice.name;
+        }
+      }
+    }
+  }
+  return null;
+};
+
 interface UnifiedReceiptProps {
   data: UnifiedReceiptData;
   onPrint?: () => void;
@@ -97,7 +140,7 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
           <IonLabel>
             <IonText className="section-title">Cliente y Usuario</IonText>
             <p className="receipt-field">
-              <strong>Cliente:</strong> {data.client.name}
+              <strong>Cliente:</strong> {formatClientName(data.client.name)}
             </p>
             <p className="receipt-field">
               <strong>Teléfono:</strong> {data.client.phone}
@@ -125,33 +168,50 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
               </IonRow>
               
               {/* Products */}
-              {data.products.map((product, index) => (
-                <IonRow key={index} className="product-row">
-                  <IonCol size="4" className="col-product">
-                    <div className="product-name">{product.name}</div>
-                    {product.options && product.options.length > 0 && (
-                      <div className="product-options">
-                        {product.options.map((option, optIndex) => (
-                          <div key={optIndex} className="option-text">
-                            {option.name}: {option.choices.map(c => c.name).join(', ')}
-                          </div>
-                        ))}
+              {data.products.map((product, index) => {
+                // Extract Ciclo from options
+                const ciclo = product.options ? extractCiclo(product.options) : null;
+                
+                // Build options text (excluding Ciclo which is shown separately)
+                const optionsText = product.options && product.options.length > 0 
+                  ? product.options
+                      .filter(opt => !opt.name?.toLowerCase().includes('ciclo'))
+                      .map(opt => `${opt.name}: ${opt.choices.map(c => c.name).join(', ')}`)
+                      .join('; ')
+                  : '';
+                
+                return (
+                  <IonRow key={index} className="product-row">
+                    <IonCol size="12" className="col-product">
+                      <div className="product-name">{product.name}</div>
+                      <div className="product-quantity">
+                        Cantidad: {product.quantity} × ${product.unitPrice.toFixed(2)} = ${product.subtotal.toFixed(2)}
                       </div>
-                    )}
-                    {product.pieces && (
-                      <div className="product-pieces">
-                        <div className="pieces-label">Piezas:</div>
-                        <div className="pieces-values">
-                          Pantalones: {product.pieces.pantalones}, Prendas: {product.pieces.prendas}, Otros: {product.pieces.otros}
+                      {ciclo && (
+                        <div className="product-ciclo">
+                          <strong>Ciclo: {ciclo}</strong>
                         </div>
-                      </div>
-                    )}
-                  </IonCol>
-                  <IonCol size="2" className="col-qty">{product.quantity}</IonCol>
-                  <IonCol size="3" className="col-price">${product.unitPrice.toFixed(2)}</IonCol>
-                  <IonCol size="3" className="col-total">${product.subtotal.toFixed(2)}</IonCol>
-                </IonRow>
-              ))}
+                      )}
+                      {optionsText && (
+                        <div className="product-options">
+                          {optionsText}
+                        </div>
+                      )}
+                      {product.pieces && (
+                        <div className="product-pieces">
+                          <div className="pieces-label">Piezas:</div>
+                          <div className="pieces-values">
+                            Pantalones: {product.pieces.pantalones}, Prendas: {product.pieces.prendas}, Otros: {product.pieces.otros}
+                          </div>
+                        </div>
+                      )}
+                    </IonCol>
+                    <IonCol size="2" className="col-qty">{product.quantity}</IonCol>
+                    <IonCol size="3" className="col-price">${product.unitPrice.toFixed(2)}</IonCol>
+                    <IonCol size="3" className="col-total">${product.subtotal.toFixed(2)}</IonCol>
+                  </IonRow>
+                );
+              })}
             </IonGrid>
           </IonLabel>
         </IonItem>
@@ -199,12 +259,13 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
         <IonItem className="receipt-section footer-section">
           <IonLabel>
             <IonText className="section-title">Información de la Empresa</IonText>
-            <p className="receipt-field">¡Gracias por su {data.type === 'income' ? 'compra' : 'pago'}!</p>
+            <p className="receipt-field">¡Gracias por tu {data.type === 'income' ? 'compra' : 'pago'}!</p>
             <p className="receipt-field">{data.company.website}</p>
             <p className="receipt-field">
               <strong>{data.company.name}</strong> - RFC: {data.company.rfc}
             </p>
             <p className="receipt-field">{data.company.address}</p>
+            <p className="receipt-field template-id">TEMPLATE_ID: GMO-46MM-FIT-v5</p>
           </IonLabel>
         </IonItem>
 
