@@ -39,7 +39,7 @@ const CartPage: React.FC = () => {
   const { loadIncomes } = useIncome();
   const history = useHistory();
 
-  const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | 'transferencia' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta' | 'Transferir' | ''>('');
   const [cashPaid, setCashPaid] = useState<string>('');
   const [showAlert, setShowAlert] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -58,7 +58,7 @@ const CartPage: React.FC = () => {
 
   const isCheckoutEnabled =
     !!paymentMethod &&
-    (paymentMethod !== 'efectivo' ||
+    (paymentMethod !== 'Efectivo' ||
       (!isNaN(cashNumber) && cashNumber >= total));
 
   // NOTE: pieces validation for "Servicio Completo" is DISABLED for now
@@ -77,7 +77,7 @@ const CartPage: React.FC = () => {
 
   useEffect(() => {
     const cash = parseFloat(cashPaid);
-    if (paymentMethod === 'efectivo' && !isNaN(cash) && cash > total) {
+    if (paymentMethod === 'Efectivo' && !isNaN(cash) && cash > total) {
       setChangeAmount(cash - total);
     } else {
       setChangeAmount(0);
@@ -102,7 +102,7 @@ const CartPage: React.FC = () => {
       return;
     }
 
-    if (paymentMethod === 'efectivo') {
+    if (paymentMethod === 'Efectivo') {
       const cash = parseFloat(cashPaid);
       if (isNaN(cash) || cash < total) {
         showErrorToast('El efectivo pagado debe ser igual o mayor al total.');
@@ -188,15 +188,27 @@ const CartPage: React.FC = () => {
               {
                 action: 1,
                 total: total,
-                paymentMethod: paymentMethod,
+                paymentMethod: 'efectivo',
                 paymentDate: new Date().toISOString(),
                 userId: 1,
-                clientId: selectedClient?.clientId ?? 1,
+                clientId: selectedClient?.clientId ?? 2,
                 companyId: 1,
-                products: products,
+                products: cartItems.map((item) => ({
+                  productId: parseInt(item.productId),
+                  quantity: item.quantity,
+                  options: Object.entries(item.selectedChoices).flatMap(([optionId, choices]) =>
+                    choices.map((choice) => ({
+                      productOptionId: parseInt(optionId),
+                      productOptionChoiceId: choice.id,
+                      quantity: choice.quantity,
+                    }))
+                  ),
+                })),
               },
             ],
           };
+
+          console.log('Income Payload:', JSON.stringify(payload, null, 2));
 
           const incomeData = await postIncome(payload);
           const rec = Array.isArray(incomeData.result)
@@ -227,9 +239,9 @@ const CartPage: React.FC = () => {
     history.push('/category');
   };
 
-  const handlePaymentMethodSelect = (method: 'efectivo' | 'tarjeta' | 'transferencia') => {
+  const handlePaymentMethodSelect = (method: 'Efectivo' | 'Tarjeta' | 'Transferir') => {
     setPaymentMethod(method);
-    if (method !== 'efectivo') {
+    if (method !== 'Efectivo') {
       setCashPaid('');
     }
   };
@@ -343,24 +355,24 @@ const CartPage: React.FC = () => {
                   {/* Payment Method */}
                   <div className="payment-section">
                     <label className="payment-label">Método de pago</label>
-                    <div className="payment-method-selector">
+                  <div className="payment-method-selector">
                       <button
-                        className={`payment-method-btn ${paymentMethod === 'efectivo' ? 'selected' : ''}`}
-                        onClick={() => handlePaymentMethodSelect('efectivo')}
+                        className={`payment-method-btn ${paymentMethod === 'Efectivo' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('Efectivo')}
                       >
                         <IonIcon icon={wallet} className="icon" />
                         Efectivo
                       </button>
                       <button
-                        className={`payment-method-btn ${paymentMethod === 'tarjeta' ? 'selected' : ''}`}
-                        onClick={() => handlePaymentMethodSelect('tarjeta')}
+                        className={`payment-method-btn ${paymentMethod === 'Tarjeta' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('Tarjeta')}
                       >
                         <IonIcon icon={card} className="icon" />
                         Tarjeta
                       </button>
                       <button
-                        className={`payment-method-btn ${paymentMethod === 'transferencia' ? 'selected' : ''}`}
-                        onClick={() => handlePaymentMethodSelect('transferencia')}
+                        className={`payment-method-btn ${paymentMethod === 'Transferir' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('Transferir')}
                       >
                         <IonIcon icon={business} className="icon" />
                         Transferir
@@ -369,7 +381,7 @@ const CartPage: React.FC = () => {
                   </div>
 
                   {/* Cash Input */}
-                  {paymentMethod === 'efectivo' && (
+                  {paymentMethod === 'Efectivo' && (
                     <div className="cash-input-section">
                       <div className="cash-input-wrapper">
                         <span className="currency-symbol">$</span>
@@ -440,26 +452,37 @@ const CartPage: React.FC = () => {
 
         <IonToast
           isOpen={showSuccessToast}
-          onDidDismiss={async () => {
-            setShowSuccessToast(false);
-            if (lastIncomeId) {
-              const ticket = await fetchTicket(lastIncomeId);
-              setTicketData(ticket);
-
-              setTimeout(() => {
-                const receiptEl = document.getElementById('receipt-container');
-                if (receiptEl) receiptEl.scrollIntoView({ behavior: 'smooth' });
-              }, 100);
-            }
-          }}
           message={`¡Pedido realizado! ${paymentMethod}${
-            paymentMethod === 'efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
+            paymentMethod === 'Efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
               ? ` | Cambio: ${formatPrice(parseFloat(cashPaid) - total)}`
               : ''
           }`}
           color="success"
           position="bottom"
           buttons={[{ text: 'OK', role: 'cancel' }]}
+          onDidDismiss={async () => {
+            setShowSuccessToast(false);
+            if (lastIncomeId) {
+              console.log('Fetching ticket for incomeId:', lastIncomeId);
+              const ticket = await fetchTicket(lastIncomeId);
+              console.log('Ticket fetched:', ticket);
+              setTicketData(ticket);
+
+              setTimeout(() => {
+                const receiptEl = document.getElementById('receipt-container');
+                if (receiptEl) {
+                  receiptEl.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  console.log('Receipt container not found, trying alternative selector');
+                  // Fallback to find receipt in another way
+                  const allReceipts = document.querySelectorAll('[id*="receipt"]');
+                  if (allReceipts.length > 0) {
+                    allReceipts[0].scrollIntoView({ behavior: 'smooth' });
+                  }
+                }
+              }, 300);
+            }
+          }}
         />
 
         {ticketData && (

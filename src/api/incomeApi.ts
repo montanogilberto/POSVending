@@ -11,18 +11,11 @@ export interface IncomePayload {
     companyId: number;
     products: Array<{
       productId: number;
-      name: string;
-      unitPrice: number;
-      subtotal: number;
       quantity: number;
       options: Array<{
         productOptionId: number;
-        choices: Array<{
-          productOptionChoiceId: number;
-          name: string;
-          price: number;
-          quantity: number;
-        }>;
+        productOptionChoiceId: number;
+        quantity: number;
       }>;
     }>;
   }>;
@@ -36,11 +29,15 @@ export const postIncome = async (payload: IncomePayload): Promise<any> => {
       body: JSON.stringify(payload),
     });
 
+    const errorText = await response.text();
+    console.log('Backend response status:', response.status);
+    console.log('Backend response:', errorText);
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
     }
 
-    return await response.json();
+    return JSON.parse(errorText);
   } catch (error) {
     console.error('Error posting income:', error);
     throw error;
