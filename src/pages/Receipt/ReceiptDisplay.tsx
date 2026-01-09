@@ -14,6 +14,62 @@ interface ReceiptDisplayProps {
   setTicketData: (data: any) => void;
 }
 
+/**
+ * Repair ticket totals that may have incorrect calculations from the backend.
+ * The backend sometimes returns total based on options sum instead of product subtotal.
+ */
+const repairTicketTotals = (ticketData: any): any => {
+  if (!ticketData || !ticketData.products || !Array.isArray(ticketData.products)) {
+    return ticketData;
+  }
+
+  // Calculate the correct subtotal from products
+  // Each product.subtotal already includes quantity, so we sum them up
+  const calculatedSubtotal = ticketData.products.reduce((sum: number, product: any) => {
+    return sum + (product.subtotal || 0);
+  }, 0);
+
+  // Calculate IVA as 16% of subtotal
+  const calculatedIva = calculatedSubtotal * 0.16;
+
+  // Calculate total as subtotal + IVA
+  const calculatedTotal = calculatedSubtotal + calculatedIva;
+
+  // Get the received totals
+  const receivedSubtotal = ticketData.totals?.subtotal || 0;
+  const receivedIva = ticketData.totals?.iva || 0;
+  const receivedTotal = ticketData.totals?.total || 0;
+
+  // Check if there's a significant discrepancy (more than 0.01)
+  const subtotalDiscrepancy = Math.abs(calculatedSubtotal - receivedSubtotal);
+  const totalDiscrepancy = Math.abs(calculatedTotal - receivedTotal);
+
+  // Log the discrepancy for debugging
+  if (subtotalDiscrepancy > 0.01 || totalDiscrepancy > 0.01) {
+    console.warn('⚠️ Ticket totals discrepancy detected - repairing:', {
+      received: { subtotal: receivedSubtotal, iva: receivedIva, total: receivedTotal },
+      calculated: { subtotal: calculatedSubtotal, iva: calculatedIva, total: calculatedTotal },
+      discrepancy: { subtotal: subtotalDiscrepancy, total: totalDiscrepancy }
+    });
+  }
+
+  // Return repaired totals if there's a significant discrepancy
+  if (subtotalDiscrepancy > 0.01 || totalDiscrepancy > 0.01) {
+    return {
+      ...ticketData,
+      totals: {
+        subtotal: Number(calculatedSubtotal.toFixed(2)),
+        iva: Number(calculatedIva.toFixed(2)),
+        total: Number(calculatedTotal.toFixed(2)),
+      },
+      _totalsRepaired: true, // Flag to indicate totals were repaired
+    };
+  }
+
+  // No significant discrepancy, return original
+  return ticketData;
+};
+
 const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
   ticketData,
   paymentMethod,
@@ -27,18 +83,23 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
   // ✅ Guard: if parent already cleared ticketData, don't render (prevents crashes)
   if (!ticketData) return null;
 
+  // 🔧 Repair totals before processing (fixes backend calculation bug)
+  const repairedTicketData = React.useMemo(() => repairTicketTotals(ticketData), [ticketData]);
+
   const unifiedReceiptData = React.useMemo(() => {
+    // Use repaired ticket data
+    const td = repairedTicketData;
     const legacyCartData: LegacyCartData = {
-      paymentDate: ticketData.paymentDate,
+      paymentDate: td.paymentDate,
       client: {
-        name: ticketData.client.name,
-        cellphone: ticketData.client.cellphone,
-        email: ticketData.client.email,
+        name: td.client.name,
+        cellphone: td.client.cellphone,
+        email: td.client.email,
       },
       user: {
-        name: ticketData.user.name,
+        name: td.user.name,
       },
-      products: ticketData.products.map((prod: any, index: number) => {
+      products: td.products.map((prod: any, index: number) => {
         // Handle both old format (options as array with optionName/choiceName) 
         // and new format (options with nested choices)
         let selectedOptions: any = {};
@@ -70,15 +131,15 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
         };
       }),
       totals: {
-        subtotal: ticketData.totals.subtotal,
-        iva: ticketData.totals.iva,
-        total: ticketData.totals.total,
+        subtotal: td.totals.subtotal,
+        iva: td.totals.iva,
+        total: td.totals.total,
       },
-      paymentMethod: ticketData.paymentMethod,
+      paymentMethod: td.paymentMethod,
     };
 
     return ReceiptService.transformCartData(legacyCartData);
-  }, [ticketData]);
+  }, [repairedTicketData]);
 
   const handlePrint = () => {
     ReceiptService.printReceipt(unifiedReceiptData, {
