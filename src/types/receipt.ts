@@ -48,8 +48,12 @@ export interface UnifiedProduct {
 }
 
 export interface ProductOption {
-  name: string;
-  choices: ProductChoice[];
+  productOptionId?: number;
+  optionName: string;
+  productOptionChoiceId?: number;
+  choiceName: string;
+  price: number;
+  quantity: number;
 }
 
 export interface ProductChoice {

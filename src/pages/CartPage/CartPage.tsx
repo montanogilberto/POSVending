@@ -224,6 +224,15 @@ const CartPage: React.FC = () => {
 
         clearCart();
         clearAllProducts();
+        
+        // Log the toast message value before showing it
+        const successMessage = `¡Pedido realizado! ${paymentMethod}${
+          paymentMethod === 'Efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
+            ? ` | Cambio: ${formatPrice(parseFloat(cashPaid) - total)}`
+            : ''
+        }`;
+        console.log('Toast message:', successMessage);
+        
         setShowSuccessToast(true);
       } else {
         showErrorToast('Ocurrió un error al procesar el pedido.');

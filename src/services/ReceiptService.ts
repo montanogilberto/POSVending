@@ -30,22 +30,29 @@ export class ReceiptService {
     return name;
   }
 
-  // Extract Ciclo value from product options
+  // Extract Ciclo value from product options (supports both old and new formats)
   private static extractCiclo(options: any[]): string | null {
     if (!options || !Array.isArray(options)) return null;
     
     for (const option of options) {
-      // Check for "Ciclo" in option name
+      // New format: flat structure with optionName and choiceName
+      if (option.optionName && option.optionName.toLowerCase().includes('ciclo')) {
+        if (option.choiceName) {
+          return option.choiceName;
+        }
+      }
+      
+      // Old format: nested structure with name and choices
       if (option.name && option.name.toLowerCase().includes('ciclo')) {
-        // Get the choice name
         if (option.choices && Array.isArray(option.choices) && option.choices.length > 0) {
-          return option.choices[0].name;
+          return option.choices[0].name || option.choices[0].choiceName;
         }
         if (option.choiceName) {
           return option.choiceName;
         }
       }
-      // Also check in choices for ciclo
+      
+      // Also check in choices for ciclo (old format)
       if (option.choices) {
         for (const choice of option.choices) {
           if (choice.name && (choice.name.toLowerCase().includes('carga alta') || 
@@ -60,7 +67,76 @@ export class ReceiptService {
     return null;
   }
 
-  // Adapter function to convert Ticket to LegacyIncomeData format
+  // Adapter function to convert Ticket to UnifiedReceiptData format (NEW approach)
+  static adaptTicketToUnifiedReceipt(ticket: Ticket): UnifiedReceiptData {
+    // Convert paymentDate to date and time components
+    const paymentDateTime = new Date(ticket.paymentDate);
+    const transactionDate = paymentDateTime.toLocaleDateString('es-ES');
+    const transactionTime = paymentDateTime.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+
+    // Convert Ticket products to UnifiedProduct format with new option structure
+    const products: UnifiedProduct[] = ticket.products.map((product: any, index: number) => {
+      // Calculate quantity if not provided by API
+      const unitPrice = product.unitPrice || 0;
+      const subtotal = product.subtotal || 0;
+      const quantity = product.quantity || (unitPrice > 0 ? Math.round(subtotal / unitPrice) : 1);
+
+      // Transform options to new format
+      let options: any[] | undefined;
+      if (product.options && Array.isArray(product.options)) {
+        options = product.options.map((option: any) => ({
+          productOptionId: option.productOptionId,
+          optionName: option.optionName || option.name || 'Opción',
+          productOptionChoiceId: option.productOptionChoiceId,
+          choiceName: option.choiceName || '',
+          price: option.price || 0,
+          quantity: option.quantity || 1
+        }));
+      }
+
+      return {
+        id: product.incomeDetailId || index,
+        name: product.name,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        subtotal: subtotal,
+        options: options && options.length > 0 ? options : undefined
+      };
+    });
+
+    return {
+      id: `income_${ticket.incomeId || Date.now()}`,
+      type: 'income',
+      date: transactionDate,
+      time: transactionTime,
+      client: {
+        name: ticket.client.name,
+        phone: ticket.client.cellphone,
+        email: ticket.client.email
+      },
+      user: {
+        name: ticket.user.name,
+        id: ticket.user.userId || 0
+      },
+      company: this.COMPANY_INFO,
+      products,
+      totals: {
+        subtotal: ticket.totals.subtotal,
+        iva: 0, // Force IVA to 0
+        total: ticket.totals.subtotal
+      },
+      payment: {
+        method: this.normalizePaymentMethod(ticket.paymentMethod),
+        amountReceived: ticket.totals.total,
+        change: 0
+      }
+    };
+  }
+
+  // Adapter function to convert Ticket to LegacyIncomeData format (OLD approach - for backward compatibility)
   static adaptTicketToLegacyIncome(ticket: Ticket): LegacyIncomeData {
     // Convert paymentDate to date and time components
     const paymentDateTime = new Date(ticket.paymentDate);
@@ -80,8 +156,16 @@ export class ReceiptService {
       // Handle both old format (options as array of choiceNames) and new format (options with nested choices)
       let options: string[] = [];
       if (product.options && Array.isArray(product.options)) {
-        // New format: options with nested choices structure
-        if (product.options[0]?.choices) {
+        // New format: options with flat structure
+        if (product.options[0]?.optionName || product.options[0]?.choiceName) {
+          product.options.forEach((option: any) => {
+            const choiceName = option.choiceName || '';
+            if (choiceName) {
+              options.push(choiceName);
+            }
+          });
+        } else if (product.options[0]?.choices) {
+          // Old format: options with nested choices structure
           product.options.forEach((option: any) => {
             if (option.choices && Array.isArray(option.choices)) {
               option.choices.forEach((choice: any) => {
@@ -129,19 +213,26 @@ export class ReceiptService {
       const unitPrice = product.unitPrice || 0;
       const subtotal = product.subtotal !== undefined ? product.subtotal : (unitPrice * quantity);
       
+      // Transform to new option format
+      let options: any[] | undefined;
+      if (product.options && product.options.length > 0) {
+        options = product.options.map((option: any, optIndex: number) => ({
+          productOptionId: optIndex,
+          optionName: 'Opción',
+          productOptionChoiceId: optIndex,
+          choiceName: typeof option === 'string' ? option : option.name || '',
+          price: 0,
+          quantity: 1
+        }));
+      }
+      
       return {
         id: index,
         name: product.name,
         quantity: quantity,
         unitPrice: unitPrice,
         subtotal: subtotal,
-        options: product.options && product.options.length > 0 ? [{
-          name: 'Opciones',
-          choices: product.options.map(option => ({
-            name: option,
-            price: 0
-          }))
-        }] : undefined
+        options: options
       };
     });
 
@@ -163,8 +254,8 @@ export class ReceiptService {
       products,
       totals: {
         subtotal: apiData.subtotal,
-        iva: apiData.iva,
-        total: apiData.total
+        iva: 0, // Force IVA to 0
+        total: apiData.subtotal
       },
       payment: {
         method: this.normalizePaymentMethod(apiData.paymentMethod),
@@ -182,13 +273,26 @@ export class ReceiptService {
       const unitPrice = product.price || product.unitPrice || 0;
       const subtotal = product.subtotal !== undefined ? product.subtotal : (unitPrice * quantity);
       
+      // Transform options to new format
+      let options: any[] | undefined;
+      if (product.selectedOptions) {
+        options = Object.entries(product.selectedOptions).map(([key, value], optIndex: number) => ({
+          productOptionId: optIndex,
+          optionName: key,
+          productOptionChoiceId: optIndex,
+          choiceName: Array.isArray(value) ? value.join(', ') : String(value),
+          price: 0,
+          quantity: 1
+        }));
+      }
+      
       return {
         id: index, // Use array index as fallback ID
         name: product.name,
         quantity: quantity,
         unitPrice: unitPrice,
         subtotal: subtotal,
-        options: product.selectedOptions ? this.parseSelectedOptions(product.selectedOptions) : undefined,
+        options: options,
         pieces: product.pieces
       };
     });
@@ -212,7 +316,11 @@ export class ReceiptService {
       },
       company: this.COMPANY_INFO,
       products,
-      totals: cartData.totals,
+      totals: {
+        subtotal: cartData.totals.subtotal,
+        iva: 0, // Force IVA to 0
+        total: cartData.totals.subtotal
+      },
       payment: {
         method: this.normalizePaymentMethod(cartData.paymentMethod),
         amountReceived: cartData.totals.total, // Default to total for non-cash payments
@@ -235,18 +343,17 @@ export class ReceiptService {
     return 'transferencia'; // Default fallback
   }
 
-  // Parse selected options from cart data
+  // Parse selected options from cart data (supports both old and new formats)
   private static parseSelectedOptions(selectedOptions: Record<string, any>): any {
     return Object.entries(selectedOptions).map(([key, value]) => ({
-      name: key,
-      choices: [{
-        name: Array.isArray(value) ? value.join(', ') : String(value),
-        price: 0
-      }]
+      optionName: key,
+      choiceName: Array.isArray(value) ? value.join(', ') : String(value),
+      price: 0,
+      quantity: 1
     }));
   }
 
-  // Generate optimized HTML for printing
+  // Generate optimized HTML for printing - COMPACT THERMAL FORMAT
   static generatePrintHTML(data: UnifiedReceiptData, options: PrintOptions = {}): string {
     const width = options.width || '58mm';
     const isThermal = options.thermal !== false;
@@ -257,19 +364,164 @@ export class ReceiptService {
 <html>
 <head>
   <title>Recibo - ${data.type === 'income' ? 'Ingreso' : 'Egreso'}</title>
-  ${this.generatePrintStyles(width, isThermal, isUltraCompact)}
+  ${this.generateCompactPrintStyles(width, isThermal, isUltraCompact)}
 </head>
 <body>
   <div class="receipt-container">
-    ${this.generateHeader(data, isUltraCompact)}
-    ${this.generateClientInfo(data, isUltraCompact)}
-    ${this.generateProducts(data, isUltraCompact)}
-    ${this.generateTotals(data, isUltraCompact)}
-    ${this.generatePaymentInfo(data, isUltraCompact)}
-    ${this.generateFooter(data, isUltraCompact)}
+    ${this.generateCompactHeader(data, isUltraCompact)}
+    ${this.generateCompactClientInfo(data, isUltraCompact)}
+    ${this.generateCompactProducts(data, isUltraCompact)}
+    ${this.generateCompactTotals(data, isUltraCompact)}
+    ${this.generateCompactPayment(data, isUltraCompact)}
+    ${this.generateCompactFooter(data, isUltraCompact)}
   </div>
 </body>
 </html>`;
+  }
+
+  // Compact thermal print styles - DARK BOLD FONTS
+  private static generateCompactPrintStyles(width: string, isThermal: boolean, isUltraCompact: boolean): string {
+    const charsPerLine = isUltraCompact ? 32 : 42;
+    const baseFontSize = isUltraCompact ? '8px' : '10px';
+    
+    return `
+<style>
+  @page { size: ${width} auto; margin: 0; }
+  html, body {
+    margin: 0; padding: 2px;
+    width: ${width};
+    font-family: 'Courier New', Courier, monospace;
+    font-size: ${baseFontSize};
+    font-weight: bold;
+    color: #000;
+    background: white;
+    line-height: 1.1;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .receipt-container { width: 100%; max-width: ${width}; margin: 0 auto; }
+  .receipt-title { font-size: ${isUltraCompact ? '12px' : '14px'}; font-weight: 900; text-align: center; margin-bottom: 4px; }
+  .receipt-subtitle { font-size: ${baseFontSize}; font-weight: bold; text-align: center; margin-bottom: 4px; }
+  .receipt-field { margin: 2px 0; font-size: ${baseFontSize}; font-weight: bold; }
+  .receipt-field strong { font-weight: 900; }
+  .meta-row { margin: 1px 0; font-size: ${baseFontSize}; font-weight: bold; }
+  .divider { border-top: 1px dashed #000; margin: 4px 0; }
+  .product-line { display: flex; justify-content: space-between; margin: 2px 0; font-size: ${baseFontSize}; font-weight: bold; }
+  .product-name { flex: 1; word-wrap: break-word; margin-right: 8px; font-weight: bold; }
+  .product-price { text-align: right; min-width: 60px; font-weight: bold; }
+  .product-qty { text-align: center; min-width: 30px; font-weight: bold; }
+  .totals-row { display: flex; justify-content: space-between; margin: 2px 0; }
+  .total-label { font-weight: 900; }
+  .total-value { text-align: right; min-width: 60px; font-weight: bold; }
+  .grand-total { font-weight: 900; font-size: ${isUltraCompact ? '11px' : '13px'}; }
+  .footer { text-align: center; margin-top: 6px; font-size: ${baseFontSize}; }
+  .footer-line { margin: 1px 0; font-weight: bold; }
+  @media print {
+    body { width: ${width}; }
+    .receipt-container { width: ${width}; max-width: ${width}; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
+</style>`;
+  }
+
+  // Compact header section
+  private static generateCompactHeader(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    return `
+    <div class="receipt-title">${data.company.name}</div>
+    ${!isUltraCompact ? `<div class="receipt-subtitle">RECIBO - ${data.type === 'income' ? 'INGRESO' : 'EGRESO'}</div>` : ''}
+    <div class="divider"></div>`;
+  }
+
+  // Compact metadata (Fecha, ID, Cliente, Teléfono, Email, Usuario)
+  private static generateCompactClientInfo(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    const clientName = this.formatClientName(data.client.name);
+    
+    return `
+    <div class="receipt-field"><strong>Fecha:</strong> ${data.date} ${data.time}</div>
+    <div class="receipt-field"><strong>ID:</strong> ${data.id}</div>
+    <div class="receipt-field"><strong>Cliente:</strong> ${clientName}</div>
+    ${data.client.phone ? `<div class="receipt-field"><strong>Teléfono:</strong> ${data.client.phone}</div>` : ''}
+    ${data.client.email ? `<div class="receipt-field"><strong>Email:</strong> ${data.client.email}</div>` : ''}
+    <div class="receipt-field"><strong>Usuario:</strong> ${data.user.name}</div>
+    <div class="divider"></div>`;
+  }
+
+  // Compact products section
+  private static generateCompactProducts(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    const productRows = data.products.map(product => {
+      // Safely access options
+      const productOptions = product.options ?? [];
+      const ciclo = productOptions.length > 0 ? this.extractCiclo(productOptions) : null;
+      
+      if (productOptions.length > 0) {
+        // Product with options - show each option as separate line
+        return productOptions.map((opt: any) => {
+          const optQty = Number(opt.quantity ?? 1);
+          const optPrice = Number(opt.price ?? 0);
+          const displayPrice = productOptions.length === 1 ? product.subtotal : optPrice;
+          
+          return `
+    <div class="product-line">
+      <span class="product-name">${optQty}x ${opt.optionName}: ${opt.choiceName}</span>
+      <span class="product-price">$${displayPrice.toFixed(2)}</span>
+    </div>`;
+        }).join('');
+      } else {
+        // Simple product
+        return `
+    <div class="product-line">
+      <span class="product-name">${product.quantity}x ${product.name}${ciclo ? ` (${ciclo})` : ''}</span>
+      <span class="product-price">$${product.subtotal.toFixed(2)}</span>
+    </div>`;
+      }
+    }).join('');
+
+    return `
+    <div class="receipt-field"><strong>Productos / Servicios</strong></div>
+    ${productRows}
+    <div class="divider"></div>`;
+  }
+
+  // Compact totals section
+  private static generateCompactTotals(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    return `
+    <div class="totals-row">
+      <span class="total-label">Subtotal:</span>
+      <span class="total-value">$${data.totals.subtotal.toFixed(2)}</span>
+    </div>
+    <div class="totals-row">
+      <span class="total-label">IVA:</span>
+      <span class="total-value">$${data.totals.iva.toFixed(2)}</span>
+    </div>
+    <div class="divider"></div>
+    <div class="totals-row grand-total">
+      <span class="total-label">TOTAL:</span>
+      <span class="total-value">$${data.totals.total.toFixed(2)}</span>
+    </div>
+    <div class="divider"></div>`;
+  }
+
+  // Compact payment section
+  private static generateCompactPayment(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    const methodText = this.getPaymentMethodText(data.payment.method);
+    
+    return `
+    <div class="receipt-field"><strong>Método:</strong> ${methodText}</div>
+    ${data.payment.method === 'efectivo' ? `
+    
+    <div class="receipt-field"><strong>Cambio:</strong> $${Number(data.payment.change ?? 0).toFixed(2)}</div>` : ''}
+    <div class="divider"></div>`;
+  }
+
+  // Compact footer section
+  private static generateCompactFooter(data: UnifiedReceiptData, isUltraCompact: boolean): string {
+    return `
+    <div class="footer">
+      <div class="footer-line">¡Gracias por tu ${data.type === 'income' ? 'compra' : 'pago'}!</div>
+      <div class="footer-line">${data.company.website}</div>
+      <div class="footer-line">${data.company.name} - RFC: ${data.company.rfc}</div>
+      <div class="footer-line">${data.company.address}</div>
+    </div>`;
   }
 
   // Generate CSS styles for printing
@@ -347,6 +599,166 @@ export class ReceiptService {
     margin: ${margin} 0;
   }
 
+  /* Service Card Styles - Match UnifiedReceipt.tsx */
+  .service-card {
+    background: white;
+    border-radius: ${isUltraCompact ? '2px' : '4px'};
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: ${isUltraCompact ? '2px' : '8px'};
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    page-break-inside: avoid;
+  }
+
+  .service-primary-header {
+    background: #64748b;
+    padding: ${isUltraCompact ? '2px 4px' : '6px 8px'};
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .service-label {
+    font-size: ${isUltraCompact ? '6px' : '9px'};
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+  }
+
+  .service-name {
+    font-size: ${isUltraCompact ? '8px' : '11px'};
+    font-weight: 600;
+    color: white;
+  }
+
+  .service-secondary-header {
+    background: #94a3b8;
+    padding: ${isUltraCompact ? '1px 4px' : '4px 8px'};
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .product-header-name {
+    flex: 1;
+    text-align: left;
+    font-size: ${isUltraCompact ? '7px' : '10px'};
+    font-weight: 600;
+    text-transform: uppercase;
+    color: white;
+  }
+
+  .product-header-qty {
+    width: 12%;
+    text-align: center;
+    font-size: ${isUltraCompact ? '7px' : '10px'};
+    font-weight: 600;
+    text-transform: uppercase;
+    color: white;
+  }
+
+  .product-header-unit-price,
+  .product-header-price {
+    width: 20%;
+    text-align: right;
+    font-size: ${isUltraCompact ? '7px' : '10px'};
+    font-weight: 600;
+    text-transform: uppercase;
+    color: white;
+  }
+
+  .product-header-price {
+    width: 22%;
+  }
+
+  /* Product Row Styles */
+  .product-row {
+    display: flex;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+    font-size: ${baseFontSize};
+    padding: ${isUltraCompact ? '1px 4px' : '3px 8px'};
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .product-row:last-child {
+    border-bottom: none;
+  }
+
+  .product-name {
+    flex: 1;
+    font-weight: 500;
+    color: #334155;
+    text-align: left;
+    font-size: ${isUltraCompact ? '7px' : '11px'};
+    word-wrap: break-word;
+  }
+
+  .product-qty {
+    width: 12%;
+    text-align: center;
+    font-weight: 600;
+    color: #475569;
+    font-size: ${isUltraCompact ? '7px' : '11px'};
+  }
+
+  .product-unit-price,
+  .product-price {
+    width: 20%;
+    text-align: right;
+    font-weight: 600;
+    color: #334155;
+    font-size: ${isUltraCompact ? '7px' : '11px'};
+  }
+
+  .product-price {
+    width: 22%;
+  }
+
+  .product-options {
+    font-size: ${smallFontSize};
+    margin-left: 10px;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+    color: #6c757d;
+    font-style: italic;
+  }
+
+  .product-pieces {
+    font-size: ${smallFontSize};
+    margin-left: 10px;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+    font-style: italic;
+    background: #f1f3f5;
+    padding: 2px 6px;
+    border-radius: 2px;
+    border-left: 2px solid #667eea;
+  }
+
+  .product-quantity {
+    font-size: ${baseFontSize};
+    margin-left: 10px;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+  }
+
+  .product-ciclo {
+    font-size: ${baseFontSize};
+    margin-left: 10px;
+    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
+    font-weight: bold;
+    color: #667eea;
+  }
+
+  .productos-title {
+    font-size: ${isUltraCompact ? '10px' : '14px'};
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: ${isUltraCompact ? '4px' : '8px'};
+    display: block;
+  }
+
+  /* Original product-header for backward compatibility */
   .product-header {
     display: flex;
     font-weight: bold;
@@ -361,61 +773,18 @@ export class ReceiptService {
   }
 
   .product-header-qty {
-    width: 15%;
+    width: 12%;
     text-align: center;
+  }
+
+  .product-header-unit-price {
+    width: 20%;
+    text-align: right;
   }
 
   .product-header-price {
-    width: 25%;
+    width: 20%;
     text-align: right;
-  }
-
-  .product-row {
-    display: flex;
-    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
-    font-size: ${baseFontSize};
-  }
-
-  .product-name {
-    flex: 1;
-    font-weight: bold;
-    word-wrap: break-word;
-  }
-
-  .product-qty {
-    width: 15%;
-    text-align: center;
-  }
-
-  .product-price {
-    width: 25%;
-    text-align: right;
-  }
-
-  .product-options {
-    font-size: ${smallFontSize};
-    margin-left: 10px;
-    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
-  }
-
-  .product-pieces {
-    font-size: ${smallFontSize};
-    margin-left: 10px;
-    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
-    font-style: italic;
-  }
-
-  .product-quantity {
-    font-size: ${baseFontSize};
-    margin-left: 10px;
-    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
-  }
-
-  .product-ciclo {
-    font-size: ${baseFontSize};
-    margin-left: 10px;
-    margin-bottom: ${isUltraCompact ? '0px' : '2px'};
-    font-weight: bold;
   }
 
   .payment-section {
@@ -496,6 +865,12 @@ export class ReceiptService {
       width: ${width};
       max-width: ${width};
     }
+    .service-card {
+      page-break-inside: avoid;
+    }
+    .receipt-section {
+      page-break-inside: avoid;
+    }
   }
 </style>`;
   }
@@ -511,12 +886,12 @@ export class ReceiptService {
     <div class="section-divider"></div>` : ''}`;
   }
 
-  // Generate client and user info
+  // Generate client and user info - MATCHES UnifiedReceipt.tsx
   private static generateClientInfo(data: UnifiedReceiptData, isUltraCompact: boolean): string {
     const clientName = this.formatClientName(data.client.name);
     
     if (isUltraCompact) {
-      // IMPROVED: Compact format - combined Fecha+Hora, tighter spacing
+      // Ultra-compact format with all info
       return `
     <div class="receipt-section">
       <div class="receipt-row">
@@ -524,9 +899,23 @@ export class ReceiptService {
         <span class="receipt-value">${data.date} ${data.time}</span>
       </div>
       <div class="receipt-row">
+        <span class="receipt-label">ID:</span>
+        <span class="receipt-value">${data.id}</span>
+      </div>
+      <div class="receipt-row">
         <span class="receipt-label">Cliente:</span>
         <span class="receipt-value">${clientName}</span>
       </div>
+      ${data.client.phone ? `
+      <div class="receipt-row">
+        <span class="receipt-label">Teléfono:</span>
+        <span class="receipt-value">${data.client.phone}</span>
+      </div>` : ''}
+      ${data.client.email ? `
+      <div class="receipt-row">
+        <span class="receipt-label">Email:</span>
+        <span class="receipt-value">${data.client.email}</span>
+      </div>` : ''}
       <div class="receipt-row">
         <span class="receipt-label">Usuario:</span>
         <span class="receipt-value">${data.user.name}</span>
@@ -535,16 +924,31 @@ export class ReceiptService {
     <div class="section-divider"></div>`;
     }
     
+    // Full format - matches UnifiedReceipt.tsx section
     return `
     <div class="receipt-section">
       <div class="receipt-row">
-        <span class="receipt-label">Fecha:</span>
+        <span class="receipt-label">Fecha y Hora:</span>
         <span class="receipt-value">${data.date} ${data.time}</span>
+      </div>
+      <div class="receipt-row">
+        <span class="receipt-label">ID:</span>
+        <span class="receipt-value">${data.id}</span>
       </div>
       <div class="receipt-row">
         <span class="receipt-label">Cliente:</span>
         <span class="receipt-value">${clientName}</span>
       </div>
+      ${data.client.phone ? `
+      <div class="receipt-row">
+        <span class="receipt-label">Teléfono:</span>
+        <span class="receipt-value">${data.client.phone}</span>
+      </div>` : ''}
+      ${data.client.email ? `
+      <div class="receipt-row">
+        <span class="receipt-label">Email:</span>
+        <span class="receipt-value">${data.client.email}</span>
+      </div>` : ''}
       <div class="receipt-row">
         <span class="receipt-label">Usuario:</span>
         <span class="receipt-value">${data.user.name}</span>
@@ -553,19 +957,32 @@ export class ReceiptService {
     <div class="section-divider"></div>`;
   }
 
-  // Generate products section
+  // Generate products section - MATCHES UnifiedReceipt.tsx service card format
   private static generateProducts(data: UnifiedReceiptData, isUltraCompact: boolean): string {
-    const productRows = data.products.map(product => {
-      // Extract Ciclo from options
+    const productRows = data.products.map((product, index) => {
+      // Extract Ciclo from options (supports both old and new formats)
       const ciclo = product.options ? this.extractCiclo(product.options) : null;
       
-      // Build options text (excluding Ciclo which is shown separately)
-      const optionsText = product.options && product.options.length > 0 
-        ? product.options
-            .filter(opt => !opt.name?.toLowerCase().includes('ciclo'))
-            .map(opt => `${opt.name}: ${opt.choices.map(c => c.name).join(', ')}`)
-            .join('; ')
-        : '';
+      // Build options text (supports both old and new formats)
+      let optionsText = '';
+      if (product.options && product.options.length > 0) {
+        // New format: flat structure with optionName and choiceName
+        if (product.options[0]?.optionName) {
+          optionsText = product.options
+            .filter((opt: any) => !opt.optionName?.toLowerCase().includes('ciclo'))
+            .map((opt: any) => `${opt.optionName} ${opt.choiceName}`)
+            .join('; ');
+        } else {
+          // Old format: nested structure with name and choices
+          optionsText = product.options
+            .filter((opt: any) => !opt.name?.toLowerCase().includes('ciclo'))
+            .map((opt: any) => {
+              const choices = opt.choices?.map((c: any) => c.name || c.choiceName).join(', ');
+              return choices ? `${opt.name}: ${choices}` : opt.name;
+            })
+            .join('; ');
+        }
+      }
       
       // Generate pieces text for "Servicio Completo" products
       const piecesText = product.pieces 
@@ -573,9 +990,10 @@ export class ReceiptService {
         : '';
       
       if (isUltraCompact) {
-        // IMPROVED: Ultra-compact single-line product format
+        // Ultra-compact single-line product format
         let productLine = `${product.quantity}x ${product.name}`;
         if (ciclo) productLine += ` (${ciclo})`;
+        if (optionsText) productLine += ` ${optionsText}`;
         return `
       <div class="product-row">
         <div class="product-name">${productLine}</div>
@@ -583,34 +1001,68 @@ export class ReceiptService {
       </div>`;
       }
       
-      // Full format with:
-      // - Product name on its own line
-      // - "Cantidad: 1 × $0.00 = $180.00" format
-      // - "Ciclo: Carga Alta" displayed after the product
+      // Full format - matches UnifiedReceipt.tsx service card with table
+      // Service card structure with headers and option rows
+      let optionRows = '';
+      
+      // Safely access product.options
+      const productOptions = product.options ?? [];
+      
+      if (productOptions.length > 0) {
+        // Show each option as a row with quantity, price columns
+        optionRows = productOptions.map((opt: any, optIndex: number) => {
+          const optQty = Number(opt.quantity ?? 1);
+          const optPrice = Number(opt.price ?? 0);
+          const displayPrice = productOptions.length === 1 ? product.subtotal : optPrice;
+          
+          return `
+      <div class="product-row">
+        <div class="product-name">${opt.optionName}: ${opt.choiceName}</div>
+        <div class="product-qty">${optQty}</div>
+        <div class="product-unit-price">$${displayPrice.toFixed(2)}</div>
+        <div class="product-price">$${(optPrice * optQty).toFixed(2)}</div>
+      </div>`;
+        }).join('');
+      } else {
+        // Simple product without options
+        optionRows = `
+      <div class="product-row">
+        <div class="product-name">${product.name}</div>
+        <div class="product-qty">${Number(product.quantity ?? 0)}</div>
+        <div class="product-unit-price">$${product.unitPrice.toFixed(2)}</div>
+        <div class="product-price">$${product.subtotal.toFixed(2)}</div>
+      </div>`;
+      }
+      
       return `
-      <div class="product-name">${product.name}</div>
-      <div class="product-quantity">Cantidad: ${product.quantity} × $${product.unitPrice.toFixed(2)} = $${product.subtotal.toFixed(2)}</div>
-      ${ciclo ? `<div class="product-ciclo">Ciclo: ${ciclo}</div>` : ''}
-      ${optionsText ? `<div class="product-options">${optionsText}</div>` : ''}
-      ${piecesText ? `<div class="product-pieces">${piecesText}</div>` : ''}`;
+      <div class="service-card">
+        <div class="service-primary-header">
+          <span class="service-label">Servicio</span>
+          <span class="service-name">${product.name}</span>
+        </div>
+        <div class="service-secondary-header">
+          <div class="product-header-name">Producto</div>
+          <div class="product-header-qty">Cant</div>
+          <div class="product-header-price">Precio</div>
+        </div>
+        ${optionRows}
+      </div>`;
     }).join('');
 
     if (isUltraCompact) {
       return `
     <div class="section-divider"></div>
     <div class="receipt-products">
+      <div class="productos-title">Productos / Servicios</div>
       ${productRows}
     </div>`;
     }
 
+    // Full format - matches UnifiedReceipt.tsx structure
     return `
     <div class="section-divider"></div>
     <div class="receipt-products">
-      <div class="product-header">
-        <div class="product-header-name">Producto</div>
-        <div class="product-header-qty">Cant</div>
-        <div class="product-header-price">Total</div>
-      </div>
+      <div class="productos-title">Productos / Servicios</div>
       ${productRows}
     </div>
     <div class="section-divider"></div>`;
@@ -649,26 +1101,26 @@ export class ReceiptService {
     <div class="section-divider"></div>`;
   }
 
-  // Generate payment information
+  // Generate payment information - MATCHES UnifiedReceipt.tsx
   private static generatePaymentInfo(data: UnifiedReceiptData, isUltraCompact: boolean): string {
     const paymentMethodText = this.getPaymentMethodText(data.payment.method);
     
     if (isUltraCompact) {
-      // IMPROVED: Compact format - combine payment fields
+      // Ultra-compact format with cash details
       if (data.payment.method === 'efectivo') {
         return `
     <div class="receipt-section payment-section">
       <div class="receipt-row">
-        <span class="receipt-label">Pago:</span>
+        <span class="receipt-label">Método:</span>
         <span class="receipt-value">${paymentMethodText}</span>
       </div>
       <div class="receipt-row">
         <span class="receipt-label">Recibido:</span>
-        <span class="receipt-value">$${data.payment.amountReceived.toFixed(2)}</span>
+        <span class="receipt-value">$${Number(data.payment.amountReceived ?? 0).toFixed(2)}</span>
       </div>
       <div class="receipt-row">
         <span class="receipt-label">Cambio:</span>
-        <span class="receipt-value">$${data.payment.change.toFixed(2)}</span>
+        <span class="receipt-value">$${Number(data.payment.change ?? 0).toFixed(2)}</span>
       </div>
     </div>
     <div class="section-divider"></div>`;
@@ -676,25 +1128,23 @@ export class ReceiptService {
       return `
     <div class="receipt-section payment-section">
       <div class="receipt-row">
-        <span class="receipt-label">Pago:</span>
+        <span class="receipt-label">Método:</span>
         <span class="receipt-value">${paymentMethodText}</span>
       </div>
     </div>
     <div class="section-divider"></div>`;
     }
     
+    // Full format - matches UnifiedReceipt.tsx payment section
     return `
     <div class="receipt-section">
       <div class="section-divider"></div>
-      <div class="payment-method">Pago: ${paymentMethodText}</div>
+      <div class="payment-method">Método: ${paymentMethodText}</div>
       ${data.payment.method === 'efectivo' ? `
-      <div class="receipt-row">
-        <span class="receipt-label">Recibido:</span>
-        <span class="receipt-value">$${data.payment.amountReceived.toFixed(2)}</span>
-      </div>
+
       <div class="receipt-row">
         <span class="receipt-label">Cambio:</span>
-        <span class="receipt-value">$${data.payment.change.toFixed(2)}</span>
+        <span class="receipt-value">$${Number(data.payment.change ?? 0).toFixed(2)}</span>
       </div>` : ''}
       <div class="section-divider"></div>
     </div>`;

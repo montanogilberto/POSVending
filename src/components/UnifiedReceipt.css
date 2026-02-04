@@ -74,7 +74,139 @@
   color: #2c3e50;
 }
 
-/* Products Table */
+/* ==========================================
+   MODERN POS RECEIPT UI STYLES
+   Laundry Business - Clean & Professional
+   ========================================== */
+
+/* Products / Servicios Section */
+.products-servicios-section {
+  margin-bottom: 20px;
+}
+
+.productos-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 16px;
+  display: block;
+}
+
+/* Service Card - Main Container */
+.service-card {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: 16px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+/* Primary Header - Light Blue-Gray */
+.service-primary-header {
+  background: #64748b;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.service-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+}
+
+.service-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+/* Secondary Header - Light Gray */
+.service-secondary-header {
+  background: #94a3b8;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.col-product-header,
+.col-cant-header,
+.col-precio-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: white;
+}
+
+.col-product-header {
+  flex: 1;
+  text-align: left;
+}
+
+.col-cant-header {
+  width: 50px;
+  text-align: center;
+}
+
+.col-precio-header {
+  width: 90px;
+  text-align: right;
+}
+
+/* Product Option Rows */
+.product-option-row {
+  background: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.15s ease;
+}
+
+.product-option-row:last-child {
+  border-bottom: none;
+}
+
+.product-option-row:hover {
+  background-color: #f8fafc;
+}
+
+.col-product-row {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  text-align: left;
+}
+
+.col-cant-row {
+  width: 50px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  text-align: center;
+}
+
+.col-precio-row {
+  width: 90px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  text-align: right;
+}
+
+/* ==========================================
+   LEGACY PRODUCTS TABLE (if needed elsewhere)
+   ========================================== */
+
 .products-table {
   background: white;
   border-radius: 6px;
@@ -267,27 +399,75 @@
   .unified-receipt-content {
     padding: 12px;
   }
-  
+
   .receipt-title {
     font-size: 20px;
   }
-  
+
   .products-table {
     font-size: 12px;
   }
-  
+
   .product-name {
     font-size: 13px;
   }
-  
+
   .receipt-actions {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .receipt-button {
     min-width: auto;
     width: 100%;
+  }
+
+  /* Modern POS UI Responsive */
+  .service-primary-header {
+    padding: 10px 12px;
+  }
+
+  .service-name {
+    font-size: 14px;
+  }
+
+  .service-secondary-header {
+    padding: 8px 12px;
+  }
+
+  .col-product-header,
+  .col-cant-header,
+  .col-precio-header {
+    font-size: 11px;
+  }
+
+  .product-option-row {
+    padding: 10px 12px;
+  }
+
+  .col-product-row {
+    font-size: 13px;
+  }
+
+  .col-cant-row,
+  .col-precio-row {
+    font-size: 13px;
+  }
+
+  .col-cant-header {
+    width: 40px;
+  }
+
+  .col-precio-header {
+    width: 80px;
+  }
+
+  .col-cant-row {
+    width: 40px;
+  }
+
+  .col-precio-row {
+    width: 80px;
   }
 }
 
@@ -295,39 +475,108 @@
   .unified-receipt-content {
     padding: 8px;
   }
-  
+
   .receipt-section {
     --padding-start: 12px;
     --inner-padding-end: 12px;
   }
-  
+
   .products-table {
     padding: 4px;
   }
-  
+
   .products-header {
     font-size: 11px;
   }
-  
+
   .product-row {
     font-size: 11px;
   }
-  
+
   .product-name {
     font-size: 12px;
   }
-  
+
   .product-options {
     font-size: 10px;
   }
-  
+
   .product-pieces {
     font-size: 10px;
     padding: 3px 6px;
   }
-  
+
   .pieces-values {
     font-size: 10px;
+  }
+
+  /* Modern POS UI Mobile */
+  .productos-title {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .service-card {
+    border-radius: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  }
+
+  .service-primary-header {
+    padding: 8px 10px;
+  }
+
+  .service-label {
+    font-size: 10px;
+  }
+
+  .service-name {
+    font-size: 13px;
+  }
+
+  .service-secondary-header {
+    padding: 6px 10px;
+  }
+
+  .col-product-header,
+  .col-cant-header,
+  .col-precio-header {
+    font-size: 10px;
+    letter-spacing: 0.2px;
+  }
+
+  .col-cant-header {
+    width: 35px;
+  }
+
+  .col-precio-header {
+    width: 70px;
+  }
+
+  .product-option-row {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .col-product-row {
+    font-size: 12px;
+  }
+
+  .col-cant-row,
+  .col-precio-row {
+    font-size: 12px;
+  }
+
+  .col-cant-row {
+    width: 35px;
+  }
+
+  .col-precio-row {
+    width: 70px;
+  }
+
+  .products-servicios-section {
+    margin-bottom: 16px;
   }
 }
 
