@@ -30,22 +30,29 @@ export class ReceiptService {
     return name;
   }
 
-  // Extract Ciclo value from product options
+  // Extract Ciclo value from product options (supports both old and new formats)
   private static extractCiclo(options: any[]): string | null {
     if (!options || !Array.isArray(options)) return null;
     
     for (const option of options) {
-      // Check for "Ciclo" in option name
+      // New format: flat structure with optionName and choiceName
+      if (option.optionName && option.optionName.toLowerCase().includes('ciclo')) {
+        if (option.choiceName) {
+          return option.choiceName;
+        }
+      }
+      
+      // Old format: nested structure with name and choices
       if (option.name && option.name.toLowerCase().includes('ciclo')) {
-        // Get the choice name
         if (option.choices && Array.isArray(option.choices) && option.choices.length > 0) {
-          return option.choices[0].name;
+          return option.choices[0].name || option.choices[0].choiceName;
         }
         if (option.choiceName) {
           return option.choiceName;
         }
       }
-      // Also check in choices for ciclo
+      
+      // Also check in choices for ciclo (old format)
       if (option.choices) {
         for (const choice of option.choices) {
           if (choice.name && (choice.name.toLowerCase().includes('carga alta') || 
@@ -60,7 +67,76 @@ export class ReceiptService {
     return null;
   }
 
-  // Adapter function to convert Ticket to LegacyIncomeData format
+  // Adapter function to convert Ticket to UnifiedReceiptData format (NEW approach)
+  static adaptTicketToUnifiedReceipt(ticket: Ticket): UnifiedReceiptData {
+    // Convert paymentDate to date and time components
+    const paymentDateTime = new Date(ticket.paymentDate);
+    const transactionDate = paymentDateTime.toLocaleDateString('es-ES');
+    const transactionTime = paymentDateTime.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+
+    // Convert Ticket products to UnifiedProduct format with new option structure
+    const products: UnifiedProduct[] = ticket.products.map((product: any, index: number) => {
+      // Calculate quantity if not provided by API
+      const unitPrice = product.unitPrice || 0;
+      const subtotal = product.subtotal || 0;
+      const quantity = product.quantity || (unitPrice > 0 ? Math.round(subtotal / unitPrice) : 1);
+
+      // Transform options to new format
+      let options: any[] | undefined;
+      if (product.options && Array.isArray(product.options)) {
+        options = product.options.map((option: any) => ({
+          productOptionId: option.productOptionId,
+          optionName: option.optionName || option.name || 'Opción',
+          productOptionChoiceId: option.productOptionChoiceId,
+          choiceName: option.choiceName || '',
+          price: option.price || 0,
+          quantity: option.quantity || 1
+        }));
+      }
+
+      return {
+        id: product.incomeDetailId || index,
+        name: product.name,
+        quantity: quantity,
+        unitPrice: unitPrice,
+        subtotal: subtotal,
+        options: options && options.length > 0 ? options : undefined
+      };
+    });
+
+    return {
+      id: `income_${ticket.incomeId || Date.now()}`,
+      type: 'income',
+      date: transactionDate,
+      time: transactionTime,
+      client: {
+        name: ticket.client.name,
+        phone: ticket.client.cellphone,
+        email: ticket.client.email
+      },
+      user: {
+        name: ticket.user.name,
+        id: ticket.user.userId || 0
+      },
+      company: this.COMPANY_INFO,
+      products,
+      totals: {
+        subtotal: ticket.totals.subtotal,
+        iva: 0, // Force IVA to 0
+        total: ticket.totals.subtotal
+      },
+      payment: {
+        method: this.normalizePaymentMethod(ticket.paymentMethod),
+        amountReceived: ticket.totals.total,
+        change: 0
+      }
+    };
+  }
+
+  // Adapter function to convert Ticket to LegacyIncomeData format (OLD approach - for backward compatibility)
   static adaptTicketToLegacyIncome(ticket: Ticket): LegacyIncomeData {
     // Convert paymentDate to date and time components
     const paymentDateTime = new Date(ticket.paymentDate);
@@ -80,8 +156,16 @@ export class ReceiptService {
       // Handle both old format (options as array of choiceNames) and new format (options with nested choices)
       let options: string[] = [];
       if (product.options && Array.isArray(product.options)) {
-        // New format: options with nested choices structure
-        if (product.options[0]?.choices) {
+        // New format: options with flat structure
+        if (product.options[0]?.optionName || product.options[0]?.choiceName) {
+          product.options.forEach((option: any) => {
+            const choiceName = option.choiceName || '';
+            if (choiceName) {
+              options.push(choiceName);
+            }
+          });
+        } else if (product.options[0]?.choices) {
+          // Old format: options with nested choices structure
           product.options.forEach((option: any) => {
             if (option.choices && Array.isArray(option.choices)) {
               option.choices.forEach((choice: any) => {
@@ -129,19 +213,26 @@ export class ReceiptService {
       const unitPrice = product.unitPrice || 0;
       const subtotal = product.subtotal !== undefined ? product.subtotal : (unitPrice * quantity);
       
+      // Transform to new option format
+      let options: any[] | undefined;
+      if (product.options && product.options.length > 0) {
+        options = product.options.map((option: any, optIndex: number) => ({
+          productOptionId: optIndex,
+          optionName: 'Opción',
+          productOptionChoiceId: optIndex,
+          choiceName: typeof option === 'string' ? option : option.name || '',
+          price: 0,
+          quantity: 1
+        }));
+      }
+      
       return {
         id: index,
         name: product.name,
         quantity: quantity,
         unitPrice: unitPrice,
         subtotal: subtotal,
-        options: product.options && product.options.length > 0 ? [{
-          name: 'Opciones',
-          choices: product.options.map(option => ({
-            name: option,
-            price: 0
-          }))
-        }] : undefined
+        options: options
       };
     });
 
@@ -163,8 +254,8 @@ export class ReceiptService {
       products,
       totals: {
         subtotal: apiData.subtotal,
-        iva: apiData.iva,
-        total: apiData.total
+        iva: 0, // Force IVA to 0
+        total: apiData.subtotal
       },
       payment: {
         method: this.normalizePaymentMethod(apiData.paymentMethod),
@@ -182,13 +273,26 @@ export class ReceiptService {
       const unitPrice = product.price || product.unitPrice || 0;
       const subtotal = product.subtotal !== undefined ? product.subtotal : (unitPrice * quantity);
       
+      // Transform options to new format
+      let options: any[] | undefined;
+      if (product.selectedOptions) {
+        options = Object.entries(product.selectedOptions).map(([key, value], optIndex: number) => ({
+          productOptionId: optIndex,
+          optionName: key,
+          productOptionChoiceId: optIndex,
+          choiceName: Array.isArray(value) ? value.join(', ') : String(value),
+          price: 0,
+          quantity: 1
+        }));
+      }
+      
       return {
         id: index, // Use array index as fallback ID
         name: product.name,
         quantity: quantity,
         unitPrice: unitPrice,
         subtotal: subtotal,
-        options: product.selectedOptions ? this.parseSelectedOptions(product.selectedOptions) : undefined,
+        options: options,
         pieces: product.pieces
       };
     });
@@ -212,7 +316,11 @@ export class ReceiptService {
       },
       company: this.COMPANY_INFO,
       products,
-      totals: cartData.totals,
+      totals: {
+        subtotal: cartData.totals.subtotal,
+        iva: 0, // Force IVA to 0
+        total: cartData.totals.subtotal
+      },
       payment: {
         method: this.normalizePaymentMethod(cartData.paymentMethod),
         amountReceived: cartData.totals.total, // Default to total for non-cash payments
@@ -235,14 +343,13 @@ export class ReceiptService {
     return 'transferencia'; // Default fallback
   }
 
-  // Parse selected options from cart data
+  // Parse selected options from cart data (supports both old and new formats)
   private static parseSelectedOptions(selectedOptions: Record<string, any>): any {
     return Object.entries(selectedOptions).map(([key, value]) => ({
-      name: key,
-      choices: [{
-        name: Array.isArray(value) ? value.join(', ') : String(value),
-        price: 0
-      }]
+      optionName: key,
+      choiceName: Array.isArray(value) ? value.join(', ') : String(value),
+      price: 0,
+      quantity: 1
     }));
   }
 
@@ -361,12 +468,17 @@ export class ReceiptService {
   }
 
   .product-header-qty {
-    width: 15%;
+    width: 12%;
     text-align: center;
   }
 
+  .product-header-unit-price {
+    width: 20%;
+    text-align: right;
+  }
+
   .product-header-price {
-    width: 25%;
+    width: 20%;
     text-align: right;
   }
 
@@ -383,12 +495,17 @@ export class ReceiptService {
   }
 
   .product-qty {
-    width: 15%;
+    width: 12%;
     text-align: center;
   }
 
+  .product-unit-price {
+    width: 20%;
+    text-align: right;
+  }
+
   .product-price {
-    width: 25%;
+    width: 20%;
     text-align: right;
   }
 
@@ -556,16 +673,29 @@ export class ReceiptService {
   // Generate products section
   private static generateProducts(data: UnifiedReceiptData, isUltraCompact: boolean): string {
     const productRows = data.products.map(product => {
-      // Extract Ciclo from options
+      // Extract Ciclo from options (supports both old and new formats)
       const ciclo = product.options ? this.extractCiclo(product.options) : null;
       
-      // Build options text (excluding Ciclo which is shown separately)
-      const optionsText = product.options && product.options.length > 0 
-        ? product.options
-            .filter(opt => !opt.name?.toLowerCase().includes('ciclo'))
-            .map(opt => `${opt.name}: ${opt.choices.map(c => c.name).join(', ')}`)
-            .join('; ')
-        : '';
+      // Build options text (supports both old and new formats)
+      let optionsText = '';
+      if (product.options && product.options.length > 0) {
+        // New format: flat structure with optionName and choiceName
+        if (product.options[0]?.optionName) {
+          optionsText = product.options
+            .filter((opt: any) => !opt.optionName?.toLowerCase().includes('ciclo'))
+            .map((opt: any) => `${opt.optionName} ${opt.choiceName}`)
+            .join('; ');
+        } else {
+          // Old format: nested structure with name and choices
+          optionsText = product.options
+            .filter((opt: any) => !opt.name?.toLowerCase().includes('ciclo'))
+            .map((opt: any) => {
+              const choices = opt.choices?.map((c: any) => c.name || c.choiceName).join(', ');
+              return choices ? `${opt.name}: ${choices}` : opt.name;
+            })
+            .join('; ');
+        }
+      }
       
       // Generate pieces text for "Servicio Completo" products
       const piecesText = product.pieces 
@@ -573,7 +703,7 @@ export class ReceiptService {
         : '';
       
       if (isUltraCompact) {
-        // IMPROVED: Ultra-compact single-line product format
+        // Ultra-compact single-line product format
         let productLine = `${product.quantity}x ${product.name}`;
         if (ciclo) productLine += ` (${ciclo})`;
         return `
@@ -585,14 +715,25 @@ export class ReceiptService {
       
       // Full format with:
       // - Product name on its own line
-      // - "Cantidad: 1 × $0.00 = $180.00" format
-      // - "Ciclo: Carga Alta" displayed after the product
+      // - Options displayed in table format with Quantity, Unit Price, and Total
       return `
       <div class="product-name">${product.name}</div>
-      <div class="product-quantity">Cantidad: ${product.quantity} × $${product.unitPrice.toFixed(2)} = $${product.subtotal.toFixed(2)}</div>
       ${ciclo ? `<div class="product-ciclo">Ciclo: ${ciclo}</div>` : ''}
       ${optionsText ? `<div class="product-options">${optionsText}</div>` : ''}
-      ${piecesText ? `<div class="product-pieces">${piecesText}</div>` : ''}`;
+      ${piecesText ? `<div class="product-pieces">${piecesText}</div>` : ''}
+      ${product.options && product.options.length > 0 ? product.options.map((opt: any) => `
+      <div class="product-row">
+        <div class="product-name">  ${opt.optionName} ${opt.choiceName}</div>
+        <div class="product-qty">${opt.quantity}</div>
+        <div class="product-unit-price">$${(opt.price || 0).toFixed(2)}</div>
+        <div class="product-price">$${((opt.price || 0) * opt.quantity).toFixed(2)}</div>
+      </div>`).join('') : `
+      <div class="product-row">
+        <div class="product-name">  ${product.name}</div>
+        <div class="product-qty">${product.quantity}</div>
+        <div class="product-unit-price">$${product.unitPrice.toFixed(2)}</div>
+        <div class="product-price">$${product.subtotal.toFixed(2)}</div>
+      </div>`}`;
     }).join('');
 
     if (isUltraCompact) {
@@ -609,6 +750,7 @@ export class ReceiptService {
       <div class="product-header">
         <div class="product-header-name">Producto</div>
         <div class="product-header-qty">Cant</div>
+        <div class="product-header-unit-price">Precio</div>
         <div class="product-header-price">Total</div>
       </div>
       ${productRows}
