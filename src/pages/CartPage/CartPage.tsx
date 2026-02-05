@@ -188,7 +188,7 @@ const CartPage: React.FC = () => {
               {
                 action: 1,
                 total: total,
-                paymentMethod: 'efectivo',
+                paymentMethod: paymentMethod.toLowerCase(),
                 paymentDate: new Date().toISOString(),
                 userId: 1,
                 clientId: selectedClient?.clientId ?? 2,
