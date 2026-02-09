@@ -302,22 +302,20 @@ const CartPage: React.FC = () => {
               <>
                 {/* Cart Items List */}
                 <div className="cart-items-list">
-                  <div className="cart-items-scroll">
-                    {cartItems.map((item) => (
-                      <CartItemCard
-                        key={item.id}
-                        id={item.id}
-                        name={item.name}
-                        quantity={item.quantity}
-                        unitPrice={item.price / item.quantity}
-                        totalPrice={item.price}
-                        selectedChoices={item.selectedChoices}
-                        selectedOptionLabels={item.selectedOptionLabels}
-                        pieces={item.pieces}
-                        onRemove={removeFromCart}
-                      />
-                    ))}
-                  </div>
+                  {cartItems.map((item) => (
+                    <CartItemCard
+                      key={item.id}
+                      id={item.id}
+                      name={item.name}
+                      quantity={item.quantity}
+                      unitPrice={item.price / item.quantity}
+                      totalPrice={item.price}
+                      selectedChoices={item.selectedChoices}
+                      selectedOptionLabels={item.selectedOptionLabels}
+                      pieces={item.pieces}
+                      onRemove={removeFromCart}
+                    />
+                  ))}
                 </div>
 
                 {/* Footer */}
