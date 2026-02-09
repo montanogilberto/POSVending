@@ -3,6 +3,7 @@ import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBac
 import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import './Header.css';
 
 interface HeaderProps {
   presentAlertPopover: (e: React.MouseEvent) => void;
@@ -41,19 +42,19 @@ const Header: React.FC<HeaderProps> = ({
         </IonButtons>
         <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>{screenTitle}</IonTitle>
         <IonButtons slot="end">
-          <IonButton onClick={presentAlertPopover} title="Help">
-            <IonIcon icon={helpCircleOutline} />
+          <IonButton onClick={presentAlertPopover} title="Help" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+            <IonIcon icon={helpCircleOutline} style={{ fontSize: '28px' }} />
           </IonButton>
-          <IonButton title="Notifications">
-            <IonIcon icon={notificationsOutline} />
+          <IonButton title="Notifications" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+            <IonIcon icon={notificationsOutline} style={{ fontSize: '28px' }} />
           </IonButton>
-          <IonButton onClick={presentMailPopover} title="Messages">
-            <IonIcon icon={mailOutline} />
+          <IonButton onClick={presentMailPopover} title="Messages" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+            <IonIcon icon={mailOutline} style={{ fontSize: '28px' }} />
           </IonButton>
-          <IonButton onClick={handleCartClick} title="Cart" style={{ position: 'relative' }}>
-            <IonIcon icon={cartOutline} />
+          <IonButton onClick={handleCartClick} title="Cart" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px', position: 'relative' }}>
+            <IonIcon icon={cartOutline} style={{ fontSize: '28px' }} />
             {totalQuantity > 0 && (
-              <IonBadge color="danger" style={{ position: 'absolute', top: '0px', right: '0px', fontSize: '10px' }}>
+              <IonBadge color="danger" style={{ position: 'absolute', top: '2px', right: '2px', fontSize: '12px', minWidth: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {totalQuantity}
               </IonBadge>
             )}
