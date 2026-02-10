@@ -131,8 +131,8 @@ export class ReceiptService {
       },
       payment: {
         method: this.normalizePaymentMethod(ticket.paymentMethod),
-        amountReceived: ticket.totals.total,
-        change: 0
+        amountReceived: ticket.totals.amountReceived,
+        change: ticket.totals.change
       }
     };
   }

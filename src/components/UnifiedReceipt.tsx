@@ -139,9 +139,9 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
         {/* CLIENT INFO */}
         <IonItem className="receipt-section">
           <IonLabel>
-            <IonText className="section-title">Cliente y Usuario</IonText>
+            <IonText className="section-title">Cliente</IonText>
             <p>
-              <strong>Cliente:</strong> {formatClientName(data.client.name)}
+              <strong>Nombre:</strong> {formatClientName(data.client.name)}
             </p>
             <p>
               <strong>Teléfono:</strong> {data.client.phone}
@@ -149,107 +149,117 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
             <p>
               <strong>Email:</strong> {data.client.email}
             </p>
+          </IonLabel>
+        </IonItem>
+
+        {/* USER INFO */}
+        <IonItem className="receipt-section">
+          <IonLabel>
+            <IonText className="section-title">Usuario</IonText>
             <p>
-              <strong>Usuario:</strong> {data.user.name}
+              <strong>Nombre:</strong> {data.user.name}
             </p>
           </IonLabel>
         </IonItem>
 
-        {/* PRODUCTS / SERVICIOS */}
-        <div className="products-servicios-section">
-          <IonText className="section-title productos-title">
-            Productos / Servicios
-          </IonText>
+        {/* PRODUCTS / SERVICIOS & TOTALS */}
+        <div className="products-totals-section">
+          
+          {/* PRODUCTS / SERVICIOS */}
+          <div className="products-servicios-section">
+            <IonText className="section-title productos-title">
+              Productos / Servicios
+            </IonText>
 
-          {data.products.map((product, index) => {
-            const serviceSubtotal = Number(product.subtotal ?? 0);
-            const opts = product.options ?? [];
-            
-            // Generate pieces text for "Servicio Completo" products
-            const piecesText = product.pieces 
-              ? `Piezas:\nPantalones: ${product.pieces.pantalones}\nPrendas: ${product.pieces.prendas}\nOtros: ${product.pieces.otros}`
-              : null;
+            {data.products.map((product, index) => {
+              const serviceSubtotal = Number(product.subtotal ?? 0);
+              const opts = product.options ?? [];
+              
+              // Generate pieces text for "Servicio Completo" products
+              const piecesText = product.pieces 
+                ? `Piezas:\nPantalones: ${product.pieces.pantalones}\nPrendas: ${product.pieces.prendas}\nOtros: ${product.pieces.otros}`
+                : null;
 
-            return (
-              <div key={index} className="service-card">
-                {/* PRIMARY HEADER - DARK */}
-                <div className="service-primary-header">
-                  <span className="service-label">Servicio</span>
-                  <span className="service-name">{product.name}</span>
-                </div>
-
-                {/* SECONDARY HEADER - LIGHTER */}
-                <div className="service-secondary-header">
-                  <span className="col-product-header">Producto</span>
-                  <span className="col-cant-header">Cant</span>
-                  <span className="col-precio-header">Precio</span>
-                </div>
-
-                {/* PRODUCT ROWS */}
-                {opts.length > 0 ? (
-                  opts.map((option, optIndex) => {
-                    const qty = Number(option.quantity ?? 0);
-                    const displayPrice =
-                      opts.length === 1 ? serviceSubtotal : Number(option.price ?? 0);
-
-                    return (
-                      <div key={optIndex} className="product-option-row">
-                        <span className="col-product-row">
-                          {option.optionName}: {option.choiceName}
-                        </span>
-                        <span className="col-cant-row">{qty}</span>
-                        <span className="col-precio-row">
-                          ${displayPrice.toFixed(2)}
-                        </span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="product-option-row">
-                    <span className="col-product-row">{product.name}</span>
-                    <span className="col-cant-row">
-                      {Number(product.quantity ?? 0)}
-                    </span>
-                    <span className="col-precio-row">
-                      ${serviceSubtotal.toFixed(2)}
-                    </span>
+              return (
+                <div key={index} className="service-card">
+                  {/* PRIMARY HEADER - DARK */}
+                  <div className="service-primary-header">
+                    <span className="service-label">Servicio</span>
+                    <span className="service-name">{product.name}</span>
                   </div>
-                )}
-                
-                {/* PIECES ROW - For Servicio Completo */}
-                {piecesText && (
-                  <div className="product-option-row" style={{ background: '#f1f3f5', borderLeft: '3px solid #667eea' }}>
-                    <span className="col-product-row" style={{ fontStyle: 'italic', color: '#667eea' }}>
-                      {piecesText}
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
 
-        {/* TOTALS */}
-        <IonItem className="receipt-section totals-section">
-          <IonLabel>
+                  {/* SECONDARY HEADER - LIGHTER */}
+                  <div className="service-secondary-header">
+                    <span className="col-product-header">Producto</span>
+                    <span className="col-cant-header">Cant</span>
+                    <span className="col-precio-header">Precio</span>
+                  </div>
+
+                  {/* PRODUCT ROWS */}
+                  {opts.length > 0 ? (
+                    opts.map((option, optIndex) => {
+                      const qty = Number(option.quantity ?? 0);
+                      const displayPrice =
+                        opts.length === 1 ? serviceSubtotal : Number(option.price ?? 0);
+
+                      return (
+                        <div key={optIndex} className="product-option-row">
+                          <span className="col-product-row">
+                            {option.optionName}: {option.choiceName}
+                          </span>
+                          <span className="col-cant-row">{qty}</span>
+                          <span className="col-precio-row">
+                            ${displayPrice.toFixed(2)}
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="product-option-row">
+                      <span className="col-product-row">{product.name}</span>
+                      <span className="col-cant-row">
+                        {Number(product.quantity ?? 0)}
+                      </span>
+                      <span className="col-precio-row">
+                        ${serviceSubtotal.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* PIECES ROW - For Servicio Completo */}
+                  {piecesText && (
+                    <div className="product-option-row" style={{ background: '#f1f3f5', borderLeft: '3px solid #667eea' }}>
+                      <span className="col-product-row" style={{ fontStyle: 'italic', color: '#667eea' }}>
+                        {piecesText}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* TOTALS */}
+          <div className="totals-section">
             <IonText className="section-title">Totales</IonText>
 
-            <p className="total-row">
+            <div className="total-row">
               <span>Subtotal:</span>
               <span>${subtotal.toFixed(2)}</span>
-            </p>
+            </div>
 
-            <p className="total-row">
+            <div className="total-row">
               <span>IVA:</span>
               <span>$0.00</span>
-            </p>
+            </div>
 
-            <p className="total-row grand-total">
+            <div className="total-row grand-total">
               <span>Total:</span>
               <span>${total.toFixed(2)}</span>
-            </p>
-          </IonLabel>
-        </IonItem>
+            </div>
+          </div>
+
+        </div>
 
         {/* PAYMENT */}
         <IonItem className="receipt-section">
@@ -262,14 +272,23 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
 
             {data.payment.method === 'efectivo' && (
               <>
-                <p>
-                  <strong>Monto Recibido:</strong> $
-                  {Number(data.payment.amountReceived ?? 0).toFixed(2)}
-                </p>
+                
 
-                <p>
-                  <strong>Cambio:</strong> ${Number(data.payment.change ?? 0).toFixed(2)}
-                </p>
+                
+
+                {data.payment.amountReceived !== undefined && (
+                  <p>
+                    <strong>Monto Recibido:</strong> $
+                    {Number(data.payment.amountReceived ?? 0).toFixed(2)}
+                  </p>
+                )}
+
+                {data.payment.change !== undefined && data.payment.change > 0 && (
+                  <p>
+                    <strong>Cambio:</strong> $
+                    {Number(data.payment.change ?? 0).toFixed(2)}
+                  </p>
+                )}
               </>
             )}
           </IonLabel>
@@ -338,3 +357,4 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
 };
 
 export default UnifiedReceipt;
+
