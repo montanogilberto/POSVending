@@ -14,6 +14,11 @@ export interface IncomePayload {
     products: Array<{
       productId: number;
       quantity: number;
+      pieces?: {
+        pantalones: number;
+        prendas: number;
+        otros: number;
+      };
       options: Array<{
         productOptionId: number;
         productOptionChoiceId: number;

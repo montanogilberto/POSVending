@@ -91,6 +91,11 @@ export interface LegacyProduct {
   unitPrice: number;
   subtotal: number;
   options?: string[];
+  pieces?: {
+    pantalones: number;
+    prendas: number;
+    otros: number;
+  };
 }
 
 export interface LegacyCartData {

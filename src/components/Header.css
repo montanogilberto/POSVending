@@ -61,14 +61,31 @@
 
 /* Cart badge positioning for larger buttons */
 .header-action-button ion-badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
   font-size: 12px;
   min-width: 20px;
   height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Flex wrapper for icon + badge */
+.icon-with-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Badge beside icon styling */
+.badge-side {
+  font-size: 11px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  line-height: 1;
 }
 

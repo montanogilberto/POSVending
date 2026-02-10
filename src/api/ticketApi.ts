@@ -3,6 +3,10 @@ export interface Ticket {
   companyId: number;
   paymentDate: string;
   paymentMethod: string;
+  cashPaid: number;
+  cashReturn: number;
+  amountReceived: number;
+  change: number;
   client: {
     clientId: number;
     name: string;
@@ -21,6 +25,11 @@ export interface Ticket {
     quantity: number;
     unitPrice: number;
     subtotal: number;
+    pieces?: {
+      pantalones: number;
+      prendas: number;
+      otros: number;
+    };
     options: {
       productOptionId: number;
       optionName: string;
@@ -33,6 +42,8 @@ export interface Ticket {
     subtotal: number;
     iva: number;
     total: number;
+    amountReceived: number;
+    change: number;
   };
   ticketMeta: object;
 }

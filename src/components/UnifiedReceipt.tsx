@@ -164,6 +164,11 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
           {data.products.map((product, index) => {
             const serviceSubtotal = Number(product.subtotal ?? 0);
             const opts = product.options ?? [];
+            
+            // Generate pieces text for "Servicio Completo" products
+            const piecesText = product.pieces 
+              ? `Piezas:\nPantalones: ${product.pieces.pantalones}\nPrendas: ${product.pieces.prendas}\nOtros: ${product.pieces.otros}`
+              : null;
 
             return (
               <div key={index} className="service-card">
@@ -207,6 +212,15 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
                     </span>
                     <span className="col-precio-row">
                       ${serviceSubtotal.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                
+                {/* PIECES ROW - For Servicio Completo */}
+                {piecesText && (
+                  <div className="product-option-row" style={{ background: '#f1f3f5', borderLeft: '3px solid #667eea' }}>
+                    <span className="col-product-row" style={{ fontStyle: 'italic', color: '#667eea' }}>
+                      {piecesText}
                     </span>
                   </div>
                 )}
@@ -255,16 +269,6 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
 
                 <p>
                   <strong>Cambio:</strong> ${Number(data.payment.change ?? 0).toFixed(2)}
-                </p>
-
-                <p>
-                  <strong>Efectivo Pagado:</strong> $
-                  {Number(data.payment.cashPaid ?? data.payment.amountReceived ?? 0).toFixed(2)}
-                </p>
-
-                <p>
-                  <strong>Devolución:</strong> $
-                  {Number(data.payment.cashReturn ?? data.payment.change ?? 0).toFixed(2)}
                 </p>
               </>
             )}

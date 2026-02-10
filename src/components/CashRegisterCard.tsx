@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { IonButton, IonIcon, IonSpinner } from "@ionic/react";
 import { lockOpen, lockClosed, addCircle, removeCircle, logIn, logOut } from "ionicons/icons";
-import { postCashRegister } from "../api/cashRegisterApi";
+import { postCashRegister, isCashRegisterOpen as checkCashRegisterOpen } from "../api/cashRegisterApi";
 
 type Props = {
   companyId: number;
   userId: number;
   onToast: (msg: string, color?: "success" | "danger" | "warning") => void;
+  onCashRegisterStatusChange?: (isOpen: boolean) => void;
 };
 
-export default function CashRegisterCard({ companyId, userId, onToast }: Props) {
+export default function CashRegisterCard({ companyId, userId, onToast, onCashRegisterStatusChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [openSession, setOpenSession] = useState<any>(null); // output_json from action=4
   const [showMove, setShowMove] = useState(false);
@@ -36,6 +37,10 @@ export default function CashRegisterCard({ companyId, userId, onToast }: Props) 
       const sessionData = session?.output_json || null;
       console.log('[CashRegister] sessionData:', sessionData);
       setOpenSession(sessionData);
+      
+      // Notify parent about cash register status
+      const isOpen = !!sessionData?.sessionId;
+      onCashRegisterStatusChange?.(isOpen);
     } catch (e: any) {
       console.error('[CashRegister] Error loading session:', e);
       onToast(e.message || "Error consultando caja", "danger");
@@ -56,7 +61,10 @@ export default function CashRegisterCard({ companyId, userId, onToast }: Props) 
         register: [{ action: 1, companyId, userId, openingCash, notes }],
       });
       console.log('[CashRegister] Box opened successfully');
-      onToast("Caja abierta", "success");
+      // Only show toast if opening cash is 0
+      if (openingCash === 0) {
+        onToast("Caja abierta", "success");
+      }
       setAmount("");
       setDescription("");
       await loadOpen();
@@ -78,7 +86,10 @@ export default function CashRegisterCard({ companyId, userId, onToast }: Props) 
         register: [{ action: 2, companyId, userId, closingCash, notes }],
       });
       console.log('[CashRegister] Box closed successfully');
-      onToast("Caja cerrada", "success");
+      // Only show toast if closing cash is 0
+      if (closingCash === 0) {
+        onToast("Caja cerrada", "success");
+      }
       setAmount("");
       setDescription("");
       await loadOpen();
@@ -133,8 +144,8 @@ export default function CashRegisterCard({ companyId, userId, onToast }: Props) 
 
         {loading ? <IonSpinner name="crescent" /> : (
           <div className={`cash-status ${isOpen ? "open" : "closed"}`}>
+            {isOpen ? "" : "Cerrada"}
             <IonIcon icon={isOpen ? lockOpen : lockClosed} />
-            {isOpen ? "Abierta" : "Cerrada"}
           </div>
         )}
       </div>

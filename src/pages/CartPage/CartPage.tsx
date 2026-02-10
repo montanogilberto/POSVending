@@ -14,7 +14,7 @@ import {
   IonLabel,
   IonChip,
 } from '@ionic/react';
-import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, lockClosed } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
 import { useProduct } from '../../context/ProductContext';
 import { useState, useEffect } from 'react';
@@ -53,6 +53,7 @@ const CartPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
+  const [isCashRegisterOpen, setIsCashRegisterOpen] = useState(false);
 
   // Calculate total
   const total = cartItems.reduce((acc, item) => acc + item.price, 0);
@@ -60,6 +61,7 @@ const CartPage: React.FC = () => {
 
   const isCheckoutEnabled =
     !!paymentMethod &&
+    isCashRegisterOpen &&
     (paymentMethod !== 'Efectivo' ||
       (!isNaN(cashNumber) && cashNumber >= total));
 
@@ -102,6 +104,12 @@ const CartPage: React.FC = () => {
   const handleCheckout = async () => {
     if (!paymentMethod) {
       setShowAlert(true);
+      return;
+    }
+
+    // Validate cash register is open
+    if (!isCashRegisterOpen) {
+      showErrorToast('La caja está cerrada. Abra la caja para realizar ventas.');
       return;
     }
 
@@ -201,6 +209,8 @@ const CartPage: React.FC = () => {
                 products: cartItems.map((item) => ({
                   productId: parseInt(item.productId),
                   quantity: item.quantity,
+                  // Only include pieces for "Servicio Completo" products
+                  ...(item.pieces && { pieces: item.pieces }),
                   options: Object.entries(item.selectedChoices).flatMap(([optionId, choices]) =>
                     choices.map((choice) => ({
                       productOptionId: parseInt(optionId),
@@ -318,131 +328,138 @@ const CartPage: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Footer */}
-                <div className="cart-footer">
-                  {/* Total */}
-                  <div className="cart-total-section">
-                    <span className="cart-total-label">Total</span>
-                    <span className="cart-total-amount">{formatPrice(total)}</span>
-                  </div>
-
-                  {/* Cash Register Card */}
-                  <CashRegisterCard
-                    companyId={1}
-                    userId={1}
-                    onToast={(msg, color) => {
-                      showErrorToast(msg, color || 'danger');
-                    }}
-                  />
-
-                  {/* Client Selector */}
-                  <div className="client-section">
-                    <div className="client-label">CLIENTE</div>
-                    <div className="client-row">
-                      <div className="client-info">
-                        {selectedClient ? (
-                          <>
-                            <div className="client-name">
-                              {selectedClient.first_name} {selectedClient.last_name}
-                            </div>
-                            <div className="client-contact">
-                              {selectedClient.cellphone}
-                              {selectedClient.email && ` • ${selectedClient.email}`}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="client-name">Mostrador / Desconocido</div>
-                            <div className="client-contact">Sin cliente seleccionado</div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <IonButton
-                      fill="outline"
-                      onClick={() => setShowClientSelector(true)}
-                      className="client-change-btn"
-                    >
-                      <IonIcon icon={person} slot="start" />
-                      Cambiar cliente
-                    </IonButton>
-                  </div>
-
-                  {/* Payment Method */}
-                  <div className="payment-section">
-                    <label className="payment-label">Método de pago</label>
-                  <div className="payment-method-selector">
-                      <button
-                        className={`payment-method-btn ${paymentMethod === 'Efectivo' ? 'selected' : ''}`}
-                        onClick={() => handlePaymentMethodSelect('Efectivo')}
-                      >
-                        <IonIcon icon={wallet} className="icon" />
-                        Efectivo
-                      </button>
-                      <button
-                        className={`payment-method-btn ${paymentMethod === 'Tarjeta' ? 'selected' : ''}`}
-                        onClick={() => handlePaymentMethodSelect('Tarjeta')}
-                      >
-                        <IonIcon icon={card} className="icon" />
-                        Tarjeta
-                      </button>
-                      <button
-                        className={`payment-method-btn ${paymentMethod === 'Transferir' ? 'selected' : ''}`}
-                        onClick={() => handlePaymentMethodSelect('Transferir')}
-                      >
-                        <IonIcon icon={business} className="icon" />
-                        Transferir
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Cash Input */}
-                  {paymentMethod === 'Efectivo' && (
-                    <div className="cash-input-section">
-                      <div className="cash-input-wrapper">
-                        <span className="currency-symbol">$</span>
-                        <input
-                          type="number"
-                          value={cashPaid}
-                          onChange={(e) => setCashPaid(e.target.value)}
-                          placeholder="0.00"
-                          min={0}
-                          step="0.01"
-                          className="cash-input"
-                        />
-                      </div>
-                      {changeAmount > 0 && (
-                        <div className="change-display">
-                          <span className="change-amount">
-                            Cambio: {formatPrice(changeAmount)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="cart-actions">
-                    <IonButton
-                      fill="outline"
-                      onClick={handleAddMoreProducts}
-                      className="cart-button-secondary"
-                    >
-                      <IonIcon slot="start" icon={addCircle} className="add-icon" />
-                      Agregar más
-                    </IonButton>
-
-                    <IonButton
-                      expand="block"
-                      onClick={handleCheckout}
-                      disabled={!isCheckoutEnabledFinal}
-                      className="cart-button-primary"
-                    >
-                      <IonIcon slot="start" icon={receipt} className="pay-icon" />
-                      PAGAR {formatPrice(total)}
-                    </IonButton>
+                {/* Detail Footer */}
+                <div className="detail-footer">
+                  <IonButton
+                    fill="outline"
+                    onClick={handleAddMoreProducts}
+                    className="detail-add-more-btn"
+                  >
+                    <IonIcon slot="start" icon={addCircle} className="add-icon" />
+                    Agregar más
+                  </IonButton>
+                  <div className="detail-total">
+                    <span className="detail-total-label">Total:</span>
+                    <span className="detail-total-amount">{formatPrice(total)}</span>
                   </div>
                 </div>
+
+                {/* Cash Register Card */}
+                <CashRegisterCard
+                  companyId={1}
+                  userId={1}
+                  onToast={(msg, color) => {
+                    showErrorToast(msg, color || 'danger');
+                  }}
+                  onCashRegisterStatusChange={setIsCashRegisterOpen}
+                />
+
+                {/* Client Selector */}
+                <div className="client-section">
+                  <div className="client-label">CLIENTE</div>
+                  <div className="client-row">
+                    <div className="client-info">
+                      {selectedClient ? (
+                        <>
+                          <div className="client-name">
+                            {selectedClient.first_name} {selectedClient.last_name}
+                          </div>
+                          <div className="client-contact">
+                            {selectedClient.cellphone}
+                            {selectedClient.email && ` • ${selectedClient.email}`}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="client-name">Mostrador / Desconocido</div>
+                          <div className="client-contact">Sin cliente seleccionado</div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <IonButton
+                    fill="outline"
+                    onClick={() => setShowClientSelector(true)}
+                    className="client-change-btn"
+                  >
+                    <IonIcon icon={person} slot="start" />
+                    Cambiar cliente
+                  </IonButton>
+                </div>
+
+                {/* Payment Method */}
+                <div className="payment-section">
+                  <label className="payment-label">Método de pago</label>
+                  <div className="payment-method-selector">
+                    <button
+                      className={`payment-method-btn ${paymentMethod === 'Efectivo' ? 'selected' : ''}`}
+                      onClick={() => handlePaymentMethodSelect('Efectivo')}
+                    >
+                      <IonIcon icon={wallet} className="icon" />
+                      Efectivo
+                    </button>
+                    <button
+                      className={`payment-method-btn ${paymentMethod === 'Tarjeta' ? 'selected' : ''}`}
+                      onClick={() => handlePaymentMethodSelect('Tarjeta')}
+                    >
+                      <IonIcon icon={card} className="icon" />
+                      Tarjeta
+                    </button>
+                    <button
+                      className={`payment-method-btn ${paymentMethod === 'Transferir' ? 'selected' : ''}`}
+                      onClick={() => handlePaymentMethodSelect('Transferir')}
+                    >
+                      <IonIcon icon={business} className="icon" />
+                      Transferir
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cash Input */}
+                {paymentMethod === 'Efectivo' && (
+                  <div className="cash-input-section">
+                    <div className="cash-input-wrapper">
+                      <span className="currency-symbol">$</span>
+                      <input
+                        type="number"
+                        value={cashPaid}
+                        onChange={(e) => setCashPaid(e.target.value)}
+                        placeholder="0.00"
+                        min={0}
+                        step="0.01"
+                        className="cash-input"
+                      />
+                    </div>
+                    {changeAmount > 0 && (
+                      <div className="change-display">
+                        <span className="change-amount">
+                          Cambio: {formatPrice(changeAmount)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Action Button */}
+                <div className="payment-actions">
+                  <IonButton
+                    expand="block"
+                    onClick={handleCheckout}
+                    disabled={!isCheckoutEnabledFinal || !isCashRegisterOpen}
+                    className="pay-button"
+                    color={!isCashRegisterOpen ? 'medium' : 'primary'}
+                  >
+                    <IonIcon slot="start" icon={receipt} className="pay-icon" />
+                    {!isCashRegisterOpen ? 'CAJA CERRADA' : `PAGAR ${formatPrice(total)}`}
+                  </IonButton>
+                </div>
+                
+                {!isCashRegisterOpen && (
+                  <div className="caja-cerrada-warning">
+                    <IonIcon icon={lockClosed} slot="start" />
+                    La caja está cerrada. Abra la caja para realizar ventas.
+                  </div>
+                )}
               </>
             )}
           </div>

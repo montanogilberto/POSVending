@@ -103,7 +103,8 @@ export class ReceiptService {
         quantity: quantity,
         unitPrice: unitPrice,
         subtotal: subtotal,
-        options: options && options.length > 0 ? options : undefined
+        options: options && options.length > 0 ? options : undefined,
+        pieces: product.pieces
       };
     });
 
@@ -452,25 +453,44 @@ export class ReceiptService {
       // Safely access options
       const productOptions = product.options ?? [];
       const ciclo = productOptions.length > 0 ? this.extractCiclo(productOptions) : null;
-      
+      // Generate pieces text for "Servicio Completo" products
+      // Use <br> for HTML rendering
+      const piecesText = product.pieces
+        ? `Piezas:<br>Pantalones: ${product.pieces.pantalones}<br>Prendas: ${product.pieces.prendas}<br>Otros: ${product.pieces.otros}`
+        : '';
+
+      // Service header
+      const serviceHeader = `
+    <div class="product-line" style="background: #64748b; padding: 2px 4px; margin-bottom: 2px;">
+      <span class="product-name" style="color: white; font-weight: bold;">Servicio: ${product.name}</span>
+    </div>`;
+
       if (productOptions.length > 0) {
         // Product with options - show each option as separate line
-        return productOptions.map((opt: any) => {
+        const optionsHtml = productOptions.map((opt: any) => {
           const optQty = Number(opt.quantity ?? 1);
           const optPrice = Number(opt.price ?? 0);
           const displayPrice = productOptions.length === 1 ? product.subtotal : optPrice;
-          
+
           return `
     <div class="product-line">
       <span class="product-name">${optQty}x ${opt.optionName}: ${opt.choiceName}</span>
       <span class="product-price">$${displayPrice.toFixed(2)}</span>
     </div>`;
         }).join('');
+
+        // Add pieces row if exists (for products like "Servicio Completo" with pieces)
+        const piecesRow = piecesText ? `
+    <div class="product-line">
+      <span class="product-name" style="font-style: italic; color: #667eea;">${piecesText}</span>
+    </div>` : '';
+
+        return serviceHeader + optionsHtml + piecesRow;
       } else {
         // Simple product
         return `
     <div class="product-line">
-      <span class="product-name">${product.quantity}x ${product.name}${ciclo ? ` (${ciclo})` : ''}</span>
+      <span class="product-name">${product.quantity}x ${product.name}${ciclo ? ` (${ciclo})` : ''}${piecesText ? ` ${piecesText}` : ''}</span>
       <span class="product-price">$${product.subtotal.toFixed(2)}</span>
     </div>`;
       }
@@ -509,7 +529,6 @@ export class ReceiptService {
     <div class="receipt-field"><strong>Método:</strong> ${methodText}</div>
     ${data.payment.method === 'efectivo' ? `
     <div class="receipt-field"><strong>Efectivo Pagado:</strong> $${Number(data.payment.cashPaid ?? data.payment.amountReceived ?? 0).toFixed(2)}</div>
-    <div class="receipt-field"><strong>Devolución:</strong> $${Number(data.payment.cashReturn ?? data.payment.change ?? 0).toFixed(2)}</div>
     <div class="receipt-field"><strong>Cambio:</strong> $${Number(data.payment.change ?? 0).toFixed(2)}</div>` : ''}
     <div class="divider"></div>`;
   }
@@ -1145,10 +1164,6 @@ export class ReceiptService {
       <div class="receipt-row">
         <span class="receipt-label">Efectivo Pagado:</span>
         <span class="receipt-value">$${Number(data.payment.cashPaid ?? data.payment.amountReceived ?? 0).toFixed(2)}</span>
-      </div>
-      <div class="receipt-row">
-        <span class="receipt-label">Devolución:</span>
-        <span class="receipt-value">$${Number(data.payment.cashReturn ?? data.payment.change ?? 0).toFixed(2)}</span>
       </div>
       <div class="receipt-row">
         <span class="receipt-label">Cambio:</span>
