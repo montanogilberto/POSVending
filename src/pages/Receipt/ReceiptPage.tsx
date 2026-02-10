@@ -33,8 +33,27 @@ const ReceiptPage: React.FC = () => {
         }
         
         console.log('Processing ticketData');
-        const legacyIncomeData = ReceiptService.adaptTicketToLegacyIncome(ticketData);
-        const unifiedData = ReceiptService.transformIncomeData(legacyIncomeData);
+        
+        // Parse pieces JSON string for each product
+        const ticketWithParsedPieces = {
+          ...ticketData,
+          products: (ticketData.products || []).map((prod: any) => {
+            let parsedPieces = undefined;
+            if (prod.pieces) {
+              try {
+                parsedPieces = typeof prod.pieces === 'string' 
+                  ? JSON.parse(prod.pieces) 
+                  : prod.pieces;
+              } catch (e) {
+                console.warn('Failed to parse pieces:', prod.pieces);
+              }
+            }
+            return { ...prod, pieces: parsedPieces };
+          })
+        };
+        
+        // Use adaptTicketToUnifiedReceipt for proper transformation with pieces
+        const unifiedData = ReceiptService.adaptTicketToUnifiedReceipt(ticketWithParsedPieces);
         
         console.log('Final unified receipt data:', unifiedData);
         setReceiptData(unifiedData);

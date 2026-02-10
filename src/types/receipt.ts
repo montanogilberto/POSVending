@@ -25,11 +25,18 @@ export interface UnifiedReceiptData {
     subtotal: number;
     iva: number;
     total: number;
+    // Frontend-computed payment info (not from backend)
+    amountReceived?: number;
+    change?: number;
+    cashPaid?: number;
+    cashReturn?: number;
   };
   payment: {
     method: 'efectivo' | 'tarjeta' | 'transferencia';
     amountReceived: number;
     change: number;
+    cashPaid?: number;
+    cashReturn?: number;
   };
 }
 
@@ -84,6 +91,11 @@ export interface LegacyProduct {
   unitPrice: number;
   subtotal: number;
   options?: string[];
+  pieces?: {
+    pantalones: number;
+    prendas: number;
+    otros: number;
+  };
 }
 
 export interface LegacyCartData {
@@ -101,6 +113,11 @@ export interface LegacyCartData {
     subtotal: number;
     iva: number;
     total: number;
+    // Frontend-computed payment info
+    amountReceived?: number;
+    change?: number;
+    cashPaid?: number;
+    cashReturn?: number;
   };
   paymentMethod: string;
 }
