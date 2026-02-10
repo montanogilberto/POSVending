@@ -32,6 +32,7 @@ import './CartPage.css';
 import CartItemCard from '../../components/CartItemCard';
 import ClientSelector from '../../components/ClientSelector';
 import ReceiptDisplay from '../Receipt/ReceiptDisplay';
+import CashRegisterCard from '../../components/CashRegisterCard';
 
 const CartPage: React.FC = () => {
   const { cart: cartItems, removeFromCart, clearCart } = useCart();
@@ -44,6 +45,7 @@ const CartPage: React.FC = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [toastColor, setToastColor] = useState<'success' | 'danger' | 'warning'>('danger');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
   const [ticketData, setTicketData] = useState<any>(null);
@@ -84,8 +86,9 @@ const CartPage: React.FC = () => {
     }
   }, [cashPaid, paymentMethod, total]);
 
-  const showErrorToast = (message: string) => {
+  const showErrorToast = (message: string, color: 'success' | 'danger' | 'warning' = 'danger') => {
     setToastMessage(message);
+    setToastColor(color);
     setShowToast(true);
   };
 
@@ -189,6 +192,8 @@ const CartPage: React.FC = () => {
                 action: 1,
                 total: total,
                 paymentMethod: paymentMethod.toLowerCase(),
+                cashPaid: paymentMethod === 'Efectivo' ? cashNumber : 0,
+                cashReturn: paymentMethod === 'Efectivo' ? changeAmount : 0,
                 paymentDate: new Date().toISOString(),
                 userId: 1,
                 clientId: selectedClient?.clientId ?? 2,
@@ -219,20 +224,15 @@ const CartPage: React.FC = () => {
             const newId = String(rec.value);
             setLastIncomeId(newId);
             await loadIncomes();
+            
+            // NOTE: Cash register movement is already auto-inserted by sp_income backend
+            // DO NOT insert again here - it would create duplicates!
+            // The backend inserts movementType='efectivo' automatically for cash payments
           }
         } catch (incomeError) {}
 
         clearCart();
         clearAllProducts();
-        
-        // Log the toast message value before showing it
-        const successMessage = `¡Pedido realizado! ${paymentMethod}${
-          paymentMethod === 'Efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
-            ? ` | Cambio: ${formatPrice(parseFloat(cashPaid) - total)}`
-            : ''
-        }`;
-        console.log('Toast message:', successMessage);
-        
         setShowSuccessToast(true);
       } else {
         showErrorToast('Ocurrió un error al procesar el pedido.');
@@ -325,6 +325,15 @@ const CartPage: React.FC = () => {
                     <span className="cart-total-label">Total</span>
                     <span className="cart-total-amount">{formatPrice(total)}</span>
                   </div>
+
+                  {/* Cash Register Card */}
+                  <CashRegisterCard
+                    companyId={1}
+                    userId={1}
+                    onToast={(msg, color) => {
+                      showErrorToast(msg, color || 'danger');
+                    }}
+                  />
 
                   {/* Client Selector */}
                   <div className="client-section">
@@ -444,7 +453,7 @@ const CartPage: React.FC = () => {
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
           message={toastMessage}
-          color="danger"
+          color={toastColor}
           position="bottom"
           buttons={[{ text: 'OK', role: 'cancel' }]}
         />
@@ -459,14 +468,10 @@ const CartPage: React.FC = () => {
 
         <IonToast
           isOpen={showSuccessToast}
-          message={`¡Pedido realizado! ${paymentMethod}${
-            paymentMethod === 'Efectivo' && !isNaN(parseFloat(cashPaid)) && parseFloat(cashPaid) > total
-              ? ` | Cambio: ${formatPrice(parseFloat(cashPaid) - total)}`
-              : ''
-          }`}
+          message="¡Pedido realizado!"
           color="success"
           position="bottom"
-          buttons={[{ text: 'OK', role: 'cancel' }]}
+          duration={3000}
           onDidDismiss={async () => {
             setShowSuccessToast(false);
             if (lastIncomeId) {
@@ -497,6 +502,7 @@ const CartPage: React.FC = () => {
             ticketData={ticketData}
             paymentMethod={paymentMethod}
             cashPaid={cashPaid}
+            changeAmount={changeAmount}
             clearCart={clearCart}
             setTicketData={setTicketData}
           />

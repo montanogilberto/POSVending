@@ -5,6 +5,8 @@ export interface IncomePayload {
     action: number;
     total: number;
     paymentMethod: string;
+    cashPaid: number;
+    cashReturn: number;
     paymentDate: string;
     userId: number;
     clientId: number;

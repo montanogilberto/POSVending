@@ -10,6 +10,7 @@ interface ReceiptDisplayProps {
   ticketData: any;
   paymentMethod: string;
   cashPaid: string;
+  changeAmount?: number;
   clearCart: () => void;
   setTicketData: (data: any) => void;
 }
@@ -74,6 +75,7 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
   ticketData,
   paymentMethod,
   cashPaid,
+  changeAmount = 0,
   clearCart,
   setTicketData,
 }) => {
@@ -86,9 +88,16 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
   // 🔧 Repair totals before processing (fixes backend calculation bug)
   const repairedTicketData = React.useMemo(() => repairTicketTotals(ticketData), [ticketData]);
 
+  // Calculate cash values from props
+  const cashPaidNumber = parseFloat(cashPaid) || 0;
+  const isCashPayment = paymentMethod.toLowerCase() === 'efectivo';
+  const calculatedChange = isCashPayment ? changeAmount : 0;
+
   const unifiedReceiptData = React.useMemo(() => {
     // Use repaired ticket data
     const td = repairedTicketData;
+    
+    // Build LegacyCartData with payment info
     const legacyCartData: LegacyCartData = {
       paymentDate: td.paymentDate,
       client: {
@@ -134,12 +143,38 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
         subtotal: td.totals.subtotal,
         iva: td.totals.iva,
         total: td.totals.total,
+        // Add payment info to totals
+        amountReceived: isCashPayment ? cashPaidNumber : td.totals.total,
+        change: calculatedChange,
+        cashPaid: isCashPayment ? cashPaidNumber : undefined,
+        cashReturn: isCashPayment ? calculatedChange : undefined,
       },
       paymentMethod: td.paymentMethod,
     };
 
-    return ReceiptService.transformCartData(legacyCartData);
-  }, [repairedTicketData]);
+    // Transform to unified format with cash info
+    const unifiedData = ReceiptService.transformCartData(legacyCartData);
+    
+    // Override payment with cash details from props
+    return {
+      ...unifiedData,
+      payment: {
+        ...unifiedData.payment,
+        method: isCashPayment ? 'efectivo' : unifiedData.payment.method,
+        amountReceived: isCashPayment ? cashPaidNumber : td.totals.total,
+        change: calculatedChange,
+        cashPaid: isCashPayment ? cashPaidNumber : undefined,
+        cashReturn: isCashPayment ? calculatedChange : undefined,
+      },
+      totals: {
+        ...unifiedData.totals,
+        amountReceived: isCashPayment ? cashPaidNumber : td.totals.total,
+        change: calculatedChange,
+        cashPaid: isCashPayment ? cashPaidNumber : undefined,
+        cashReturn: isCashPayment ? calculatedChange : undefined,
+      },
+    };
+  }, [repairedTicketData, paymentMethod, cashPaid, changeAmount]);
 
   const handlePrint = () => {
     ReceiptService.printReceipt(unifiedReceiptData, {

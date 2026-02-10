@@ -1,3 +1,46 @@
+/* ===== Header Toolbar Alignment ===== */
+/* 
+ * Solution: Use CSS variables and ::part() to align toolbar with centered content.
+ * On laptops, the slot="end" buttons will align above the centered panels.
+ */
+
+/* Base: Mobile - full width with padding */
+.dashboard-header ion-toolbar {
+  --padding-start: 16px !important;
+  --padding-end: 16px !important;
+  --min-height: 56px;
+}
+
+/* Container part: center the toolbar content at 1400px max-width */
+.dashboard-header ion-toolbar::part(container) {
+  max-width: 1400px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: var(--padding-start, 16px);
+  padding-right: var(--padding-end, 16px);
+}
+
+/* Responsive: Tablet (768px+) */
+@media (min-width: 768px) {
+  .dashboard-header ion-toolbar {
+    --padding-start: 24px !important;
+    --padding-end: 24px !important;
+  }
+}
+
+/* Responsive: Desktop (1024px+) */
+@media (min-width: 1024px) {
+  .dashboard-header ion-toolbar {
+    --padding-start: 32px !important;
+    --padding-end: 32px !important;
+  }
+}
+
+/* Force end buttons to stay within container bounds */
+.dashboard-header ion-toolbar ion-buttons[slot="end"] {
+  max-width: 50%;
+}
+
 /* Header Action Buttons - Bigger Touch Targets */
 .header-action-button {
   --border-radius: 12px;

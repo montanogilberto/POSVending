@@ -256,6 +256,16 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
                 <p>
                   <strong>Cambio:</strong> ${Number(data.payment.change ?? 0).toFixed(2)}
                 </p>
+
+                <p>
+                  <strong>Efectivo Pagado:</strong> $
+                  {Number(data.payment.cashPaid ?? data.payment.amountReceived ?? 0).toFixed(2)}
+                </p>
+
+                <p>
+                  <strong>Devolución:</strong> $
+                  {Number(data.payment.cashReturn ?? data.payment.change ?? 0).toFixed(2)}
+                </p>
               </>
             )}
           </IonLabel>

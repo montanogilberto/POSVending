@@ -508,7 +508,8 @@ export class ReceiptService {
     return `
     <div class="receipt-field"><strong>Método:</strong> ${methodText}</div>
     ${data.payment.method === 'efectivo' ? `
-    
+    <div class="receipt-field"><strong>Efectivo Pagado:</strong> $${Number(data.payment.cashPaid ?? data.payment.amountReceived ?? 0).toFixed(2)}</div>
+    <div class="receipt-field"><strong>Devolución:</strong> $${Number(data.payment.cashReturn ?? data.payment.change ?? 0).toFixed(2)}</div>
     <div class="receipt-field"><strong>Cambio:</strong> $${Number(data.payment.change ?? 0).toFixed(2)}</div>` : ''}
     <div class="divider"></div>`;
   }
@@ -1115,12 +1116,12 @@ export class ReceiptService {
         <span class="receipt-value">${paymentMethodText}</span>
       </div>
       <div class="receipt-row">
-        <span class="receipt-label">Recibido:</span>
-        <span class="receipt-value">$${Number(data.payment.amountReceived ?? 0).toFixed(2)}</span>
+        <span class="receipt-label">Efectivo:</span>
+        <span class="receipt-value">$${Number(data.payment.cashPaid ?? data.payment.amountReceived ?? 0).toFixed(2)}</span>
       </div>
       <div class="receipt-row">
-        <span class="receipt-label">Cambio:</span>
-        <span class="receipt-value">$${Number(data.payment.change ?? 0).toFixed(2)}</span>
+        <span class="receipt-label">Devolución:</span>
+        <span class="receipt-value">$${Number(data.payment.cashReturn ?? data.payment.change ?? 0).toFixed(2)}</span>
       </div>
     </div>
     <div class="section-divider"></div>`;
@@ -1141,7 +1142,14 @@ export class ReceiptService {
       <div class="section-divider"></div>
       <div class="payment-method">Método: ${paymentMethodText}</div>
       ${data.payment.method === 'efectivo' ? `
-
+      <div class="receipt-row">
+        <span class="receipt-label">Efectivo Pagado:</span>
+        <span class="receipt-value">$${Number(data.payment.cashPaid ?? data.payment.amountReceived ?? 0).toFixed(2)}</span>
+      </div>
+      <div class="receipt-row">
+        <span class="receipt-label">Devolución:</span>
+        <span class="receipt-value">$${Number(data.payment.cashReturn ?? data.payment.change ?? 0).toFixed(2)}</span>
+      </div>
       <div class="receipt-row">
         <span class="receipt-label">Cambio:</span>
         <span class="receipt-value">$${Number(data.payment.change ?? 0).toFixed(2)}</span>

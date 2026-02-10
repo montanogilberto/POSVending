@@ -772,3 +772,125 @@
   }
 }
 
+/* ===== Cash Register Card ===== */
+.cash-box {
+  margin-top: 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.cash-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.cash-box-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #111827;
+}
+
+.cash-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.cash-status.open { color: #059669; }
+.cash-status.closed { color: #b45309; }
+
+.cash-box-body .kv {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  color: #111827;
+}
+
+.cash-box-hint {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.cash-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.cash-move-input {
+  width: 100%;
+  padding: 12px 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 1rem;
+  margin-top: 8px;
+}
+
+.cash-move-title {
+  font-weight: 700;
+  color: #111827;
+}
+
+.cash-move-hint {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-bottom: 8px;
+  font-style: italic;
+}
+
+.cash-open {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.cash-open .cash-move-input { margin-top: 0; }
+
+/* Responsive for cash box */
+@media (min-width: 768px) {
+  .cash-box {
+    padding: 14px 16px;
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cash-box {
+    padding: 10px 12px;
+    margin-top: 10px;
+    border-radius: 10px;
+  }
+
+  .cash-box-title {
+    font-size: 0.75rem;
+  }
+
+  .cash-status {
+    font-size: 0.8rem;
+  }
+
+  .cash-box-body .kv {
+    font-size: 0.9rem;
+  }
+
+  .cash-actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .cash-actions ion-button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
