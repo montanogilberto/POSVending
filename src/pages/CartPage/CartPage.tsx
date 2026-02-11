@@ -13,16 +13,17 @@ import {
   IonLoading,
   IonLabel,
   IonChip,
+  IonInput,
 } from '@ionic/react';
-import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, lockClosed } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, lockClosed, pricetag } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
 import { useProduct } from '../../context/ProductContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useHistory } from 'react-router-dom';
 import { submitOrder } from '../../api/cartApi';
 import useInactivityTimer from '../../hooks/useInactivityTimer';
 import { fetchTicket } from '../../api/ticketApi';
-import { postIncome } from '../../api/incomeApi';
+import { postIncome, applyPromoToIncome } from '../../api/incomeApi';
 import { useIncome } from '../../context/IncomeContext';
 import { Client } from '../../api/clientsApi';
 
@@ -33,6 +34,13 @@ import CartItemCard from '../../components/CartItemCard';
 import ClientSelector from '../../components/ClientSelector';
 import ReceiptDisplay from '../Receipt/ReceiptDisplay';
 import CashRegisterCard from '../../components/CashRegisterCard';
+
+/**
+ * Helper function for 2x1 promotion: calculates how many items to pay for.
+ * Buy 2, get 1 free means: for every 3 items, pay for 2.
+ * Formula: qty - floor(qty / 2) = pay for 2 out of every 3
+ */
+const payQty2x1 = (qty: number): number => Math.max(0, qty - Math.floor(qty / 2));
 
 const CartPage: React.FC = () => {
   const { cart: cartItems, removeFromCart, clearCart } = useCart();
@@ -55,8 +63,72 @@ const CartPage: React.FC = () => {
   const [showClientSelector, setShowClientSelector] = useState(false);
   const [isCashRegisterOpen, setIsCashRegisterOpen] = useState(false);
 
-  // Calculate total
-  const total = cartItems.reduce((acc, item) => acc + item.price, 0);
+  // Promotion code state
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
+  const [promoApplied, setPromoApplied] = useState(false);
+
+  // Validate promo code (currently supports "2X1" for 2x1 on all services)
+  const isPromoValid = useMemo(() => {
+    const code = promoCode.trim().toUpperCase();
+    if (!code) return false;
+    // Supported promo codes
+    const supportedCodes = ['2X1'];
+    return supportedCodes.includes(code);
+  }, [promoCode]);
+
+  // Promotion is active if code is valid
+  const promoActive = promoCode.trim().length > 0 && isPromoValid;
+
+  // Clear promo error when code changes
+  useEffect(() => {
+    setPromoError('');
+  }, [promoCode]);
+
+  // Compute totals with promotion preview
+  const totals = useMemo(() => {
+    // Guard: if no cart items, return zeros
+    if (!cartItems || cartItems.length === 0) {
+      return { lines: [], subtotal: 0, total: 0, discount: 0 };
+    }
+    
+    let subtotal = 0;
+    let totalPromo = 0;
+    const lines = cartItems.map((item) => {
+      // item.price is already the line total (price * quantity)
+      const lineTotal = Number(item.price) || 0;
+      const qty = Number(item.quantity) || 1;
+      
+      subtotal += lineTotal;
+      
+      if (!promoActive) {
+        return { ...item, payQty: qty, promoLineTotal: lineTotal, discount: 0 };
+      }
+      
+      const payQty = payQty2x1(qty);
+      const promoLineTotal = qty > 0 
+        ? Math.round((lineTotal * (payQty / qty)) * 100) / 100 
+        : lineTotal;
+      const discount = Math.round((lineTotal - promoLineTotal) * 100) / 100;
+      
+      totalPromo += promoLineTotal;
+      
+      return { ...item, payQty, promoLineTotal, discount };
+    });
+
+    const discount = Math.round((subtotal - totalPromo) * 100) / 100;
+    const finalTotal = promoActive ? totalPromo : subtotal;
+
+    return { 
+      lines, 
+      subtotal: Math.round(subtotal * 100) / 100, 
+      total: Math.round(finalTotal * 100) / 100, 
+      discount: Math.round(discount * 100) / 100
+    };
+  }, [cartItems, promoActive]);
+
+  // Calculate total (use promo-adjusted total)
+  const total = totals.total;
   const cashNumber = parseFloat(cashPaid);
 
   const isCheckoutEnabled =
@@ -65,16 +137,6 @@ const CartPage: React.FC = () => {
     (paymentMethod !== 'Efectivo' ||
       (!isNaN(cashNumber) && cashNumber >= total));
 
-  // NOTE: pieces validation for "Servicio Completo" is DISABLED for now
-  // const hasValidServicioCompleto = cartItems.every(item => {
-  //   const isServicioCompleto = item.name?.toLowerCase().includes('servicio completo');
-  //   if (!isServicioCompleto) return true;
-  //   if (!item.pieces) return false;
-  //   const totalPieces = item.pieces.pantalones + item.pieces.prendas + item.pieces.otros;
-  //   return totalPieces > 0;
-  // });
-
-  // Checkout enabled without pieces validation
   const isCheckoutEnabledFinal = isCheckoutEnabled;
 
   useInactivityTimer(300000, () => window.location.reload());
@@ -95,10 +157,11 @@ const CartPage: React.FC = () => {
   };
 
   const formatPrice = (price: number) => {
+    const safePrice = isNaN(price) ? 0 : price;
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
       currency: 'MXN',
-    }).format(price);
+    }).format(safePrice);
   };
 
   const handleCheckout = async () => {
@@ -194,6 +257,8 @@ const CartPage: React.FC = () => {
             };
           });
 
+          const promoCodeValue = promoActive ? promoCode.trim().toUpperCase() : null;
+
           const payload = {
             income: [
               {
@@ -206,6 +271,7 @@ const CartPage: React.FC = () => {
                 userId: 1,
                 clientId: selectedClient?.clientId ?? 2,
                 companyId: 1,
+                promotionCode: promoCodeValue,
                 products: cartItems.map((item) => ({
                   productId: parseInt(item.productId),
                   quantity: item.quantity,
@@ -234,10 +300,28 @@ const CartPage: React.FC = () => {
             const newId = String(rec.value);
             setLastIncomeId(newId);
             await loadIncomes();
-            
-            // NOTE: Cash register movement is already auto-inserted by sp_income backend
-            // DO NOT insert again here - it would create duplicates!
-            // The backend inserts movementType='efectivo' automatically for cash payments
+
+            // Apply promo code to income via stored procedure (DB is source of truth)
+            if (promoActive && promoCodeValue) {
+              try {
+                const promoPayload = {
+                  promo: [{
+                    action: 1,
+                    incomeId: parseInt(newId),
+                    companyId: 1,
+                    code: promoCodeValue,
+                    userId: 1
+                  }]
+                };
+                console.log('Applying promo:', JSON.stringify(promoPayload, null, 2));
+                const promoResult = await applyPromoToIncome(promoPayload);
+                console.log('Promo applied result:', promoResult);
+                setPromoApplied(true);
+              } catch (promoError) {
+                console.error('Error applying promo:', promoError);
+                // Continue even if promo fails - income was still created
+              }
+            }
           }
         } catch (incomeError) {}
 
@@ -264,6 +348,9 @@ const CartPage: React.FC = () => {
       setCashPaid('');
     }
   };
+
+  // Get original total for display
+  const originalTotal = cartItems.reduce((acc, item) => acc + item.price, 0);
 
   return (
     <IonPage>
@@ -340,8 +427,53 @@ const CartPage: React.FC = () => {
                   </IonButton>
                   <div className="detail-total">
                     <span className="detail-total-label">Total:</span>
-                    <span className="detail-total-amount">{formatPrice(total)}</span>
+                    <span className="detail-total-amount">
+                      {formatPrice(total)}
+                    </span>
                   </div>
+                </div>
+
+                {/* Promotion Code Section */}
+                <div className="promo-section">
+                  <div className="promo-label">CÓDIGO DE PROMOCIÓN</div>
+                  <div className="promo-input-wrapper">
+                    <IonInput
+                      value={promoCode}
+                      placeholder="Ej: 2X1"
+                      onIonInput={(e) => setPromoCode(e.detail.value ?? '')}
+                      className={`promo-input ${promoActive ? 'promo-active' : ''} ${promoError ? 'promo-error' : ''}`}
+                      fill="outline"
+                      mode="md"
+                    />
+                    {promoActive && (
+                      <div className="promo-badge">
+                        <IonIcon icon={checkmarkCircle} />
+                        <span>2x1 aplicado</span>
+                      </div>
+                    )}
+                  </div>
+                  {promoError && (
+                    <div className="promo-error-message">
+                      <IonIcon icon={lockClosed} />
+                      {promoError}
+                    </div>
+                  )}
+                  {promoActive && totals.discount > 0 && (
+                    <div className="promo-discount-display">
+                      <div className="discount-row">
+                        <span className="discount-label">Subtotal:</span>
+                        <span className="discount-original">{formatPrice(originalTotal)}</span>
+                      </div>
+                      <div className="discount-row discount-savings">
+                        <span className="discount-label">Descuento 2x1:</span>
+                        <span className="discount-amount">-{formatPrice(totals.discount)}</span>
+                      </div>
+                      <div className="discount-row discount-final">
+                        <span className="discount-label">Total a pagar:</span>
+                        <span className="discount-final-amount">{formatPrice(total)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Cash Register Card */}
@@ -522,6 +654,8 @@ const CartPage: React.FC = () => {
             changeAmount={changeAmount}
             clearCart={clearCart}
             setTicketData={setTicketData}
+            promotionCode={promoActive ? promoCode.trim().toUpperCase() : undefined}
+            discountAmount={promoActive ? totals.discount : undefined}
           />
         )}
 

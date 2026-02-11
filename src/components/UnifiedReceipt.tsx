@@ -20,7 +20,7 @@ import {
   IonContent
 } from '@ionic/react';
 
-import { printOutline, closeOutline, downloadOutline } from 'ionicons/icons';
+import { printOutline, closeOutline, downloadOutline, pricetagOutline } from 'ionicons/icons';
 import { UnifiedReceiptData, PrintOptions } from '../types/receipt';
 import { ReceiptService } from '../services/ReceiptService';
 import './UnifiedReceipt.css';
@@ -60,7 +60,13 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
   // ✅ FORCE IVA = 0 LOCALLY
   const iva = 0;
   const subtotal = Number(data.totals.subtotal ?? 0);
-  const total = subtotal + iva;
+  const discount = Number(data.totals.discount ?? 0);
+  const originalTotal = data.totals.originalTotal ? Number(data.totals.originalTotal) : subtotal;
+  const total = originalTotal - discount;
+
+  // Promotion info from data
+  const promotion = data.promotion;
+  const hasPromotion = !!promotion && promotion.discount > 0;
 
   const handlePrint = () => {
     const updatedData = {
@@ -68,7 +74,9 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
       totals: {
         ...data.totals,
         iva,
-        total
+        total,
+        discount,
+        originalTotal
       }
     };
 
@@ -82,7 +90,9 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
       totals: {
         ...data.totals,
         iva,
-        total
+        total,
+        discount,
+        originalTotal
       }
     };
 
@@ -161,6 +171,27 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
             </p>
           </IonLabel>
         </IonItem>
+
+        {/* PROMOTION SECTION */}
+        {hasPromotion && (
+          <IonItem className="receipt-section promotion-section">
+            <IonLabel>
+              <IonText className="section-title">
+                <IonIcon icon={pricetagOutline} style={{ marginRight: '6px' }} />
+                Promoción Aplicada
+              </IonText>
+              <p>
+                <strong>Código:</strong> {promotion.code}
+              </p>
+              <p>
+                <strong>Tipo:</strong> {promotion.type === 'B2G1' ? '2x1 (Buy 2 Get 1)' : promotion.type}
+              </p>
+              <p className="promo-discount">
+                <strong>Descuento:</strong> ${promotion.discount.toFixed(2)}
+              </p>
+            </IonLabel>
+          </IonItem>
+        )}
 
         {/* PRODUCTS / SERVICIOS & TOTALS */}
         <div className="products-totals-section">
@@ -245,8 +276,19 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
 
             <div className="total-row">
               <span>Subtotal:</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span>${originalTotal.toFixed(2)}</span>
             </div>
+
+            {/* Show discount if promo applied */}
+            {hasPromotion && (
+              <div className="total-row discount-row">
+                <span>
+                  <IonIcon icon={pricetagOutline} style={{ marginRight: '4px' }} />
+                  Descuento ({promotion.code}):
+                </span>
+                <span>-${discount.toFixed(2)}</span>
+              </div>
+            )}
 
             <div className="total-row">
               <span>IVA:</span>

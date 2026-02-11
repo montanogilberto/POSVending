@@ -21,6 +21,11 @@ export interface UnifiedReceiptData {
     website: string;
   };
   products: UnifiedProduct[];
+  promotion?: {
+    code: string;
+    discount: number;
+    type: string; // 'B2G1', 'PCT', 'FIXED'
+  };
   totals: {
     subtotal: number;
     iva: number;
@@ -30,6 +35,9 @@ export interface UnifiedReceiptData {
     change?: number;
     cashPaid?: number;
     cashReturn?: number;
+    // Promotion-related fields
+    discount?: number;
+    originalTotal?: number;
   };
   payment: {
     method: 'efectivo' | 'tarjeta' | 'transferencia';
@@ -118,6 +126,9 @@ export interface LegacyCartData {
     change?: number;
     cashPaid?: number;
     cashReturn?: number;
+    // Promotion-related fields
+    discount?: number;
+    originalTotal?: number;
   };
   paymentMethod: string;
 }

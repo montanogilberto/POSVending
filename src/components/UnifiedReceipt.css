@@ -324,6 +324,64 @@
   justify-content: flex-end;
 }
 
+/* ==========================================
+   PROMOTION SECTION STYLES
+   ========================================== */
+
+.promotion-section {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border: 2px solid #22c55e;
+}
+
+.promotion-section .section-title {
+  color: #166534;
+  border-bottom-color: #86efac;
+}
+
+.promo-discount {
+  color: #166534;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Discount row in totals section */
+.discount-row {
+  color: #bbf7d0 !important;
+}
+
+.discount-row span:last-child {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+/* Responsive for promotion section */
+@media (max-width: 576px) {
+  .promotion-section {
+    padding: 10px;
+  }
+  
+  .promo-discount {
+    font-size: 14px;
+  }
+}
+
+/* Dark mode for promotion section */
+@media (prefers-color-scheme: dark) {
+  .promotion-section {
+    background: linear-gradient(135deg, #14532d 0%, #166534 100%);
+    border-color: #22c55e;
+  }
+  
+  .promotion-section .section-title {
+    color: #bbf7d0;
+    border-bottom-color: #22c55e;
+  }
+  
+  .promo-discount {
+    color: #bbf7d0;
+  }
+}
+
 /* Totals Section - Now uses DIV instead of IonItem */
 .totals-section {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

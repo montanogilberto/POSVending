@@ -937,6 +937,217 @@
   }
 }
 
+/* ===== Promotion Code Section ===== */
+.promo-section {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.promo-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.promo-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.promo-input {
+  flex: 1;
+  --border-radius: 10px;
+  --border-color: #d1d5db;
+  --border-width: 1.5px;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  font-size: 1rem;
+  color: #111827;
+  transition: all 0.15s ease;
+}
+
+.promo-input:focus-within {
+  --border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.promo-input.promo-active {
+  --border-color: #059669;
+  --color: #059669;
+}
+
+.promo-input.promo-error {
+  --border-color: #ef4444;
+}
+
+.promo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #dcfce7;
+  border-radius: 20px;
+  color: #059669;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.promo-badge ion-icon {
+  font-size: 1rem;
+}
+
+.promo-error-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fef2f2;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.promo-error-message ion-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.promo-discount-display {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px dashed #d1d5db;
+}
+
+.discount-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 0.95rem;
+}
+
+.discount-row:last-child {
+  margin-bottom: 0;
+}
+
+.discount-label {
+  color: #6b7280;
+}
+
+.discount-original {
+  color: #6b7280;
+  text-decoration: line-through;
+  font-weight: 500;
+}
+
+.discount-savings .discount-amount {
+  color: #059669;
+  font-weight: 700;
+}
+
+.discount-final {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.discount-final .discount-label {
+  font-weight: 600;
+  color: #111827;
+}
+
+.discount-final-amount {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #059669;
+}
+
+/* Responsive for promo section */
+@media (min-width: 768px) {
+  .promo-section {
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+
+  .promo-label {
+    font-size: 0.85rem;
+  }
+
+  .promo-input {
+    font-size: 1.05rem;
+    padding: 14px 16px;
+  }
+
+  .promo-badge {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+
+  .discount-row {
+    font-size: 1rem;
+  }
+
+  .discount-final-amount {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .promo-section {
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+  }
+
+  .promo-label {
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  .promo-input-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .promo-input {
+    font-size: 0.95rem;
+    padding: 12px 14px;
+  }
+
+  .promo-badge {
+    justify-content: center;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .promo-discount-display {
+    padding: 10px;
+  }
+
+  .discount-row {
+    font-size: 0.9rem;
+  }
+
+  .discount-final-amount {
+    font-size: 1.1rem;
+  }
+}
+
 /* ===== Cash Register Card ===== */
 .cash-box {
   margin-top: 12px;
