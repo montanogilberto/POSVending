@@ -2,6 +2,7 @@ interface Income {
   incomeId: number;
   orderId: number;
   total: number;
+  discountAmount: number; // Discount from promotions (2x1, etc.)
   paymentMethod: string;
   paymentDate: string;
   userId: number;
