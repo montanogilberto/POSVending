@@ -1,16 +1,6 @@
-# Product Wizard Nested Payload Migration TODO
+# TODO - companyId global integration
 
-- [x] Analyze current product API/context/types/wizard integration
-- [x] Update API request typings for nested product payload contract
-- [x] Update ProductContext create flow to submit nested payload
-- [x] Update ProductWizard state mapping and submit payload
-- [ ] Align product types with nested response/payload structure
-- [x] Integrate ProductWizard into ProductsManagementPage create flow
-- [ ] Run type/build validation and fix typing issues
-
-# Categories API Contract Fix TODO
-
-- [x] Fix categories request/response contract mismatch with backend
-  - [x] Update `src/data/categories.ts` to use `productCategories` request key and parse camelCase response
-  - [x] Update `src/utils/apiUtils.ts` to use `productCategories` and parse both camelCase/snake_case response keys
-  - [ ] Verify no TypeScript issues in modified sections
+- [x] Update login flow to capture and persist backend `companyId` from `/login`.
+- [x] Remove hardcoded `companyId: 1` in transaction flows and use global user context companyId.
+- [ ] Adjust company selection behavior to align with backend-provided companyId.
+- [ ] Run build validation and fix any typing/runtime issues.

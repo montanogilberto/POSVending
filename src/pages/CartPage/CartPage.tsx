@@ -26,6 +26,7 @@ import { fetchTicket } from '../../api/ticketApi';
 import { postIncome, applyPromoToIncome } from '../../api/incomeApi';
 import { useIncome } from '../../context/IncomeContext';
 import { Client } from '../../api/clientsApi';
+import { useUser } from '../../components/UserContext';
 
 import '../../styles/dashboard.css';
 import './CartPage.css';
@@ -46,6 +47,7 @@ const CartPage: React.FC = () => {
   const { cart: cartItems, removeFromCart, clearCart } = useCart();
   const { clearAllProducts } = useProduct();
   const { loadIncomes } = useIncome();
+  const { companyId } = useUser();
   const history = useHistory();
 
   const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta' | 'Transferir' | ''>('');
@@ -270,7 +272,7 @@ const CartPage: React.FC = () => {
                 paymentDate: new Date().toISOString(),
                 userId: 1,
                 clientId: selectedClient?.clientId ?? 2,
-                companyId: 1,
+                companyId: companyId || 0,
                 promotionCode: promoCodeValue,
                 products: cartItems.map((item) => ({
                   productId: parseInt(item.productId),
@@ -308,7 +310,7 @@ const CartPage: React.FC = () => {
                   promo: [{
                     action: 1,
                     incomeId: parseInt(newId),
-                    companyId: 1,
+                    companyId: companyId || 0,
                     code: promoCodeValue,
                     userId: 1
                   }]
@@ -478,7 +480,7 @@ const CartPage: React.FC = () => {
 
                 {/* Cash Register Card */}
                 <CashRegisterCard
-                  companyId={1}
+                  companyId={companyId || 0}
                   userId={1}
                   onToast={(msg, color) => {
                     showErrorToast(msg, color || 'danger');
