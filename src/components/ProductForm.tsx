@@ -20,6 +20,7 @@ import {
 import { close } from 'ionicons/icons';
 import { useProduct } from '../context/ProductContext';
 import { Product } from '../data/type_products';
+import { useUser } from './UserContext';
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ interface ProductFormProps {
 
 const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) => {
   const { createProduct, updateProduct, loading } = useProduct();
+  const { companyId: sessionCompanyId } = useUser();
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -52,7 +54,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
         description: product.description,
         barCode: product.barCode,
         categoryId: product.categoryId,
-        companyId: product.companyId,
+        companyId: product.companyId || sessionCompanyId,
       });
     } else {
       setFormData({
@@ -64,10 +66,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
         description: '',
         barCode: '',
         categoryId: 0,
-        companyId: 0,
+        companyId: sessionCompanyId,
       });
     }
-  }, [product]);
+  }, [product, sessionCompanyId]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
@@ -78,10 +80,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
 
   const handleSubmit = async () => {
     try {
+      const payload = {
+        ...formData,
+        companyId: sessionCompanyId,
+      };
+
       if (product) {
-        await updateProduct(product.productId, formData);
+        await updateProduct(product.productId, payload);
       } else {
-        await createProduct(formData);
+        await createProduct(payload);
       }
       onClose();
     } catch (error) {
@@ -178,8 +185,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
             <IonLabel position="stacked">ID Compañía</IonLabel>
             <IonInput
               type="number"
-              value={formData.companyId}
-              onIonChange={(e) => handleInputChange('companyId', parseInt(e.detail.value!))}
+              value={sessionCompanyId}
+              readonly
             />
           </IonItem>
 

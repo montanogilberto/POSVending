@@ -5,18 +5,24 @@ export interface ExpenseCategory {
   companyId: number;
 }
 
-export async function fetchExpenseCategories(): Promise<ExpenseCategory[]> {
+export async function fetchExpenseCategories(companyId: number): Promise<ExpenseCategory[]> {
   try {
     console.log('fetchExpenseCategories called');
+    const normalizedCompanyId = Number(companyId);
+    if (!Number.isFinite(normalizedCompanyId) || normalizedCompanyId <= 0) {
+      console.warn('fetchExpenseCategories called with invalid companyId:', companyId);
+      return [];
+    }
+
     const body = JSON.stringify({
       product_categories: [
         {
-          companyId: "1"
+          companyId: normalizedCompanyId.toString()
         }
       ]
     });
     console.log('Request body:', body);
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/by_company_products_category', {
+    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_products_categorie', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

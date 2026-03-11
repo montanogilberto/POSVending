@@ -1,144 +1,206 @@
 import React, { useRef, useState } from 'react';
-import { IonContent, IonPage, IonInput, IonGrid, IonRow, IonCol, IonLabel, IonToast, IonRouterLink, IonButton, IonIcon, IonLoading } from '@ionic/react';
+import {
+  IonContent, IonPage, IonInput, IonGrid, IonRow, IonCol,
+  IonLabel, IonToast, IonRouterLink, IonButton, IonIcon, IonLoading,
+} from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-//import './../../master.css';
-import './Login.css';
 import { eye, eyeOff } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
-
+import CompanySelector from '../../components/CompanySelector/CompanySelector';
+import './Login.css';
 
 interface LoginProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess?: () => void;
 }
-
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const history = useHistory();
+  const { login, setUserData } = useUser();
+
   const usernameRef = useRef<string>('');
   const passwordRef = useRef<string>('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const { username, avatarUrl, setUsername, setAvatarUrl } = useUser();
 
+  const [loading, setLoading]                       = useState(false);
+  const [message, setMessage]                       = useState<string | null>(null);
+  const [showPassword, setShowPassword]             = useState(false);
+  const [showCompanySelector, setShowCompanySelector] = useState(false);
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+  // Temporary holder for user data between credential validation and company selection
+  const pendingUserRef = useRef<{ userId: number; username: string; avatarUrl: string } | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    const username = usernameRef.current;
+    const username = usernameRef.current.trim();
     const password = passwordRef.current;
 
-    const loginPayload = {
-      logins: [
-        { username, password },
-      ],
-    };
+    if (!username || !password) {
+      setMessage('Por favor ingresa usuario y contraseña');
+      return;
+    }
 
-    console.log('Attempting login with payload:', loginPayload);
+    setLoading(true);
+    setMessage(null);
 
     try {
       const response = await fetch('https://smartloansbackend.azurewebsites.net/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginPayload),
+        body: JSON.stringify({ logins: [{ username, password }] }),
       });
 
-      console.log('Response received:', response);
-
       if (!response.ok) {
-        throw new Error(`Network response was not ok: ${response.statusText}`);
+        throw new Error(`Error del servidor: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Response JSON:', data);
+      const result = data.result?.[0];
+      const msg    = result?.msg ?? '';
 
-      const loginMessage = data.result[0]?.msg;
-      console.log('Login message:', loginMessage);
+      if (!result || msg === 'User Invalid' || msg === 'Invalid' || msg.toLowerCase().includes('invalid')) {
+        setMessage('Usuario o contraseña incorrectos');
+        return;
+      }
 
-      if (loginMessage === 'User Invalid') {
-        setMessage(loginMessage);
-        console.error('Login failed:', loginMessage);
-      } else {
-        console.log('Login successful:', loginMessage);
-        setUsername(username);  // Set the username in the global context
-        setAvatarUrl(data.result[0]?.avatarUrl);  // Set the avatar URL in the global context
-        
-        onLoginSuccess();
-        history.push('/Laundry');
+      if (msg.toLowerCase().includes('error') || msg.toLowerCase().includes('inactive')) {
+        setMessage(msg);
+        return;
       }
-    } catch (error) {
-      console.error('Error during login:', error);
-      if (error instanceof Error) {
-        setMessage(`Login failed: ${error.message}`);
-      } else {
-        setMessage('Login failed: An unknown error occurred');
-      }
+
+      // Credentials valid — store pending user data and open company selector
+      pendingUserRef.current = {
+        userId:    result.userId    ?? 0,
+        username:  username,
+        avatarUrl: result.avatarUrl ?? 'https://www.w3schools.com/howto/img_avatar.png',
+      };
+
+      // Pre-populate user fields in context (not yet authenticated)
+      setUserData({
+        userId:    pendingUserRef.current.userId,
+        username:  pendingUserRef.current.username,
+        avatarUrl: pendingUserRef.current.avatarUrl,
+      });
+
+      setShowCompanySelector(true);
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      setMessage(`Error al iniciar sesión: ${msg}`);
     } finally {
       setLoading(false);
     }
+  };
 
-    
+  const handleCompanyConfirm = (
+    companyId: number,
+    companyName: string,
+    branchId: number,
+    branchName: string,
+  ) => {
+    const pending = pendingUserRef.current;
+    if (!pending) return;
+
+    // Finalise login — sets isAuthenticated = true and persists to localStorage
+    login({
+      userId:      pending.userId,
+      username:    pending.username,
+      avatarUrl:   pending.avatarUrl,
+      companyId,
+      companyName,
+      branchId,
+      branchName,
+    });
+
+    setShowCompanySelector(false);
+    onLoginSuccess?.();
+    history.push('/laundry');   // ← lowercase, matches App.tsx route
   };
 
   return (
     <IonPage>
-      <IonContent className="ion-padding">
+      <IonContent className="ion-padding login-page-content">
         <IonGrid>
           <IonRow className="ion-justify-content-center">
             <IonCol size="12" sizeSm="8" sizeMd="6" sizeLg="4">
-              <h1 className="ion-text-center">Login</h1>
+
+              {/* Logo / Brand */}
+              <div className="login-brand">
+                <div className="login-logo">POS</div>
+                <h1 className="login-title">POS GMO</h1>
+                <p className="login-subtitle">Sistema de punto de venta</p>
+              </div>
+
               <IonToast
                 isOpen={!!message}
                 message={message || ''}
-                duration={3000}
+                duration={3500}
                 onDidDismiss={() => setMessage(null)}
                 color="danger"
                 position="top"
               />
-              <form onSubmit={handleLogin}>
-                <IonLabel position="floating">Username</IonLabel>
-                <IonInput
-                  type="text"
-                  onIonChange={e => usernameRef.current = e.detail.value!}
-                  style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}
-                />
-                <IonLabel position="floating">Password</IonLabel>
-                <IonInput
-                  type={showPassword ? 'text' : 'password'}
-                  onIonChange={e => passwordRef.current = e.detail.value!}
-                  style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}
-                >
-                  <IonIcon
-                    slot="end"
-                    icon={showPassword ? eye : eyeOff}
-                    onClick={togglePasswordVisibility}
-                    style={{ position: 'absolute', top: '46%', transform: 'translateY(-50%)', right: '10px', cursor: 'pointer', zIndex: 2 }}
-                  />
-                </IonInput>
-                <IonButton
-                  type="submit"
-                  expand="full"
-                  disabled={loading}
-                  style={{ width: '100%' }}
-                >
-                  Login
-                </IonButton>
-              </form>
-              <div className="ion-text-center">
-                <p><IonRouterLink href="/forgot-password">Forgot Password?</IonRouterLink></p>
-                <p><IonRouterLink href="/create-account">Create Account</IonRouterLink></p>
+
+              <div className="login-card">
+                <h2 className="login-card-title">Iniciar sesión</h2>
+
+                <form onSubmit={handleLogin} className="login-form">
+                  <div className="login-field">
+                    <IonLabel className="login-label">Usuario</IonLabel>
+                    <IonInput
+                      type="text"
+                      placeholder="Ingresa tu usuario"
+                      onIonInput={e => { usernameRef.current = (e.detail.value ?? ''); }}
+                      className="login-input"
+                      autocomplete="username"
+                    />
+                  </div>
+
+                  <div className="login-field">
+                    <IonLabel className="login-label">Contraseña</IonLabel>
+                    <div className="login-password-wrapper">
+                      <IonInput
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Ingresa tu contraseña"
+                        onIonInput={e => { passwordRef.current = (e.detail.value ?? ''); }}
+                        className="login-input"
+                        autocomplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="login-eye-btn"
+                        onClick={() => setShowPassword(v => !v)}
+                        tabIndex={-1}
+                      >
+                        <IonIcon icon={showPassword ? eye : eyeOff} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <IonButton
+                    type="submit"
+                    expand="block"
+                    disabled={loading}
+                    className="login-submit-btn"
+                  >
+                    {loading ? 'Verificando...' : 'Iniciar sesión'}
+                  </IonButton>
+                </form>
+
+                <div className="login-links">
+                  <IonRouterLink href="/forgot-password">¿Olvidaste tu contraseña?</IonRouterLink>
+                  <IonRouterLink href="/create-account">Crear cuenta</IonRouterLink>
+                </div>
               </div>
+
             </IonCol>
           </IonRow>
         </IonGrid>
       </IonContent>
-      <IonLoading
-        isOpen={loading}
-        message="Iniciando sesión..."
+
+      <IonLoading isOpen={loading} message="Verificando credenciales..." />
+
+      {/* Company & Branch selector — shown after credentials validated */}
+      <CompanySelector
+        isOpen={showCompanySelector}
+        onConfirm={handleCompanyConfirm}
       />
     </IonPage>
   );

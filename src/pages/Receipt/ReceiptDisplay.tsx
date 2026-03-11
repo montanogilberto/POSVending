@@ -13,6 +13,8 @@ interface ReceiptDisplayProps {
   changeAmount?: number;
   clearCart: () => void;
   setTicketData: (data: any) => void;
+  promotionCode?: string;
+  discountAmount?: number;
 }
 
 /**
@@ -104,6 +106,8 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
   changeAmount = 0,
   clearCart,
   setTicketData,
+  promotionCode,
+  discountAmount,
 }) => {
   const history = useHistory();
   const [closing, setClosing] = React.useState(false);
@@ -157,6 +161,12 @@ const unifiedReceiptData = React.useMemo(() => {
     
     const result = {
       ...adaptedData,
+      // Include promotion info if available
+      promotion: promotionCode ? {
+        code: promotionCode,
+        discount: discountAmount || 0,
+        type: 'B2G1', // 2x1 promotion
+      } : undefined,
       payment: {
         ...adaptedData.payment,
         // Use backend values unless we have better values from props
@@ -169,6 +179,9 @@ const unifiedReceiptData = React.useMemo(() => {
         ...adaptedData.totals,
         amountReceived: shouldOverridePayment ? cashPaidNumber : adaptedData.totals.amountReceived,
         change: shouldOverridePayment ? Math.max(0, calculatedChange) : adaptedData.totals.change,
+        // Include discount in totals if promo applied
+        discount: discountAmount || 0,
+        originalTotal: discountAmount ? (adaptedData.totals.total + discountAmount) : undefined,
       },
     };
     
@@ -185,9 +198,15 @@ const unifiedReceiptData = React.useMemo(() => {
       cashPaid: result.payment.cashPaid,
       cashReturn: result.payment.cashReturn
     });
+    if (promotionCode) {
+      console.log('🧾 [ReceiptDisplay] Promotion applied:', {
+        code: promotionCode,
+        discount: discountAmount
+      });
+    }
     
     return result;
-  }, [repairedTicketData, paymentMethod, cashPaid, changeAmount]);
+  }, [repairedTicketData, paymentMethod, cashPaid, changeAmount, promotionCode, discountAmount]);
 
   const handlePrint = () => {
     ReceiptService.printReceipt(unifiedReceiptData, {
@@ -271,3 +290,4 @@ const unifiedReceiptData = React.useMemo(() => {
 };
 
 export default ReceiptDisplay;
+

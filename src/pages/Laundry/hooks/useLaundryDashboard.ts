@@ -249,7 +249,11 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
         const dateString = hermosilloDate.toISOString().split('T')[0];
         return dateString === todayString;
       })
-      .reduce((sum, income) => sum + income.total, 0);
+      .reduce((sum, income) => {
+        const total = Number(income.total) || 0;
+        const discount = Number(income.discountAmount) || 0;
+        return sum + total - discount;
+      }, 0);
   };
 
   const calculateMonthlyTotal = (): number => {
@@ -270,7 +274,11 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
           hermosilloDate.getFullYear() === currentYear
         );
       })
-      .reduce((sum, income) => sum + income.total, 0);
+      .reduce((sum, income) => {
+        const total = Number(income.total) || 0;
+        const discount = Number(income.discountAmount) || 0;
+        return sum + total - discount;
+      }, 0);
   };
 
   const currentMonthYear = new Date().toLocaleDateString('es-ES', {

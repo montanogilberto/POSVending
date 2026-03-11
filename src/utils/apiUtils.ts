@@ -281,20 +281,20 @@ export const fetchCategoriesByCompany = async (companyId: string | number): Prom
   }
 
   const requestBody = {
-    product_categories: [
+    productCategories: [
       {
-        companyId: numericCompanyId.toString(),
+        companyId: numericCompanyId,
       },
     ],
   };
 
   try {
     const data = await makeApiRequest(
-      'https://smartloansbackend.azurewebsites.net/by_company_products_category',
+      'https://smartloansbackend.azurewebsites.net/all_products_categories',
       requestBody
     );
 
-    return data.product_categories || [];
+    return data.productCategories || data.product_categories || [];
   } catch (error) {
     console.error('Error fetching categories:', error);
     throw error;

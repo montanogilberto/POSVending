@@ -56,13 +56,20 @@ async function testProductsAPI() {
   }
 }
 
-async function testCategoriesAPI() {
+async function testCategoriesAPI(companyId = 1) {
   console.log('\nTesting Categories API with corrected request format...');
   
+  const normalizedCompanyId = Number(companyId);
+  if (!Number.isFinite(normalizedCompanyId) || normalizedCompanyId <= 0) {
+    console.log('Invalid companyId for testCategoriesAPI:', companyId);
+    return false;
+  }
+
   const requestBody = {
-    product_categories: [
+    productCategories: [
       {
-        companyId: "1",
+        companyId: normalizedCompanyId,
+        categoryId: null,
       },
     ],
   };
@@ -70,7 +77,7 @@ async function testCategoriesAPI() {
   try {
     console.log('Request body:', JSON.stringify(requestBody, null, 2));
     
-    const response = await fetch(`${API_BASE_URL}/by_company_products_category`, {
+    const response = await fetch(`${API_BASE_URL}/all_products_categories`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -90,9 +97,9 @@ async function testCategoriesAPI() {
 
     const data = await response.json();
     console.log('Success! Response data structure:');
-    console.log('- Has product_categories property:', !!data.product_categories);
-    if (data.product_categories && Array.isArray(data.product_categories)) {
-      console.log('- Categories array length:', data.product_categories.length);
+    console.log('- Has productCategories property:', !!data.productCategories);
+    if (data.productCategories && Array.isArray(data.productCategories)) {
+      console.log('- Categories array length:', data.productCategories.length);
     }
     
     return true;

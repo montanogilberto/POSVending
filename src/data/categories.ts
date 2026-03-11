@@ -11,14 +11,14 @@
     try {
       console.log('fetchCategories called');
       const body = JSON.stringify({
-        product_categories: [
+        productCategories: [
           {
-            companyId: "1"
+            companyId: 1
           }
         ]
       });
       console.log('Request body:', body);
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/by_company_products_category', {
+      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_products_categories', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,7 +35,7 @@
 
       const data = await response.json();
       console.log('Response data:', data);
-      const fetchedCategories: any[] = data.product_categories || [];
+      const fetchedCategories: any[] = data.productCategories || data.product_categories || [];
       // Map to match interface, assuming API returns categoryId or productCategoryId
       return fetchedCategories.map(cat => ({
         categoryId: cat.categoryId || cat.productCategoryId,

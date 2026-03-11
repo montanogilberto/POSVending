@@ -1,59 +1,172 @@
-/* src/pages/Login.css */
-.login-container {
-  max-width: 400px;
-  margin: auto;
-  padding: 20px;
-  background-color: #fff;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+/* ============================================
+   Login.css — Modern POS Login Page
+   ============================================ */
+
+.login-page-content {
+  --background: linear-gradient(160deg, #1E3A8A 0%, #2563EB 50%, #3B82F6 100%);
+}
+
+/* ── Brand / Logo ── */
+.login-brand {
+  text-align: center;
+  padding: 48px 0 32px;
+}
+
+.login-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  font-size: 22px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -1px;
+  margin-bottom: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+.login-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
+}
+
+.login-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+}
+
+/* ── Card ── */
+.login-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 28px 24px 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  margin-bottom: 24px;
+}
+
+.login-card-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 24px 0;
   text-align: center;
 }
 
-.login-header {
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 20px;
-}
-
+/* ── Form ── */
 .login-form {
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
-/* Style for the IonLabel */
-.login-form ion-label {
-  margin-bottom: 5px;
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-/* Style for the IonInput */
-.login-form ion-input {
-  margin-bottom: 15px;
+.login-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  letter-spacing: 0.2px;
 }
 
-.login-button {
-  background-color: #1877f2;
-  color: #fff;
-  padding: 10px;
+.login-input {
+  --background: #F4F6F9;
+  --border-radius: 12px;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --padding-top: 12px;
+  --padding-bottom: 12px;
+  --color: #111827;
+  --placeholder-color: #9CA3AF;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  font-size: 15px;
+  transition: border-color 0.15s;
+}
+
+.login-input.has-focus {
+  border-color: #2563EB;
+}
+
+/* ── Password wrapper ── */
+.login-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-password-wrapper .login-input {
+  flex: 1;
+  --padding-end: 48px;
+}
+
+.login-eye-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
   border: none;
-  border-radius: 4px;
   cursor: pointer;
+  color: #9CA3AF;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  z-index: 2;
+  outline: none;
 }
 
-.login-button:hover {
-  background-color: #115293;
+.login-eye-btn:hover { color: #6B7280; }
+
+/* ── Submit button ── */
+.login-submit-btn {
+  --background: #2563EB;
+  --background-activated: #1D4ED8;
+  --background-hover: #1D4ED8;
+  --border-radius: 12px;
+  --box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  --padding-top: 14px;
+  --padding-bottom: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 4px;
+  height: 50px;
 }
 
-.login-footer {
+/* ── Links ── */
+.login-links {
+  display: flex;
+  justify-content: space-between;
   margin-top: 20px;
-  font-size: 14px;
-  color: #555;
+  padding-top: 16px;
+  border-top: 1px solid #F3F4F6;
 }
 
-.login-footer a {
-  color: #1877f2;
+.login-links ion-router-link {
+  font-size: 13px;
+  color: #2563EB;
+  font-weight: 600;
   text-decoration: none;
 }
 
-.login-footer a:hover {
+.login-links ion-router-link:hover {
   text-decoration: underline;
+}
+
+/* ── Responsive ── */
+@media (min-width: 480px) {
+  .login-brand { padding: 56px 0 36px; }
+  .login-card  { padding: 36px 32px 28px; }
 }
