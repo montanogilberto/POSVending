@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   IonContent,
   IonToast,
   IonPage,
-  IonButton,
 } from '@ionic/react';
 import './Laundry.css';
 import Header from '../../components/Header';
@@ -15,12 +14,10 @@ import { useLaundryDashboard } from './hooks/useLaundryDashboard';
 import MetricsGrid from './components/MetricsGrid';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
-import { ReceiptService } from '../../services/ReceiptService';
 
 const Laundry: React.FC = () => {
   const {
     location,
-    history,
     allIncome,
     showToast,
     setShowToast,
@@ -50,13 +47,25 @@ const Laundry: React.FC = () => {
     getTitleFromPath,
   } = useLaundryDashboard();
 
-  // Navigate to ReceiptPage instead of showing modal
-  const handleViewReceipt = (receiptData: any) => {
-    history.push({
-      pathname: '/receipt',
-      state: { ticketData: receiptData }
+  useEffect(() => {
+    const rawAuth = localStorage.getItem('pos_gmo_auth');
+    let parsedAuth: any = null;
+    try {
+      parsedAuth = rawAuth ? JSON.parse(rawAuth) : null;
+    } catch (e) {
+      console.warn('[Laundry] Failed to parse pos_gmo_auth from localStorage', e);
+    }
+
+    console.log('[Laundry] mounted/render', {
+      path: location.pathname,
+      auth: parsedAuth,
+      allIncomeCount: allIncome.length,
+      hasPieData: !!pieData,
+      showCart,
+      cartCount: cart.length,
+      popoverState,
     });
-  };
+  }, [location.pathname, allIncome.length, pieData, showCart, cart.length, popoverState]);
 
   return (
     <IonPage>
@@ -108,7 +117,7 @@ const Laundry: React.FC = () => {
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
         />
 
-<AlertPopover
+        <AlertPopover
           isOpen={popoverState.showAlertPopover}
           event={popoverState.event}
           onDidDismiss={dismissAlertPopover}

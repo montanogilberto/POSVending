@@ -1,6 +1,7 @@
-# TODO - companyId global integration
+# TODO - Laundry production blank diagnosis and fix
 
-- [x] Update login flow to capture and persist backend `companyId` from `/login`.
-- [x] Remove hardcoded `companyId: 1` in transaction flows and use global user context companyId.
-- [ ] Adjust company selection behavior to align with backend-provided companyId.
-- [ ] Run build validation and fix any typing/runtime issues.
+- [ ] Add targeted runtime logs in `src/pages/Laundry/Laundry.tsx` for pathname, auth snapshot, and section visibility.
+- [ ] Add diagnostics in `src/pages/Laundry/hooks/useLaundryDashboard.ts` for loadIncomes lifecycle and allIncome/chart branches.
+- [ ] Check and normalize route casing references (`/Laundry` vs `/laundry`) in routing/title logic and dependent files.
+- [ ] Run `npm run build` to validate changes.
+- [ ] Confirm root cause from logs, apply final behavior fix, and keep/remove selected logs accordingly.
