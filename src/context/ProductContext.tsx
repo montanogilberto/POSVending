@@ -1,7 +1,8 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Product } from '../data/type_products';
-import { getAllProducts, getOneProduct, createOrUpdateProduct, deleteProduct, CreateProductRequest, GetOneProductRequest, DeleteProductRequest } from '../api/productsApi';
+import { getProductsByCompany, getOneProduct, createOrUpdateProduct, deleteProduct, CreateProductRequest, GetOneProductRequest, DeleteProductRequest } from '../api/productsApi';
+import { useUser } from '../components/UserContext';
 
 interface ProductContextType {
   productsList: Product[];
@@ -23,6 +24,7 @@ interface ProductContextType {
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { companyId } = useUser();
   const [productsList, setProductsList] = useState<Product[]>([]);
   const [productsDetail, setProductsDetail] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,18 +38,31 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const fetchProducts = useCallback(async () => {
+    const normalizedCompanyId = Number(companyId);
+
+    if (!Number.isFinite(normalizedCompanyId) || normalizedCompanyId <= 0) {
+      setProductsList([]);
+      setError('No valid company selected');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const products = await getAllProducts();
+      const products = await getProductsByCompany(normalizedCompanyId);
       setProductsList(products);
     } catch (err) {
-      setError('Failed to fetch products');
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Failed to fetch products';
+      setError(message);
+      console.error('[ProductContext.fetchProducts] Failed to fetch products', {
+        companyId,
+        normalizedCompanyId,
+        error: err,
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [companyId]);
 
   const fetchProductById = async (productId: number) => {
     setLoading(true);
@@ -74,17 +89,21 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const request: CreateProductRequest = {
         products: [{
-          productId: 0, // Assuming 0 for new products
+          action: 1,
+          productId: null,
+          companyId: Number(productData.companyId || companyId),
+          categoryId: Number(productData.categoryId || 0),
           name: productData.name,
+          barCode: productData.barCode || '',
           code: productData.code,
-          dateOfExpire: productData.dateOfExpire,
-          productFormId: productData.productFormId,
-          manufactureId: productData.manufactureId,
-          description: productData.description,
-          barCode: productData.barCode,
-          categoryId: productData.categoryId,
-          companyId: productData.companyId,
-          action: '1' // Create
+          dateOfExpire: productData.dateOfExpire || null,
+          manufactureId: productData.manufactureId ?? null,
+          description: productData.description || '',
+          productFormId: productData.productFormId || 0,
+          productForm: (productData as any).productForm ?? undefined,
+          productDetails: (productData as any).productDetails ?? undefined,
+          productDescriptions: (productData as any).productDescriptions ?? [],
+          productOptions: (productData as any).productOptions ?? [],
         }]
       };
       await createOrUpdateProduct(request);
@@ -112,7 +131,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
           description: productData.description || '',
           barCode: productData.barCode || '',
           categoryId: productData.categoryId || 0,
-          companyId: productData.companyId || 0,
+          // Use context companyId as fallback
+          companyId: productData.companyId || companyId,
           action: '2' // Update
         }]
       };

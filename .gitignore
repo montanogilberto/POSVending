@@ -8,3 +8,6 @@ ios/
 # Environment files
 .env
 .env.*
+
+# Markdown planning docs
+MD/

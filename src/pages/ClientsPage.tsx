@@ -26,7 +26,7 @@ import {
   IonText,
   IonSearchbar,
 } from '@ionic/react';
-import { add, create, trash, pencil, arrowBack, person, mail, checkmarkCircle, closeCircle, call, save, personCircle, time } from 'ionicons/icons';
+import { add, trash, pencil, arrowBack, person, mail, checkmarkCircle, closeCircle, call, save, personCircle, time } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
@@ -334,61 +334,67 @@ const ClientsPage: React.FC = () => {
           {filteredClients.map((client) => (
             <IonCard key={client.clientId} className="client-card">
               <IonCardContent className="client-card-content">
-                {/* Client Name - Main Element */}
-                <div className="client-header">
-                  <IonIcon icon={personCircle} className="client-avatar" />
-                  <IonCardTitle className="client-name">
-                    {client.first_name} {client.last_name}
-                  </IonCardTitle>
-                </div>
-
-                {/* Metadata */}
-                <div className="client-metadata">
-                  {/* Phone - Primary */}
-                  <div className="metadata-row">
-                    <IonIcon icon={call} className="metadata-icon phone-icon" />
-                    <IonText className="metadata-value">{client.cellphone}</IonText>
+                <div className="client-card-row">
+                  {/* Left section */}
+                  <div className="client-left">
+                    <IonIcon icon={personCircle} className="client-avatar" />
                   </div>
 
-                  {/* Email - Secondary */}
-                  <div className="metadata-row">
-                    <IonIcon icon={mail} className="metadata-icon email-icon" />
-                    <IonText className={`metadata-value ${!client.email ? 'text-muted' : ''}`}>
-                      {client.email || 'No registrado'}
-                    </IonText>
+                  {/* Main section */}
+                  <div className="client-main">
+                    <div className="client-header">
+                      <IonCardTitle className="client-name">
+                        {client.first_name} {client.last_name}
+                      </IonCardTitle>
+                    </div>
+
+                    <p className="client-subtitle">
+                      {client.email || 'Sin correo registrado'}
+                    </p>
+
+                    <div className="client-meta-row">
+                      <span className="client-meta-badge">
+                        <span className="meta-label">Teléfono</span>
+                        <span className="meta-value">{client.cellphone || '—'}</span>
+                      </span>
+
+                      <span className="client-meta-badge">
+                        <span className="meta-label">Email</span>
+                        <span className={`meta-value${!client.email ? ' empty' : ''}`}>
+                          {client.email || 'No registrado'}
+                        </span>
+                      </span>
+
+                      <span className="client-meta-badge">
+                        <span className="meta-label">Creado</span>
+                        <span className="meta-value">{formatDate(client.created_At)}</span>
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Created Date - Small, Muted */}
-                  <div className="metadata-row date-row">
-                    <IonIcon icon={time} className="metadata-icon date-icon" />
-                    <IonText className="metadata-value date-value">
-                      Creado: {formatDate(client.created_At)}
-                    </IonText>
+                  {/* Right section */}
+                  <div className="client-actions">
+                    <IonButton
+                      fill="outline"
+                      size="small"
+                      color="primary"
+                      onClick={() => handleEdit(client)}
+                      className="action-button edit-button"
+                    >
+                      <IonIcon icon={pencil} slot="start" />
+                      Editar
+                    </IonButton>
+                    <IonButton
+                      fill="outline"
+                      size="small"
+                      color="danger"
+                      onClick={() => handleDelete(client)}
+                      className="action-button delete-button"
+                    >
+                      <IonIcon icon={trash} slot="start" />
+                      Eliminar
+                    </IonButton>
                   </div>
-                </div>
-
-                {/* Action Buttons - Bottom Right */}
-                <div className="client-actions">
-                  <IonButton 
-                    fill="outline" 
-                    size="small" 
-                    color="primary" 
-                    onClick={() => handleEdit(client)}
-                    className="action-button edit-button"
-                  >
-                    <IonIcon icon={pencil} slot="start" />
-                    Editar
-                  </IonButton>
-                  <IonButton 
-                    fill="outline" 
-                    size="small" 
-                    color="danger" 
-                    onClick={() => handleDelete(client)}
-                    className="action-button delete-button"
-                  >
-                    <IonIcon icon={trash} slot="start" />
-                    Eliminar
-                  </IonButton>
                 </div>
               </IonCardContent>
             </IonCard>

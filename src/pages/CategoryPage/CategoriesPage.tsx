@@ -1,13 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   IonPage,
   IonContent,
   IonCard,
   IonCardTitle,
   IonImg,
-  IonGrid,
-  IonRow,
-  IonCol,
   IonLoading,
   IonButton,
   IonIcon,
@@ -20,21 +17,29 @@ import {
   IonLabel,
   IonInput,
   IonTextarea,
-  IonButtons,
+  IonSearchbar,
 } from '@ionic/react';
-import { pencil, trash, add, camera } from 'ionicons/icons';
+import { pencil, trash, add, camera, pricetagOutline } from 'ionicons/icons';
 import { fetchCategories, Category, createCategory, updateCategory, deleteCategory } from '../../api/categoriesApi';
 import { saveImage } from '../../api/saveImageApi';
 import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import { useUser } from '../../components/UserContext';
+import './CategoriesPage.css';
 
 interface LocalCategory {
   id: number;
   name: string;
   description: string;
   image: string;
+  productsCount?: number;
 }
 
+type CategoryFilter = 'all' | 'withImage' | 'withoutImage';
+
 const CategoriesPage: React.FC = () => {
+  const { companyId } = useUser();
   const [categories, setCategories] = useState<LocalCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -46,18 +51,45 @@ const CategoriesPage: React.FC = () => {
     description: '',
     image: '',
   });
+  const [searchText, setSearchText] = useState('');
+  const [activeFilter, setActiveFilter] = useState<CategoryFilter>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
+    showAlertPopover: false,
+    showMailPopover: false,
+  });
+
+  const presentAlertPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
+
+  const presentMailPopover = (e: React.MouseEvent) => {
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  };
+
+  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
   useEffect(() => {
     const loadCategories = async () => {
+      if (!companyId) {
+        setCategories([]);
+        setLoading(false);
+        return;
+      }
+
       try {
-        const fetchedCategories = await fetchCategories('1'); // Assuming companyId is '1'
-        setCategories(fetchedCategories.map((cat: Category) => ({
-          id: cat.categoryId,
-          name: cat.name,
-          description: '', // API doesn't provide description, so leave empty
-          image: cat.image,
-        })));
+        const fetchedCategories = await fetchCategories(String(companyId));
+        setCategories(
+          fetchedCategories.map((cat: Category) => ({
+            id: cat.categoryId,
+            name: cat.name,
+            description: '',
+            image: cat.image,
+            productsCount: 0,
+          }))
+        );
       } catch (error) {
         console.error('Error loading categories:', error);
       } finally {
@@ -66,7 +98,7 @@ const CategoriesPage: React.FC = () => {
     };
 
     loadCategories();
-  }, []);
+  }, [companyId]);
 
   const handleDelete = (category: LocalCategory) => {
     setSelectedCategory(category);
@@ -106,36 +138,38 @@ const CategoriesPage: React.FC = () => {
     try {
       let imagePath = formData.image;
       if (formData.image.startsWith('data:image')) {
-        // Extract base64 data
         const base64Data = formData.image.split(',')[1];
         const filename = `category_${Date.now()}.png`;
         imagePath = await saveImage(filename, base64Data);
       }
 
+      if (!companyId) {
+        throw new Error('No company selected');
+      }
+
       if (editingCategory) {
-        // Update existing
-        await updateCategory(editingCategory.id, formData.name, imagePath, 1);
+        await updateCategory(editingCategory.id, formData.name, imagePath, companyId);
         setCategories(categories.map(cat =>
           cat.id === editingCategory.id
-            ? { ...cat, name: formData.name, image: imagePath }
+            ? { ...cat, name: formData.name, image: imagePath, description: formData.description }
             : cat
         ));
       } else {
-        // Create new
-        await createCategory(formData.name, imagePath, 1);
-        // Reload categories after create
-        const fetchedCategories = await fetchCategories('1');
-        setCategories(fetchedCategories.map((cat: Category) => ({
-          id: cat.categoryId,
-          name: cat.name,
-          description: '', // API doesn't provide description, so leave empty
-          image: cat.image,
-        })));
+        await createCategory(formData.name, imagePath, companyId);
+        const fetchedCategories = await fetchCategories(String(companyId));
+        setCategories(
+          fetchedCategories.map((cat: Category) => ({
+            id: cat.categoryId,
+            name: cat.name,
+            description: '',
+            image: cat.image,
+            productsCount: 0,
+          }))
+        );
       }
       setShowModal(false);
     } catch (error) {
       console.error('Error saving category:', error);
-      // Handle error (e.g., show toast)
     }
   };
 
@@ -154,126 +188,166 @@ const CategoriesPage: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  const filteredCategories = useMemo(() => {
+    let result = [...categories];
+
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      result = result.filter((c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q)
+      );
+    }
+
+    if (activeFilter === 'withImage') {
+      result = result.filter((c) => !!c.image);
+    } else if (activeFilter === 'withoutImage') {
+      result = result.filter((c) => !c.image);
+    }
+
+    return result.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [categories, searchText, activeFilter]);
+
   return (
-    <IonPage style={{ backgroundColor: '#f9fafb' }}>
+    <IonPage className="categories-page">
       <Header
-        presentAlertPopover={() => {}}
-        presentMailPopover={() => {}}
-        screenTitle="Categorías Disponibles"
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle="Categorías"
+        showBackButton={true}
+        backButtonText="Menú"
+        backButtonHref="/laundry"
       />
 
-      <IonContent style={{ '--background': '#f9fafb' }}>
+      <IonContent className="categories-content">
         <IonLoading isOpen={loading} message="Cargando categorías..." />
-        <IonGrid style={{ padding: '16px' }}>
-          <IonRow>
-            {categories.map((category) => (
-              <IonCol size="6" sizeMd="4" sizeLg="3" key={category.id} style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-                <IonCard
-                  style={{
-                    width: '180px',
-                    minHeight: '200px',
-                    borderRadius: '16px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                    backgroundColor: '#ffffff',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    padding: '20px 16px',
-                    transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
-                  }}
-                >
-                  <IonImg
-                    src={category.image}
-                    style={{
-                      width: '64px',
-                      height: '64px',
-                      objectFit: 'contain',
-                      marginBottom: '16px',
-                    }}
-                  />
-                  <IonCardTitle
-                    style={{
-                      fontSize: '16px',
-                      fontWeight: '500',
-                      color: '#374151',
-                      textAlign: 'center',
-                      margin: '0 0 20px 0',
-                      lineHeight: '1.2',
-                    }}
-                  >
-                    {category.name}
-                  </IonCardTitle>
-                  <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'center' }}>
+
+        <div className="categories-search-section">
+          <div className="categories-search-row">
+            <IonSearchbar
+              className="categories-searchbar"
+              placeholder="Buscar por nombre o descripción"
+              value={searchText}
+              onIonInput={(e) => setSearchText(e.detail.value ?? '')}
+              debounce={200}
+              animated={false}
+            />
+          </div>
+
+          <div className="categories-chips-row">
+            <button
+              className={`categories-chip${activeFilter === 'all' ? ' active' : ''}`}
+              onClick={() => setActiveFilter('all')}
+            >
+              Todas
+            </button>
+            <button
+              className={`categories-chip${activeFilter === 'withImage' ? ' active' : ''}`}
+              onClick={() => setActiveFilter('withImage')}
+            >
+              Con imagen
+            </button>
+            <button
+              className={`categories-chip${activeFilter === 'withoutImage' ? ' active' : ''}`}
+              onClick={() => setActiveFilter('withoutImage')}
+            >
+              Sin imagen
+            </button>
+          </div>
+        </div>
+
+        {!loading && (
+          <p className="categories-results-count">
+            {filteredCategories.length}{' '}
+            {filteredCategories.length === 1 ? 'categoría' : 'categorías'}
+            {searchText.trim() ? ` para "${searchText.trim()}"` : ''}
+          </p>
+        )}
+
+        <div className="categories-list">
+          {!loading && filteredCategories.length === 0 ? (
+            <div className="categories-empty">
+              <div className="categories-empty-icon">🏷️</div>
+              <p>No se encontraron categorías</p>
+              <span>
+                {searchText.trim()
+                  ? 'Intenta con otro término de búsqueda'
+                  : 'Agrega tu primera categoría con el botón +'}
+              </span>
+            </div>
+          ) : (
+            filteredCategories.map((category) => (
+              <IonCard key={category.id} className="category-card">
+                <div className="category-card-body">
+                  <div className="category-left">
+                    {category.image ? (
+                      <IonImg src={category.image} className="category-image" />
+                    ) : (
+                      <div className="category-fallback-icon">
+                        <IonIcon icon={pricetagOutline} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="category-main">
+                    <IonCardTitle className="category-title">{category.name}</IonCardTitle>
+                    <p className="category-description">
+                      {category.description || 'Sin descripción registrada'}
+                    </p>
+
+                    <div className="category-meta-row">
+                      <span className="category-meta-badge">
+                        <span className="meta-label">Productos</span>
+                        <span className="meta-value">{category.productsCount ?? 0}</span>
+                      </span>
+                      <span className="category-meta-badge">
+                        <span className="meta-label">Imagen</span>
+                        <span className="meta-value">{category.image ? 'Sí' : 'No'}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="category-actions">
                     <IonButton
                       fill="outline"
                       color="primary"
                       size="small"
-                      style={{
-                        '--border-radius': '8px',
-                        '--padding-start': '12px',
-                        '--padding-end': '12px',
-                        '--padding-top': '8px',
-                        '--padding-bottom': '8px',
-                        '--border-color': '#3b82f6',
-                        '--color': '#3b82f6',
-                        flex: 1,
-                        maxWidth: '60px',
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(category);
-                      }}
+                      className="category-action-btn edit"
+                      onClick={() => handleEdit(category)}
                     >
-                      <IonIcon icon={pencil} style={{ fontSize: '16px' }} />
+                      <IonIcon icon={pencil} slot="start" />
+                      Editar
                     </IonButton>
                     <IonButton
                       fill="outline"
                       color="danger"
                       size="small"
-                      style={{
-                        '--border-radius': '8px',
-                        '--padding-start': '12px',
-                        '--padding-end': '12px',
-                        '--padding-top': '8px',
-                        '--padding-bottom': '8px',
-                        '--border-color': '#ef4444',
-                        '--color': '#ef4444',
-                        flex: 1,
-                        maxWidth: '60px',
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(category);
-                      }}
+                      className="category-action-btn delete"
+                      onClick={() => handleDelete(category)}
                     >
-                      <IonIcon icon={trash} style={{ fontSize: '16px' }} />
+                      <IonIcon icon={trash} slot="start" />
+                      Eliminar
                     </IonButton>
                   </div>
-                </IonCard>
-              </IonCol>
-            ))}
-          </IonRow>
-        </IonGrid>
+                </div>
+              </IonCard>
+            ))
+          )}
+        </div>
+
+        <div style={{ height: '88px' }} />
 
         <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={handleCreate}>
+          <IonFabButton onClick={handleCreate} className="categories-fab">
             <IonIcon icon={add} />
           </IonFabButton>
         </IonFab>
 
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
-          <div style={{ padding: '16px', textAlign: 'center', fontSize: '18px', fontWeight: '500' }}>
+          <div className="categories-modal-title">
             {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
           </div>
-          <div style={{ padding: '0 16px 16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <div className="categories-modal-actions">
             <IonButton onClick={() => setShowModal(false)}>Cancelar</IonButton>
             <IonButton onClick={handleSave}>Guardar</IonButton>
           </div>
@@ -312,7 +386,7 @@ const CategoriesPage: React.FC = () => {
               </IonItem>
               {formData.image && (
                 <IonItem>
-                  <IonImg src={formData.image} style={{ maxHeight: '200px', width: '100%', objectFit: 'contain' }} />
+                  <IonImg src={formData.image} className="categories-image-preview" />
                 </IonItem>
               )}
             </IonList>
@@ -338,6 +412,17 @@ const CategoriesPage: React.FC = () => {
           ]}
         />
       </IonContent>
+
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
     </IonPage>
   );
 };

@@ -1,39 +1,28 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import './UsersPage.css';
 import {
   IonPage,
   IonContent,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
-  IonButtons,
   IonButton,
   IonIcon,
   IonList,
-  IonItem,
-  IonLabel,
   IonCard,
-  IonCardContent,
-  IonCardHeader,
   IonCardTitle,
-  IonCardSubtitle,
   IonFab,
   IonFabButton,
   IonAlert,
-  IonToast,
   IonModal,
   IonInput,
-  IonNote,
-  IonText,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonAvatar,
-  IonImg,
+  IonItem,
+  IonLabel,
   IonSelect,
   IonSelectOption,
+  IonAvatar,
+  IonImg,
+  IonSearchbar,
+  IonTextarea,
 } from '@ionic/react';
-import { add, create, trash, pencil, camera, person, checkmarkCircle, closeCircle, mail, save, arrowBack } from 'ionicons/icons';
+import { add, trash, pencil, camera, personCircle } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
@@ -46,6 +35,8 @@ interface User {
   avatar: string;
   status: 'active' | 'inactive';
 }
+
+type UserFilter = 'all' | 'active' | 'inactive';
 
 const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([
@@ -74,9 +65,7 @@ const UsersPage: React.FC = () => {
       status: 'inactive',
     },
   ]);
-  const [loading, setLoading] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
+
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
@@ -84,29 +73,8 @@ const UsersPage: React.FC = () => {
     showMailPopover: false,
   });
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newUser, setNewUser] = useState<Partial<User>>({
-    name: '',
-    email: '',
-    role: 'employee',
-    avatar: '',
-    status: 'active',
-  });
-  const [createErrors, setCreateErrors] = useState({
-    name: '',
-    email: { isValid: true, message: '' },
-    role: '',
-  });
-
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
-  const [editErrors, setEditErrors] = useState({
-    name: '',
-    email: { isValid: true, message: '' },
-    role: '',
-  });
-
   const [showModal, setShowModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
   const [formData, setFormData] = useState<Partial<User>>({
     name: '',
     email: '',
@@ -114,6 +82,9 @@ const UsersPage: React.FC = () => {
     avatar: '',
     status: 'active',
   });
+
+  const [searchText, setSearchText] = useState('');
+  const [activeFilter, setActiveFilter] = useState<UserFilter>('all');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -172,21 +143,20 @@ const UsersPage: React.FC = () => {
 
   const handleSave = () => {
     if (editingUser) {
-      // Edit existing
       setUsers(users.map(user =>
         user.id === editingUser.id
-          ? { ...user, ...formData }
+          ? { ...user, ...formData } as User
           : user
       ));
     } else {
-      // Create new
+      const nextId = users.length ? Math.max(...users.map(u => u.id)) + 1 : 1;
       const newUser: User = {
-        id: Math.max(...users.map(u => u.id)) + 1,
+        id: nextId,
         name: formData.name || '',
         email: formData.email || '',
-        role: formData.role || 'employee',
+        role: (formData.role as User['role']) || 'employee',
         avatar: formData.avatar || '',
-        status: formData.status || 'active',
+        status: (formData.status as User['status']) || 'active',
       };
       setUsers([...users, newUser]);
     }
@@ -217,9 +187,28 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    return status === 'active' ? 'success' : 'danger';
-  };
+  const getStatusLabel = (status: string) => (status === 'active' ? 'Activo' : 'Inactivo');
+
+  const filteredUsers = useMemo(() => {
+    let result = [...users];
+
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      result = result.filter((u) =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        getRoleLabel(u.role).toLowerCase().includes(q)
+      );
+    }
+
+    if (activeFilter === 'active') {
+      result = result.filter((u) => u.status === 'active');
+    } else if (activeFilter === 'inactive') {
+      result = result.filter((u) => u.status === 'inactive');
+    }
+
+    return result.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [users, searchText, activeFilter]);
 
   return (
     <IonPage>
@@ -232,60 +221,121 @@ const UsersPage: React.FC = () => {
         backButtonHref="/Laundry"
       />
 
-      <IonContent>
-        <IonGrid>
-          <IonRow>
-            {users.map((user) => (
-              <IonCol size="12" sizeMd="6" sizeLg="4" key={user.id}>
-                <IonCard>
-                  <IonCardHeader>
-                    <IonAvatar style={{ margin: '0 auto 10px' }}>
+      <IonContent className="users-content">
+        <div className="users-search-section">
+          <div className="users-search-row">
+            <IonSearchbar
+              className="users-searchbar"
+              placeholder="Buscar por nombre, email o rol"
+              value={searchText}
+              onIonInput={(e) => setSearchText(e.detail.value ?? '')}
+              debounce={200}
+              animated={false}
+            />
+          </div>
+
+          <div className="users-chips-row">
+            <button
+              className={`users-chip${activeFilter === 'all' ? ' active' : ''}`}
+              onClick={() => setActiveFilter('all')}
+            >
+              Todos
+            </button>
+            <button
+              className={`users-chip${activeFilter === 'active' ? ' active' : ''}`}
+              onClick={() => setActiveFilter('active')}
+            >
+              Activos
+            </button>
+            <button
+              className={`users-chip${activeFilter === 'inactive' ? ' active' : ''}`}
+              onClick={() => setActiveFilter('inactive')}
+            >
+              Inactivos
+            </button>
+          </div>
+        </div>
+
+        <p className="users-results-count">
+          {filteredUsers.length} {filteredUsers.length === 1 ? 'usuario' : 'usuarios'}
+          {searchText.trim() ? ` para "${searchText.trim()}"` : ''}
+        </p>
+
+        <IonList className="users-list">
+          {filteredUsers.map((user) => (
+            <IonCard key={user.id} className="user-card">
+              <div className="user-card-body">
+                <div className="user-left">
+                  {user.avatar ? (
+                    <IonAvatar className="user-avatar">
                       <IonImg src={user.avatar} />
                     </IonAvatar>
-                    <IonCardTitle>{user.name}</IonCardTitle>
-                    <IonCardSubtitle>{user.email}</IonCardSubtitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    <p><strong>Rol:</strong> {getRoleLabel(user.role)}</p>
-                    <p><strong>Estado:</strong>
-                      <IonIcon
-                        icon={person}
-                        color={getStatusColor(user.status)}
-                        style={{ marginLeft: '8px' }}
-                      />
-                      {user.status === 'active' ? 'Activo' : 'Inactivo'}
-                    </p>
-                    <IonButtons slot="end">
-                      <IonButton fill="clear" color="primary" onClick={() => handleEdit(user)}>
-                        <IonIcon icon={pencil} />
-                      </IonButton>
-                      <IonButton fill="clear" color="danger" onClick={() => handleDelete(user)}>
-                        <IonIcon icon={trash} />
-                      </IonButton>
-                    </IonButtons>
-                  </IonCardContent>
-                </IonCard>
-              </IonCol>
-            ))}
-          </IonRow>
-        </IonGrid>
+                  ) : (
+                    <div className="user-fallback-icon">
+                      <IonIcon icon={personCircle} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="user-main">
+                  <IonCardTitle className="user-name">{user.name}</IonCardTitle>
+                  <p className="user-subtitle">{user.email}</p>
+
+                  <div className="user-meta-row">
+                    <span className="user-meta-badge">
+                      <span className="meta-label">Rol</span>
+                      <span className="meta-value">{getRoleLabel(user.role)}</span>
+                    </span>
+                    <span className="user-meta-badge">
+                      <span className="meta-label">Estado</span>
+                      <span className={`meta-value ${user.status === 'active' ? 'status-active' : 'status-inactive'}`}>
+                        {getStatusLabel(user.status)}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="user-actions">
+                  <IonButton
+                    fill="outline"
+                    size="small"
+                    color="primary"
+                    className="user-action-btn edit"
+                    onClick={() => handleEdit(user)}
+                  >
+                    <IonIcon icon={pencil} slot="start" />
+                    Editar
+                  </IonButton>
+                  <IonButton
+                    fill="outline"
+                    size="small"
+                    color="danger"
+                    className="user-action-btn delete"
+                    onClick={() => handleDelete(user)}
+                  >
+                    <IonIcon icon={trash} slot="start" />
+                    Eliminar
+                  </IonButton>
+                </div>
+              </div>
+            </IonCard>
+          ))}
+        </IonList>
+
+        <div style={{ height: '88px' }} />
 
         <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={handleCreate}>
+          <IonFabButton onClick={handleCreate} className="users-fab">
             <IonIcon icon={add} />
           </IonFabButton>
         </IonFab>
 
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
-          <IonHeader>
-            <IonToolbar>
-              <IonTitle>{editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}</IonTitle>
-              <IonButtons slot="end">
-                <IonButton onClick={() => setShowModal(false)}>Cancelar</IonButton>
-                <IonButton onClick={handleSave}>Guardar</IonButton>
-              </IonButtons>
-            </IonToolbar>
-          </IonHeader>
+          <IonItem lines="none" className="users-modal-title-item">
+            <IonLabel className="users-modal-title">
+              {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+            </IonLabel>
+          </IonItem>
           <IonContent>
             <IonList>
               <IonItem>
@@ -348,6 +398,11 @@ const UsersPage: React.FC = () => {
                 </IonItem>
               )}
             </IonList>
+
+            <div className="users-modal-actions">
+              <IonButton onClick={() => setShowModal(false)} fill="outline">Cancelar</IonButton>
+              <IonButton onClick={handleSave}>Guardar</IonButton>
+            </div>
           </IonContent>
         </IonModal>
 

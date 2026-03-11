@@ -1,164 +1,160 @@
 /* ==========================================================================
-   ClientsPage - Enhanced UI/UX Styling
+   ClientsPage - Unified List Card Layout (Aligned with Products)
    ========================================================================== */
 
 /* Search Bar Styles */
 .search-container {
-  padding: 16px;
-  background: var(--ion-background-color, #ffffff);
+  padding: 14px 16px 10px;
+  background: #ffffff;
   position: sticky;
   top: 0;
-  z-index: 100;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+  border-bottom: 1px solid #E8ECF0;
+  box-shadow: none;
 }
 
 .clients-searchbar {
   --border-radius: 12px;
-  --background: var(--ion-item-background, #f4f5f8);
-  --placeholder-color: var(--ion-color-medium, #6c757d);
-  --icon-color: var(--ion-color-primary, #0056D2);
+  --background: #F4F6F9;
+  --placeholder-color: #9CA3AF;
+  --icon-color: #6B7280;
+  --color: #111827;
   padding: 0;
-}
-
-.clients-searchbar ion-searchbar {
-  border-radius: 12px;
 }
 
 /* Client List Container */
 .clients-list {
-  padding: 16px;
+  padding: 14px 16px;
   background: var(--ion-background-color, #ffffff);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 /* ==========================================================================
-   Client Card Redesign
+   Client Card
    ========================================================================== */
 
 .client-card {
-  margin: 0 0 20px 0 !important;
+  margin: 0 !important;
   border-radius: 16px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04) !important;
-  border: 1px solid var(--ion-border-color, #e0e0e0);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
   overflow: hidden;
 }
 
 .client-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06) !important;
-}
-
-.client-card:active {
-  transform: translateY(0);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.08),
+    0 8px 20px rgba(0, 0, 0, 0.07) !important;
+  transform: translateY(-1px);
 }
 
 .client-card-content {
-  padding: 20px !important;
+  padding: 16px !important;
 }
 
-/* Client Header - Name and Avatar */
-.client-header {
+.client-card-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--ion-border-color, #e0e0e0);
+}
+
+.client-left {
+  flex-shrink: 0;
+}
+
+.client-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .client-avatar {
   font-size: 40px;
   color: var(--ion-color-primary, #0056D2);
-  background: rgba(0, 86, 210, 0.1);
+  background: rgba(0, 86, 210, 0.12);
   border-radius: 50%;
   padding: 4px;
 }
 
-.client-name {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--ion-text-color, #1a1a1a);
-  margin: 0;
-  line-height: 1.3;
-}
-
-/* Client Metadata */
-.client-metadata {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.metadata-row {
+.client-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  margin-bottom: 4px;
 }
 
-.metadata-icon {
-  font-size: 18px;
-  min-width: 24px;
-  text-align: center;
-}
-
-.phone-icon {
-  color: var(--ion-color-success, #28a745);
-}
-
-.email-icon {
-  color: var(--ion-color-primary, #0056D2);
-}
-
-.date-icon {
-  color: var(--ion-color-medium, #6c757d);
-}
-
-.metadata-value {
-  font-size: 15px;
-  color: var(--ion-text-color, #333333);
-  word-break: break-word;
-}
-
-.metadata-value.text-muted {
-  color: var(--ion-color-medium, #6c757d);
-  font-style: italic;
-}
-
-/* Date Row - Smaller and more muted */
-.date-row {
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--ion-border-color, #e0e0e0);
-}
-
-.date-row .metadata-icon {
+.client-name {
   font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  line-height: 1.35;
+  letter-spacing: -0.1px;
 }
 
-.date-value {
-  font-size: 13px !important;
-  color: var(--ion-color-medium, #6c757d) !important;
+.client-subtitle {
+  font-size: 13px;
+  color: #6B7280;
+  margin: 0 0 10px 0;
+  line-height: 1.5;
 }
 
-/* ==========================================================================
-   Action Buttons
-   ========================================================================== */
+/* Metadata badges */
+.client-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
 
+.client-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F4F6F9;
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.meta-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.meta-value {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.meta-value.empty {
+  color: #C4C9D4;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Action Buttons */
 .client-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--ion-border-color, #e0e0e0);
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .action-button {
-  --border-radius: 8px;
+  --border-radius: 10px;
   font-weight: 600;
   text-transform: none;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
+  min-height: 40px;
+  min-width: 96px;
 }
 
 .edit-button {
@@ -206,99 +202,74 @@
    Responsive Design
    ========================================================================== */
 
-/* Tablet (768px and up) */
 @media (min-width: 768px) {
   .search-container {
-    padding: 20px 24px;
+    padding: 16px 24px 12px;
+    max-width: 860px;
+    margin: 0 auto;
   }
-  
+
   .clients-list {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
-    padding: 20px 24px;
+    padding: 16px 24px;
+    max-width: 860px;
+    margin: 0 auto;
+    gap: 14px;
   }
-  
-  .client-card {
-    margin: 0 !important;
+
+  .client-card-content {
+    padding: 18px 20px !important;
   }
-  
+
   .client-name {
-    font-size: 22px;
+    font-size: 17px;
   }
 }
 
-/* Desktop (1024px and up) */
 @media (min-width: 1024px) {
   .search-container {
-    padding: 24px 32px;
-    max-width: 1400px;
-    margin: 0 auto;
+    padding: 20px 32px 14px;
+    max-width: 960px;
   }
-  
+
   .clients-list {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    padding: 24px 32px;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-  
-  .client-card-content {
-    padding: 24px !important;
-  }
-  
-  .client-name {
-    font-size: 24px;
-  }
-  
-  .client-avatar {
-    font-size: 48px;
+    padding: 20px 32px;
+    max-width: 960px;
+    gap: 14px;
   }
 }
 
-/* Large Desktop (1400px and up) */
-@media (min-width: 1400px) {
-  .clients-list {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-/* Mobile - Single column */
 @media (max-width: 767px) {
   .search-container {
     padding: 12px;
   }
-  
+
   .clients-list {
     padding: 12px;
   }
-  
+
   .client-card-content {
-    padding: 16px !important;
+    padding: 14px !important;
   }
-  
-  .client-name {
-    font-size: 18px;
+
+  .client-card-row {
+    gap: 10px;
   }
-  
+
   .client-avatar {
     font-size: 36px;
   }
-  
+
   .client-actions {
-    flex-direction: column;
-    gap: 8px;
+    margin-left: 0;
   }
-  
+
   .action-button {
-    width: 100%;
-    margin: 0;
+    min-width: 88px;
   }
 }
 
 /* ==========================================================================
-   Professional Modal Styles (Existing - Keep for reference)
+   Professional Modal Styles (Existing)
    ========================================================================== */
 
 .client-modal {
@@ -463,23 +434,3 @@
     margin-top: 24px;
   }
 }
-
-/* Enterprise-grade subtle animations */
-.form-item ion-input {
-  transition: all 0.3s ease;
-}
-
-.form-item ion-input:focus-within {
-  --border-color: #0056D2;
-  box-shadow: 0 0 0 3px rgba(0, 86, 210, 0.1);
-}
-
-/* Professional spacing */
-.form-container > .form-item:first-child {
-  margin-top: 0;
-}
-
-.form-container > .form-item:last-child {
-  margin-bottom: 0;
-}
-
