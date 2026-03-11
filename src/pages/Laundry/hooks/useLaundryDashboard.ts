@@ -73,10 +73,17 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
   // Cargar ingresos al entrar
   useEffect(() => {
     const controller = new AbortController();
+    console.log('[LaundryDashboard] mount -> loadIncomes', {
+      path: location.pathname,
+      hasAuth: !!localStorage.getItem('pos_gmo_auth'),
+    });
     loadIncomes(controller.signal);
-    
-    return () => controller.abort();
-  }, [loadIncomes]);
+
+    return () => {
+      console.log('[LaundryDashboard] unmount -> abort loadIncomes');
+      controller.abort();
+    };
+  }, [loadIncomes, location.pathname]);
 
   // Timer de inactividad para refrescar
   useInactivityTimer(300000, () => {
@@ -97,7 +104,13 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
   // ║   Gráfica: DINERO por método de pago / mes    ║
   // ╚═══════════════════════════════════════════════╝
   useEffect(() => {
+    console.log('[LaundryDashboard] allIncome changed', {
+      count: allIncome.length,
+      sample: allIncome[0] ?? null,
+    });
+
     if (allIncome.length === 0) {
+      console.log('[LaundryDashboard] No income data -> pieData=null');
       setPieData(null);
       return;
     }
@@ -122,6 +135,10 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
     });
 
     if (monthlyIncomes.length === 0) {
+      console.log('[LaundryDashboard] No monthly incomes for current month/year', {
+        currentMonth,
+        currentYear,
+      });
       setPieData(null);
       return;
     }
@@ -166,6 +183,10 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
       ],
     };
 
+    console.log('[LaundryDashboard] pieData generated', {
+      labels: data.labels,
+      values: data.datasets?.[0]?.data,
+    });
     setPieData(data);
   }, [allIncome]);
 
