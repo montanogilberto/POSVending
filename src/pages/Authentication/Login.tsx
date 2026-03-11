@@ -26,7 +26,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [showCompanySelector, setShowCompanySelector] = useState(false);
 
   // Temporary holder for user data between credential validation and company selection
-  const pendingUserRef = useRef<{ userId: number; username: string; avatarUrl: string } | null>(null);
+  const pendingUserRef = useRef<{ userId: number; username: string; avatarUrl: string; backendCompanyId: number } | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,9 +68,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
       // Credentials valid — store pending user data and open company selector
       pendingUserRef.current = {
-        userId:    result.userId    ?? 0,
+        userId:    Number(result.userId ?? 0),
         username:  username,
         avatarUrl: result.avatarUrl ?? 'https://www.w3schools.com/howto/img_avatar.png',
+        backendCompanyId: Number(result.companyId ?? 0),
       };
 
       // Pre-populate user fields in context (not yet authenticated)
@@ -78,6 +79,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         userId:    pendingUserRef.current.userId,
         username:  pendingUserRef.current.username,
         avatarUrl: pendingUserRef.current.avatarUrl,
+        companyId: pendingUserRef.current.backendCompanyId,
       });
 
       setShowCompanySelector(true);
