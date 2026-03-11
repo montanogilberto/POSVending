@@ -1,3 +1,5 @@
+import { fetchCategoriesByCompany } from '../utils/apiUtils';
+
 export interface Category {
   categoryId: number;
   name: string;
@@ -9,7 +11,6 @@ export const fetchCategories = async (companyId: string): Promise<Category[]> =>
   console.log('companyId:' + companyId);
   
   // Use the shared utility function for consistent error handling and API calls
-  const { fetchCategoriesByCompany } = await import('../utils/apiUtils');
   return await fetchCategoriesByCompany(companyId);
 };
 
