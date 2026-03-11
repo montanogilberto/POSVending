@@ -1,7 +1,6 @@
-# TODO - Laundry production blank diagnosis and fix
+# Laundry Dashboard Visibility Fix TODO
 
-- [ ] Add targeted runtime logs in `src/pages/Laundry/Laundry.tsx` for pathname, auth snapshot, and section visibility.
-- [ ] Add diagnostics in `src/pages/Laundry/hooks/useLaundryDashboard.ts` for loadIncomes lifecycle and allIncome/chart branches.
-- [ ] Check and normalize route casing references (`/Laundry` vs `/laundry`) in routing/title logic and dependent files.
-- [ ] Run `npm run build` to validate changes.
-- [ ] Confirm root cause from logs, apply final behavior fix, and keep/remove selected logs accordingly.
+- [x] Review global theme/style files for overrides that can hide Laundry content
+- [x] Add scoped fallback visibility styles in `src/pages/Laundry/Laundry.css`
+- [ ] Run quick project check (build/type-check) to ensure no regressions
+- [ ] Mark tasks complete after verification
