@@ -46,7 +46,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({
     setTicketData(null);
     clearCart();
     await loadIncomes();
-    history.push('/Laundry');
+    history.push('/laundry');
   };
 
   return (

@@ -229,7 +229,7 @@ const unifiedReceiptData = React.useMemo(() => {
       setTicketData(null);
       
       // Navigate away
-      history.replace('/Laundry');
+      history.replace('/laundry');
       
       // Dismiss loader after navigation
       setClosing(false);
