@@ -13,6 +13,8 @@ interface LoginProps {
   onLoginSuccess?: () => void;
 }
 
+const SKIP_COMPANY_WIZARD = true; // temporary debug switch
+
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const history = useHistory();
   const { login, setUserData } = useUser();
@@ -66,7 +68,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         return;
       }
 
-      // Credentials valid — store pending user data and open company selector
+      // Credentials valid — store pending user data
       pendingUserRef.current = {
         userId:    Number(result.userId ?? 0),
         username:  username,
@@ -82,6 +84,36 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         companyId: pendingUserRef.current.backendCompanyId,
       });
 
+      if (SKIP_COMPANY_WIZARD) {
+        const fallbackCompanyId =
+          Number.isFinite(Number(pendingUserRef.current.backendCompanyId)) &&
+          Number(pendingUserRef.current.backendCompanyId) > 0
+            ? Number(pendingUserRef.current.backendCompanyId)
+            : 1;
+
+        console.log('[Login] SKIP_COMPANY_WIZARD enabled -> direct login to /laundry', {
+          userId: pendingUserRef.current.userId,
+          username: pendingUserRef.current.username,
+          backendCompanyId: pendingUserRef.current.backendCompanyId,
+          finalCompanyId: fallbackCompanyId,
+        });
+
+        login({
+          userId: pendingUserRef.current.userId,
+          username: pendingUserRef.current.username,
+          avatarUrl: pendingUserRef.current.avatarUrl,
+          companyId: fallbackCompanyId,
+          companyName: 'Empresa',
+          branchId: 1,
+          branchName: 'Sucursal',
+        });
+
+        onLoginSuccess?.();
+        history.replace('/laundry');
+        return;
+      }
+
+      console.log('[Login] Company selector path enabled');
       setShowCompanySelector(true);
 
     } catch (err) {
@@ -93,28 +125,48 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   const handleCompanyConfirm = (
-    companyId: number,
-    companyName: string,
+    selectedCompanyId: number,
+    selectedCompanyName: string,
     branchId: number,
     branchName: string,
   ) => {
     const pending = pendingUserRef.current;
-    if (!pending) return;
+    if (!pending) {
+      setMessage('Sesión de inicio incompleta. Intenta de nuevo.');
+      return;
+    }
+
+    const finalCompanyId =
+      Number.isFinite(Number(selectedCompanyId)) && Number(selectedCompanyId) > 0
+        ? Number(selectedCompanyId)
+        : Number(pending.backendCompanyId);
+
+    if (!finalCompanyId || finalCompanyId <= 0) {
+      setMessage('Debes seleccionar una empresa válida para continuar.');
+      return;
+    }
+
+    console.log('[Login] Finalizing login with company:', {
+      selectedCompanyId,
+      backendCompanyId: pending.backendCompanyId,
+      finalCompanyId,
+      branchId,
+    });
 
     // Finalise login — sets isAuthenticated = true and persists to localStorage
     login({
-      userId:      pending.userId,
-      username:    pending.username,
-      avatarUrl:   pending.avatarUrl,
-      companyId,
-      companyName,
+      userId: pending.userId,
+      username: pending.username,
+      avatarUrl: pending.avatarUrl,
+      companyId: finalCompanyId,
+      companyName: selectedCompanyName || 'Empresa',
       branchId,
       branchName,
     });
 
     setShowCompanySelector(false);
     onLoginSuccess?.();
-    history.push('/laundry');   // ← lowercase, matches App.tsx route
+    history.replace('/laundry');
   };
 
   return (

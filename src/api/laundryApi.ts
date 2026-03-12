@@ -20,46 +20,61 @@ interface CartItem {
   selectedOptions: { [optionId: number]: number };
 }
 
-export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> => {
+export const fetchAllLaundry = async (
+  signal?: AbortSignal,
+  companyId?: number
+): Promise<Income[]> => {
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), 10000);
+
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, timeoutController.signal])
+    : timeoutController.signal;
+
   try {
-    const controller = new AbortController();
-    const abortSignal = signal || controller.signal;
+    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_income', {
+      signal: combinedSignal
+    });
 
-    // Set timeout to prevent hanging requests
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    if (!response.ok) throw new Error(`Error al obtener datos del backend: ${response.status}`);
 
-    try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_income', {
-        signal: abortSignal
+    const data = await response.json();
+    console.log('Fetched all_income:', data);
+
+    // Ensure data.income is an array, default to empty array if not
+    const incomeArray = Array.isArray(data.income) ? data.income : [];
+
+    // Filter by company when provided
+    const normalizedCompanyId = Number(companyId);
+    const shouldFilterByCompany = Number.isFinite(normalizedCompanyId) && normalizedCompanyId > 0;
+
+    const filteredIncome = shouldFilterByCompany
+      ? incomeArray.filter((income: Income) => Number(income.companyId) === normalizedCompanyId)
+      : incomeArray;
+
+    if (!shouldFilterByCompany) {
+      console.warn('[fetchAllLaundry] companyId missing/invalid, returning unfiltered income data', {
+        companyId
       });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) throw new Error(`Error al obtener datos del backend: ${response.status}`);
-
-      const data = await response.json();
-      console.log('Fetched all_income:', data);
-      // Ensure data.income is an array, default to empty array if not
-      const incomeArray = Array.isArray(data.income) ? data.income : [];
-      // Sort by paymentDate descending (newest first)
-      const sortedIncome = incomeArray.sort((a: Income, b: Income) =>
-        new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-      );
-      return sortedIncome;
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      
-      // Handle abort errors gracefully
-      if (fetchError.name === 'AbortError') {
-        console.log('Laundry fetch aborted');
-        return [];
-      }
-      
-      throw fetchError;
     }
-  } catch (error) {
-    console.error(error);
-    throw error; // Re-throw to allow caller to handle
+
+    // Sort by paymentDate descending (newest first)
+    const sortedIncome = filteredIncome.sort((a: Income, b: Income) =>
+      new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+    );
+
+    return sortedIncome;
+  } catch (fetchError: any) {
+    // Handle abort errors gracefully
+    if (fetchError.name === 'AbortError') {
+      console.log('Laundry fetch aborted');
+      return [];
+    }
+
+    console.error(fetchError);
+    throw fetchError; // Re-throw to allow caller to handle
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 

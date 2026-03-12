@@ -259,9 +259,9 @@ const AppShell: React.FC = () => {
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
-            <IonTabButton tab="laundry" href="/laundry">
+<IonTabButton tab="laundry" href="/laundry">
               <IonIcon aria-hidden="true" icon={shirt} />
-              <IonLabel>Laundry</IonLabel>
+              <IonLabel>laundry</IonLabel>
             </IonTabButton>
             <IonTabButton tab="scannerqr" href="/scannerqr">
               <IonIcon aria-hidden="true" icon={qrCode} />
