@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Redirect, Route, useHistory } from 'react-router-dom';
 import {
   IonApp,
@@ -28,29 +28,29 @@ import {
   logOutOutline, people, cube, notifications, mail, grid, person, menu, water,
 } from 'ionicons/icons';
 
-import Vending               from './pages/Vending';
-import Setting               from './pages/Setting';
-import Sells                 from './pages/Sells';
-import Laundry               from './pages/Laundry/Laundry';
-import ScannerQR             from './pages/ScannerQR';
-import Category              from './pages/CategoryPage/CategoryPage';
-import ProductListPage       from './pages/products/ProductListPage';
-import ProductDetailPage     from './pages/products/ProductDetailPage';
-import CartPage              from './pages/CartPage/CartPage';
-import MovementsPage         from './pages/MovementsPage';
-import LedStatusPage         from './pages/LedStatusPage';
-import ClientsPage           from './pages/ClientsPage';
-import ProductsManagementPage from './pages/products/ProductsManagementPage';
-import AlertsPage            from './pages/AlertsPage';
-import EmailsPage            from './pages/EmailsPage';
-import CategoriesPage        from './pages/CategoryPage/CategoriesPage';
-import UsersPage             from './pages/UsersPage';
-import IncomesPage           from './pages/IncomesPage';
-import ExpensesPage          from './pages/ExpensesPage';
-import WaterTanksPage        from './pages/WaterTanksPage';
-import WaterTanksHistoryPage from './pages/WaterTanksHistoryPage';
-import ReceiptPage           from './pages/Receipt/ReceiptPage';
-import Login                 from './pages/Authentication/Login';
+const Vending = React.lazy(() => import('./pages/Vending'));
+const Setting = React.lazy(() => import('./pages/Setting'));
+const Sells = React.lazy(() => import('./pages/Sells'));
+const Laundry = React.lazy(() => import('./pages/Laundry/Laundry'));
+const ScannerQR = React.lazy(() => import('./pages/ScannerQR'));
+const Category = React.lazy(() => import('./pages/CategoryPage/CategoryPage'));
+const ProductListPage = React.lazy(() => import('./pages/products/ProductListPage'));
+const ProductDetailPage = React.lazy(() => import('./pages/products/ProductDetailPage'));
+const CartPage = React.lazy(() => import('./pages/CartPage/CartPage'));
+const MovementsPage = React.lazy(() => import('./pages/MovementsPage'));
+const LedStatusPage = React.lazy(() => import('./pages/LedStatusPage'));
+const ClientsPage = React.lazy(() => import('./pages/ClientsPage'));
+const ProductsManagementPage = React.lazy(() => import('./pages/products/ProductsManagementPage'));
+const AlertsPage = React.lazy(() => import('./pages/AlertsPage'));
+const EmailsPage = React.lazy(() => import('./pages/EmailsPage'));
+const CategoriesPage = React.lazy(() => import('./pages/CategoryPage/CategoriesPage'));
+const UsersPage = React.lazy(() => import('./pages/UsersPage'));
+const IncomesPage = React.lazy(() => import('./pages/IncomesPage'));
+const ExpensesPage = React.lazy(() => import('./pages/ExpensesPage'));
+const WaterTanksPage = React.lazy(() => import('./pages/WaterTanksPage'));
+const WaterTanksHistoryPage = React.lazy(() => import('./pages/WaterTanksHistoryPage'));
+const ReceiptPage = React.lazy(() => import('./pages/Receipt/ReceiptPage'));
+const Login = React.lazy(() => import('./pages/Authentication/Login'));
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -69,8 +69,8 @@ import './theme/variables.css';
 import { IncomeProvider }  from './context/IncomeContext';
 import { ProductProvider } from './context/ProductContext';
 import { useUser } from './components/UserContext';
-import ForgotPassword from './pages/Authentication/ForgotPassword';
-import CreateAccount  from './pages/Authentication/CreateAccount';
+const ForgotPassword = React.lazy(() => import('./pages/Authentication/ForgotPassword'));
+const CreateAccount = React.lazy(() => import('./pages/Authentication/CreateAccount'));
 
 setupIonicReact();
 
@@ -290,6 +290,7 @@ const App: React.FC = () => {
     <IncomeProvider>
       <ProductProvider>
         <IonApp>
+          <Suspense fallback={<IonPage><IonContent /></IonPage>}>
           <IonReactRouter>
             {/*
              * Top-level router outlet:
@@ -307,6 +308,7 @@ const App: React.FC = () => {
               <Route component={AppShell} />
             </IonRouterOutlet>
           </IonReactRouter>
+          </Suspense>
         </IonApp>
       </ProductProvider>
     </IncomeProvider>

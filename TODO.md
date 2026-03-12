@@ -1,6 +1,8 @@
-# Laundry Dashboard Visibility Fix TODO
+# Chunk Reduction Plan
 
-- [x] Review global theme/style files for overrides that can hide Laundry content
-- [x] Add scoped fallback visibility styles in `src/pages/Laundry/Laundry.css`
-- [ ] Run quick project check (build/type-check) to ensure no regressions
-- [ ] Mark tasks complete after verification
+- [x] Analyze bundle warnings and identify root causes
+- [x] Update `src/api/categoriesApi.ts` to remove ineffective dynamic import
+- [x] Refactor `src/App.tsx` to use route-level lazy loading with `React.lazy` + `Suspense`
+- [x] Update `vite.config.ts` with `manualChunks` for better vendor splitting
+- [ ] Run production build and compare chunk output/warnings
+- [ ] Summarize results and remaining optimization opportunities

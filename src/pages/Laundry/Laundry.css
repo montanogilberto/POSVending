@@ -2,42 +2,6 @@
 .dashboard-content {
   --background: #F9FAFB;
   background: #F9FAFB;
-  --color: #222;
-  color: #222;
-}
-
-.dashboard-content * {
-  color: inherit;
-}
-
-/* Force Ionic text-bearing components to stay visible in this page */
-.dashboard-content ion-card,
-.dashboard-content ion-card-title,
-.dashboard-content ion-card-subtitle,
-.dashboard-content ion-label,
-.dashboard-content ion-item,
-.dashboard-content ion-item h1,
-.dashboard-content ion-item h2,
-.dashboard-content ion-item h3,
-.dashboard-content ion-item p,
-.dashboard-content p,
-.dashboard-content h1,
-.dashboard-content h2,
-.dashboard-content h3,
-.dashboard-content h4,
-.dashboard-content span,
-.dashboard-content div {
-  color: #222;
-}
-
-/* Ensure Ionic cards/items are not transparent on this page */
-.dashboard-content ion-card {
-  --background: #fff;
-  background: #fff;
-}
-
-.dashboard-content ion-item {
-  --background: transparent;
 }
 
 .dashboard-container {
