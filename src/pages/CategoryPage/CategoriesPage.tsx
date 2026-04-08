@@ -39,11 +39,9 @@ interface LocalCategory {
 type CategoryFilter = 'all' | 'withImage' | 'withoutImage';
 
 const CategoriesPage: React.FC = () => {
-<<<<<<< HEAD
-  const { companyId } = useUser();
-=======
+
   const companyId = 1;
->>>>>>> c73013ab (reverse several branches retail)
+
   const [categories, setCategories] = useState<LocalCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -85,26 +83,14 @@ const CategoriesPage: React.FC = () => {
       }
 
       try {
-<<<<<<< HEAD
-        const fetchedCategories = await fetchCategories(String(companyId));
-        setCategories(
-          fetchedCategories.map((cat: Category) => ({
-            id: cat.categoryId,
-            name: cat.name,
-            description: '',
-            image: cat.image,
-            productsCount: 0,
-          }))
-        );
-=======
         const fetchedCategories = await fetchCategories(companyId.toString());
         setCategories(fetchedCategories.map((cat: Category) => ({
           id: cat.categoryId,
           name: cat.name,
-          description: '', // API doesn't provide description, so leave empty
+          description: '', // API doesn't provide description or productsCount
           image: cat.image,
+          productsCount: 0,
         })));
->>>>>>> c73013ab (reverse several branches retail)
       } catch (error) {
         console.error('Error loading categories:', error);
       } finally {
@@ -163,10 +149,7 @@ const CategoriesPage: React.FC = () => {
       }
 
       if (editingCategory) {
-<<<<<<< HEAD
-=======
         // Update existing
->>>>>>> c73013ab (reverse several branches retail)
         await updateCategory(editingCategory.id, formData.name, imagePath, companyId);
         setCategories(categories.map(cat =>
           cat.id === editingCategory.id
@@ -174,19 +157,6 @@ const CategoriesPage: React.FC = () => {
             : cat
         ));
       } else {
-<<<<<<< HEAD
-        await createCategory(formData.name, imagePath, companyId);
-        const fetchedCategories = await fetchCategories(String(companyId));
-        setCategories(
-          fetchedCategories.map((cat: Category) => ({
-            id: cat.categoryId,
-            name: cat.name,
-            description: '',
-            image: cat.image,
-            productsCount: 0,
-          }))
-        );
-=======
         // Create new
         await createCategory(formData.name, imagePath, companyId);
         // Reload categories after create
@@ -194,10 +164,10 @@ const CategoriesPage: React.FC = () => {
         setCategories(fetchedCategories.map((cat: Category) => ({
           id: cat.categoryId,
           name: cat.name,
-          description: '', // API doesn't provide description, so leave empty
+          description: '', // API doesn't provide description or productsCount
           image: cat.image,
+          productsCount: 0,
         })));
->>>>>>> c73013ab (reverse several branches retail)
       }
       setShowModal(false);
     } catch (error) {
@@ -460,3 +430,4 @@ const CategoriesPage: React.FC = () => {
 };
 
 export default CategoriesPage;
+
