@@ -3,6 +3,7 @@ import { useHistory, useLocation } from 'react-router-dom';
 import { useIncome } from '../../../context/IncomeContext';
 import { fetchTicket } from '../../../api/ticketApi';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
+import { useUser } from '../../../components/UserContext';
 import { Transaction, CartItem, LocationState } from '../types';
 
 type UseLaundryDashboardReturn = {
@@ -58,6 +59,7 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
   const location = useLocation();
   const history = useHistory();
   const { allIncome, loadIncomes } = useIncome();
+  const { companyId } = useUser();
 
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -72,23 +74,30 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
 
   // Cargar ingresos al entrar
   useEffect(() => {
+    if (!companyId || Number(companyId) <= 0) {
+      console.warn('[LaundryDashboard] skip loadIncomes -> invalid companyId', { companyId });
+      return;
+    }
+
     const controller = new AbortController();
     console.log('[LaundryDashboard] mount -> loadIncomes', {
       path: location.pathname,
       hasAuth: !!localStorage.getItem('pos_gmo_auth'),
+      companyId,
     });
-    loadIncomes(controller.signal);
+    loadIncomes({ signal: controller.signal, companyId });
 
     return () => {
       console.log('[LaundryDashboard] unmount -> abort loadIncomes');
       controller.abort();
     };
-  }, [loadIncomes, location.pathname]);
+  }, [loadIncomes, companyId]);
 
   // Timer de inactividad para refrescar
   useInactivityTimer(300000, () => {
+    if (!companyId || Number(companyId) <= 0) return;
     const controller = new AbortController();
-    loadIncomes(controller.signal);
+    loadIncomes({ signal: controller.signal, companyId });
   });
 
 
@@ -244,7 +253,7 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
       setShowToast(true);
       setCart([]);
       setShowCart(false);
-      loadIncomes();
+      loadIncomes({ companyId });
     } catch (error) {
       console.error(error);
       setToastMessage('Error al confirmar la venta.');

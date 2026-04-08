@@ -4,7 +4,7 @@ import {
   IonToast,
   IonPage,
 } from '@ionic/react';
-import './Laundry.css';
+// import './Laundry.css';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import LogoutAlert from '../../components/Alerts/LogoutAlert';

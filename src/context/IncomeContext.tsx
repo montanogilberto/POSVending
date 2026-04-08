@@ -13,9 +13,14 @@ interface Income {
   companyId: number;
 }
 
+interface LoadIncomesOptions {
+  signal?: AbortSignal;
+  companyId?: number;
+}
+
 interface IncomeContextType {
   allIncome: Income[];
-  loadIncomes: (signal?: AbortSignal) => Promise<void>;
+  loadIncomes: (options?: LoadIncomesOptions) => Promise<void>;
 }
 
 const IncomeContext = createContext<IncomeContextType | undefined>(undefined);
@@ -23,9 +28,12 @@ const IncomeContext = createContext<IncomeContextType | undefined>(undefined);
 export const IncomeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [allIncome, setAllIncome] = useState<Income[]>([]);
 
-  const loadIncomes = useCallback(async (signal?: AbortSignal) => {
+  const loadIncomes = useCallback(async (options?: LoadIncomesOptions) => {
+    const signal = options?.signal;
+    const companyId = options?.companyId;
+
     try {
-      const incomes = await fetchAllLaundry(signal);
+      const incomes = await fetchAllLaundry(signal, companyId);
       // Only update state if request wasn't aborted
       if (!signal?.aborted) {
         setAllIncome(incomes);

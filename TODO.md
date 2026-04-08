@@ -1,8 +1,4 @@
-# Chunk Reduction Plan
-
-- [x] Analyze bundle warnings and identify root causes
-- [x] Update `src/api/categoriesApi.ts` to remove ineffective dynamic import
-- [x] Refactor `src/App.tsx` to use route-level lazy loading with `React.lazy` + `Suspense`
-- [x] Update `vite.config.ts` with `manualChunks` for better vendor splitting
-- [ ] Run production build and compare chunk output/warnings
-- [ ] Summarize results and remaining optimization opportunities
+- [x] Add temporary skip flag for company wizard in Login flow
+- [x] Implement direct login-to-/laundry path when skip flag is enabled (keep wizard code intact)
+- [x] Add debug console logs for skip path vs wizard path
+- [ ] Verify critical path behavior sum
