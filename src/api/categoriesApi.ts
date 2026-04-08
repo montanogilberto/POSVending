@@ -11,13 +11,18 @@ export const fetchCategories = async (companyId: string): Promise<Category[]> =>
   console.log('companyId:' + companyId);
   
   // Use the shared utility function for consistent error handling and API calls
+<<<<<<< HEAD
   return await fetchCategoriesByCompany(companyId);
+=======
+  const { fetchCategoriesByCompany } = await import('../utils/apiUtils');
+  return await fetchCategoriesByCompany(Number(companyId));
+>>>>>>> c73013ab (reverse several branches retail)
 };
 
 export const createCategory = async (name: string, image: string, companyId: number): Promise<void> => {
   console.log('name:' + name + 'path' + image)
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/product_categories', {
+    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_product_categories', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

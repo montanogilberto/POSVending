@@ -10,6 +10,7 @@ import MailPopover from '../../components/PopOver/MailPopover';
 import '../../styles/dashboard.css';
 
 const CategoryPage: React.FC = () => {
+  const companyId = 1;
   const history = useHistory();
   const location = useLocation();
   const [categories, setCategories] = useState<Categories[]>([]);
@@ -39,11 +40,11 @@ const CategoryPage: React.FC = () => {
     if (hasFetched.current) return;
     hasFetched.current = true;
 
-    const loadCategories = async () => {
+  const loadCategories = async () => {
       try {
         setLoading(true);
         const fetchedCategories = await fetchCategories();
-        setCategories(fetchedCategories);
+        setCategories(fetchedCategories.filter(cat => cat.companyId === companyId));
       } catch (error) {
         console.error('Error loading categories:', error);
       } finally {

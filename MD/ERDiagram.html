@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Products Database — ER Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #F0F4F8;
+      min-height: 100vh;
+      padding: 40px 24px 60px;
+      color: #1E293B;
+    }
+
+    /* ── Page Header ── */
+    .page-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .page-header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #0F172A;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .page-header p {
+      font-size: 14px;
+      color: #64748B;
+      font-weight: 400;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #EFF6FF;
+      color: #2563EB;
+      border: 1px solid #BFDBFE;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 12px;
+      margin-top: 10px;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Diagram Card ── */
+    .diagram-card {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+      padding: 40px 32px;
+      max-width: 1200px;
+      margin: 0 auto 40px;
+      overflow-x: auto;
+    }
+
+    .diagram-card .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ── Legend ── */
+    .legend-card {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+      padding: 28px 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .legend-card h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      background: #F8FAFC;
+      border-radius: 12px;
+      border: 1px solid #E2E8F0;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .legend-dot.pk  { background: #2563EB; }
+    .legend-dot.fk  { background: #7C3AED; }
+    .legend-dot.rel { background: #059669; }
+    .legend-dot.cfg { background: #D97706; }
+
+    .legend-text strong {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1E293B;
+      margin-bottom: 2px;
+    }
+
+    .legend-text span {
+      font-size: 12px;
+      color: #64748B;
+      line-height: 1.5;
+    }
+
+    /* ── Table Groups ── */
+    .groups-card {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
+      padding: 28px 32px;
+      max-width: 1200px;
+      margin: 0 auto 40px;
+    }
+
+    .groups-card h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    .groups-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .group-item {
+      padding: 16px 18px;
+      border-radius: 12px;
+      border-left: 4px solid;
+    }
+
+    .group-item.main   { background: #EFF6FF; border-color: #2563EB; }
+    .group-item.config { background: #FFF7ED; border-color: #D97706; }
+    .group-item.pos    { background: #F0FDF4; border-color: #059669; }
+
+    .group-item h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .group-item.main   h3 { color: #1D4ED8; }
+    .group-item.config h3 { color: #B45309; }
+    .group-item.pos    h3 { color: #047857; }
+
+    .group-item ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .group-item ul li {
+      font-size: 12px;
+      color: #475569;
+      padding: 2px 0;
+      font-family: 'Courier New', monospace;
+      font-weight: 500;
+    }
+
+    .group-item ul li::before {
+      content: '→ ';
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <h1>Products Database Schema</h1>
+    <p>Entity-Relationship Diagram · Crow's Foot Notation</p>
+    <span class="badge">POS GMO — Product Management</span>
+  </div>
+
+  <!-- Table Groups Summary -->
+  <div class="groups-card">
+    <h2>Table Groups</h2>
+    <div class="groups-grid">
+      <div class="group-item main">
+        <h3>🗂 Main Tables</h3>
+        <ul>
+          <li>productsCategories</li>
+          <li>products</li>
+        </ul>
+      </div>
+      <div class="group-item config">
+        <h3>⚙️ Product Configuration</h3>
+        <ul>
+          <li>productsDetails</li>
+          <li>productsForm</li>
+          <li>productsDescription</li>
+          <li>productsPackings</li>
+          <li>productsPackingsPresentation</li>
+        </ul>
+      </div>
+      <div class="group-item pos">
+        <h3>🛒 POS Customization</h3>
+        <ul>
+          <li>productsOptions</li>
+          <li>productsOptionsChoices</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ER Diagram -->
+  <div class="diagram-card">
+    <div class="mermaid">
+erDiagram
+
+    productsCategories {
+        int     categoryId      PK
+        string  name
+        string  description
+    }
+
+    products {
+        int      productId    PK
+        int      categoryId   FK
+        string   name
+        string   barCode
+        string   code
+        string   description
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    productsDetails {
+        int productDetailId        PK
+        int productId              FK
+        int productFormId          FK
+        int productDescriptionId   FK
+        int packingId              FK
+        int packingPresentationId  FK
+    }
+
+    productsForm {
+        int    productFormId  PK
+        string name
+    }
+
+    productsDescription {
+        int    productDescriptionId  PK
+        string description
+    }
+
+    productsPackings {
+        int    packagingId  PK
+        string name
+    }
+
+    productsPackingsPresentation {
+        int    presentationId  PK
+        string name
+    }
+
+    productsOptions {
+        int    productOptionId  PK
+        int    productId        FK
+        string name
+        string optionType
+    }
+
+    productsOptionsChoices {
+        int   productOptionChoiceId  PK
+        int   productOptionId        FK
+        string name
+        float  extraPrice
+    }
+
+    %% ── Relationships ──────────────────────────────────────
+    productsCategories          ||--o{ products                    : "contains"
+    products                    ||--o{ productsDetails             : "has"
+    products                    ||--o{ productsOptions             : "has"
+    productsOptions             ||--o{ productsOptionsChoices      : "has"
+    productsForm                ||--o{ productsDetails             : "used in"
+    productsDescription         ||--o{ productsDetails             : "used in"
+    productsPackings            ||--o{ productsDetails             : "used in"
+    productsPackingsPresentation||--o{ productsDetails             : "used in"
+
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend-card">
+    <h2>Notation Guide</h2>
+    <div class="legend-grid">
+      <div class="legend-item">
+        <div class="legend-dot pk"></div>
+        <div class="legend-text">
+          <strong>PK — Primary Key</strong>
+          <span>Unique identifier for each row in the table. Cannot be null.</span>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot fk"></div>
+        <div class="legend-text">
+          <strong>FK — Foreign Key</strong>
+          <span>References the primary key of another table to establish a relationship.</span>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot rel"></div>
+        <div class="legend-text">
+          <strong>|| — o{ &nbsp; One-to-Many</strong>
+          <span>One record on the left can relate to zero or many records on the right.</span>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot cfg"></div>
+        <div class="legend-text">
+          <strong>productsDetails — Junction</strong>
+          <span>Connects products to form, description, packing, and presentation configs.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'default',
+      er: {
+        diagramPadding: 40,
+        layoutDirection: 'TB',
+        minEntityWidth: 100,
+        minEntityHeight: 75,
+        entityPadding: 15,
+        useMaxWidth: true,
+      },
+      themeVariables: {
+        primaryColor:        '#EFF6FF',
+        primaryTextColor:    '#1E293B',
+        primaryBorderColor:  '#2563EB',
+        lineColor:           '#64748B',
+        secondaryColor:      '#F8FAFC',
+        tertiaryColor:       '#F0FDF4',
+        edgeLabelBackground: '#ffffff',
+        fontFamily:          "'Segoe UI', system-ui, sans-serif",
+        fontSize:            '13px',
+      }
+    });
+  </script>
+
+</body>
+</html>
