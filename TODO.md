@@ -1,4 +1,4 @@
 - [x] Add temporary skip flag for company wizard in Login flow
 - [x] Implement direct login-to-/laundry path when skip flag is enabled (keep wizard code intact)
 - [x] Add debug console logs for skip path vs wizard path
-- [ ] Verify critical path behavior summary
+- [ ] Verify critical path behavior sum
