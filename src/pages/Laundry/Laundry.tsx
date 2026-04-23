@@ -4,14 +4,16 @@ import {
   IonToast,
   IonPage,
   IonButton,
+  IonIcon,
 } from '@ionic/react';
-// import './Laundry.css';
+import './Laundry.css';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import LogoutAlert from '../../components/Alerts/LogoutAlert';
 import MailPopover from '../../components/PopOver/MailPopover';
 import LaundryChart from '../../components/LaundryChart';
 import { useLaundryDashboard } from './hooks/useLaundryDashboard';
+import { hourglassOutline } from 'ionicons/icons';
 import MetricsGrid from './components/MetricsGrid';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
@@ -66,64 +68,72 @@ const Laundry: React.FC = () => {
         screenTitle={getTitleFromPath(location.pathname)}
       />
       <IonContent fullscreen className="dashboard-content">
-        <div className="dashboard-container">
+        {allIncome.length === 0 ? (
+          <div style={{padding: '4rem', textAlign: 'center', color: 'var(--ion-color-medium)'}}>
+            <IonIcon icon={hourglassOutline} size="large" style={{marginBottom: '1rem'}} />
+            <h3>Cargando datos de lavandería...</h3>
+            <p>Obteniendo transacciones recientes</p>
+          </div>
+        ) : (
+          <div className="dashboard-container">
 
-          {/* Metrics Grid */}
-          <MetricsGrid
-            calculateDailySales={calculateDailySales}
-            calculateMonthlyTotal={calculateMonthlyTotal}
-            calculateTotal={calculateTotal}
-            currentMonthYear={currentMonthYear}
-            currentUser={currentUser}
-            percentageChange={percentageChange}
-            handleStartSeller={handleStartSeller}
-          />
-
-          {/* Laundry Chart */}
-          <LaundryChart pieData={pieData} />
-
-          {/* Carrito Summary if showCart */}
-          {showCart && cart.length > 0 && (
-            <CartSummary
-              cart={cart}
-              onConfirmSale={handleConfirmSale}
-              setCart={setCart}
-              setShowCart={setShowCart}
+            {/* Metrics Grid */}
+            <MetricsGrid
+              calculateDailySales={calculateDailySales}
+              calculateMonthlyTotal={calculateMonthlyTotal}
+              calculateTotal={calculateTotal}
+              currentMonthYear={currentMonthYear}
+              currentUser={currentUser}
+              percentageChange={percentageChange}
+              handleStartSeller={handleStartSeller}
             />
-          )}
 
-          {/* Actividad Reciente */}
-          <RecentActivity
-            allIncome={allIncome}
-            onShowReceipt={handleShowReceipt}
-          />
-        </div>
+            {/* laundry Chart */}
+<LaundryChart pieData={pieData} />
 
-        {/* Toast */}
-        <IonToast
-          isOpen={showToast}
-          onDidDismiss={() => setShowToast(false)}
-          message={toastMessage}
-          duration={2000}
-          color={toastMessage.includes('Error') ? 'danger' : 'success'}
-        />
+            {/* Carrito Summary if showCart */}
+            {showCart && cart.length > 0 && (
+              <CartSummary
+                cart={cart}
+                onConfirmSale={handleConfirmSale}
+                setCart={setCart}
+                setShowCart={setShowCart}
+              />
+            )}
 
-        <AlertPopover
-          isOpen={popoverState.showAlertPopover}
-          event={popoverState.event}
-          onDidDismiss={dismissAlertPopover}
-        />
-        <MailPopover
-          isOpen={popoverState.showMailPopover}
-          event={popoverState.event}
-          onDidDismiss={dismissMailPopover}
-        />
-        <LogoutAlert
-          isOpen={showLogoutAlert}
-          onDidDismiss={() => setShowLogoutAlert(false)}
-          handleLogoutConfirm={handleLogoutConfirm}
-        />
+            {/* Actividad Reciente */}
+            <RecentActivity
+              allIncome={allIncome}
+              onShowReceipt={handleShowReceipt}
+            />
+          </div>
+        )}
       </IonContent>
+
+      {/* Toast */}
+      <IonToast
+        isOpen={showToast}
+        onDidDismiss={() => setShowToast(false)}
+        message={toastMessage}
+        duration={2000}
+        color={toastMessage.includes('Error') ? 'danger' : 'success'}
+      />
+
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
+      <LogoutAlert
+        isOpen={showLogoutAlert}
+        onDidDismiss={() => setShowLogoutAlert(false)}
+        handleLogoutConfirm={handleLogoutConfirm}
+      />
     </IonPage>
   );
 };

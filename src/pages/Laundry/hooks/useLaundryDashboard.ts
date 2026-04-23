@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 import { useIncome } from '../../../context/IncomeContext';
 import { fetchTicket } from '../../../api/ticketApi';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
 import { useUser } from '../../../components/UserContext';
 import { Transaction, CartItem, LocationState } from '../types';
+import { parseSqlDateToUTC, isCurrentMonthUTC, isTodayUTC } from '../../../utils/dateUtils';
 
 type UseLaundryDashboardReturn = {
   location: ReturnType<typeof useLocation>;
@@ -50,9 +51,9 @@ type PaymentMethod = 'Efectivo' | 'Transferencia' | 'Tarjeta';
 const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
 
 const PAYMENT_COLORS: Record<PaymentMethod, string> = {
-  Efectivo: '#16A34A',        // verde fuerte
-  Transferencia: '#22C55E',  // verde medio
-  Tarjeta: '#86EFAC',        // verde claro
+  Efectivo: '#16A34A',
+  Transferencia: '#22C55E',  
+  Tarjeta: '#86EFAC',
 };
 
 export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
@@ -71,6 +72,10 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [pieData, setPieData] = useState<any>(null);
+  const [popoverState, setPopoverState] = useState({
+    showAlertPopover: false,
+    showMailPopover: false,
+  });
 
   // Cargar ingresos al entrar
   useEffect(() => {
@@ -91,31 +96,31 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
       console.log('[LaundryDashboard] unmount -> abort loadIncomes');
       controller.abort();
     };
-  }, [loadIncomes, companyId]);
+  }, [loadIncomes, companyId, location.pathname]);
 
-  // Timer de inactividad para refrescar
-  useInactivityTimer(300000, () => {
+  // Timer de inactividad
+  useInactivityTimer(300000, useCallback(() => {
     if (!companyId || Number(companyId) <= 0) return;
     const controller = new AbortController();
     loadIncomes({ signal: controller.signal, companyId });
-  });
-
-
+  }, [companyId, loadIncomes]));
 
   // Limpiar carrito cuando se oculta
   useEffect(() => {
     if (!showCart) {
       setCart([]);
     }
-  }, [showCart, setCart]);
+  }, [showCart]);
 
-  // ╔═══════════════════════════════════════════════╗
-  // ║   Gráfica: DINERO por método de pago / mes    ║
-  // ╚═══════════════════════════════════════════════╝
+  // Gráfica de pagos por método
   useEffect(() => {
     console.log('[LaundryDashboard] allIncome changed', {
       count: allIncome.length,
       sample: allIncome[0] ?? null,
+      dateRanges: {
+        oldest: allIncome.length > 0 ? allIncome[allIncome.length-1]?.paymentDate : null,
+        newest: allIncome[0]?.paymentDate,
+      }
     });
 
     if (allIncome.length === 0) {
@@ -124,46 +129,85 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
       return;
     }
 
-    const now = new Date();
-    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-    const currentMonth = hermosilloNow.getMonth();
-    const currentYear = hermosilloNow.getFullYear();
-
-    // Filtrar ingresos del mes actual
+    // Current month incomes
     const monthlyIncomes = allIncome.filter((income) => {
-      const utcDate = new Date(
-        income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z')
-      );
-      const hermosilloDate = new Date(
-        utcDate.getTime() - 7 * 60 * 60 * 1000
-      );
-      return (
-        hermosilloDate.getMonth() === currentMonth &&
-        hermosilloDate.getFullYear() === currentYear
-      );
+      const date = parseSqlDateToUTC(income.paymentDate);
+      if (!date) return false;
+      
+      const isCurrentMonth = isCurrentMonthUTC(date);
+      
+      if (isCurrentMonth && process.env.NODE_ENV === 'development') {
+        console.log('[LaundryDashboard] Current month match:', {
+          incomeId: income.incomeId,
+          utcDate: date.toISOString().split('T')[0],
+        });
+      }
+      
+      return isCurrentMonth;
     });
 
+    const now = new Date();
+    console.log('[LaundryDashboard] Monthly filter result:', {
+      monthlyCount: monthlyIncomes.length,
+      currentMonthYear: `${now.getUTCMonth() + 1}/${now.getUTCFullYear()}`,
+      allIncomeCount: allIncome.length
+    });
+
+    let incomesForPie = monthlyIncomes;
+    let usedMonthYear = `${now.getUTCMonth() + 1}/${now.getUTCFullYear()}`;
+
+    // Fallback: if no current month data, use latest available month
     if (monthlyIncomes.length === 0) {
-      console.log('[LaundryDashboard] No monthly incomes for current month/year', {
-        currentMonth,
-        currentYear,
+      // Filter valid dates, sort desc by date
+      const validIncomes = allIncome
+        .map(income => ({ income, date: parseSqlDateToUTC(income.paymentDate) }))
+        .filter(({ date }) => date !== null)
+        .sort((a, b) => b.date!.getTime() - a.date!.getTime());
+
+      if (validIncomes.length === 0) {
+        console.log('[LaundryDashboard] No valid dates in allIncome -> pieData=null');
+        setPieData(null);
+        return;
+      }
+
+      // Group by month/year until find non-empty group
+      const monthGroups: Record<string, any[]> = {};
+      for (const { income, date } of validIncomes) {
+        const key = `${date!.getUTCMonth() + 1}/${date!.getUTCFullYear()}`;
+        if (!monthGroups[key]) monthGroups[key] = [];
+        monthGroups[key].push(income);
+      }
+
+      // Find latest non-empty month
+      const sortedMonths = Object.keys(monthGroups).sort((a, b) => {
+        const [ma, ya] = a.split('/').map(Number);
+        const [mb, yb] = b.split('/').map(Number);
+        return yb * 100 + mb - (ya * 100 + ma);
       });
-      setPieData(null);
-      return;
+
+      if (sortedMonths.length > 0) {
+        const latestMonth = sortedMonths[0];
+        incomesForPie = monthGroups[latestMonth];
+        usedMonthYear = latestMonth;
+        console.log(`[LaundryDashboard] Fallback to latest month: ${latestMonth} (${incomesForPie.length} records)`);
+      } else {
+        console.log('[LaundryDashboard] No monthly groups found -> pieData=null');
+        setPieData(null);
+        return;
+      }
     }
 
-    // Mapear valores de la BD (minúsculas) → labels de la UI
+    // Mapear métodos de pago
     const methodMap: Record<string, PaymentMethod> = {
       efectivo: 'Efectivo',
       tarjeta: 'Tarjeta',
       transferencia: 'Transferencia',
     };
 
-    // Sumar TOTAL de dinero por método de pago
-    const paymentTotals = monthlyIncomes.reduce(
+    const paymentTotals = incomesForPie.reduce(
       (acc: Record<PaymentMethod, number>, income: any) => {
         const raw = (income.paymentMethod || '').toString().toLowerCase();
-        const method = methodMap[raw];
+        const method = methodMap[raw] as PaymentMethod;
 
         if (!method) {
           console.warn('Método de pago desconocido:', income.paymentMethod);
@@ -181,29 +225,29 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
       }
     );
 
+    console.log(`[LaundryDashboard] Using ${incomesForPie.length} incomes from ${usedMonthYear} for pieData`);
+
     const data = {
-      labels: PAYMENT_METHODS, // ['Efectivo', 'Transferencia', 'Tarjeta']
-      datasets: [
-        {
-          data: PAYMENT_METHODS.map((m) => paymentTotals[m] || 0),
-          backgroundColor: PAYMENT_METHODS.map((m) => PAYMENT_COLORS[m]),
-          borderWidth: 0,
-        },
-      ],
+      labels: PAYMENT_METHODS,
+      datasets: [{
+        data: PAYMENT_METHODS.map((m) => paymentTotals[m] || 0),
+        backgroundColor: PAYMENT_METHODS.map((m) => PAYMENT_COLORS[m]),
+        borderWidth: 0,
+      }],
     };
 
     console.log('[LaundryDashboard] pieData generated', {
       labels: data.labels,
-      values: data.datasets?.[0]?.data,
+      values: data.datasets[0]?.data,
     });
     setPieData(data);
   }, [allIncome]);
 
-  const handleStartSeller = () => {
+  const handleStartSeller = useCallback(() => {
     history.push('/category');
-  };
+  }, [history]);
 
-  const handleConfirmSale = async () => {
+  const handleConfirmSale = useCallback(async () => {
     if (cart.length === 0) {
       setToastMessage('El carrito está vacío.');
       setShowToast(true);
@@ -238,10 +282,7 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
 
       const now = new Date();
       const newTransaction: Transaction = {
-        date:
-          now.toLocaleDateString('es-ES') +
-          ' ' +
-          now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: now.toLocaleDateString('es-ES') + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         amount: total,
         user: 'admin',
         productName: cart.map((item) => item.name).join(', '),
@@ -253,63 +294,71 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
       setShowToast(true);
       setCart([]);
       setShowCart(false);
-      loadIncomes({ companyId });
+      loadIncomes({ companyId: Number(companyId) });
     } catch (error) {
       console.error(error);
       setToastMessage('Error al confirmar la venta.');
       setShowToast(true);
     }
-  };
+  }, [cart, companyId, loadIncomes]);
 
-  const calculateTotal = (): number =>
-    allIncome.reduce((sum, income) => sum + income.total, 0);
+  const calculateTotal = useCallback((): number =>
+    allIncome.reduce((sum, income) => sum + Number(income.total || 0), 0), [allIncome]);
 
-  const calculateDailySales = (): number => {
-    const today = new Date();
-    const hermosilloToday = new Date(today.getTime() - 7 * 60 * 60 * 1000); // UTC-7
-    const todayString = hermosilloToday.toISOString().split('T')[0]; // YYYY-MM-DD
+  const calculateDailySales = useCallback((): number => {
     return allIncome
       .filter((income) => {
-        const utcDate = new Date(
-          income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z')
-        );
-        const hermosilloDate = new Date(
-          utcDate.getTime() - 7 * 60 * 60 * 1000
-        );
-        const dateString = hermosilloDate.toISOString().split('T')[0];
-        return dateString === todayString;
+        const date = parseSqlDateToUTC(income.paymentDate);
+        return date ? isTodayUTC(date) : false;
       })
       .reduce((sum, income) => {
         const total = Number(income.total) || 0;
         const discount = Number(income.discountAmount) || 0;
         return sum + total - discount;
       }, 0);
-  };
+  }, [allIncome]);
 
-  const calculateMonthlyTotal = (): number => {
+  const calculateMonthlyTotal = useCallback((): number => {
+    // Reuse same fallback logic as pieData (current or latest month)
     const now = new Date();
-    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-    const currentMonth = hermosilloNow.getMonth();
-    const currentYear = hermosilloNow.getFullYear();
-    return allIncome
-      .filter((income) => {
-        const utcDate = new Date(
-          income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z')
-        );
-        const hermosilloDate = new Date(
-          utcDate.getTime() - 7 * 60 * 60 * 1000
-        );
-        return (
-          hermosilloDate.getMonth() === currentMonth &&
-          hermosilloDate.getFullYear() === currentYear
-        );
-      })
-      .reduce((sum, income) => {
-        const total = Number(income.total) || 0;
-        const discount = Number(income.discountAmount) || 0;
-        return sum + total - discount;
-      }, 0);
-  };
+    const monthlyIncomes = allIncome.filter((income) => {
+      const date = parseSqlDateToUTC(income.paymentDate);
+      return date ? isCurrentMonthUTC(date) : false;
+    });
+
+    if (monthlyIncomes.length > 0) {
+      // Use current month
+    } else {
+      // Fallback to latest month (same logic as pieData)
+      const validIncomes = allIncome
+        .map(income => ({ income, date: parseSqlDateToUTC(income.paymentDate) }))
+        .filter(({ date }) => date !== null)
+        .sort((a, b) => b.date!.getTime() - a.date!.getTime());
+
+      if (validIncomes.length > 0) {
+        const monthGroups: Record<string, any[]> = {};
+        for (const { income, date } of validIncomes) {
+          const key = `${date!.getUTCMonth() + 1}/${date!.getUTCFullYear()}`;
+          if (!monthGroups[key]) monthGroups[key] = [];
+          monthGroups[key].push(income);
+        }
+        const sortedMonths = Object.keys(monthGroups).sort((a, b) => {
+          const [ma, ya] = a.split('/').map(Number);
+          const [mb, yb] = b.split('/').map(Number);
+          return yb * 100 + mb - (ya * 100 + ma);
+        });
+        if (sortedMonths.length > 0) {
+          monthlyIncomes.splice(0, 0, ...monthGroups[sortedMonths[0]]);
+        }
+      }
+    }
+
+    return monthlyIncomes.reduce((sum, income) => {
+      const total = Number(income.total) || 0;
+      const discount = Number(income.discountAmount) || 0;
+      return sum + total - discount;
+    }, 0);
+  }, [allIncome]);
 
   const currentMonthYear = new Date().toLocaleDateString('es-ES', {
     month: 'short',
@@ -318,51 +367,43 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
   const currentUser = 'admin';
   const percentageChange = '+0%';
 
-  const [popoverState, setPopoverState] = useState<{
-    showAlertPopover: boolean;
-    showMailPopover: boolean;
-    event?: Event;
-  }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
-
-  const presentAlertPopover = (e: React.MouseEvent) => {
-    setPopoverState({
-      ...popoverState,
+  const presentAlertPopover = useCallback((e: React.MouseEvent) => {
+    setPopoverState(prev => ({
+      ...prev,
       showAlertPopover: true,
-      event: e.nativeEvent,
-    });
-  };
+      event: e.nativeEvent as Event,
+    }));
+  }, []);
 
-  const dismissAlertPopover = () =>
-    setPopoverState({ ...popoverState, showAlertPopover: false });
+  const dismissAlertPopover = useCallback(() => {
+    setPopoverState(prev => ({ ...prev, showAlertPopover: false }));
+  }, []);
 
-  const presentMailPopover = (e: React.MouseEvent) => {
-    setPopoverState({
-      ...popoverState,
+  const presentMailPopover = useCallback((e: React.MouseEvent) => {
+    setPopoverState(prev => ({
+      ...prev,
       showMailPopover: true,
-      event: e.nativeEvent,
-    });
-  };
+      event: e.nativeEvent as Event,
+    }));
+  }, []);
 
-  const dismissMailPopover = () =>
-    setPopoverState({ ...popoverState, showMailPopover: false });
+  const dismissMailPopover = useCallback(() => {
+    setPopoverState(prev => ({ ...prev, showMailPopover: false }));
+  }, []);
 
-  const handleLogoutConfirm = () => {
+  const handleLogoutConfirm = useCallback(() => {
     setAuthenticated(false);
     history.push('/Login');
     setShowLogoutAlert(false);
-  };
+  }, [history]);
 
-  const handleShowReceipt = async (incomeId: number) => {
+  const handleShowReceipt = useCallback(async (incomeId: number) => {
     try {
       console.log('Fetching ticket for incomeId:', incomeId);
       const ticket = await fetchTicket(incomeId.toString());
       console.log('Fetched ticket result:', ticket);
       
       if (ticket) {
-        // Navigate to ReceiptPage instead of showing modal
         history.push({
           pathname: '/receipt',
           state: { ticketData: ticket }
@@ -377,12 +418,11 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
       setToastMessage('Error al obtener el recibo: ' + (error.message || 'Error desconocido'));
       setShowToast(true);
     }
-  };
+  }, [history, setToastMessage, setShowToast]);
 
-  const getTitleFromPath = (pathname: string): string => {
+  const getTitleFromPath = useCallback((pathname: string): string => {
     switch (pathname) {
       case '/POS':
-        return 'Lavandería';
       case '/Laundry':
         return 'Lavandería';
       case '/ScannerQR':
@@ -394,7 +434,7 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
       default:
         return 'POS GMO';
     }
-  };
+  }, []);
 
   return {
     location,
@@ -435,3 +475,4 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
     getTitleFromPath,
   };
 };
+

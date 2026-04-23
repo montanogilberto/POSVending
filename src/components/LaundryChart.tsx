@@ -43,7 +43,19 @@ interface LaundryChartProps {
 }
 
 const LaundryChart: React.FC<LaundryChartProps> = ({ pieData }) => {
-  if (!pieData) return null;
+if (!pieData) {
+  return (
+    <IonCard className="dashboard-card">
+      <IonCardHeader>
+        <IonCardTitle>Distribución de Pagos</IonCardTitle>
+      </IonCardHeader>
+      <IonCardContent className="chart-container">
+        <IonIcon icon={cashOutline} size="large" color="medium" />
+        <p style={{color: 'var(--ion-color-medium)', fontSize: '1.1rem', margin: '1rem 0'}}>No hay datos de pagos para este mes</p>
+      </IonCardContent>
+    </IonCard>
+  );
+}
 
   const values: number[] = pieData.datasets[0]?.data ?? [];
   const colors: string[] = (pieData.datasets[0]?.backgroundColor as string[]) || [];

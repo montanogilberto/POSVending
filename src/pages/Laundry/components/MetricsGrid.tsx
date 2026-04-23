@@ -73,8 +73,12 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
       {/* CTA Section */}
       <IonRow>
         <IonCol size="12">
-          <div className="dashboard-cta-section">
-            <IonButton expand="block" className="start-sale-button primary-cta" onClick={handleStartSeller}>
+          <div className="centered-button-container">
+            <IonButton 
+              expand="block" 
+              className="start-sale-button-main" 
+              onClick={handleStartSeller}
+            >
               Iniciar Venta
             </IonButton>
           </div>

@@ -219,8 +219,8 @@ const ProductsManagementPage: React.FC = () => {
               </span>
             </div>
           ) : (
-            filteredProducts.map((product) => (
-              <div key={product.productId} className="product-card">
+            filteredProducts.map((product, index) => (
+              <div key={product.productId || index} className="product-card">
                 <div className="product-card-body">
                   {/* ── Left: info ── */}
                   <div className="product-card-info">
