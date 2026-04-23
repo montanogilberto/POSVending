@@ -22,11 +22,7 @@ export async function fetchExpenseCategories(companyId: number): Promise<Expense
       ]
     });
     console.log('Request body:', body);
-<<<<<<< HEAD
     const response = await fetch('https://smartloansbackend.azurewebsites.net/all_products_categorie', {
-=======
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_products_categories', {
->>>>>>> c73013ab (reverse several branches retail)
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
