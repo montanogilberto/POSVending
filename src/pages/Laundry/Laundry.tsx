@@ -61,6 +61,7 @@ const Laundry: React.FC = () => {
   };
 
   return (
+    
     <IonPage>
       <Header
         presentAlertPopover={presentAlertPopover}
@@ -68,6 +69,7 @@ const Laundry: React.FC = () => {
         screenTitle={getTitleFromPath(location.pathname)}
       />
       <IonContent fullscreen className="dashboard-content">
+
         {allIncome.length === 0 ? (
           <div style={{padding: '4rem', textAlign: 'center', color: 'var(--ion-color-medium)'}}>
             <IonIcon icon={hourglassOutline} size="large" style={{marginBottom: '1rem'}} />

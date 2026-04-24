@@ -1,36 +1,44 @@
-/**
- * Parse SQL datetime ("2026-04-08 22:17:53") to UTC Date
- * Returns null for invalid/null input
- */
-export function parseSqlDateToUTC(paymentDate: string | null | undefined): Date | null {
-  if (!paymentDate) return null;
-  
+// utils/dateUtils.ts
+
+// Parse SQL Server datetime string safely (UTC aware)
+export const parseSqlDateToUTC = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+
   try {
-    // "2026-04-08 22:17:53" → "2026-04-08T22:17:53:00Z"
-    const dateStr = paymentDate.replace(' ', 'T') + ':00Z';
-    const date = new Date(dateStr);
-    
-    return isNaN(date.getTime()) ? null : date;
-  } catch {
+    // Convert "YYYY-MM-DD HH:mm:ss.sss" → "YYYY-MM-DDTHH:mm:ss.sssZ"
+    const iso = dateStr.replace(' ', 'T') + 'Z';
+
+    const date = new Date(iso);
+
+    if (isNaN(date.getTime())) {
+      console.warn('[parseSqlDateToUTC] Invalid date:', dateStr);
+      return null;
+    }
+
+    return date;
+  } catch (err) {
+    console.error('[parseSqlDateToUTC] Error parsing:', dateStr, err);
     return null;
   }
-}
+};
 
-/**
- * Check if date is current month (UTC)
- */
-export function isCurrentMonthUTC(date: Date): boolean {
+// Check if date is today (UTC)
+export const isTodayUTC = (date: Date): boolean => {
   const now = new Date();
-  return date.getUTCMonth() === now.getUTCMonth() &&
-         date.getUTCFullYear() === now.getUTCFullYear();
-}
 
-/**
- * Check if date is today (UTC date-only)
- */
-export function isTodayUTC(date: Date): boolean {
+  return (
+    date.getUTCFullYear() === now.getUTCFullYear() &&
+    date.getUTCMonth() === now.getUTCMonth() &&
+    date.getUTCDate() === now.getUTCDate()
+  );
+};
+
+// Check if date is in current month (UTC)
+export const isCurrentMonthUTC = (date: Date): boolean => {
   const now = new Date();
-  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  return date.toISOString().split('T')[0] === todayUTC.toISOString().split('T')[0];
-}
 
+  return (
+    date.getUTCFullYear() === now.getUTCFullYear() &&
+    date.getUTCMonth() === now.getUTCMonth()
+  );
+};

@@ -132,7 +132,11 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
     // Current month incomes
     const monthlyIncomes = allIncome.filter((income) => {
       const date = parseSqlDateToUTC(income.paymentDate);
-      if (!date) return false;
+
+      if (!date) {
+        console.warn('[LaundryDashboard] Invalid date detected:', income.paymentDate);
+        return false;
+      }
       
       const isCurrentMonth = isCurrentMonthUTC(date);
       
