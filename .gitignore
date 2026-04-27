@@ -12,6 +12,7 @@ ios/
 # Markdown planning docs
 MD/
 
+dist/
 # Build output
 dist/
 build/
