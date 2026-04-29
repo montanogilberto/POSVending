@@ -63,7 +63,7 @@ const Laundry: React.FC = () => {
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle={getTitleFromPath(location.pathname)}
+        screenTitle={getTitleFromPath()}
       />
       <IonContent fullscreen className="dashboard-content">
         <div className="dashboard-container">
