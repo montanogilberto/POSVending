@@ -1,180 +1,174 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 import { useIncome } from '../../../context/IncomeContext';
 import { fetchTicket } from '../../../api/ticketApi';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
-import { Transaction, CartItem, LocationState } from '../types';
-
-type UseLaundryDashboardReturn = {
-  location: ReturnType<typeof useLocation>;
-  history: ReturnType<typeof useHistory>;
-  allIncome: any[];
-  showToast: boolean;
-  setShowToast: React.Dispatch<React.SetStateAction<boolean>>;
-  toastMessage: string;
-  setToastMessage: React.Dispatch<React.SetStateAction<string>>;
-  transactions: Transaction[];
-  cart: CartItem[];
-  setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
-  showCart: boolean;
-  setShowCart: React.Dispatch<React.SetStateAction<boolean>>;
-  showLogoutAlert: boolean;
-  setShowLogoutAlert: React.Dispatch<React.SetStateAction<boolean>>;
-  authenticated: boolean;
-  showReceiptModal: boolean;
-  setShowReceiptModal: React.Dispatch<React.SetStateAction<boolean>>;
-  receiptData: any;
-  setReceiptData: React.Dispatch<React.SetStateAction<any>>;
-  pieData: any;
-  handleStartSeller: () => void;
-  handleConfirmSale: () => Promise<void>;
-  calculateTotal: () => number;
-  calculateDailySales: () => number;
-  calculateMonthlyTotal: () => number;
-  currentMonthYear: string;
-  currentUser: string;
-  percentageChange: string;
-  popoverState: { showAlertPopover: boolean; showMailPopover: boolean; event?: Event };
-  presentAlertPopover: (e: React.MouseEvent) => void;
-  dismissAlertPopover: () => void;
-  presentMailPopover: (e: React.MouseEvent) => void;
-  dismissMailPopover: () => void;
-  handleLogoutConfirm: () => void;
-  handleShowReceipt: (incomeId: number) => Promise<void>;
-  getTitleFromPath: (pathname: string) => string;
-};
+import { Transaction, CartItem } from '../types';
 
 type PaymentMethod = 'Efectivo' | 'Transferencia' | 'Tarjeta';
 
 const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
 
 const PAYMENT_COLORS: Record<PaymentMethod, string> = {
-  Efectivo: '#16A34A',        // verde fuerte
-  Transferencia: '#22C55E',  // verde medio
-  Tarjeta: '#86EFAC',        // verde claro
+  Efectivo: '#16A34A',
+  Transferencia: '#22C55E',
+  Tarjeta: '#86EFAC',
 };
 
-export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
+// 🔥 helper to normalize Hermosillo date (reused everywhere)
+const toHermosilloDate = (dateStr: string) => {
+  const utcDate = new Date(dateStr + (dateStr.includes('Z') ? '' : 'Z'));
+  return new Date(utcDate.getTime() - 7 * 60 * 60 * 1000);
+};
+
+export const useLaundryDashboard = () => {
   const location = useLocation();
   const history = useHistory();
   const { allIncome, loadIncomes } = useIncome();
 
+  // 🔹 UI State
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+  // 🔹 Data State
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [pieData, setPieData] = useState<any>(null);
 
-  // Cargar ingresos al entrar
+  // 🔹 Popover State ✅ FIXED
+  const [popoverState, setPopoverState] = useState<{
+    showAlertPopover: boolean;
+    showMailPopover: boolean;
+    event?: Event;
+  }>({
+    showAlertPopover: false,
+    showMailPopover: false,
+    event: undefined,
+  });
+
+  // ✅ Load incomes
   useEffect(() => {
     const controller = new AbortController();
-    loadIncomes(controller.signal);
-    
+    loadIncomes({ signal: controller.signal });
     return () => controller.abort();
   }, [loadIncomes]);
 
-  // Timer de inactividad para refrescar
+  // ✅ Refresh on inactivity
   useInactivityTimer(300000, () => {
     const controller = new AbortController();
-    loadIncomes(controller.signal);
+    loadIncomes({ signal: controller.signal });
   });
 
-
-
-  // Limpiar carrito cuando se oculta
+  // ✅ Clear cart automatically
   useEffect(() => {
-    if (!showCart) {
-      setCart([]);
-    }
-  }, [showCart, setCart]);
+    if (!showCart) setCart([]);
+  }, [showCart]);
 
-  // ╔═══════════════════════════════════════════════╗
-  // ║   Gráfica: DINERO por método de pago / mes    ║
-  // ╚═══════════════════════════════════════════════╝
-  useEffect(() => {
-    if (allIncome.length === 0) {
-      setPieData(null);
-      return;
-    }
+  // ✅ PIE CHART (optimized with useMemo)
+  const pieChartData = useMemo(() => {
+    if (!allIncome?.length) return null;
 
     const now = new Date();
     const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-    const currentMonth = hermosilloNow.getMonth();
-    const currentYear = hermosilloNow.getFullYear();
 
-    // Filtrar ingresos del mes actual
-    const monthlyIncomes = allIncome.filter((income) => {
-      const utcDate = new Date(
-        income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z')
-      );
-      const hermosilloDate = new Date(
-        utcDate.getTime() - 7 * 60 * 60 * 1000
-      );
+    const monthly = allIncome.filter((income) => {
+      if (!income?.paymentDate) return false;
+      const d = toHermosilloDate(income.paymentDate);
       return (
-        hermosilloDate.getMonth() === currentMonth &&
-        hermosilloDate.getFullYear() === currentYear
+        d.getMonth() === hermosilloNow.getMonth() &&
+        d.getFullYear() === hermosilloNow.getFullYear()
       );
     });
 
-    if (monthlyIncomes.length === 0) {
-      setPieData(null);
-      return;
-    }
+    if (!monthly.length) return null;
 
-    // Mapear valores de la BD (minúsculas) → labels de la UI
     const methodMap: Record<string, PaymentMethod> = {
       efectivo: 'Efectivo',
       tarjeta: 'Tarjeta',
       transferencia: 'Transferencia',
     };
 
-    // Sumar TOTAL de dinero por método de pago
-    const paymentTotals = monthlyIncomes.reduce(
+    const totals = monthly.reduce(
       (acc: Record<PaymentMethod, number>, income: any) => {
-        const raw = (income.paymentMethod || '').toString().toLowerCase();
-        const method = methodMap[raw];
-
-        if (!method) {
-          console.warn('Método de pago desconocido:', income.paymentMethod);
-          return acc;
-        }
-
-        const totalNumber = Number(income.total) || 0;
-        acc[method] = (acc[method] || 0) + totalNumber;
+        const method = methodMap[(income.paymentMethod || '').toLowerCase()];
+        if (!method) return acc;
+        acc[method] += Number(income.total) || 0;
         return acc;
       },
-      {
-        Efectivo: 0,
-        Transferencia: 0,
-        Tarjeta: 0,
-      }
+      { Efectivo: 0, Transferencia: 0, Tarjeta: 0 }
     );
 
-    const data = {
-      labels: PAYMENT_METHODS, // ['Efectivo', 'Transferencia', 'Tarjeta']
+    const values = PAYMENT_METHODS.map((m) => totals[m] || 0);
+    if (values.every((v) => v === 0)) return null;
+
+    return {
+      labels: PAYMENT_METHODS,
       datasets: [
         {
-          data: PAYMENT_METHODS.map((m) => paymentTotals[m] || 0),
+          data: values,
           backgroundColor: PAYMENT_METHODS.map((m) => PAYMENT_COLORS[m]),
           borderWidth: 0,
         },
       ],
     };
-
-    setPieData(data);
   }, [allIncome]);
 
-  const handleStartSeller = () => {
-    history.push('/category');
+  // sync state (optional, keeps compatibility with your component)
+  useEffect(() => {
+    setPieData(pieChartData);
+  }, [pieChartData]);
+
+  // ✅ METRICS
+  const calculateTotal = () =>
+    allIncome.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+
+  const calculateDailySales = () => {
+    const today = toHermosilloDate(new Date().toISOString())
+      .toISOString()
+      .split('T')[0];
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => {
+        const d = toHermosilloDate(i.paymentDate);
+        return d.toISOString().split('T')[0] === today;
+      })
+      .reduce((sum, i) => {
+        return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
+      }, 0);
   };
 
+  const calculateMonthlyTotal = () => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => {
+        const d = toHermosilloDate(i.paymentDate);
+        return (
+          d.getMonth() === hermosilloNow.getMonth() &&
+          d.getFullYear() === hermosilloNow.getFullYear()
+        );
+      })
+      .reduce((sum, i) => {
+        return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
+      }, 0);
+  };
+
+  const currentMonthYear = new Date().toLocaleDateString('es-ES', {
+    month: 'short',
+    year: 'numeric',
+  });
+
+  // ✅ ACTIONS
+  const handleStartSeller = () => history.push('/category');
+
   const handleConfirmSale = async () => {
-    if (cart.length === 0) {
+    if (!cart.length) {
       setToastMessage('El carrito está vacío.');
       setShowToast(true);
       return;
@@ -182,6 +176,7 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
 
     try {
       const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+
       const response = await fetch(
         'https://smartloansbackend.azurewebsites.net/pos_laundry',
         {
@@ -201,170 +196,58 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
         }
       );
 
-      if (!response.ok)
-        throw new Error(`Error al crear venta: ${response.status}`);
-      const data = await response.json();
-      console.log('Venta creada:', data);
+      if (!response.ok) throw new Error();
 
-      const now = new Date();
-      const newTransaction: Transaction = {
-        date:
-          now.toLocaleDateString('es-ES') +
-          ' ' +
-          now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        amount: total,
-        user: 'admin',
-        productName: cart.map((item) => item.name).join(', '),
-        quantity: cart.reduce((sum, item) => sum + item.quantity, 0),
-      };
-
-      setTransactions((prev) => [newTransaction, ...prev].slice(0, 5));
       setToastMessage(`Venta confirmada: $${total.toFixed(2)}`);
       setShowToast(true);
       setCart([]);
       setShowCart(false);
       loadIncomes();
-    } catch (error) {
-      console.error(error);
+    } catch {
       setToastMessage('Error al confirmar la venta.');
       setShowToast(true);
     }
   };
 
-  const calculateTotal = (): number =>
-    allIncome.reduce((sum, income) => sum + income.total, 0);
+  const handleShowReceipt = async (incomeId: number) => {
+    try {
+      const ticket = await fetchTicket(incomeId.toString());
+      if (!ticket) throw new Error();
 
-  const calculateDailySales = (): number => {
-    const today = new Date();
-    const hermosilloToday = new Date(today.getTime() - 7 * 60 * 60 * 1000); // UTC-7
-    const todayString = hermosilloToday.toISOString().split('T')[0]; // YYYY-MM-DD
-    return allIncome
-      .filter((income) => {
-        const utcDate = new Date(
-          income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z')
-        );
-        const hermosilloDate = new Date(
-          utcDate.getTime() - 7 * 60 * 60 * 1000
-        );
-        const dateString = hermosilloDate.toISOString().split('T')[0];
-        return dateString === todayString;
-      })
-      .reduce((sum, income) => {
-        const total = Number(income.total) || 0;
-        const discount = Number(income.discountAmount) || 0;
-        return sum + total - discount;
-      }, 0);
+      history.push('/receipt', { ticketData: ticket });
+    } catch {
+      setToastMessage('Error al obtener el recibo.');
+      setShowToast(true);
+    }
   };
 
-  const calculateMonthlyTotal = (): number => {
-    const now = new Date();
-    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-    const currentMonth = hermosilloNow.getMonth();
-    const currentYear = hermosilloNow.getFullYear();
-    return allIncome
-      .filter((income) => {
-        const utcDate = new Date(
-          income.paymentDate + (income.paymentDate.includes('Z') ? '' : 'Z')
-        );
-        const hermosilloDate = new Date(
-          utcDate.getTime() - 7 * 60 * 60 * 1000
-        );
-        return (
-          hermosilloDate.getMonth() === currentMonth &&
-          hermosilloDate.getFullYear() === currentYear
-        );
-      })
-      .reduce((sum, income) => {
-        const total = Number(income.total) || 0;
-        const discount = Number(income.discountAmount) || 0;
-        return sum + total - discount;
-      }, 0);
-  };
-
-  const currentMonthYear = new Date().toLocaleDateString('es-ES', {
-    month: 'short',
-    year: 'numeric',
-  });
-  const currentUser = 'admin';
-  const percentageChange = '+0%';
-
-  const [popoverState, setPopoverState] = useState<{
-    showAlertPopover: boolean;
-    showMailPopover: boolean;
-    event?: Event;
-  }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
-
+  // ✅ POPOVER HANDLERS (FIXED)
   const presentAlertPopover = (e: React.MouseEvent) => {
     setPopoverState({
-      ...popoverState,
       showAlertPopover: true,
+      showMailPopover: false,
       event: e.nativeEvent,
     });
   };
 
-  const dismissAlertPopover = () =>
-    setPopoverState({ ...popoverState, showAlertPopover: false });
+  const dismissAlertPopover = () => {
+    setPopoverState((prev) => ({ ...prev, showAlertPopover: false }));
+  };
 
   const presentMailPopover = (e: React.MouseEvent) => {
     setPopoverState({
-      ...popoverState,
+      showAlertPopover: false,
       showMailPopover: true,
       event: e.nativeEvent,
     });
   };
 
-  const dismissMailPopover = () =>
-    setPopoverState({ ...popoverState, showMailPopover: false });
-
-  const handleLogoutConfirm = () => {
-    setAuthenticated(false);
-    history.push('/Login');
-    setShowLogoutAlert(false);
+  const dismissMailPopover = () => {
+    setPopoverState((prev) => ({ ...prev, showMailPopover: false }));
   };
 
-  const handleShowReceipt = async (incomeId: number) => {
-    try {
-      console.log('Fetching ticket for incomeId:', incomeId);
-      const ticket = await fetchTicket(incomeId.toString());
-      console.log('Fetched ticket result:', ticket);
-      
-      if (ticket) {
-        // Navigate to ReceiptPage instead of showing modal
-        history.push({
-          pathname: '/receipt',
-          state: { ticketData: ticket }
-        });
-      } else {
-        console.warn('Ticket is null for incomeId:', incomeId);
-        setToastMessage('No se encontró el ticket para este ingreso.');
-        setShowToast(true);
-      }
-    } catch (error: any) {
-      console.error('Error fetching ticket:', error);
-      setToastMessage('Error al obtener el recibo: ' + (error.message || 'Error desconocido'));
-      setShowToast(true);
-    }
-  };
-
-  const getTitleFromPath = (pathname: string): string => {
-    switch (pathname) {
-      case '/POS':
-        return 'Lavandería';
-      case '/Laundry':
-        return 'Lavandería';
-      case '/ScannerQR':
-        return 'Lector QR';
-      case '/Setting':
-        return 'Configuración';
-      case '/Sells':
-        return 'Ventas';
-      default:
-        return 'POS GMO';
-    }
-  };
+  // ✅ TITLE (clean)
+  const getTitleFromPath = () => 'Lavandería';
 
   return {
     location,
@@ -381,27 +264,30 @@ export const useLaundryDashboard = (): UseLaundryDashboardReturn => {
     setShowCart,
     showLogoutAlert,
     setShowLogoutAlert,
-    authenticated,
-    showReceiptModal,
-    setShowReceiptModal,
     receiptData,
     setReceiptData,
     pieData,
-    handleStartSeller,
-    handleConfirmSale,
+
     calculateTotal,
     calculateDailySales,
     calculateMonthlyTotal,
     currentMonthYear,
-    currentUser,
-    percentageChange,
+
+    handleStartSeller,
+    handleConfirmSale,
+    handleShowReceipt,
+
     popoverState,
     presentAlertPopover,
     dismissAlertPopover,
     presentMailPopover,
     dismissMailPopover,
-    handleLogoutConfirm,
-    handleShowReceipt,
+
+    handleLogoutConfirm: () => history.push('/Login'),
+
+    currentUser: 'admin',
+    percentageChange: '+0%',
+
     getTitleFromPath,
   };
 };

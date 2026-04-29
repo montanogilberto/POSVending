@@ -2,7 +2,7 @@ interface Income {
   incomeId: number;
   orderId: number;
   total: number;
-  discountAmount: number; // Discount from promotions (2x1, etc.)
+  discountAmount: number;
   paymentMethod: string;
   paymentDate: string;
   userId: number;
@@ -20,73 +20,95 @@ interface CartItem {
   selectedOptions: { [optionId: number]: number };
 }
 
-export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> => {
+// ✅ FIXED: Proper options object instead of raw signal
+export const fetchAllLaundry = async (
+  options?: { signal?: AbortSignal }
+): Promise<Income[]> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
   try {
-    const controller = new AbortController();
-    const abortSignal = signal || controller.signal;
+    // ✅ Only create controller if none provided
+    const controller = options?.signal ? null : new AbortController();
+    const signal = options?.signal ?? controller!.signal;
 
-    // Set timeout to prevent hanging requests
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_income', {
-        signal: abortSignal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) throw new Error(`Error al obtener datos del backend: ${response.status}`);
-
-      const data = await response.json();
-      console.log('Fetched all_income:', data);
-      // Ensure data.income is an array, default to empty array if not
-      const incomeArray = Array.isArray(data.income) ? data.income : [];
-      // Sort by paymentDate descending (newest first)
-      const sortedIncome = incomeArray.sort((a: Income, b: Income) =>
-        new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-      );
-      return sortedIncome;
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      
-      // Handle abort errors gracefully
-      if (fetchError.name === 'AbortError') {
-        console.log('Laundry fetch aborted');
-        return [];
-      }
-      
-      throw fetchError;
+    // ✅ Timeout only if we created controller
+    if (controller) {
+      timeoutId = setTimeout(() => controller.abort(), 10000);
     }
-  } catch (error) {
-    console.error(error);
-    throw error; // Re-throw to allow caller to handle
+
+    const response = await fetch(
+      'https://smartloansbackend.azurewebsites.net/all_income',
+      { signal }
+    );
+
+    if (timeoutId) clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Error al obtener datos del backend: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Fetched all_income:', data);
+
+    // ✅ Safe array handling
+    const incomeArray: Income[] = Array.isArray(data.income)
+      ? data.income
+      : [];
+
+    // ✅ Sort newest first
+    return incomeArray.sort(
+      (a, b) =>
+        new Date(b.paymentDate).getTime() -
+        new Date(a.paymentDate).getTime()
+    );
+  } catch (error: any) {
+    if (timeoutId) clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      console.log('Laundry fetch aborted');
+      return [];
+    }
+
+    console.error('fetchAllLaundry error:', error);
+    throw error;
   }
 };
 
-export const createLaundrySale = async (cart: CartItem[], total: number): Promise<any> => {
+// ✅ Cleaned + consistent POST
+export const createLaundrySale = async (
+  cart: CartItem[],
+  total: number
+): Promise<any> => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/pos_laundry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pos_laundry: {
-          details: cart.map(item => ({
-            productId: item.productId,
-            cantidad: item.quantity,
-            precio_unitario: item.price,
-            subtotal: item.subtotal
-          })),
-          total
-        }
-      }),
-    });
+    const response = await fetch(
+      'https://smartloansbackend.azurewebsites.net/pos_laundry',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pos_laundry: {
+            details: cart.map((item) => ({
+              productId: item.productId,
+              cantidad: item.quantity,
+              precio_unitario: item.price,
+              subtotal: item.subtotal,
+            })),
+            total,
+          },
+        }),
+      }
+    );
 
-    if (!response.ok) throw new Error(`Error al crear venta: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Error al crear venta: ${response.status}`);
+    }
+
     const data = await response.json();
     console.log('Venta creada:', data);
+
     return data;
   } catch (error) {
-    console.error(error);
-    throw error; // Re-throw to allow caller to handle
+    console.error('createLaundrySale error:', error);
+    throw error;
   }
 };
