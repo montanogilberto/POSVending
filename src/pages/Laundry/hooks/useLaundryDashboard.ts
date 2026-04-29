@@ -52,14 +52,14 @@ export const useLaundryDashboard = () => {
   // ✅ Load incomes
   useEffect(() => {
     const controller = new AbortController();
-    loadIncomes({ signal: controller.signal });
+    loadIncomes(controller.signal);
     return () => controller.abort();
   }, [loadIncomes]);
 
   // ✅ Refresh on inactivity
   useInactivityTimer(300000, () => {
     const controller = new AbortController();
-    loadIncomes({ signal: controller.signal });
+    loadIncomes(controller.signal);
   });
 
   // ✅ Clear cart automatically
