@@ -21,56 +21,37 @@ interface CartItem {
 }
 
 // ✅ FIXED: Proper options object instead of raw signal
-export const fetchAllLaundry = async (
-  options?: { signal?: AbortSignal }
-): Promise<Income[]> => {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
+export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> => {
   try {
-    // ✅ Only create controller if none provided
-    const controller = options?.signal ? null : new AbortController();
-    const signal = options?.signal ?? controller!.signal;
-
-    // ✅ Timeout only if we created controller
-    if (controller) {
-      timeoutId = setTimeout(() => controller.abort(), 10000);
-    }
-
     const response = await fetch(
       'https://smartloansbackend.azurewebsites.net/all_income',
-      { signal }
+      signal ? { signal } : {}
     );
 
-    if (timeoutId) clearTimeout(timeoutId);
-
     if (!response.ok) {
-      throw new Error(`Error al obtener datos del backend: ${response.status}`);
+      throw new Error(`Error ${response.status}`);
     }
 
     const data = await response.json();
+
     console.log('Fetched all_income:', data);
 
-    // ✅ Safe array handling
-    const incomeArray: Income[] = Array.isArray(data.income)
-      ? data.income
-      : [];
+    const incomeArray = Array.isArray(data.income) ? data.income : [];
 
-    // ✅ Sort newest first
     return incomeArray.sort(
-      (a, b) =>
+      (a: Income, b: Income) =>
         new Date(b.paymentDate).getTime() -
         new Date(a.paymentDate).getTime()
     );
-  } catch (error: any) {
-    if (timeoutId) clearTimeout(timeoutId);
 
+  } catch (error: any) {
     if (error.name === 'AbortError') {
-      console.log('Laundry fetch aborted');
+      console.log('Fetch aborted');
       return [];
     }
 
-    console.error('fetchAllLaundry error:', error);
-    throw error;
+    console.error('Error loading incomes:', error);
+    return [];
   }
 };
 
