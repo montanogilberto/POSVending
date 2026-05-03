@@ -22,9 +22,11 @@ const toHermosilloDate = (dateStr: string) => {
 };
 
 export const useLaundryDashboard = () => {
+  console.log("🔵 useLaundryDashboard hook called");
   const location = useLocation();
   const history = useHistory();
   const { allIncome, loadIncomes } = useIncome();
+  console.log("🔵 useLaundryDashboard - IncomeContext:", { allIncomeLength: allIncome?.length || 0 });
 
   // 🔹 UI State
   const [showToast, setShowToast] = useState(false);
@@ -49,8 +51,9 @@ export const useLaundryDashboard = () => {
     event: undefined,
   });
 
-  // ✅ Load incomes
+// ✅ Load incomes
   useEffect(() => {
+    console.log("🔵 useLaundryDashboard - Loading incomes...");
     const controller = new AbortController();
     loadIncomes(controller.signal);
     return () => controller.abort();
@@ -69,6 +72,7 @@ export const useLaundryDashboard = () => {
 
   // ✅ PIE CHART (optimized with useMemo)
   const pieChartData = useMemo(() => {
+    console.log("🔵 useLaundryDashboard - Computing pie chart, allIncome length:", allIncome?.length);
     if (!allIncome?.length) return null;
 
     const now = new Date();

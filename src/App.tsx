@@ -99,6 +99,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
   ...rest
 }) => {
   const { isAuthenticated } = useUser();
+  console.log("🔒 PrivateRoute check:", rest.path, "isAuthenticated:", isAuthenticated);
 
   return (
     <Route
@@ -113,6 +114,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 const AppShell: React.FC = () => {
   const { logout, username, companyName, branchName } = useUser();
   const history = useHistory();
+  console.log("🏠 AppShell rendered for user:", username, companyName, branchName);
 
   const handleLogout = () => {
     logout();

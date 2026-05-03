@@ -42,6 +42,7 @@ if (typeof window !== 'undefined') {
 }
 
 // ── Render ────────────────────────────────────────────────────────────────
+console.log("🔵 App root rendered with UserProvider & CartProvider");
 const container = document.getElementById('root');
 const root = createRoot(container!);
 

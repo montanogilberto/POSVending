@@ -32,6 +32,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     e.preventDefault();
     const username = usernameRef.current.trim();
     const password = passwordRef.current;
+    console.log("🔵 Login attempt:", { username: username.substring(0,2) + "***", hasPassword: !!password });
 
     if (!username || !password) {
       setMessage('Por favor ingresa usuario y contraseña');
@@ -53,6 +54,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       }
 
       const data = await response.json();
+      console.log("🔵 Login API response:", data);
       const result = data.result?.[0];
       const msg    = result?.msg ?? '';
 
@@ -96,6 +98,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     branchId: number,
     branchName: string,
   ) => {
+    console.log("🟢 Login: Company confirmed:", { companyId, companyName, branchId, branchName });
     const pending = pendingUserRef.current;
     if (!pending) return;
 

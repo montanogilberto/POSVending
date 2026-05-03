@@ -16,6 +16,7 @@ import MetricsGrid from './components/MetricsGrid';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
 import { ReceiptService } from '../../services/ReceiptService';
+import { useEffect } from 'react';
 
 const Laundry: React.FC = () => {
   const {
@@ -49,6 +50,18 @@ const Laundry: React.FC = () => {
     handleShowReceipt,
     getTitleFromPath,
   } = useLaundryDashboard();
+
+  useEffect(() => {
+    console.log("🧺 Laundry component MOUNTED");
+  }, []);
+
+  useEffect(() => {
+    console.log("🧺 Laundry data update:", {
+      allIncomeLength: allIncome?.length || 0,
+      pieData: !!pieData,
+      showCart,
+    });
+  }, [allIncome?.length, pieData, showCart]);
 
   // Navigate to ReceiptPage instead of showing modal
   const handleViewReceipt = (receiptData: any) => {

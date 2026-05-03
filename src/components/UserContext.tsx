@@ -41,6 +41,7 @@ const DEFAULT_AUTH: AuthData = {
 
 // ── localStorage helpers ───────────────────────────────────────────────────
 const loadStoredAuth = (): AuthData => {
+  console.log("🔵 UserContext: Loading stored auth from localStorage");
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? { ...DEFAULT_AUTH, ...JSON.parse(raw) } : DEFAULT_AUTH;
@@ -75,12 +76,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   /** Full login — merges data and marks session as authenticated */
   const login = (data: Partial<AuthData>) => {
+    console.log("🟢 UserContext LOGIN SUCCESS:", { ...auth, ...data, isAuthenticated: true });
     const next: AuthData = { ...auth, ...data, isAuthenticated: true };
     saveAuth(next);
   };
 
   /** Logout — clears everything */
   const logout = () => {
+    console.log("🔴 UserContext LOGOUT called");
     localStorage.removeItem(STORAGE_KEY);
     setAuth(DEFAULT_AUTH);
   };

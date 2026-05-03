@@ -1,21 +1,18 @@
-# Fix Ionic Popover Event Crash (Blank UI)
+## Console Logging Plan for Login → Laundry Debug
 
-**Status**: Laundry fixed ✅
+### Steps to Complete:
+- [x] 1. Read & analyze useLaundryDashboard.ts hook ✅
+- [x] 2. Add logs to src/main.tsx
+- [x] 3. Add logs to src/components/UserContext.tsx
+- [x] 4. Add logs to src/pages/Authentication/Login.tsx
+- [x] 5. Add logs to src/App.tsx
+- [x] 6. Add logs to src/pages/Laundry/Laundry.tsx
+- [x] 7. Add logs to src/pages/Laundry/hooks/useLaundryDashboard.ts
+## Console Logs Complete ✅
 
-## Steps:
-1. ✅ Create TODO.md with plan steps
-2. ✅ Edit `src/pages/Laundry/Laundry.tsx` - Added safe conditional rendering for AlertPopover and MailPopover
-3. ✅ Added defensive rendering: {pieData && <LaundryChart />} & {allIncome?.length && <RecentActivity />}
-4. 🔄 Test: `npm run dev`, verify full dashboard renders, popovers/charts safe
-5. 🔄 Build/deploy
-6. 🔄 Other pages if needed
-7. ✅ Complete
+**Test ready:**
+1. `npm run dev`
+2. Login → Laundry
+3. F12 Console → copy 🔵🟢🧺 logs
 
-**Root cause**: `IonPopover event=undefined` when `isOpen=true` from initial state → production crash.
-
-**Fix applied**: `{popoverState.show* && popoverState.event && <Popover ... />}` in Laundry.tsx
-
-**Verification**: Hook already had proper `event: e.nativeEvent` set. Condition prevents render until ready.
-
-**Next**: Test + consider app-wide fix if other pages crash.
-
+Share console output to analyze blank screen.
