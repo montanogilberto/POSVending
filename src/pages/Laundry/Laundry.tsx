@@ -80,7 +80,7 @@ const Laundry: React.FC = () => {
           />
 
           {/* Laundry Chart */}
-          <LaundryChart pieData={pieData} />
+          {pieData && <LaundryChart pieData={pieData} />}
 
           {/* Carrito Summary if showCart */}
           {showCart && cart.length > 0 && (
@@ -93,10 +93,12 @@ const Laundry: React.FC = () => {
           )}
 
           {/* Actividad Reciente */}
-          <RecentActivity
-            allIncome={allIncome}
-            onShowReceipt={handleShowReceipt}
-          />
+          {allIncome?.length > 0 && (
+            <RecentActivity
+              allIncome={allIncome}
+              onShowReceipt={handleShowReceipt}
+            />
+          )}
         </div>
 
         {/* Toast */}
@@ -108,16 +110,20 @@ const Laundry: React.FC = () => {
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
         />
 
-<AlertPopover
-          isOpen={popoverState.showAlertPopover}
-          event={popoverState.event}
-          onDidDismiss={dismissAlertPopover}
-        />
-        <MailPopover
-          isOpen={popoverState.showMailPopover}
-          event={popoverState.event}
-          onDidDismiss={dismissMailPopover}
-        />
+{popoverState.showAlertPopover && popoverState.event && (
+  <AlertPopover
+    isOpen={popoverState.showAlertPopover}
+    event={popoverState.event}
+    onDidDismiss={dismissAlertPopover}
+  />
+)}
+        {popoverState.showMailPopover && popoverState.event && (
+          <MailPopover
+            isOpen={popoverState.showMailPopover}
+            event={popoverState.event}
+            onDidDismiss={dismissMailPopover}
+          />
+        )}
         <LogoutAlert
           isOpen={showLogoutAlert}
           onDidDismiss={() => setShowLogoutAlert(false)}
