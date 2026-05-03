@@ -52,7 +52,7 @@ export const useLaundryDashboard = () => {
   // ✅ Load incomes
   useEffect(() => {
     const controller = new AbortController();
-    loadIncomes({ signal: controller.signal });
+    loadIncomes(controller.signal);
     return () => controller.abort();
   }, [loadIncomes]);
 
