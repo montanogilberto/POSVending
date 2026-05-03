@@ -79,7 +79,7 @@ const Laundry: React.FC = () => {
             handleStartSeller={handleStartSeller}
           />
 
-          {/* Laundry Chart */}
+          {/* Laundry Chart 2 */}
           {pieData && <LaundryChart pieData={pieData} />}
 
           {/* Carrito Summary if showCart */}
