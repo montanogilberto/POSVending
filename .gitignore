@@ -16,6 +16,7 @@ dist/
 # Build output
 dist/
 build/
+venv/
 
 # Logs
 npm-debug.log*

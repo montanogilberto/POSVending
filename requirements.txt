@@ -1,0 +1,12 @@
+google-adk
+speechrecognition
+pyaudio
+requests
+python-dotenv
+google-generativeai
+
+# google-adk: ADK Agent framework
+# speechrecognition + pyaudio: Local STT (mic)
+# requests: API calls to backend
+# python-dotenv: .env for keys/API
+# google-generativeai: Gemini model if needed

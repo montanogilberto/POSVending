@@ -24,6 +24,7 @@
     "@yudiel/react-qr-scanner": "^2.3.1",
     "chart.js": "^4.5.1",
     "chartjs-plugin-datalabels": "^2.2.0",
+    "googleapis": "^171.4.0",
     "ionicons": "^7.4.0",
     "microsoft-cognitiveservices-speech-sdk": "^1.46.0",
     "react": "19.1.1",
