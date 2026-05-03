@@ -1,14 +1,24 @@
-# Voice Sell Agent TODO
+# IncomeContext AbortSignal Fix - TODO
 
-## Plan Steps:
-1. [ ] Create useSpeechAgent hook with microsoft-cognitiveservices-speech-sdk for STT (speech to text), TTS (text to speech).
-2. [ ] Implement intent parser: parse voice "registra venta [product name] [qty] [pay cash/method amount]".
-3. [ ] Integrate product matching (fuzzy search from productsApi).
-4. [ ] Chain workflow: getProductsByCompany -> addToCart -> postCashRegister or postIncome -> record order.
-5. [ ] Update Sells.tsx with mic button, agent display, status feedback.
-6. [ ] Add to App.tsx providers if needed.
-7. [ ] Test with "registra una venta de servicio completo".
+## Plan Breakdown & Progress
+✅ **Step 1**: Analyze files (IncomeContext.tsx, useLaundryDashboard.ts) - Complete  
+✅ **Step 2**: Create & confirm edit plan - Complete (user approved)  
+✅ **Step 3**: Apply targeted edits to IncomeContext.tsx - Complete  
+- Updated catch: error: any → unknown  
+- Updated AbortError check: error.name → (error as any)?.name  
+- State guard: !signal || !signal.aborted → !signal?.aborted  
 
-1. [x] Update requirements.txt with Python deps (google-adk, speechrecognition etc.)\n2. [x] Setup venv_agent and pip install\nProgress: Python env ready.\nNext: Create agent.py
+✅ **Step 4**: Test changes  
+- Run `npm run dev` (or use existing dev server)  
+- Navigate to Laundry dashboard  
+- Verify incomes load without AbortSignal/console errors  
+- Quick navigation test: No React state crashes on abort  
 
+⏳ **Step 5**: If UI still blank  
+- Temporarily comment <AlertPopover /> and <MailPopover />  
+- Verify Header screenTitle={getTitleFromPath(location.pathname)}  
+- Check popoverState.event is defined  
 
+✅ **Step 6**: Task complete  
+
+*Updated after Step 3 completion.*

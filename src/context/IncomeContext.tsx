@@ -26,13 +26,12 @@ export const IncomeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const loadIncomes = useCallback(async (signal?: AbortSignal) => {
     try {
       const incomes = await fetchAllLaundry(signal);
-      // Only update state if request wasn't aborted
+
       if (!signal?.aborted) {
         setAllIncome(incomes);
       }
-    } catch (error: any) {
-      // Ignore abort errors
-      if (error.name !== 'AbortError') {
+    } catch (error: unknown) {
+      if ((error as any)?.name !== 'AbortError') {
         console.error('Error loading incomes:', error);
       }
     }
