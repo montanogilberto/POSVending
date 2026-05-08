@@ -1,22 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   IonContent,
   IonToast,
   IonPage,
-  IonButton,
 } from '@ionic/react';
 import './Laundry.css';
+
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import LogoutAlert from '../../components/Alerts/LogoutAlert';
 import MailPopover from '../../components/PopOver/MailPopover';
 import LaundryChart from '../../components/LaundryChart';
+
 import { useLaundryDashboard } from './hooks/useLaundryDashboard';
 import MetricsGrid from './components/MetricsGrid';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
-import { ReceiptService } from '../../services/ReceiptService';
-import { useEffect } from 'react';
 
 const Laundry: React.FC = () => {
   const {
@@ -63,14 +62,6 @@ const Laundry: React.FC = () => {
     });
   }, [allIncome?.length, pieData, showCart]);
 
-  // Navigate to ReceiptPage instead of showing modal
-  const handleViewReceipt = (receiptData: any) => {
-    history.push({
-      pathname: '/receipt',
-      state: { ticketData: receiptData }
-    });
-  };
-
   return (
     <IonPage>
       <Header
@@ -78,10 +69,11 @@ const Laundry: React.FC = () => {
         presentMailPopover={presentMailPopover}
         screenTitle={getTitleFromPath()}
       />
+
       <IonContent fullscreen className="dashboard-content">
         <div className="dashboard-container">
 
-          {/* Metrics Grid */}
+          {/* ✅ Metrics Grid ALWAYS visible */}
           <MetricsGrid
             calculateDailySales={calculateDailySales}
             calculateMonthlyTotal={calculateMonthlyTotal}
@@ -92,10 +84,22 @@ const Laundry: React.FC = () => {
             handleStartSeller={handleStartSeller}
           />
 
-          {/* Laundry Chart 2 */}
-          {pieData && <LaundryChart pieData={pieData} />}
+          {/* ✅ Chart Section (SAFE RENDERING) */}
+          <div style={{ marginTop: '20px' }}>
+            {allIncome?.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                Cargando datos...
+              </div>
+            ) : pieData ? (
+              <LaundryChart pieData={pieData} />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                No hay datos para el mes actual
+              </div>
+            )}
+          </div>
 
-          {/* Carrito Summary if showCart */}
+          {/* ✅ Cart Summary */}
           {showCart && cart.length > 0 && (
             <CartSummary
               cart={cart}
@@ -105,16 +109,17 @@ const Laundry: React.FC = () => {
             />
           )}
 
-          {/* Actividad Reciente */}
+          {/* ✅ Recent Activity */}
           {allIncome?.length > 0 && (
             <RecentActivity
               allIncome={allIncome}
               onShowReceipt={handleShowReceipt}
             />
           )}
+
         </div>
 
-        {/* Toast */}
+        {/* ✅ Toast */}
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
@@ -123,13 +128,15 @@ const Laundry: React.FC = () => {
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
         />
 
-{popoverState.showAlertPopover && popoverState.event && (
-  <AlertPopover
-    isOpen={popoverState.showAlertPopover}
-    event={popoverState.event}
-    onDidDismiss={dismissAlertPopover}
-  />
-)}
+        {/* ✅ Popovers */}
+        {popoverState.showAlertPopover && popoverState.event && (
+          <AlertPopover
+            isOpen={popoverState.showAlertPopover}
+            event={popoverState.event}
+            onDidDismiss={dismissAlertPopover}
+          />
+        )}
+
         {popoverState.showMailPopover && popoverState.event && (
           <MailPopover
             isOpen={popoverState.showMailPopover}
@@ -137,11 +144,14 @@ const Laundry: React.FC = () => {
             onDidDismiss={dismissMailPopover}
           />
         )}
+
+        {/* ✅ Logout Alert */}
         <LogoutAlert
           isOpen={showLogoutAlert}
           onDidDismiss={() => setShowLogoutAlert(false)}
           handleLogoutConfirm={handleLogoutConfirm}
         />
+
       </IonContent>
     </IonPage>
   );

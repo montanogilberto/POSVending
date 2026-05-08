@@ -26,7 +26,11 @@ export const useLaundryDashboard = () => {
   const location = useLocation();
   const history = useHistory();
   const { allIncome, loadIncomes } = useIncome();
-  console.log("🔵 useLaundryDashboard - IncomeContext:", { allIncomeLength: allIncome?.length || 0 });
+
+  //console.log("🔵 useLaundryDashboard - IncomeContext:", { allIncomeLength: allIncome?.length || 0 });
+
+  console.log("🔵 IncomeContext:", { allIncomeLength: allIncome?.length || 0 });
+
 
   // 🔹 UI State
   const [showToast, setShowToast] = useState(false);
@@ -38,7 +42,7 @@ export const useLaundryDashboard = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [receiptData, setReceiptData] = useState<any>(null);
-  const [pieData, setPieData] = useState<any>(null);
+  //const [pieData, setPieData] = useState<any>(null);
 
   // 🔹 Popover State ✅ FIXED
   const [popoverState, setPopoverState] = useState<{
@@ -53,7 +57,8 @@ export const useLaundryDashboard = () => {
 
 // ✅ Load incomes
   useEffect(() => {
-    console.log("🔵 useLaundryDashboard - Loading incomes...");
+    //console.log("🔵 useLaundryDashboard - Loading incomes...");
+    console.log("🔵 Loading incomes...");
     const controller = new AbortController();
     loadIncomes(controller.signal);
     return () => controller.abort();
@@ -71,8 +76,12 @@ export const useLaundryDashboard = () => {
   }, [showCart]);
 
   // ✅ PIE CHART (optimized with useMemo)
-  const pieChartData = useMemo(() => {
-    console.log("🔵 useLaundryDashboard - Computing pie chart, allIncome length:", allIncome?.length);
+  //const pieChartData = useMemo(() => {
+    //console.log("🔵 useLaundryDashboard - Computing pie chart, allIncome length:", allIncome?.length);
+
+  // ✅ PIE CHART (🔥 FIXED — single source of truth)
+  const pieData = useMemo(() => {
+    console.log("🔵 Computing pie chart, allIncome length:", allIncome?.length);
     if (!allIncome?.length) return null;
 
     const now = new Date();
@@ -121,9 +130,9 @@ export const useLaundryDashboard = () => {
   }, [allIncome]);
 
   // sync state (optional, keeps compatibility with your component)
-  useEffect(() => {
-    setPieData(pieChartData);
-  }, [pieChartData]);
+  //useEffect(() => {
+    //setPieData(pieChartData);
+  //}, [pieChartData]);
 
   // ✅ METRICS
   const calculateTotal = () =>
