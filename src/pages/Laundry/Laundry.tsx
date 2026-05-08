@@ -67,10 +67,11 @@ const Laundry: React.FC = () => {
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle={getTitleFromPath()}
+        //screenTitle={getTitleFromPath()}
+        screenTitle="Laundry Dashboard 1" // Hardcode this temporarily
       />
 
-      <IonContent fullscreen className="dashboard-content">
+      <IonContent fullscreen={true} style={{ '--background': '#F9FAFB' }} className="dashboard-content">
         <div className="dashboard-container">
 
           {/* ✅ Metrics Grid ALWAYS visible */}
