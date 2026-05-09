@@ -1,3 +1,17 @@
+#root-outlet, 
+ion-router-outlet, 
+ion-page {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Specifically target the 'invisible' class Ionic uses during transitions */
+.ion-page-invisible {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 /* Dashboard Layout */
 .dashboard-content {
   --background: #F9FAFB;
