@@ -8,6 +8,8 @@ import {
   IonTabBar,
   IonTabButton,
   IonTabs,
+  IonButton,
+  IonButtons,
   IonMenu,
   IonList,
   IonItem,
@@ -311,10 +313,17 @@ const AppShell: React.FC = () => {
               <IonLabel>Vending POS</IonLabel>
             </IonTabButton>
 
-            <IonTabButton tab="menu" className="menu-tab" onClick={handleOpenMenu}>
-              <IonIcon aria-hidden="true" icon={menu} />
-              <IonLabel>Menú</IonLabel>
-            </IonTabButton>
+            <IonButtons slot="end" className="menu-tab">
+              <IonButton
+                fill="clear"
+                className="menu-tab-button"
+                onClick={handleOpenMenu}
+                aria-label="Abrir menú"
+              >
+                <IonIcon aria-hidden="true" icon={menu} />
+                <span className="menu-tab-label">Menú</span>
+              </IonButton>
+            </IonButtons>
           </IonTabBar>
         </IonTabs>
       </IonPage>

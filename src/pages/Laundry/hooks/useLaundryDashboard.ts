@@ -296,7 +296,7 @@ export const useLaundryDashboard = () => {
     presentMailPopover,
     dismissMailPopover,
 
-    handleLogoutConfirm: () => history.push('/Login'),
+    handleLogoutConfirm: () => history.push('/login'),
 
     currentUser: 'admin',
     percentageChange: '+0%',

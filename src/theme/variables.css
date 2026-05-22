@@ -166,6 +166,20 @@ http://ionicframework.com/docs/theming/ */
     --background: var(--ion-tabbar-background);
     border-top: 1px solid var(--ion-tabbar-border-color);
   }
+
+  .custom-tabbar .menu-tab-button::part(native) {
+    flex-direction: column;
+    font-size: 0.65rem;
+    color: var(--text-secondary, #666);
+    --padding-start: 8px;
+    --padding-end: 8px;
+  }
+
+  .custom-tabbar .menu-tab-label {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.65rem;
+  }
   
   /* ===== Buttons ===== */
   ion-button.button-primary,
