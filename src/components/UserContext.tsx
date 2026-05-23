@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { RoleCode, normalizeRoleCode } from '../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../utils/formatters';
 
 // ── Storage key ────────────────────────────────────────────────────────────
@@ -14,6 +15,8 @@ export interface AuthData {
   companyName: string;
   branchId: number;
   branchName: string;
+  roleCode: RoleCode;
+  roleName: string;
 }
 
 interface UserContextProps extends AuthData {
@@ -38,6 +41,8 @@ const DEFAULT_AUTH: AuthData = {
   companyName: '',
   branchId: 0,
   branchName: '',
+  roleCode: 'employee',
+  roleName: 'Empleado',
 };
 
 // ── localStorage helpers ───────────────────────────────────────────────────
@@ -45,7 +50,13 @@ const loadStoredAuth = (): AuthData => {
   console.log("🔵 UserContext: Loading stored auth from localStorage");
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...DEFAULT_AUTH, ...JSON.parse(raw) } : DEFAULT_AUTH;
+    if (!raw) return DEFAULT_AUTH;
+    const parsed = JSON.parse(raw) as Partial<AuthData>;
+    return {
+      ...DEFAULT_AUTH,
+      ...parsed,
+      roleCode: normalizeRoleCode(parsed.roleCode),
+    };
   } catch {
     return DEFAULT_AUTH;
   }
@@ -78,7 +89,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   /** Full login — merges data and marks session as authenticated */
   const login = (data: Partial<AuthData>) => {
     console.log("🟢 UserContext LOGIN SUCCESS:", { ...auth, ...data, isAuthenticated: true });
-    const next: AuthData = { ...auth, ...data, isAuthenticated: true };
+    const next: AuthData = {
+      ...auth,
+      ...data,
+      roleCode: normalizeRoleCode(data.roleCode ?? auth.roleCode),
+      isAuthenticated: true,
+    };
     saveAuth(next);
   };
 
