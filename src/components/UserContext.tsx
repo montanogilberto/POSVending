@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { DEFAULT_AVATAR_URL } from '../utils/formatters';
 
 // ── Storage key ────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'pos_gmo_auth';
@@ -32,7 +33,7 @@ const DEFAULT_AUTH: AuthData = {
   isAuthenticated: false,
   userId: 0,
   username: '',
-  avatarUrl: 'https://www.w3schools.com/howto/img_avatar.png',
+  avatarUrl: DEFAULT_AVATAR_URL,
   companyId: 0,
   companyName: '',
   branchId: 0,
@@ -88,9 +89,22 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAuth(DEFAULT_AUTH);
   };
 
-  // Legacy setters
-  const setUsername  = (username: string)  => saveAuth({ ...auth, username });
-  const setAvatarUrl = (avatarUrl: string) => saveAuth({ ...auth, avatarUrl });
+  // Legacy setters (functional updates avoid stale auth in async flows)
+  const setUsername = (username: string) => {
+    setAuth((prev) => {
+      const next = { ...prev, username };
+      persistAuth(next);
+      return next;
+    });
+  };
+
+  const setAvatarUrl = (avatarUrl: string) => {
+    setAuth((prev) => {
+      const next = { ...prev, avatarUrl };
+      persistAuth(next);
+      return next;
+    });
+  };
 
   return (
     <UserContext.Provider

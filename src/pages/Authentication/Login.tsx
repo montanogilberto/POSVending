@@ -6,6 +6,8 @@ import {
 import { useHistory } from 'react-router-dom';
 import { eye, eyeOff } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
+import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
+import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/CompanySelector/CompanySelector';
 import './Login.css';
 
@@ -43,20 +45,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setMessage(null);
 
     try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ logins: [{ username, password }] }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error del servidor: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("🔵 Login API response:", data);
-      const result = data.result?.[0];
-      const msg    = result?.msg ?? '';
+      const result = await postLogin(username, password);
+      console.log('🔵 Login API response:', result);
+      const msg = result?.msg ?? '';
 
       if (!result || msg === 'User Invalid' || msg === 'Invalid' || msg.toLowerCase().includes('invalid')) {
         setMessage('Usuario o contraseña incorrectos');
@@ -68,11 +59,33 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         return;
       }
 
+      const userId = parseUserId(result.userId);
+      if (!userId) {
+        setMessage('No se recibió el ID de usuario del servidor');
+        return;
+      }
+
+      // /login returns userId only — profile photo comes from POST /one_users
+      let avatarUrl = DEFAULT_AVATAR_URL;
+      let displayName = username;
+      try {
+        const profile = await fetchUserProfile(userId);
+        console.log('🔵 one_users profile:', profile);
+        if (profile?.name) {
+          displayName = profile.name;
+        }
+        if (profile?.avatarUrl) {
+          avatarUrl = profile.avatarUrl;
+        }
+      } catch (profileErr) {
+        console.warn('Could not load user profile from one_users:', profileErr);
+      }
+
       // Credentials valid — store pending user data and open company selector
       pendingUserRef.current = {
-        userId:    result.userId    ?? 0,
-        username:  username,
-        avatarUrl: result.avatarUrl ?? 'https://www.w3schools.com/howto/img_avatar.png',
+        userId,
+        username: displayName,
+        avatarUrl,
       };
 
       // Pre-populate user fields in context (not yet authenticated)
