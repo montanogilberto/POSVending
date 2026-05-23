@@ -1,5 +1,41 @@
 // Utility functions for formatting values
 
+import { API_BASE_URL, PROFILE_IMAGE_BASE_URL } from '../api/usersApi';
+
+export const DEFAULT_AVATAR_URL =
+  'https://www.w3schools.com/howto/img_avatar.png';
+
+/**
+ * Resolves user avatar paths from login/API into a loadable image URL.
+ */
+export const resolveAvatarUrl = (avatarUrl?: string | null): string => {
+  if (!avatarUrl?.trim()) {
+    return DEFAULT_AVATAR_URL;
+  }
+
+  const url = avatarUrl.trim();
+
+  if (
+    url.startsWith('data:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('blob:')
+  ) {
+    return url;
+  }
+
+  if (url.startsWith('/')) {
+    return `${API_BASE_URL}${url}`;
+  }
+
+  // Bare filename from dbo.users.image (e.g. nallely.jpg)
+  if (/\.(jpe?g|png|gif|webp|bmp)$/i.test(url)) {
+    return `${PROFILE_IMAGE_BASE_URL}${url}`;
+  }
+
+  return `${API_BASE_URL}/${url}`;
+};
+
 /**
  * Formats a number with thousand separators (commas) and 2 decimal places
  * @param amount - The number to format

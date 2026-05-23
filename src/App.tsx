@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Redirect, Route, useHistory } from 'react-router-dom';
 import {
   IonApp,
@@ -20,6 +20,7 @@ import {
   IonAvatar,
   IonSplitPane,
   IonPage,
+  IonImg,
   setupIonicReact,
 } from '@ionic/react';
 import { menuController } from '@ionic/core';
@@ -85,6 +86,8 @@ import './theme/variables.css';
 import { IncomeProvider } from './context/IncomeContext';
 import { ProductProvider } from './context/ProductContext';
 import { useUser } from './components/UserContext';
+import { getOneUser, pickProfileImageUrl } from './api/usersApi';
+import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 
 setupIonicReact();
 
@@ -112,8 +115,39 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 };
 
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName } = useUser();
+  const { logout, username, companyName, branchName, avatarUrl, userId, setAvatarUrl } =
+    useUser();
   const history = useHistory();
+  const [profileImageSrc, setProfileImageSrc] = useState(() =>
+    resolveAvatarUrl(avatarUrl)
+  );
+
+  useEffect(() => {
+    setProfileImageSrc(resolveAvatarUrl(avatarUrl));
+  }, [avatarUrl]);
+
+  // Refresh profile photo from /one_users (e.g. after backend adds imageUrl)
+  useEffect(() => {
+    if (!userId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await getOneUser(userId);
+        const imageUrl = pickProfileImageUrl(profile);
+        if (!cancelled && imageUrl && imageUrl !== avatarUrl) {
+          setAvatarUrl(imageUrl);
+        }
+      } catch {
+        /* keep stored avatar */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, avatarUrl, setAvatarUrl]);
+
   console.log("🏠 AppShell rendered for user:", username, companyName, branchName);
 
   const handleLogout = () => {
@@ -121,7 +155,7 @@ const AppShell: React.FC = () => {
     history.push('/login');
   };
 
-  const handleOpenMenu = async () => {
+  const openMainMenu = async () => {
     await menuController.open('main-menu');
   };
 
@@ -138,7 +172,11 @@ const AppShell: React.FC = () => {
         <IonContent>
           <div className="profile-header">
             <IonAvatar className="profile-avatar">
-              <img src="/logo192.png" alt="Profile" />
+              <IonImg
+                src={profileImageSrc}
+                alt="Foto de perfil"
+                onIonError={() => setProfileImageSrc(DEFAULT_AVATAR_URL)}
+              />
             </IonAvatar>
 
             <div className="profile-info">
@@ -311,10 +349,22 @@ const AppShell: React.FC = () => {
               <IonLabel>Vending POS</IonLabel>
             </IonTabButton>
 
-            <IonTabButton tab="menu" className="menu-tab" onClick={handleOpenMenu}>
+            <div
+              className="menu-tab-slot menu-tab"
+              role="button"
+              tabIndex={0}
+              aria-label="Abrir menú"
+              onClick={openMainMenu}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openMainMenu();
+                }
+              }}
+            >
               <IonIcon aria-hidden="true" icon={menu} />
-              <IonLabel>Menú</IonLabel>
-            </IonTabButton>
+              <IonLabel className="menu-tab-bar-label">Menú</IonLabel>
+            </div>
           </IonTabBar>
         </IonTabs>
       </IonPage>

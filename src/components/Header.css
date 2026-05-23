@@ -41,6 +41,18 @@
   max-width: 50%;
 }
 
+/* Hamburger: visible when side menu is overlay (< 792px split pane) */
+.header-menu-button {
+  --color: var(--text-primary, #222);
+  margin-inline-start: 4px;
+}
+
+@media (min-width: 792px) {
+  .header-menu-button.only-mobile {
+    display: none !important;
+  }
+}
+
 /* Header Action Buttons - Bigger Touch Targets */
 .header-action-button {
   --border-radius: 12px;

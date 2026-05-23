@@ -198,7 +198,7 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
           
           {/* PRODUCTS / SERVICIOS */}
           <div className="products-servicios-section">
-            <IonText className="section-title productos-title">
+            <IonText >
               Productos / Servicios
             </IonText>
 

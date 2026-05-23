@@ -1,5 +1,5 @@
 import React from 'react';
-import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBackButton, IonBadge } from '@ionic/react';
+import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBackButton, IonBadge, IonMenuButton } from '@ionic/react';
 import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -36,8 +36,15 @@ const Header: React.FC<HeaderProps> = ({
     <IonHeader className="dashboard-header">
       <IonToolbar color="light">
         <IonButtons slot="start">
-          {showBackButton && (
+          {showBackButton ? (
             <IonBackButton text={backButtonText} defaultHref={backButtonHref} />
+          ) : (
+            <IonMenuButton
+              menu="main-menu"
+              autoHide={false}
+              className="only-mobile header-menu-button"
+              aria-label="Abrir menú"
+            />
           )}
         </IonButtons>
         <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>{screenTitle}</IonTitle>

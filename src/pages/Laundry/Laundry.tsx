@@ -67,8 +67,8 @@ const Laundry: React.FC = () => {
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        //screenTitle={getTitleFromPath()}
-        screenTitle="Laundry Dashboard 1" // Hardcode this temporarily
+        screenTitle={getTitleFromPath()}
+        
       />
 
       <IonContent fullscreen={true} style={{ '--background': '#F9FAFB' }} className="dashboard-content">
