@@ -87,6 +87,7 @@ import { IncomeProvider } from './context/IncomeContext';
 import { ProductProvider } from './context/ProductContext';
 import { useUser } from './components/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
+import { canAccess } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 
 setupIonicReact();
@@ -115,7 +116,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 };
 
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName, avatarUrl, userId, setAvatarUrl } =
+  const { logout, username, companyName, branchName, avatarUrl, userId, roleCode, roleName, setAvatarUrl } =
     useUser();
   const history = useHistory();
   const [profileImageSrc, setProfileImageSrc] = useState(() =>
@@ -183,8 +184,8 @@ const AppShell: React.FC = () => {
               <h3 className="profile-name">{username || 'Usuario'}</h3>
               <p className="profile-role">
                 {companyName
-                  ? `${companyName}${branchName ? ` · ${branchName}` : ''}`
-                  : 'Administrator'}
+                  ? `${companyName}${branchName ? ` · ${branchName}` : ''} · ${roleName}`
+                  : roleName || 'Usuario'}
               </p>
             </div>
           </div>
@@ -193,95 +194,119 @@ const AppShell: React.FC = () => {
             <IonItemDivider>Catálogo</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
               <IonItem button routerLink="/clients">
                 <IonIcon icon={people} slot="start" />
                 <IonLabel>Clientes</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'products') && (
               <IonItem button routerLink="/products-management">
                 <IonIcon icon={cube} slot="start" />
                 <IonLabel>Productos</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'categories') && (
               <IonItem button routerLink="/categories">
                 <IonIcon icon={grid} slot="start" />
                 <IonLabel>Categorías</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonItemDivider>Mensajes</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'alerts') && (
               <IonItem button routerLink="/alerts">
                 <IonIcon icon={notifications} slot="start" />
                 <IonLabel>Alertas</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'emails') && (
               <IonItem button routerLink="/emails">
                 <IonIcon icon={mail} slot="start" />
                 <IonLabel>Correos</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonItemDivider>Administración</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'users') && (
               <IonItem button routerLink="/users">
                 <IonIcon icon={person} slot="start" />
                 <IonLabel>Usuarios</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'ingresos') && (
               <IonItem button routerLink="/ingresos">
                 <IonIcon icon={barChart} slot="start" />
                 <IonLabel>Ingresos</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'egresos') && (
               <IonItem button routerLink="/egresos">
                 <IonIcon icon={barChart} slot="start" />
                 <IonLabel>Egresos</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonItemDivider>IOT</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'iot') && (
               <IonItem button routerLink="/led-status">
                 <IonIcon icon={bulb} slot="start" />
                 <IonLabel>LED Status</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'iot') && (
               <IonItem button routerLink="/water-tanks">
                 <IonIcon icon={water} slot="start" />
                 <IonLabel>Water Tanks</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonItemDivider>Sistema</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'settings') && (
               <IonItem button routerLink="/setting">
                 <IonIcon icon={settings} slot="start" />
                 <IonLabel>Configuración</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'sells') && (
               <IonItem button routerLink="/sells">
                 <IonIcon icon={barChart} slot="start" />
                 <IonLabel>Ventas</IonLabel>
               </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>

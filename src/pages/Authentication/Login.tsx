@@ -7,6 +7,7 @@ import { useHistory } from 'react-router-dom';
 import { eye, eyeOff } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
+import { normalizeRoleCode } from '../../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/CompanySelector/CompanySelector';
 import './Login.css';
@@ -28,7 +29,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [showCompanySelector, setShowCompanySelector] = useState(false);
 
   // Temporary holder for user data between credential validation and company selection
-  const pendingUserRef = useRef<{ userId: number; username: string; avatarUrl: string } | null>(null);
+  const pendingUserRef = useRef<{
+    userId: number;
+    username: string;
+    avatarUrl: string;
+    defaultCompanyId: number;
+    defaultBranchId: number;
+    roleCode: ReturnType<typeof normalizeRoleCode>;
+    roleName: string;
+  } | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,11 +90,20 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         console.warn('Could not load user profile from one_users:', profileErr);
       }
 
+      const defaultCompanyId = parseUserId(result.companyId);
+      const defaultBranchId = parseUserId(result.branchId);
+      const roleCode = normalizeRoleCode(result.roleCode);
+      const roleName = result.roleName?.trim() || roleCode;
+
       // Credentials valid — store pending user data and open company selector
       pendingUserRef.current = {
         userId,
         username: displayName,
         avatarUrl,
+        defaultCompanyId,
+        defaultBranchId,
+        roleCode,
+        roleName,
       };
 
       // Pre-populate user fields in context (not yet authenticated)
@@ -93,6 +111,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         userId:    pendingUserRef.current.userId,
         username:  pendingUserRef.current.username,
         avatarUrl: pendingUserRef.current.avatarUrl,
+        roleCode:  pendingUserRef.current.roleCode,
+        roleName:  pendingUserRef.current.roleName,
       });
 
       setShowCompanySelector(true);
@@ -115,6 +135,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const pending = pendingUserRef.current;
     if (!pending) return;
 
+    // Role from /login applies to default company; reuse until per-company roles API exists
+    const roleCode =
+      companyId === pending.defaultCompanyId ? pending.roleCode : 'employee';
+    const roleName =
+      companyId === pending.defaultCompanyId ? pending.roleName : 'Empleado';
+
     // Finalise login — sets isAuthenticated = true and persists to localStorage
     login({
       userId:      pending.userId,
@@ -122,8 +148,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       avatarUrl:   pending.avatarUrl,
       companyId,
       companyName,
-      branchId,
+      branchId:    branchId || pending.defaultBranchId,
       branchName,
+      roleCode,
+      roleName,
     });
 
     setShowCompanySelector(false);

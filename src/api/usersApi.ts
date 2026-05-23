@@ -21,6 +21,9 @@ export interface ApiUser {
 export interface LoginResult {
   userId?: string | number;
   companyId?: string | number;
+  branchId?: string | number;
+  roleCode?: string;
+  roleName?: string;
   msg?: string;
   error?: string;
 }
