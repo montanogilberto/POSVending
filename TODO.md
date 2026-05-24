@@ -1,18 +1,10 @@
-## Console Logging Plan for Login → Laundry Debug
+## TODO
 
-### Steps to Complete:
-- [x] 1. Read & analyze useLaundryDashboard.ts hook ✅
-- [x] 2. Add logs to src/main.tsx
-- [x] 3. Add logs to src/components/UserContext.tsx
-- [x] 4. Add logs to src/pages/Authentication/Login.tsx
-- [x] 5. Add logs to src/App.tsx
-- [x] 6. Add logs to src/pages/Laundry/Laundry.tsx
-- [x] 7. Add logs to src/pages/Laundry/hooks/useLaundryDashboard.ts
-## Console Logs Complete ✅
+### IncomesPage UI consistency refactor
+- [ ] Inspect current UI structure and align it with catalog/dashboard patterns from ClientsPage and ExpensesPage
+- [x] Improve `src/components/IncomesFilters.tsx` option casing/values to match API/filtering
+- [x] Improve `src/components/IncomesList.tsx` action UI to use Ionic buttons and better match catalog UX
+- [ ] Refactor `src/pages/IncomesPage.tsx` to simplify state/derive data and standardize empty/loading states
 
-**Test ready:**
-1. `npm run dev`
-2. Login → Laundry
-3. F12 Console → copy 🔵🟢🧺 logs
+- [ ] Run lint/build/tests (if available) and verify filters, infinite scroll, delete/receipt navigation
 
-Share console output to analyze blank screen.

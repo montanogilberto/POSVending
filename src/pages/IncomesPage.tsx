@@ -5,7 +5,7 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonButton,
+
   IonToast,
   IonIcon,
   IonCard,
@@ -14,19 +14,21 @@ import {
   IonCardSubtitle,
   IonCardTitle,
   IonLoading,
+  IonButton,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
+
 import IncomesChart from '../components/IncomesChart';
 import IncomesFilters from '../components/IncomesFilters';
 import IncomesList from '../components/IncomesList';
 import { fetchAllLaundry } from '../api/laundryApi';
 import { fetchTicket } from '../api/ticketApi';
 import { ReceiptService } from '../services/ReceiptService';
-import { LegacyIncomeData, UnifiedReceiptData } from '../types/receipt';
+
 import { waterOutline } from 'ionicons/icons';
+import { postIncomeAction } from '../api/incomeApi';
+
 
 interface Income {
   incomeId: number;
@@ -57,7 +59,7 @@ const IncomesPage: React.FC = () => {
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
-  const [chartData, setChartData] = useState<any>(null);
+  const [chartData, setChartData] = useState<unknown>(null);
   const [totalIncome, setTotalIncome] = useState<number>(0);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -83,7 +85,7 @@ const IncomesPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    let filtered = allIncome.filter((income) => {
+    const filtered = allIncome.filter((income) => {
       const matchesSearch =
         income.incomeId.toString().includes(searchText) ||
         income.total.toString().includes(searchText);
@@ -148,7 +150,7 @@ const IncomesPage: React.FC = () => {
         displayedIncome.length + 3
       );
       setDisplayedIncome([...displayedIncome, ...nextItems]);
-      (event.target as any).complete();
+      (event.target as unknown as { complete: () => void }).complete();
     }, 500);
   };
 
@@ -166,17 +168,18 @@ const IncomesPage: React.FC = () => {
         return;
       }
 
-      // Use adapter to convert Ticket to LegacyIncomeData format
-      const legacyIncomeData = ReceiptService.adaptTicketToLegacyIncome(ticket);
+      // Use adapter to convert Ticket to LegacyIncomeData format (kept for side-effects/compat)
+      ReceiptService.adaptTicketToLegacyIncome(ticket);
       
       // Navigate to ReceiptPage with ticket data
       history.push({
         pathname: '/receipt',
         state: { ticketData: ticket }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching ticket:', error);
-      setToastMessage('Error al cargar el recibo: ' + (error.message || 'Error desconocido'));
+      const message = error instanceof Error ? error.message : String(error);
+      setToastMessage('Error al cargar el recibo: ' + message);
       setShowToast(true);
     } finally {
       setLoading(false);
@@ -214,7 +217,27 @@ const IncomesPage: React.FC = () => {
             </IonCol>
           </IonRow>
 
-          {/* Total Income Card */}
+          {/* Monthly income metric (like Laundry MetricsGrid monthly total) */}
+          <IonRow>
+            <IonCol size="12">
+              <IonCard className="dashboard-small-kpi-card">
+                <IonCardContent className="kpi-card-content">
+                  <div className="kpi-icon">
+                    <IonIcon icon={waterOutline} size="large" />
+                  </div>
+                  <div className="kpi-info">
+                    <IonCardTitle className="kpi-label">Total Mensual</IonCardTitle>
+                    <div className="kpi-amount">${calculateTotal().toFixed(2)}</div>
+                    <div className="kpi-meta">
+                      <span>{currentMonthYear}</span>
+                    </div>
+                  </div>
+                </IonCardContent>
+              </IonCard>
+            </IonCol>
+          </IonRow>
+
+          {/* Total Income (legacy KPI) */}
           <IonRow>
             <IonCol size="12">
               <IonCard className="dashboard-kpi-card">
@@ -244,21 +267,64 @@ const IncomesPage: React.FC = () => {
             </IonCol>
           </IonRow>
 
-          {/* Filters */}
+          {/* Filters (collapsible) */}
           <IonRow className="ion-justify-content-center">
             <IonCol sizeMd="8" sizeLg="6" sizeXs="12">
-              <IncomesFilters
-                searchText={searchText}
-                setSearchText={setSearchText}
-                filterPaymentMethod={filterPaymentMethod}
-                setFilterPaymentMethod={setFilterPaymentMethod}
-                filterDateFrom={filterDateFrom}
-                setFilterDateFrom={setFilterDateFrom}
-                filterDateTo={filterDateTo}
-                setFilterDateTo={setFilterDateTo}
-              />
+              {/* Uses the same UX pattern as other pages: small, explicit controls */}
+              <IonCard className="dashboard-card" style={{ padding: 0, overflow: 'hidden' }}>
+                <IonCardContent style={{ padding: 12 }}>
+                  <IonRow className="ion-align-items-center ion-justify-content-between">
+                    <IonCol size="auto">
+                      <IonCardSubtitle style={{ margin: 0 }}>Filtros</IonCardSubtitle>
+                    </IonCol>
+                    <IonCol size="auto">
+                      <IonButton
+                        size="small"
+                        fill="clear"
+                        onClick={() => {
+                          const el = document.getElementById('incomes-filters-panel');
+                          if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+                        }}
+                      >
+                        Mostrar/Ocultar
+                      </IonButton>
+
+                      <IonButton
+                        size="small"
+                        fill="clear"
+                        onClick={() => {
+                          setSearchText('');
+                          setFilterPaymentMethod('');
+                          setFilterDateFrom('');
+                          setFilterDateTo('');
+
+                          // Ensure the list immediately reflects cleared filters
+                          // (displayedIncome + chartData update via existing effects)
+                        }}
+                      >
+                        Limpiar
+                      </IonButton>
+                    </IonCol>
+                  </IonRow>
+                </IonCardContent>
+                {/* Filters collapsed by default.
+                    Keep search bar visible (handled inside IncomesFilters), hide the rest by not toggling the panel. */}
+                <div id="incomes-filters-panel" style={{ display: 'none' }}>
+                  <IncomesFilters
+                    searchText={searchText}
+                    setSearchText={setSearchText}
+                    filterPaymentMethod={filterPaymentMethod}
+                    setFilterPaymentMethod={setFilterPaymentMethod}
+                    filterDateFrom={filterDateFrom}
+                    setFilterDateFrom={setFilterDateFrom}
+                    filterDateTo={filterDateTo}
+                    setFilterDateTo={setFilterDateTo}
+                  />
+                </div>
+              </IonCard>
             </IonCol>
           </IonRow>
+
 
           {/* Incomes List */}
           <IonRow className="ion-justify-content-center">
@@ -268,7 +334,34 @@ const IncomesPage: React.FC = () => {
                 displayedIncome={displayedIncome}
                 loadMoreIncomes={loadMoreIncomes}
                 handleShowReceipt={handleShowReceipt}
+                onIncomeAction={async (incomeId, action) => {
+                  setLoading(true);
+                  try {
+                    const res = await postIncomeAction({
+                      income: [{ incomeId, action }],
+                    });
+
+                    // Backend example:
+                    // { result: [{ value: "4320", msg: "Deleted Successfully", error: "0" }] }
+                    const msg = res?.result?.[0]?.msg ?? 'Acción realizada exitosamente';
+                    setToastMessage(msg);
+                    setShowToast(true);
+
+                    // Reload from backend to reflect deletion/update
+                    const incomes = await fetchAllLaundry();
+                    setAllIncome(incomes);
+                    setFilteredIncome(incomes);
+                  } catch (error: unknown) {
+                    console.error('Error performing income action:', error);
+                  const msg = error instanceof Error ? error.message : undefined;
+                    setToastMessage(msg ? `Error: ${msg}` : 'Error al procesar la acción');
+                    setShowToast(true);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
               />
+
             </IonCol>
           </IonRow>
         </IonGrid>

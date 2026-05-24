@@ -134,6 +134,43 @@ export const postIncome = async (payload: IncomePayload): Promise<any> => {
  * };
  * await applyPromoToIncome(promoPayload);
  */
+export interface IncomeActionPayload {
+  income: Array<{
+    action: number;
+    incomeId: number;
+  }>;
+}
+
+/**
+ * Perform an action over one or more incomes.
+ * Example (delete):
+ * {
+ *   "income": [{ "action": 2, "incomeId": 4320 }]
+ * }
+ */
+export const postIncomeAction = async (payload: IncomeActionPayload): Promise<any> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/income`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const errorText = await response.text();
+    console.log('Income action response status:', response.status);
+    console.log('Income action response:', errorText);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+    }
+
+    return JSON.parse(errorText);
+  } catch (error) {
+    console.error('Error performing income action:', error);
+    throw error;
+  }
+};
+
 export const applyPromoToIncome = async (payload: ApplyPromoPayload): Promise<any> => {
   try {
     const response = await fetch(`${API_BASE_URL}/income/apply-promo`, {
@@ -156,4 +193,5 @@ export const applyPromoToIncome = async (payload: ApplyPromoPayload): Promise<an
     throw error;
   }
 };
+
 
