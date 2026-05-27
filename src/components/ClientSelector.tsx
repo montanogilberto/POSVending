@@ -203,6 +203,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
       setIsCreating(true);
       try {
         const clientId = Date.now(); // Generate unique ID
+        const normalizedCellphone = (newClient.cellphone || '').replace(/\D/g, '');
         const requestData = {
           clients: [{
             clientId,
@@ -217,32 +218,65 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         console.log('[CLIENT_CREATION] Request to create client:', JSON.stringify(requestData, null, 2));
 
         const response = await createOrUpdateClient(requestData);
-        
-        console.log('[CLIENT_CREATION] Response from API:', JSON.stringify(response, null, 2));
-        console.log('[CLIENT_CREATION] API msg:', response.result?.[0]?.msg);
-        console.log('[CLIENT_CREATION] API error:', response.result?.[0]?.error);
-        
-        if (response.result?.[0]?.error) {
-          throw new Error(response.result[0].error);
-        }
-        
-        // Create the new client object
-        const createdClient: Client = {
-          clientId,
-          first_name: newClient.first_name!,
-          last_name: newClient.last_name!,
-          cellphone: newClient.cellphone!,
-          email: newClient.email!,
-        };
 
-        setToastMessage('Cliente creado exitosamente');
-        setToastColor('success');
-        setShowToast(true);
-        
-        // Select the newly created client and close modal
-        onChange(createdClient);
-        onClose();
-        
+        console.log('[CLIENT_CREATION] Response from API:', JSON.stringify(response, null, 2));
+
+        const apiMsg = typeof response === 'string'
+          ? response
+          : response.result?.[0]?.msg || response.msg || '';
+        const apiError = typeof response === 'string'
+          ? ''
+          : response.result?.[0]?.error || response.error || '';
+
+        console.log('[CLIENT_CREATION] API msg:', apiMsg);
+        console.log('[CLIENT_CREATION] API error:', apiError);
+
+        // Always refresh clients from DB to avoid selecting a local-only/non-persisted client
+        console.log('[CLIENT_CREATION] Refreshing client list to verify...');
+        const updatedClients = await getAllClients();
+        console.log('[CLIENT_CREATION] Updated clients count:', updatedClients.length);
+        setClients(updatedClients);
+        setHasLoaded(true);
+
+        // Case: cellphone already exists -> select existing client by phone
+        const cellphoneAlreadyExists =
+          apiMsg.toLowerCase().includes('cellphone already exists') ||
+          (typeof response === 'string' && response.toLowerCase().includes('cellphone already exists'));
+
+        if (cellphoneAlreadyExists) {
+          const existingClient = updatedClients.find(
+            (c) => c.cellphone.replace(/\D/g, '') === normalizedCellphone
+          );
+
+          if (existingClient) {
+            onChange(existingClient);
+            onClose();
+            setToastMessage('El teléfono ya existe. Se seleccionó el cliente existente.');
+            setToastColor('success');
+            setShowToast(true);
+          } else {
+            throw new Error('El teléfono ya existe pero no se encontró el cliente en la lista actualizada.');
+          }
+        } else if (apiError && apiError !== '0') {
+          throw new Error(apiMsg || apiError || 'Error al crear el cliente');
+        } else {
+          // Normal success path: ensure we select the persisted client from DB
+          const persistedClient =
+            updatedClients.find((c) => c.clientId === clientId) ||
+            updatedClients.find((c) => c.cellphone.replace(/\D/g, '') === normalizedCellphone);
+
+          if (!persistedClient) {
+            throw new Error('No se pudo verificar el cliente creado en la base de datos.');
+          }
+
+          onChange(persistedClient);
+          onClose();
+
+          setToastMessage('Cliente creado exitosamente');
+          setToastColor('success');
+          setShowToast(true);
+        }
+
         // Reset form
         setShowCreateForm(false);
         setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
@@ -252,22 +286,10 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           email: { isValid: true, message: '' },
           cellphone: '',
         });
-        
-        // Refresh client list
-        setHasLoaded(false);
-        
-        // Load clients again to verify the new client exists in database
-        console.log('[CLIENT_CREATION] Refreshing client list to verify...');
-        const updatedClients = await getAllClients();
-        console.log('[CLIENT_CREATION] Updated clients count:', updatedClients.length);
-        const newClientExists = updatedClients.some(c => c.clientId === clientId);
-        console.log('[CLIENT_CREATION] New client exists in database:', newClientExists);
-        setClients(updatedClients);
-        setHasLoaded(true);
-        
+
       } catch (error) {
         console.error('Error creating client:', error);
-        setToastMessage('Error al crear el cliente');
+        setToastMessage(error instanceof Error ? error.message : 'Error al crear el cliente');
         setToastColor('danger');
         setShowToast(true);
       } finally {
