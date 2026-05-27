@@ -21,13 +21,17 @@ export interface CreateClientRequest {
   }>;
 }
 
-export interface CreateClientResponse {
-  result: Array<{
+export interface CreateClientResponseObject {
+  result?: Array<{
     value: string;
     msg: string;
     error: string;
   }>;
+  msg?: string;
+  error?: string;
 }
+
+export type CreateClientResponse = CreateClientResponseObject | string;
 
 export interface GetAllClientsResponse {
   result: Array<{

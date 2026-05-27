@@ -1,18 +1,11 @@
-## Console Logging Plan for Login → Laundry Debug
+# ReceiptService Refactor TODO
 
-### Steps to Complete:
-- [x] 1. Read & analyze useLaundryDashboard.ts hook ✅
-- [x] 2. Add logs to src/main.tsx
-- [x] 3. Add logs to src/components/UserContext.tsx
-- [x] 4. Add logs to src/pages/Authentication/Login.tsx
-- [x] 5. Add logs to src/App.tsx
-- [x] 6. Add logs to src/pages/Laundry/Laundry.tsx
-- [x] 7. Add logs to src/pages/Laundry/hooks/useLaundryDashboard.ts
-## Console Logs Complete ✅
-
-**Test ready:**
-1. `npm run dev`
-2. Login → Laundry
-3. F12 Console → copy 🔵🟢🧺 logs
-
-Share console output to analyze blank screen.
+- [x] Create `src/services/receipt/companyInfo.ts` for company constants
+- [x] Create `src/services/receipt/normalizers.ts` for shared formatting/payment/date helpers
+- [x] Create `src/services/receipt/adapters.ts` for Ticket/Legacy/Cart transformation logic
+- [x] Create `src/services/receipt/printStyles.ts` for print CSS generators
+- [x] Create `src/services/receipt/printTemplate.ts` for print HTML section generators
+- [x] Create `src/services/receipt/printRuntime.ts` for print window/blob helpers
+- [x] Refactor `src/services/ReceiptService.ts` into façade preserving public API
+- [ ] Run TypeScript validation (`npx tsc --noEmit`)
+- [ ] Mark completed tasks in TODO

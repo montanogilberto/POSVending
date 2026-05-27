@@ -269,7 +269,7 @@ const CartPage: React.FC = () => {
                 cashReturn: paymentMethod === 'Efectivo' ? changeAmount : 0,
                 paymentDate: new Date().toISOString(),
                 userId: 1,
-                clientId: selectedClient?.clientId ?? 2,
+                clientId: selectedClient?.clientId ?? 1,
                 companyId: 1,
                 promotionCode: promoCodeValue,
                 products: cartItems.map((item) => ({
