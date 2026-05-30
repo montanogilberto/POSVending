@@ -2,6 +2,7 @@ const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 export interface Client {
   clientId: number;
+  companyId?: number;
   first_name: string;
   last_name: string;
   cellphone: string;

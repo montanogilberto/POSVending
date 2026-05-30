@@ -15,7 +15,7 @@ import {
   IonChip,
   IonInput,
 } from '@ionic/react';
-import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, lockClosed, pricetag } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, pricetag } from 'ionicons/icons';
 import { useCart } from '../../context/CartContext';
 import { useProduct } from '../../context/ProductContext';
 import { useState, useEffect, useMemo } from 'react';
@@ -33,7 +33,6 @@ import './CartPage.css';
 import CartItemCard from '../../components/CartItemCard';
 import ClientSelector from '../../components/ClientSelector';
 import ReceiptDisplay from '../Receipt/ReceiptDisplay';
-import CashRegisterCard from '../../components/CashRegisterCard';
 
 /**
  * Helper function for 2x1 promotion: calculates how many items to pay for.
@@ -61,7 +60,6 @@ const CartPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
-  const [isCashRegisterOpen, setIsCashRegisterOpen] = useState(false);
 
   // Promotion code state
   const [promoCode, setPromoCode] = useState('');
@@ -133,7 +131,6 @@ const CartPage: React.FC = () => {
 
   const isCheckoutEnabled =
     !!paymentMethod &&
-    isCashRegisterOpen &&
     (paymentMethod !== 'Efectivo' ||
       (!isNaN(cashNumber) && cashNumber >= total));
 
@@ -170,11 +167,6 @@ const CartPage: React.FC = () => {
       return;
     }
 
-    // Validate cash register is open
-    if (!isCashRegisterOpen) {
-      showErrorToast('La caja está cerrada. Abra la caja para realizar ventas.');
-      return;
-    }
 
     if (paymentMethod === 'Efectivo') {
       const cash = parseFloat(cashPaid);
@@ -454,7 +446,6 @@ const CartPage: React.FC = () => {
                   </div>
                   {promoError && (
                     <div className="promo-error-message">
-                      <IonIcon icon={lockClosed} />
                       {promoError}
                     </div>
                   )}
@@ -475,16 +466,6 @@ const CartPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-
-                {/* Cash Register Card */}
-                <CashRegisterCard
-                  companyId={1}
-                  userId={1}
-                  onToast={(msg, color) => {
-                    showErrorToast(msg, color || 'danger');
-                  }}
-                  onCashRegisterStatusChange={setIsCashRegisterOpen}
-                />
 
                 {/* Client Selector */}
                 <div className="client-section">
@@ -577,21 +558,14 @@ const CartPage: React.FC = () => {
                   <IonButton
                     expand="block"
                     onClick={handleCheckout}
-                    disabled={!isCheckoutEnabledFinal || !isCashRegisterOpen}
+                    disabled={!isCheckoutEnabledFinal}
                     className="pay-button"
-                    color={!isCashRegisterOpen ? 'medium' : 'primary'}
+                    color="primary"
                   >
                     <IonIcon slot="start" icon={receipt} className="pay-icon" />
-                    {!isCashRegisterOpen ? 'CAJA CERRADA' : `PAGAR ${formatPrice(total)}`}
+                    {`PAGAR ${formatPrice(total)}`}
                   </IonButton>
                 </div>
-                
-                {!isCashRegisterOpen && (
-                  <div className="caja-cerrada-warning">
-                    <IonIcon icon={lockClosed} slot="start" />
-                    La caja está cerrada. Abra la caja para realizar ventas.
-                  </div>
-                )}
               </>
             )}
           </div>

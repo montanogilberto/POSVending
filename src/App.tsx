@@ -29,7 +29,7 @@ import {
   cash,
   settings,
   barChart,
-  shirt,
+  home,
   qrCode,
   bulb,
   logOutOutline,
@@ -360,8 +360,8 @@ const AppShell: React.FC = () => {
 
           <IonTabBar slot="bottom" className="custom-tabbar">
             <IonTabButton tab="laundry" href="/laundry">
-              <IonIcon aria-hidden="true" icon={shirt} />
-              <IonLabel>Laundry</IonLabel>
+              <IonIcon aria-hidden="true" icon={home} />
+              <IonLabel>Dashboard</IonLabel>
             </IonTabButton>
 
             <IonTabButton tab="scannerqr" href="/scannerqr">

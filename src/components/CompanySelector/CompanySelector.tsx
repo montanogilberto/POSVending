@@ -44,11 +44,17 @@ const CompanySelector: React.FC<CompanySelectorProps> = ({ isOpen, onConfirm }) 
 
   const loadCompanies = async () => {
     setLoading(true);
+    setError('');
     try {
       const data = await getAllCompanies();
       setCompanies(data);
+      // If backend is temporarily failing, getAllCompanies now returns [].
+      // Keep flow usable and guide user to create a company.
+      if (!Array.isArray(data) || data.length === 0) {
+        setError('No se pudo obtener la lista de empresas del servidor. Puedes crear una empresa nueva para continuar.');
+      }
     } catch {
-      setError('No se pudieron cargar las empresas');
+      setError('No se pudieron cargar las empresas. Puedes crear una nueva para continuar.');
     } finally {
       setLoading(false);
     }

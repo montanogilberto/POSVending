@@ -22,9 +22,12 @@ import {
   IonToast,
   IonRow,
   IonCol,
+  IonSelect,
+  IonSelectOption,
 } from '@ionic/react';
 import { person, close, checkmarkCircle, business, add, mail, call, save, arrowBack } from 'ionicons/icons';
 import { Client, getAllClients, createOrUpdateClient } from '../api/clientsApi';
+import { useUser } from './UserContext';
 
 interface ClientSelectorProps {
   isOpen: boolean;
@@ -39,6 +42,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   onChange,
   selectedClient,
 }) => {
+  const { companyId } = useUser();
   const [searchText, setSearchText] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +58,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     cellphone: '',
     email: '',
   });
+  const [selectedCountryCode, setSelectedCountryCode] = useState('+52');
   const [createErrors, setCreateErrors] = useState<{
     first_name: string;
     last_name: string;
@@ -87,6 +92,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
       setSearchText('');
       setShowCreateForm(false);
       setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
+      setSelectedCountryCode('+52');
       setCreateErrors({
         first_name: '',
         last_name: '',
@@ -110,7 +116,12 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   };
 
   // Filter clients based on search text
-  const filteredClients = clients.filter((client) => {
+  const companyScopedClients = useMemo(
+    () => clients.filter((client) => Number(client.companyId ?? 0) === Number(companyId)),
+    [clients, companyId]
+  );
+
+  const filteredClients = companyScopedClients.filter((client) => {
     const search = searchText.toLowerCase().trim();
     if (!search) return true;
     
@@ -202,14 +213,14 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     if (createIsValid) {
       setIsCreating(true);
       try {
-        const clientId = Date.now(); // Generate unique ID
         const normalizedCellphone = (newClient.cellphone || '').replace(/\D/g, '');
+        const formattedCellphone = `${selectedCountryCode}${normalizedCellphone}`;
         const requestData = {
           clients: [{
-            clientId,
+            clientId: 0,
             first_name: newClient.first_name!,
             last_name: newClient.last_name!,
-            cellphone: newClient.cellphone!,
+            cellphone: formattedCellphone,
             email: newClient.email!,
             action: "1" // "1" for create
           }]
@@ -244,9 +255,12 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           (typeof response === 'string' && response.toLowerCase().includes('cellphone already exists'));
 
         if (cellphoneAlreadyExists) {
-          const existingClient = updatedClients.find(
-            (c) => c.cellphone.replace(/\D/g, '') === normalizedCellphone
-          );
+          const normalizedTarget = `${selectedCountryCode.replace(/\D/g, '')}${normalizedCellphone}`;
+          const existingClient = updatedClients.find((c) => {
+            const clientDigits = c.cellphone.replace(/\D/g, '');
+            const sameCompany = Number(c.companyId ?? 0) === Number(companyId);
+            return sameCompany && (clientDigits === normalizedTarget || clientDigits.endsWith(normalizedCellphone));
+          });
 
           if (existingClient) {
             onChange(existingClient);
@@ -261,9 +275,12 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           throw new Error(apiMsg || apiError || 'Error al crear el cliente');
         } else {
           // Normal success path: ensure we select the persisted client from DB
-          const persistedClient =
-            updatedClients.find((c) => c.clientId === clientId) ||
-            updatedClients.find((c) => c.cellphone.replace(/\D/g, '') === normalizedCellphone);
+          const normalizedTarget = `${selectedCountryCode.replace(/\D/g, '')}${normalizedCellphone}`;
+          const persistedClient = updatedClients.find((c) => {
+            const clientDigits = c.cellphone.replace(/\D/g, '');
+            const sameCompany = Number(c.companyId ?? 0) === Number(companyId);
+            return sameCompany && (clientDigits === normalizedTarget || clientDigits.endsWith(normalizedCellphone));
+          });
 
           if (!persistedClient) {
             throw new Error('No se pudo verificar el cliente creado en la base de datos.');
@@ -280,6 +297,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         // Reset form
         setShowCreateForm(false);
         setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
+        setSelectedCountryCode('+52');
         setCreateErrors({
           first_name: '',
           last_name: '',
@@ -301,6 +319,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   const handleCancelCreate = () => {
     setShowCreateForm(false);
     setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
+    setSelectedCountryCode('+52');
     setCreateErrors({
       first_name: '',
       last_name: '',
@@ -372,6 +391,45 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
             </div>
             
             <IonRow>
+              <IonCol size="12">
+                <IonItem className="form-item">
+                  <IonLabel position="stacked">País</IonLabel>
+                  <IonSelect
+                    value={selectedCountryCode}
+                    onIonChange={(e) => setSelectedCountryCode(e.detail.value)}
+                    interface="popover"
+                    className="form-input"
+                  >
+                    <IonSelectOption value="+52">México (+52)</IonSelectOption>
+                    <IonSelectOption value="+1">Estados Unidos (+1)</IonSelectOption>
+                    <IonSelectOption value="+1">Canadá (+1)</IonSelectOption>
+                  </IonSelect>
+                </IonItem>
+              </IonCol>
+            </IonRow>
+
+            <IonRow>
+              <IonCol size="12">
+                <IonItem className="form-item">
+                  <IonIcon icon={call} slot="start" color="primary" />
+                  <IonLabel position="floating">Teléfono *</IonLabel>
+                  <IonInput
+                    value={newClient.cellphone}
+                    onIonChange={(e) => setNewClient(prev => ({ ...prev, cellphone: e.detail.value! }))}
+                    color={createErrors.cellphone ? 'danger' : 'primary'}
+                    className="form-input"
+                    type="tel"
+                  />
+                </IonItem>
+                {createErrors.cellphone && (
+                  <IonText color="danger" className="error-text">
+                    {createErrors.cellphone}
+                  </IonText>
+                )}
+              </IonCol>
+            </IonRow>
+
+            <IonRow>
               <IonCol size="6">
                 <IonItem className="form-item">
                   <IonIcon icon={person} slot="start" color="primary" />
@@ -407,27 +465,9 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                 )}
               </IonCol>
             </IonRow>
-            
+
             <IonRow>
-              <IonCol size="6">
-                <IonItem className="form-item">
-                  <IonIcon icon={call} slot="start" color="primary" />
-                  <IonLabel position="floating">Teléfono *</IonLabel>
-                  <IonInput
-                    value={newClient.cellphone}
-                    onIonChange={(e) => setNewClient(prev => ({ ...prev, cellphone: e.detail.value! }))}
-                    color={createErrors.cellphone ? 'danger' : 'primary'}
-                    className="form-input"
-                    type="tel"
-                  />
-                </IonItem>
-                {createErrors.cellphone && (
-                  <IonText color="danger" className="error-text">
-                    {createErrors.cellphone}
-                  </IonText>
-                )}
-              </IonCol>
-              <IonCol size="6">
+              <IonCol size="12">
                 <IonItem className="form-item">
                   <IonIcon icon={mail} slot="start" color="primary" />
                   <IonLabel position="floating">Email</IonLabel>

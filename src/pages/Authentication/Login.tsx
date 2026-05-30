@@ -7,6 +7,7 @@ import { useHistory } from 'react-router-dom';
 import { eye, eyeOff } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
+import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
 import { normalizeRoleCode } from '../../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/CompanySelector/CompanySelector';
@@ -125,7 +126,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleCompanyConfirm = (
+  const handleCompanyConfirm = async (
     companyId: number,
     companyName: string,
     branchId: number,
@@ -153,6 +154,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       roleCode,
       roleName,
     });
+
+    // Auto-open cash register on session start if currently closed
+    try {
+      const open = await isCashRegisterOpen(companyId);
+      if (!open) {
+        await openCashRegister(companyId, pending.userId, 0, 'Apertura automática al iniciar sesión');
+      }
+    } catch (cashErr) {
+      console.warn('Cash register auto-open failed:', cashErr);
+    }
 
     setShowCompanySelector(false);
     onLoginSuccess?.();

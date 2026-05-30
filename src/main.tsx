@@ -5,41 +5,11 @@ import App from './App';
 import { UserProvider } from './components/UserContext';
 import { CartProvider } from './context/CartContext';
 
-// ── Chrome Runtime Error Suppression ──────────────────────────────────────
-// Prevents "Unchecked runtime.lastError" warnings in console
-const getChromeRuntime = () => {
-  if (typeof window !== 'undefined' && (window as any).chrome?.runtime) {
-    return (window as any).chrome.runtime;
-  }
-  return null;
-};
-
-const chromeRuntime = getChromeRuntime();
-
-if (chromeRuntime?.onMessage) {
-  chromeRuntime.onMessage.addListener((_message: any, _sender: any, sendResponse: any) => {
-    try {
-      sendResponse({ success: true });
-    } catch (e) {
-      // Ignore sendResponse errors
-    }
-    return false;
-  });
-}
-
-const suppressRuntimeErrors = () => {
-  try {
-    if (chromeRuntime && (chromeRuntime as any).lastError) {
-      const _ = (chromeRuntime as any).lastError;
-    }
-  } catch (e) {
-    // Ignore
-  }
-};
-
-if (typeof window !== 'undefined') {
-  setInterval(suppressRuntimeErrors, 100);
-}
+// NOTE:
+// Removed manual chrome.runtime listener/lastError polling.
+// Those handlers can themselves trigger noisy extension-channel errors
+// such as: "A listener indicated an asynchronous response..."
+// and are unrelated to core app rendering/auth logic.
 
 // ── Render ────────────────────────────────────────────────────────────────
 console.log("🔵 App root rendered with UserProvider & CartProvider");

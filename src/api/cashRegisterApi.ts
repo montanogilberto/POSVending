@@ -35,3 +35,25 @@ export async function isCashRegisterOpen(companyId: number): Promise<boolean> {
   }
 }
 
+export async function openCashRegister(
+  companyId: number,
+  userId: number,
+  openingCash = 0,
+  notes = 'Apertura automática al iniciar sesión'
+) {
+  return postCashRegister({
+    register: [{ action: 1, companyId, userId, openingCash, notes }],
+  });
+}
+
+export async function closeCashRegister(
+  companyId: number,
+  userId: number,
+  closingCash = 0,
+  notes = 'Cierre automático al cerrar sesión'
+) {
+  return postCashRegister({
+    register: [{ action: 2, companyId, userId, closingCash, notes }],
+  });
+}
+
