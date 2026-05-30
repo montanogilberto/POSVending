@@ -38,16 +38,40 @@ const apiPost = async (path: string, body: any): Promise<any> => {
 
 /** Fetch all companies */
 export const getAllCompanies = async (): Promise<Company[]> => {
-  const res = await fetch(`${API_BASE_URL}/all_companies`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) throw new Error('Failed to fetch companies');
-  const data = await res.json();
-  if (data.result?.[0]?.companies) return data.result[0].companies;
-  if (Array.isArray(data.companies)) return data.companies;
-  if (Array.isArray(data)) return data;
-  return [];
+  try {
+    const res = await fetch(`${API_BASE_URL}/all_companies`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const rawBody = await res.text();
+    let data: any = null;
+    try {
+      data = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      data = null;
+    }
+
+    if (!res.ok) {
+      console.error('[getAllCompanies] Request failed', {
+        status: res.status,
+        statusText: res.statusText,
+        bodyPreview: rawBody?.slice(0, 300),
+      });
+      // Do not hard-fail login/selector UX on backend 500.
+      return [];
+    }
+
+    if (data?.result?.[0]?.companies) return data.result[0].companies;
+    if (Array.isArray(data?.companies)) return data.companies;
+    if (Array.isArray(data)) return data;
+
+    return [];
+  } catch (error) {
+    console.error('[getAllCompanies] Network/parse error:', error);
+    // Keep UI usable: allow user to create/select flow even if list cannot be loaded.
+    return [];
+  }
 };
 
 /** Get one company by ID */

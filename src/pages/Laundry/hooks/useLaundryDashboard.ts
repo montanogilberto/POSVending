@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 import { useIncome } from '../../../context/IncomeContext';
+import { useUser } from '../../../components/UserContext';
+import { isCashRegisterOpen, closeCashRegister } from '../../../api/cashRegisterApi';
 import { fetchTicket } from '../../../api/ticketApi';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
 import { Transaction, CartItem } from '../types';
@@ -26,6 +28,7 @@ export const useLaundryDashboard = () => {
   const location = useLocation();
   const history = useHistory();
   const { allIncome, loadIncomes } = useIncome();
+  const { companyId, userId, logout } = useUser();
 
   //console.log("🔵 useLaundryDashboard - IncomeContext:", { allIncomeLength: allIncome?.length || 0 });
 
@@ -296,7 +299,21 @@ export const useLaundryDashboard = () => {
     presentMailPopover,
     dismissMailPopover,
 
-    handleLogoutConfirm: () => history.push('/login'),
+    handleLogoutConfirm: async () => {
+      try {
+        if (companyId && userId) {
+          const open = await isCashRegisterOpen(companyId);
+          if (open) {
+            await closeCashRegister(companyId, userId, 0, 'Cierre automático al cerrar sesión');
+          }
+        }
+      } catch (cashErr) {
+        console.warn('Cash register auto-close failed:', cashErr);
+      } finally {
+        logout();
+        history.push('/login');
+      }
+    },
 
     currentUser: 'admin',
     percentageChange: '+0%',
