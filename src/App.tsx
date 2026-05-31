@@ -46,7 +46,7 @@ import {
 import Vending from './pages/Vending';
 import Setting from './pages/Setting';
 import Sells from './pages/Sells';
-import Laundry from './pages/Laundry/Laundry';
+import Dashboard from './pages/Dashboard/Dashboard';
 import ScannerQR from './pages/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
@@ -326,7 +326,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/pos" component={Vending} />
             <PrivateRoute exact path="/setting" component={Setting} />
             <PrivateRoute exact path="/sells" component={Sells} />
-            <PrivateRoute exact path="/laundry" component={Laundry} />
+            <PrivateRoute exact path="/dashboard" component={Dashboard} />
             <PrivateRoute exact path="/scannerqr" component={ScannerQR} />
 
             <PrivateRoute exact path="/category" component={Category} />
@@ -359,7 +359,7 @@ const AppShell: React.FC = () => {
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
-            <IonTabButton tab="laundry" href="/laundry">
+            <IonTabButton tab="dashboard" href="/dashboard">
               <IonIcon aria-hidden="true" icon={home} />
               <IonLabel>Dashboard</IonLabel>
             </IonTabButton>
