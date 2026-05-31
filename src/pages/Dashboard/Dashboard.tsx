@@ -13,20 +13,40 @@ import MailPopover from '../../components/PopOver/MailPopover';
 import LaundryChart from '../../components/LaundryChart';
 
 import { useDashboard } from './hooks/useDashboard';
+import MetricsGrid from './components/MetricsGrid';
+import CartSummary from './components/CartSummary';
+import RecentActivity from './components/RecentActivity';
 
 const Dashboard: React.FC = () => {
   const {
+    location,
+    history,
     allIncome,
     showToast,
     setShowToast,
     toastMessage,
+    cart,
+    setCart,
+    showCart,
+    setShowCart,
+    showLogoutAlert,
+    setShowLogoutAlert,
     pieData,
+    handleStartSeller,
+    handleConfirmSale,
+    calculateTotal,
+    calculateDailySales,
+    calculateMonthlyTotal,
+    currentMonthYear,
+    currentUser,
+    percentageChange,
     popoverState,
     presentAlertPopover,
     dismissAlertPopover,
     presentMailPopover,
     dismissMailPopover,
     handleLogoutConfirm,
+    handleShowReceipt,
     getTitleFromPath,
   } = useDashboard();
 
@@ -38,8 +58,9 @@ const Dashboard: React.FC = () => {
     console.log("🧺 Dashboard data update:", {
       allIncomeLength: allIncome?.length || 0,
       pieData: !!pieData,
+      showCart,
     });
-  }, [allIncome?.length, pieData]);
+  }, [allIncome?.length, pieData, showCart]);
 
   return (
     <IonPage>
@@ -51,7 +72,19 @@ const Dashboard: React.FC = () => {
 
       <IonContent fullscreen={true} style={{ '--background': '#F9FAFB' }} className="dashboard-content">
         <div className="dashboard-container">
-          {/* ✅ Chart Section */}
+
+          {/* ✅ Metrics Grid ALWAYS visible */}
+          <MetricsGrid
+            calculateDailySales={calculateDailySales}
+            calculateMonthlyTotal={calculateMonthlyTotal}
+            calculateTotal={calculateTotal}
+            currentMonthYear={currentMonthYear}
+            currentUser={currentUser}
+            percentageChange={percentageChange}
+            handleStartSeller={handleStartSeller}
+          />
+
+          {/* ✅ Chart Section (SAFE RENDERING) */}
           <div style={{ marginTop: '20px' }}>
             {allIncome?.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>
@@ -65,8 +98,28 @@ const Dashboard: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* ✅ Cart Summary */}
+          {showCart && cart.length > 0 && (
+            <CartSummary
+              cart={cart}
+              onConfirmSale={handleConfirmSale}
+              setCart={setCart}
+              setShowCart={setShowCart}
+            />
+          )}
+
+          {/* ✅ Recent Activity */}
+          {allIncome?.length > 0 && (
+            <RecentActivity
+              allIncome={allIncome}
+              onShowReceipt={handleShowReceipt}
+            />
+          )}
+
         </div>
 
+        {/* ✅ Toast */}
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
@@ -75,6 +128,7 @@ const Dashboard: React.FC = () => {
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
         />
 
+        {/* ✅ Popovers */}
         {popoverState.showAlertPopover && popoverState.event && (
           <AlertPopover
             isOpen={popoverState.showAlertPopover}
@@ -91,11 +145,13 @@ const Dashboard: React.FC = () => {
           />
         )}
 
+        {/* ✅ Logout Alert */}
         <LogoutAlert
-          isOpen={false}
-          onDidDismiss={() => {}}
+          isOpen={showLogoutAlert}
+          onDidDismiss={() => setShowLogoutAlert(false)}
           handleLogoutConfirm={handleLogoutConfirm}
         />
+
       </IonContent>
     </IonPage>
   );
