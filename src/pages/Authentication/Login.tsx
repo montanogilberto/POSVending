@@ -167,7 +167,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
     setShowCompanySelector(false);
     onLoginSuccess?.();
-    history.push('/laundry');   // ← lowercase, matches App.tsx route
+    history.push('/dashboard');
   };
 
   return (

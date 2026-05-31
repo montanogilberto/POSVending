@@ -23,7 +23,7 @@ const toHermosilloDate = (dateStr: string) => {
   return new Date(utcDate.getTime() - 7 * 60 * 60 * 1000);
 };
 
-export const useLaundryDashboard = () => {
+export const useDashboard = () => {
   console.log("🔵 useLaundryDashboard hook called");
   const location = useLocation();
   const history = useHistory();

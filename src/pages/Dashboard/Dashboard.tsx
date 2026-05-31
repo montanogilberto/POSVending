@@ -4,7 +4,7 @@ import {
   IonToast,
   IonPage,
 } from '@ionic/react';
-import './Laundry.css';
+import './Dashboard.css';
 
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
@@ -12,55 +12,34 @@ import LogoutAlert from '../../components/Alerts/LogoutAlert';
 import MailPopover from '../../components/PopOver/MailPopover';
 import LaundryChart from '../../components/LaundryChart';
 
-import { useLaundryDashboard } from './hooks/useLaundryDashboard';
-import MetricsGrid from './components/MetricsGrid';
-import CartSummary from './components/CartSummary';
-import RecentActivity from './components/RecentActivity';
+import { useDashboard } from './hooks/useDashboard';
 
-const Laundry: React.FC = () => {
+const Dashboard: React.FC = () => {
   const {
-    location,
-    history,
     allIncome,
     showToast,
     setShowToast,
     toastMessage,
-    cart,
-    setCart,
-    showCart,
-    setShowCart,
-    showLogoutAlert,
-    setShowLogoutAlert,
     pieData,
-    handleStartSeller,
-    handleConfirmSale,
-    calculateTotal,
-    calculateDailySales,
-    calculateMonthlyTotal,
-    currentMonthYear,
-    currentUser,
-    percentageChange,
     popoverState,
     presentAlertPopover,
     dismissAlertPopover,
     presentMailPopover,
     dismissMailPopover,
     handleLogoutConfirm,
-    handleShowReceipt,
     getTitleFromPath,
-  } = useLaundryDashboard();
+  } = useDashboard();
 
   useEffect(() => {
-    console.log("🧺 Laundry component MOUNTED");
+    console.log("🧺 Dashboard component MOUNTED");
   }, []);
 
   useEffect(() => {
-    console.log("🧺 Laundry data update:", {
+    console.log("🧺 Dashboard data update:", {
       allIncomeLength: allIncome?.length || 0,
       pieData: !!pieData,
-      showCart,
     });
-  }, [allIncome?.length, pieData, showCart]);
+  }, [allIncome?.length, pieData]);
 
   return (
     <IonPage>
@@ -68,24 +47,11 @@ const Laundry: React.FC = () => {
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
         screenTitle={getTitleFromPath()}
-        
       />
 
       <IonContent fullscreen={true} style={{ '--background': '#F9FAFB' }} className="dashboard-content">
         <div className="dashboard-container">
-
-          {/* ✅ Metrics Grid ALWAYS visible */}
-          <MetricsGrid
-            calculateDailySales={calculateDailySales}
-            calculateMonthlyTotal={calculateMonthlyTotal}
-            calculateTotal={calculateTotal}
-            currentMonthYear={currentMonthYear}
-            currentUser={currentUser}
-            percentageChange={percentageChange}
-            handleStartSeller={handleStartSeller}
-          />
-
-          {/* ✅ Chart Section (SAFE RENDERING) */}
+          {/* ✅ Chart Section */}
           <div style={{ marginTop: '20px' }}>
             {allIncome?.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>
@@ -99,28 +65,8 @@ const Laundry: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* ✅ Cart Summary */}
-          {showCart && cart.length > 0 && (
-            <CartSummary
-              cart={cart}
-              onConfirmSale={handleConfirmSale}
-              setCart={setCart}
-              setShowCart={setShowCart}
-            />
-          )}
-
-          {/* ✅ Recent Activity */}
-          {allIncome?.length > 0 && (
-            <RecentActivity
-              allIncome={allIncome}
-              onShowReceipt={handleShowReceipt}
-            />
-          )}
-
         </div>
 
-        {/* ✅ Toast */}
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
@@ -129,7 +75,6 @@ const Laundry: React.FC = () => {
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
         />
 
-        {/* ✅ Popovers */}
         {popoverState.showAlertPopover && popoverState.event && (
           <AlertPopover
             isOpen={popoverState.showAlertPopover}
@@ -146,16 +91,14 @@ const Laundry: React.FC = () => {
           />
         )}
 
-        {/* ✅ Logout Alert */}
         <LogoutAlert
-          isOpen={showLogoutAlert}
-          onDidDismiss={() => setShowLogoutAlert(false)}
+          isOpen={false}
+          onDidDismiss={() => {}}
           handleLogoutConfirm={handleLogoutConfirm}
         />
-
       </IonContent>
     </IonPage>
   );
 };
 
-export default Laundry;
+export default Dashboard;
