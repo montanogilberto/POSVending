@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
   IonContent, IonPage, IonInput, IonGrid, IonRow, IonCol,
   IonLabel, IonToast, IonRouterLink, IonButton, IonIcon, IonLoading,
+  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { eye, eyeOff } from 'ionicons/icons';
@@ -28,6 +29,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [message, setMessage]                       = useState<string | null>(null);
   const [showPassword, setShowPassword]             = useState(false);
   const [showCompanySelector, setShowCompanySelector] = useState(false);
+  const [showOpenCashPrompt, setShowOpenCashPrompt] = useState(false);
+  const [openCashAmount, setOpenCashAmount] = useState<string>('0');
+  const [openCashNote, setOpenCashNote] = useState<string>('Apertura al iniciar sesión');
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    companyId: number;
+    userId: number;
+  } | null>(null);
 
   // Temporary holder for user data between credential validation and company selection
   const pendingUserRef = useRef<{
@@ -155,17 +163,75 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       roleName,
     });
 
-    // Auto-open cash register on session start if currently closed
+    setShowCompanySelector(false);
+
+    // Ask user to open cash register if currently closed (before navigating)
     try {
+      console.log('💰 [CashRegister][Login] Checking cash register status...', { companyId, userId: pending.userId });
       const open = await isCashRegisterOpen(companyId);
+      console.log('💰 [CashRegister][Login] Cash register status result:', { companyId, isOpen: open });
+
       if (!open) {
-        await openCashRegister(companyId, pending.userId, 0, 'Apertura automática al iniciar sesión');
+        console.log('💰 [CashRegister][Login] Cash register is CLOSED. Showing open-cash modal.');
+        setPendingNavigation({ companyId, userId: pending.userId });
+        setOpenCashAmount('0');
+        setOpenCashNote('Apertura al iniciar sesión');
+        setShowOpenCashPrompt(true);
+        return;
       }
+
+      console.log('💰 [CashRegister][Login] Cash register is already OPEN. Navigating to dashboard.');
     } catch (cashErr) {
-      console.warn('Cash register auto-open failed:', cashErr);
+      console.warn('💰 [CashRegister][Login] Cash register status check failed:', cashErr);
     }
 
-    setShowCompanySelector(false);
+    console.log('💰 [CashRegister][Login] Continue to dashboard without open-cash modal.');
+    onLoginSuccess?.();
+    history.push('/dashboard');
+  };
+
+  const handleSkipOpenCash = () => {
+    console.log('💰 [CashRegister][Login] User skipped opening cash register. Navigating to dashboard.');
+    setShowOpenCashPrompt(false);
+    setPendingNavigation(null);
+    onLoginSuccess?.();
+    history.push('/dashboard');
+  };
+
+  const handleConfirmOpenCash = async () => {
+    const pending = pendingNavigation;
+    if (!pending) {
+      console.warn('💰 [CashRegister][Login] Missing pending navigation context; cannot open cash register.');
+      return;
+    }
+
+    const amount = Number(openCashAmount);
+    console.log('💰 [CashRegister][Login] User requested open cash register with amount/note:', {
+      companyId: pending.companyId,
+      userId: pending.userId,
+      amount,
+      note: openCashNote,
+    });
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      console.warn('💰 [CashRegister][Login] Invalid amount for opening cash register:', { openCashAmount });
+      setMessage('Ingresa un monto válido para abrir caja (0 o mayor)');
+      return;
+    }
+
+    try {
+      console.log('💰 [CashRegister][Login] Opening cash register...');
+      await openCashRegister(pending.companyId, pending.userId, amount, openCashNote || 'Apertura al iniciar sesión');
+      console.log('💰 [CashRegister][Login] Cash register opened successfully.');
+    } catch (cashErr) {
+      console.warn('💰 [CashRegister][Login] Cash register open failed:', cashErr);
+      setMessage('No se pudo abrir la caja');
+      return;
+    }
+
+    console.log('💰 [CashRegister][Login] Closing modal and navigating to dashboard.');
+    setShowOpenCashPrompt(false);
+    setPendingNavigation(null);
     onLoginSuccess?.();
     history.push('/dashboard');
   };
@@ -257,6 +323,48 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         isOpen={showCompanySelector}
         onConfirm={handleCompanyConfirm}
       />
+
+      <IonModal isOpen={showOpenCashPrompt} onDidDismiss={handleSkipOpenCash}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Apertura de caja</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={handleSkipOpenCash}>Omitir</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <p>La caja está cerrada. Ingresa el efectivo inicial para validar caja física.</p>
+          <div className="login-field">
+            <IonLabel className="login-label">Efectivo inicial</IonLabel>
+            <IonInput
+              type="number"
+              min="0"
+              step="0.01"
+              value={openCashAmount}
+              onIonInput={e => setOpenCashAmount(e.detail.value ?? '0')}
+              className="login-input"
+              placeholder="0.00"
+            />
+          </div>
+          <div className="login-field">
+            <IonLabel className="login-label">Nota (opcional)</IonLabel>
+            <IonInput
+              type="text"
+              value={openCashNote}
+              onIonInput={e => setOpenCashNote(e.detail.value ?? '')}
+              className="login-input"
+              placeholder="Apertura al iniciar sesión"
+            />
+          </div>
+          <IonButton expand="block" onClick={handleConfirmOpenCash}>
+            Abrir caja y continuar
+          </IonButton>
+          <IonButton expand="block" fill="outline" onClick={handleSkipOpenCash}>
+            Continuar sin abrir caja
+          </IonButton>
+        </IonContent>
+      </IonModal>
     </IonPage>
   );
 };
