@@ -106,6 +106,7 @@ export interface OneTicketTrackingItem {
   containerName: string;
   receiptUrl: string;
   phone: string;
+  channelResponse?: Record<string, any> | null;
 }
 
 export interface OneTicketTrackingRequest {
@@ -127,6 +128,28 @@ export interface OneTicketTrackingRecord {
 export interface OneTicketTrackingResponse {
   tickets?: OneTicketTrackingRecord[];
   [key: string]: any;
+}
+
+function stringifyErrorBody(errorBody: any): string {
+  if (!errorBody) return '';
+  if (typeof errorBody === 'string') return errorBody;
+  try {
+    return JSON.stringify(errorBody);
+  } catch {
+    return String(errorBody);
+  }
+}
+
+async function readErrorBody(response: Response): Promise<any> {
+  try {
+    return await response.json();
+  } catch {
+    try {
+      return await response.text();
+    } catch {
+      return null;
+    }
+  }
 }
 
 export const fetchTicket = async (incomeId: string, signal?: AbortSignal): Promise<Ticket | null> => {
@@ -214,8 +237,15 @@ export const sendTicketSms = async (
 
     try {
       const encodedTicketId = encodeURIComponent(ticketId);
+      const smsUrl = `https://smartloansbackend.azurewebsites.net/api/tickets/${encodedTicketId}/send-sms`;
+      console.log('[TicketAPI][SMS] Request', {
+        url: smsUrl,
+        ticketId,
+        payload
+      });
+
       const response = await fetch(
-        `https://smartloansbackend.azurewebsites.net/api/tickets/${encodedTicketId}/send-sms`,
+        smsUrl,
         {
           method: 'POST',
           headers: {
@@ -228,6 +258,11 @@ export const sendTicketSms = async (
       );
 
       clearTimeout(timeoutId);
+      console.log('[TicketAPI][SMS] Response status', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
 
       if (!response.ok) {
         let errorBody: any = null;
@@ -255,6 +290,7 @@ export const sendTicketSms = async (
       }
 
       const data = await response.json();
+      console.log('[TicketAPI][SMS] Response body', data);
       if (!data || typeof data !== 'object') {
         return null;
       }
@@ -286,8 +322,19 @@ export const saveTicketHtml = async (
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
+      const saveHtmlUrl = 'https://smartloansbackend.azurewebsites.net/api/tickets/receipt-html';
+      console.log('[TicketAPI][UPLOAD_AZURE] Request', {
+        url: saveHtmlUrl,
+        incomeId: payload.incomeId,
+        companyId: payload.companyId,
+        branchId: payload.branchId,
+        clientPhone: payload.clientPhone,
+        fileName: payload.fileName,
+        htmlLength: payload.html?.length || 0
+      });
+
       const response = await fetch(
-        'https://smartloansbackend.azurewebsites.net/api/tickets/receipt-html',
+        saveHtmlUrl,
         {
           method: 'POST',
           headers: {
@@ -300,12 +347,22 @@ export const saveTicketHtml = async (
       );
 
       clearTimeout(timeoutId);
+      console.log('[TicketAPI][UPLOAD_AZURE] Response status', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
 
       if (!response.ok) {
-        throw new Error(`Error saving ticket html: ${response.status}`);
+        const errorBody = await readErrorBody(response);
+        const errorBodyText = stringifyErrorBody(errorBody);
+        throw new Error(
+          `Error saving ticket html: ${response.status}${errorBodyText ? ` - ${errorBodyText}` : ''}`
+        );
       }
 
       const data = await response.json();
+      console.log('[TicketAPI][UPLOAD_AZURE] Response body', data);
       if (!data || typeof data !== 'object') {
         return null;
       }
@@ -339,8 +396,15 @@ export const sendTicketWhatsapp = async (
 
     try {
       const encodedPathParam = encodeURIComponent(phoneOrTicketId);
+      const whatsappUrl = `https://smartloansbackend.azurewebsites.net/api/tickets/${encodedPathParam}/send-whatsapp`;
+      console.log('[TicketAPI][WHATSAPP] Request', {
+        url: whatsappUrl,
+        pathParam: phoneOrTicketId,
+        payload
+      });
+
       const response = await fetch(
-        `https://smartloansbackend.azurewebsites.net/api/tickets/${encodedPathParam}/send-whatsapp`,
+        whatsappUrl,
         {
           method: 'POST',
           headers: {
@@ -353,18 +417,14 @@ export const sendTicketWhatsapp = async (
       );
 
       clearTimeout(timeoutId);
+      console.log('[TicketAPI][WHATSAPP] Response status', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
 
       if (!response.ok) {
-        let errorBody: any = null;
-        try {
-          errorBody = await response.json();
-        } catch {
-          try {
-            errorBody = await response.text();
-          } catch {
-            errorBody = null;
-          }
-        }
+        const errorBody = await readErrorBody(response);
         console.error('sendTicketWhatsapp - Non-OK response', {
           status: response.status,
           statusText: response.statusText,
@@ -372,14 +432,14 @@ export const sendTicketWhatsapp = async (
           requestPayload: payload,
           responseBody: errorBody
         });
+        const errorBodyText = stringifyErrorBody(errorBody);
         throw new Error(
-          `Error sending ticket whatsapp: ${response.status}${
-            errorBody ? ` - ${typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)}` : ''
-          }`
+          `Error sending ticket whatsapp: ${response.status}${errorBodyText ? ` - ${errorBodyText}` : ''}`
         );
       }
 
       const data = await response.json();
+      console.log('[TicketAPI][WHATSAPP] Response body', data);
       if (!data || typeof data !== 'object') {
         return null;
       }
@@ -411,8 +471,14 @@ export const postOneTicketTracking = async (
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
+      const trackingUrl = 'https://smartloansbackend.azurewebsites.net/one_ticket_tracking';
+      console.log('[TicketAPI][TRACKING] Calling /one_ticket_tracking', {
+        url: trackingUrl
+      });
+      console.log('[TicketAPI][TRACKING] Request payload for /one_ticket_tracking:', payload);
+
       const response = await fetch(
-        'https://smartloansbackend.azurewebsites.net/one_ticket_tracking',
+        trackingUrl,
         {
           method: 'POST',
           headers: {
@@ -425,18 +491,14 @@ export const postOneTicketTracking = async (
       );
 
       clearTimeout(timeoutId);
+      console.log('[TicketAPI][TRACKING] Response status from /one_ticket_tracking', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
 
       if (!response.ok) {
-        let errorBody: any = null;
-        try {
-          errorBody = await response.json();
-        } catch {
-          try {
-            errorBody = await response.text();
-          } catch {
-            errorBody = null;
-          }
-        }
+        const errorBody = await readErrorBody(response);
         console.error('postOneTicketTracking - Non-OK response', {
           status: response.status,
           statusText: response.statusText,
@@ -444,14 +506,14 @@ export const postOneTicketTracking = async (
           requestPayload: payload,
           responseBody: errorBody
         });
+        const errorBodyText = stringifyErrorBody(errorBody);
         throw new Error(
-          `Error posting one_ticket_tracking: ${response.status}${
-            errorBody ? ` - ${typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody)}` : ''
-          }`
+          `Error posting one_ticket_tracking: ${response.status}${errorBodyText ? ` - ${errorBodyText}` : ''}`
         );
       }
 
       const data = await response.json();
+      console.log('[TicketAPI][TRACKING] Response from sp_ticket_tracking:', data);
       if (!data || typeof data !== 'object') {
         return null;
       }

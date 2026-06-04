@@ -18,16 +18,14 @@ import {
   IonLoading,
   IonFooter,
   IonInput,
-  IonNote,
   IonToast,
   IonRow,
   IonCol,
   IonSelect,
   IonSelectOption,
 } from '@ionic/react';
-import { person, close, checkmarkCircle, business, add, mail, call, save, arrowBack } from 'ionicons/icons';
+import { person, close, checkmarkCircle, business, add, mail, call, save } from 'ionicons/icons';
 import { Client, getAllClients, createOrUpdateClient } from '../api/clientsApi';
-import { useUser } from './UserContext';
 
 interface ClientSelectorProps {
   isOpen: boolean;
@@ -42,14 +40,12 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   onChange,
   selectedClient,
 }) => {
-  const { companyId } = useUser();
   const [searchText, setSearchText] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const searchbarRef = useRef<HTMLIonSearchbarElement>(null);
 
-  // Create client form state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newClient, setNewClient] = useState<Partial<Client>>({
@@ -74,21 +70,18 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   const [showToast, setShowToast] = useState(false);
   const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
 
-  // Load clients only when modal opens
   useEffect(() => {
     if (isOpen && !hasLoaded) {
       loadClients();
     }
-  }, [isOpen]);
+  }, [isOpen, hasLoaded]);
 
-  // Focus searchbar when modal opens
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
         searchbarRef.current?.setFocus();
       }, 100);
     } else {
-      // Reset states when modal closes
       setSearchText('');
       setShowCreateForm(false);
       setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
@@ -101,6 +94,8 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
       });
     }
   }, [isOpen]);
+
+  const normalizePhoneDigits = (phone: string) => (phone || '').replace(/\D/g, '');
 
   const loadClients = async () => {
     setLoading(true);
@@ -115,23 +110,37 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     }
   };
 
-  // Filter clients based on search text
-  const companyScopedClients = useMemo(
-    () => clients.filter((client) => Number(client.companyId ?? 0) === Number(companyId)),
-    [clients, companyId]
-  );
+  const searchableClients = useMemo(() => {
+    const map = new Map<number, Client>();
+    clients.forEach((client) => {
+      map.set(client.clientId, client);
+    });
+    return Array.from(map.values());
+  }, [clients]);
 
-  const filteredClients = companyScopedClients.filter((client) => {
+  const filteredClients = useMemo(() => {
     const search = searchText.toLowerCase().trim();
-    if (!search) return true;
-    
-    return (
-      client.first_name.toLowerCase().includes(search) ||
-      client.last_name.toLowerCase().includes(search) ||
-      client.cellphone.includes(search) ||
-      (client.email && client.email.toLowerCase().includes(search))
-    );
-  });
+    if (!search) return searchableClients;
+
+    const searchDigits = normalizePhoneDigits(search);
+
+    return searchableClients.filter((client) => {
+      const firstName = (client.first_name || '').toLowerCase();
+      const lastName = (client.last_name || '').toLowerCase();
+      const email = (client.email || '').toLowerCase();
+      const cellphone = client.cellphone || '';
+      const cellphoneDigits = normalizePhoneDigits(cellphone);
+
+      return (
+        firstName.includes(search) ||
+        lastName.includes(search) ||
+        `${firstName} ${lastName}`.includes(search) ||
+        email.includes(search) ||
+        cellphone.includes(search) ||
+        (searchDigits.length > 0 && cellphoneDigits.includes(searchDigits))
+      );
+    });
+  }, [searchText, searchableClients]);
 
   const handleSelectClient = (client: Client) => {
     onChange(client);
@@ -144,8 +153,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   };
 
   const formatPhone = (phone: string) => {
-    // Format phone as XXX-XXX-XXXX if 10 digits
-    const digits = phone.replace(/\D/g, '');
+    const digits = normalizePhoneDigits(phone);
     if (digits.length === 10) {
       return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
     }
@@ -157,7 +165,6 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     return `${client.first_name} ${client.last_name}`.trim();
   };
 
-  // Validation functions
   const validateEmail = (email: string) => {
     if (!email.trim()) return { isValid: true, message: '' };
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -172,12 +179,11 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
 
   const validateCellphone = (cellphone: string) => {
     if (!cellphone) return 'El teléfono es obligatorio';
-    const digitsOnly = cellphone.replace(/\D/g, '');
+    const digitsOnly = normalizePhoneDigits(cellphone);
     if (digitsOnly.length < 10) return 'El teléfono debe tener al menos 10 dígitos';
     return '';
   };
 
-  // Computed validation for create form
   const createIsValid = useMemo(() => {
     const emailValidation = validateEmail(newClient.email || '');
     const errors: any = {
@@ -191,7 +197,6 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     );
   }, [newClient.first_name, newClient.last_name, newClient.email, newClient.cellphone]);
 
-  // Update errors when form fields change
   useEffect(() => {
     const emailValidation = validateEmail(newClient.email || '');
     const errors = {
@@ -209,110 +214,101 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     setNewClient((prev) => ({ ...prev, email: value }));
   };
 
+  const isDuplicateCellphoneMessage = (text: string) => {
+    const normalized = (text || '').toLowerCase();
+    return (
+      normalized.includes('cellphone already exists') ||
+      normalized.includes('uq_clients_cellphone') ||
+      normalized.includes('unique key constraint') ||
+      normalized.includes('duplicate key')
+    );
+  };
+
   const handleSaveClient = async () => {
-    if (createIsValid) {
-      setIsCreating(true);
-      try {
-        const normalizedCellphone = (newClient.cellphone || '').replace(/\D/g, '');
-        const formattedCellphone = `${selectedCountryCode}${normalizedCellphone}`;
-        const requestData = {
-          clients: [{
-            clientId: 0,
-            first_name: newClient.first_name!,
-            last_name: newClient.last_name!,
-            cellphone: formattedCellphone,
-            email: newClient.email!,
-            action: "1" // "1" for create
-          }]
-        };
+    if (!createIsValid || isCreating) return;
 
-        console.log('[CLIENT_CREATION] Request to create client:', JSON.stringify(requestData, null, 2));
+    setIsCreating(true);
+    try {
+      const localDigits = normalizePhoneDigits(newClient.cellphone || '');
+      const formattedCellphone = `${selectedCountryCode}${localDigits}`;
 
-        const response = await createOrUpdateClient(requestData);
+      const requestData = {
+        clients: [{
+          clientId: 0,
+          first_name: newClient.first_name!,
+          last_name: newClient.last_name!,
+          cellphone: formattedCellphone,
+          email: newClient.email || '',
+          action: '1'
+        }]
+      };
 
-        console.log('[CLIENT_CREATION] Response from API:', JSON.stringify(response, null, 2));
+      const response = await createOrUpdateClient(requestData);
 
-        const apiMsg = typeof response === 'string'
-          ? response
-          : response.result?.[0]?.msg || response.msg || '';
-        const apiError = typeof response === 'string'
-          ? ''
-          : response.result?.[0]?.error || response.error || '';
+      const apiMsg = typeof response === 'string'
+        ? response
+        : response.result?.[0]?.msg || response.msg || '';
 
-        console.log('[CLIENT_CREATION] API msg:', apiMsg);
-        console.log('[CLIENT_CREATION] API error:', apiError);
+      const apiError = typeof response === 'string'
+        ? ''
+        : response.result?.[0]?.error || response.error || '';
 
-        // Always refresh clients from DB to avoid selecting a local-only/non-persisted client
-        console.log('[CLIENT_CREATION] Refreshing client list to verify...');
-        const updatedClients = await getAllClients();
-        console.log('[CLIENT_CREATION] Updated clients count:', updatedClients.length);
-        setClients(updatedClients);
-        setHasLoaded(true);
+      const responseText = `${apiMsg} ${apiError} ${typeof response === 'string' ? response : ''}`;
 
-        // Case: cellphone already exists -> select existing client by phone
-        const cellphoneAlreadyExists =
-          apiMsg.toLowerCase().includes('cellphone already exists') ||
-          (typeof response === 'string' && response.toLowerCase().includes('cellphone already exists'));
+      const updatedClients = await getAllClients();
+      setClients(updatedClients);
+      setHasLoaded(true);
 
-        if (cellphoneAlreadyExists) {
-          const normalizedTarget = `${selectedCountryCode.replace(/\D/g, '')}${normalizedCellphone}`;
-          const existingClient = updatedClients.find((c) => {
-            const clientDigits = c.cellphone.replace(/\D/g, '');
-            const sameCompany = Number(c.companyId ?? 0) === Number(companyId);
-            return sameCompany && (clientDigits === normalizedTarget || clientDigits.endsWith(normalizedCellphone));
-          });
+      const normalizedTarget = `${selectedCountryCode.replace(/\D/g, '')}${localDigits}`;
 
-          if (existingClient) {
-            onChange(existingClient);
-            onClose();
-            setToastMessage('El teléfono ya existe. Se seleccionó el cliente existente.');
-            setToastColor('success');
-            setShowToast(true);
-          } else {
-            throw new Error('El teléfono ya existe pero no se encontró el cliente en la lista actualizada.');
-          }
-        } else if (apiError && apiError !== '0') {
-          throw new Error(apiMsg || apiError || 'Error al crear el cliente');
-        } else {
-          // Normal success path: ensure we select the persisted client from DB
-          const normalizedTarget = `${selectedCountryCode.replace(/\D/g, '')}${normalizedCellphone}`;
-          const persistedClient = updatedClients.find((c) => {
-            const clientDigits = c.cellphone.replace(/\D/g, '');
-            const sameCompany = Number(c.companyId ?? 0) === Number(companyId);
-            return sameCompany && (clientDigits === normalizedTarget || clientDigits.endsWith(normalizedCellphone));
-          });
-
-          if (!persistedClient) {
-            throw new Error('No se pudo verificar el cliente creado en la base de datos.');
-          }
-
-          onChange(persistedClient);
-          onClose();
-
-          setToastMessage('Cliente creado exitosamente');
-          setToastColor('success');
-          setShowToast(true);
-        }
-
-        // Reset form
-        setShowCreateForm(false);
-        setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
-        setSelectedCountryCode('+52');
-        setCreateErrors({
-          first_name: '',
-          last_name: '',
-          email: { isValid: true, message: '' },
-          cellphone: '',
+      const findByPhone = (list: Client[]) =>
+        list.find((c) => {
+          const d = normalizePhoneDigits(c.cellphone || '');
+          return d === normalizedTarget || d.endsWith(localDigits) || normalizedTarget.endsWith(d);
         });
 
-      } catch (error) {
-        console.error('Error creating client:', error);
-        setToastMessage(error instanceof Error ? error.message : 'Error al crear el cliente');
-        setToastColor('danger');
+      if (isDuplicateCellphoneMessage(responseText)) {
+        const existingClient = findByPhone(updatedClients);
+        if (existingClient) {
+          onChange(existingClient);
+          onClose();
+          setToastMessage('El teléfono ya existe. Se seleccionó el cliente existente.');
+          setToastColor('success');
+          setShowToast(true);
+        } else {
+          throw new Error('El teléfono ya existe pero no se encontró el cliente.');
+        }
+      } else if (apiError && apiError !== '0') {
+        throw new Error(apiMsg || apiError || 'Error al crear el cliente');
+      } else {
+        const persistedClient = findByPhone(updatedClients);
+        if (!persistedClient) {
+          throw new Error('No se pudo verificar el cliente creado en la base de datos.');
+        }
+
+        onChange(persistedClient);
+        onClose();
+        setToastMessage('Cliente creado exitosamente');
+        setToastColor('success');
         setShowToast(true);
-      } finally {
-        setIsCreating(false);
       }
+
+      setShowCreateForm(false);
+      setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
+      setSelectedCountryCode('+52');
+      setCreateErrors({
+        first_name: '',
+        last_name: '',
+        email: { isValid: true, message: '' },
+        cellphone: '',
+      });
+    } catch (error) {
+      console.error('Error creating client:', error);
+      setToastMessage(error instanceof Error ? error.message : 'Error al crear el cliente');
+      setToastColor('danger');
+      setShowToast(true);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -345,18 +341,18 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           </IonButtons>
           <IonTitle className="client-selector-title">Seleccionar Cliente</IonTitle>
           <IonButtons slot="end">
-            <IonButton 
-              fill="clear" 
-              onClick={handleSelectMostrador} 
+            <IonButton
+              fill="clear"
+              onClick={handleSelectMostrador}
               className="mostrador-button"
             >
               <IonIcon icon={business} slot="start" />
               Mostrador
             </IonButton>
             {!showCreateForm && (
-              <IonButton 
-                fill="solid" 
-                color="primary" 
+              <IonButton
+                fill="solid"
+                color="primary"
                 onClick={() => setShowCreateForm(true)}
                 className="create-client-btn"
               >
@@ -377,8 +373,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
             className="client-searchbar"
           />
         </div>
-        
-        {/* Create Client Form - Collapsible */}
+
         {showCreateForm && (
           <div className="create-client-form">
             <div className="form-header">
@@ -389,7 +384,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                 <IonIcon icon={close} />
               </IonButton>
             </div>
-            
+
             <IonRow>
               <IonCol size="12">
                 <IonItem className="form-item">
@@ -485,17 +480,17 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                 )}
               </IonCol>
             </IonRow>
-            
+
             <div className="form-actions">
-              <IonButton 
-                fill="outline" 
+              <IonButton
+                fill="outline"
                 onClick={handleCancelCreate}
                 disabled={isCreating}
               >
                 Cancelar
               </IonButton>
-              <IonButton 
-                fill="solid" 
+              <IonButton
+                fill="solid"
                 color="success"
                 onClick={handleSaveClient}
                 disabled={!createIsValid || isCreating}
@@ -515,7 +510,6 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
       </IonHeader>
 
       <IonContent className="client-selector-content">
-        {/* Selected client indicator */}
         {selectedClient && (
           <div className="selected-client-chip">
             <IonChip color="success" outline>
@@ -533,14 +527,12 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           <div className="empty-state">
             <IonIcon icon={person} className="empty-icon" />
             <IonText color="medium">
-              {searchText
-                ? 'No se encontraron clientes'
-                : 'No hay clientes disponibles'}
+              {searchText ? 'No se encontraron clientes' : 'No hay clientes disponibles'}
             </IonText>
             {!searchText && !showCreateForm && (
-              <IonButton 
-                fill="solid" 
-                color="primary" 
+              <IonButton
+                fill="solid"
+                color="primary"
                 onClick={() => setShowCreateForm(true)}
                 className="create-from-empty"
               >
@@ -556,9 +548,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                 key={client.clientId}
                 button
                 onClick={() => handleSelectClient(client)}
-                className={`client-item ${
-                  selectedClient?.clientId === client.clientId ? 'selected' : ''
-                }`}
+                className={`client-item ${selectedClient?.clientId === client.clientId ? 'selected' : ''}`}
               >
                 <div className="client-item-content">
                   <div className="client-name-row">
@@ -601,7 +591,6 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         </IonButton>
       </IonFooter>
 
-      {/* Toast Notifications */}
       <IonToast
         isOpen={showToast}
         onDidDismiss={() => setShowToast(false)}
@@ -614,4 +603,3 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
 };
 
 export default ClientSelector;
-
