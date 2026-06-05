@@ -129,10 +129,7 @@ export function useReceiptPrint({
           console.log('[ReceiptPrint] Existing tracked ticket found. Reusing receiptUrl:', receiptUrl);
         } else {
           console.log('[ReceiptPrint] No existing tracked receipt. Generating receipt HTML...');
-          const html = ReceiptService.generatePrintHTML(receiptData, {
-            width: '46mm',
-            thermal: true
-          });
+          const html = ReceiptService.generateMobileReceiptHTML(receiptData);
 
           const trimmedHtml = (html || '').trim();
           const isValidTicketHtml =

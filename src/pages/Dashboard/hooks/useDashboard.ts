@@ -58,19 +58,22 @@ export const useDashboard = () => {
     event: undefined,
   });
 
-// ✅ Load incomes
-  useEffect(() => {
-    //console.log("🔵 useLaundryDashboard - Loading incomes...");
-    console.log("🔵 Loading incomes...");
+  const refreshDashboardData = () => {
     const controller = new AbortController();
     loadIncomes(controller.signal);
     return () => controller.abort();
+  };
+
+  // ✅ Load incomes
+  useEffect(() => {
+    //console.log("🔵 useLaundryDashboard - Loading incomes...");
+    console.log("🔵 Loading incomes...");
+    return refreshDashboardData();
   }, [loadIncomes]);
 
   // ✅ Refresh on inactivity
   useInactivityTimer(300000, () => {
-    const controller = new AbortController();
-    loadIncomes(controller.signal);
+    refreshDashboardData();
   });
 
   // ✅ Clear cart automatically
@@ -179,6 +182,42 @@ export const useDashboard = () => {
     month: 'short',
     year: 'numeric',
   });
+
+  const percentageChange = useMemo(() => {
+    if (!allIncome?.length) return '0%';
+
+    const nowHerm = toHermosilloDate(new Date().toISOString());
+    const todayKey = nowHerm.toISOString().split('T')[0];
+
+    const yesterdayHerm = new Date(nowHerm);
+    yesterdayHerm.setDate(yesterdayHerm.getDate() - 1);
+    const yesterdayKey = yesterdayHerm.toISOString().split('T')[0];
+
+    const getNet = (dateKey: string) =>
+      allIncome
+        .filter((i) => i?.paymentDate)
+        .filter((i) => {
+          const d = toHermosilloDate(i.paymentDate);
+          return d.toISOString().split('T')[0] === dateKey;
+        })
+        .reduce((sum, i) => {
+          return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
+        }, 0);
+
+    const todayTotal = getNet(todayKey);
+    const yesterdayTotal = getNet(yesterdayKey);
+
+    if (yesterdayTotal === 0) {
+      if (todayTotal === 0) return '0%';
+      return '+100%';
+    }
+
+    const deltaPct = ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100;
+    const rounded = Math.round(deltaPct * 10) / 10;
+
+    if (rounded === 0) return '0%';
+    return `${rounded > 0 ? '+' : ''}${rounded}%`;
+  }, [allIncome]);
 
   // ✅ ACTIONS
   const handleStartSeller = () => history.push('/category');
@@ -316,8 +355,9 @@ export const useDashboard = () => {
     },
 
     currentUser: 'admin',
-    percentageChange: '+0%',
+    percentageChange,
 
     getTitleFromPath,
+    refreshDashboardData,
   };
 };

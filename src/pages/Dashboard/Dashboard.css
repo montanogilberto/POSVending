@@ -1,487 +1,411 @@
-#root-outlet, 
-ion-router-outlet, 
-ion-page {
-  opacity: 1 !important;
-  visibility: visible !important;
-}
+/* ==========================================================================
+   1. HIGH-FIDELITY DESIGN SYSTEM CONTAINERS
+   ========================================================================== */
+   #root-outlet, 
+   ion-router-outlet, 
+   ion-page {
+     opacity: 1 !important;
+     visibility: visible !important;
+   }
+   
+   .ion-page-invisible {
+     opacity: 1 !important;
+     visibility: visible !important;
+   }
+   
+   .dashboard-content {
+     --background: #F9FAFB;
+   }
+   
+   .dashboard-container {
+     max-width: 1160px;
+     margin: 0 auto;
+     padding: 32px;
+     display: flex;
+     flex-direction: column;
+     gap: 32px;
+     width: 100%;
+   }
+   
+   /* ==========================================================================
+      2. ADAPTIVE KPI CARD STYLING
+      ========================================================================== */
+   .dashboard-kpi-card {
+     margin: 0 !important;
+     border-radius: 24px !important;
+     overflow: hidden;
+     --background: #ffffff;
+     box-shadow: 
+       0 10px 30px rgba(0, 0, 0, 0.02),
+       0 2px 8px rgba(0, 0, 0, 0.01) !important;
+   }
+   
+   .kpi-card-content-wrapper {
+     --padding-start: 32px !important;
+     --padding-end: 32px !important;
+     --padding-top: 32px !important;
+     --padding-bottom: 32px !important;
+   }
+   
+   /* Flexbox alignments for responsive layout adaptation */
+   .kpi-main-responsive-row {
+     display: flex !important;
+     flex-direction: column !important; /* Stack components vertically on mobile first */
+     align-items: flex-start !important;
+     gap: 20px;
+     width: 100%;
+   }
+   
+   .kpi-left-responsive-col {
+     display: flex !important;
+     align-items: center !important;
+     gap: 24px;
+     width: 100%;
+   }
+   
+   /* Big Blue Branding Calendar Container */
+   .kpi-main-icon {
+     width: 84px;
+     height: 84px;
+     background: #0056D2;
+     border-radius: 22px;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     color: #ffffff;
+     flex-shrink: 0;
+   }
+   
+   .kpi-main-icon ion-icon {
+     font-size: 38px;
+   }
+   
+   .kpi-info-block {
+     display: flex;
+     flex-direction: column;
+   }
+   
+   .kpi-label-text {
+     font-family: 'Inter', sans-serif;
+     font-size: 1.15rem;
+     font-weight: 700;
+     color: #1A202C;
+   }
+   
+   /* Base Mobile-First Typography Configuration */
+   .kpi-amount-text h1 {
+     font-family: 'Inter', sans-serif;
+     font-size: 2.8rem !important; /* Scaled down slightly for mobile safety */
+     font-weight: 800 !important;
+     color: #0056D2 !important;
+     margin: 4px 0 !important;
+     line-height: 1.1;
+     letter-spacing: -0.02em;
+     white-space: nowrap; /* Prevents single number breaks on narrow layout viewports */
+   }
+   
+   .kpi-date-text {
+     display: flex;
+     align-items: center;
+     gap: 6px;
+     color: #718096;
+     font-size: 0.95rem;
+     font-weight: 600;
+   }
+   
+   .kpi-date-text ion-icon {
+     font-size: 16px;
+     color: #718096;
+   }
+   
+   /* Responsive Right Container Placement rules */
+   .kpi-right-responsive-col {
+     width: 100%;
+     display: flex;
+     justify-content: flex-start; /* Left align trend block when stacked on mobile screens */
+   }
+   
+   /* Premium High-Fidelity Green Trend Capsule */
+   .kpi-trend-badge-box {
+     display: flex;
+     align-items: center;
+     gap: 12px;
+     background: #E6F4EA !important;
+     padding: 10px 16px;
+     border-radius: 18px;
+     border: 1px solid #DCFCE7;
+     display: inline-flex !important;
+   }
+   
+   .trend-badge-icon-circle {
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     width: 28px;
+     height: 28px;
+     background: #CEEAD6;
+     color: #137333;
+     border-radius: 50%;
+   }
+   
+   .trend-badge-icon-circle ion-icon {
+     font-size: 18px;
+   }
+   
+   .trend-badge-text-stack {
+     display: flex;
+     flex-direction: column;
+   }
+   
+   .trend-percentage-value {
+     font-size: 1.1rem;
+     font-weight: 700;
+     color: #137333;
+     line-height: 1.1;
+   }
+   
+   .trend-label-sub {
+     font-size: 0.85rem;
+     color: #5F6368;
+     font-weight: 600;
+   }
+   
+   /* Full-Width Core CTA Action Button */
+   .start-sale-button-fullwidth {
+     --background: #0056D2 !important;
+     --background-hover: #0046b0 !important;
+     --color: #ffffff !important;
+     --border-radius: 16px !important;
+     font-family: 'Inter', sans-serif;
+     font-weight: 700;
+     font-size: 1.2rem;
+     text-transform: none;
+     height: 58px;
+     width: 100% !important;
+     margin: 12px 0 0 0 !important;
+     box-shadow: 0 4px 14px rgba(0, 86, 210, 0.15);
+   }
+   
+   .start-sale-button-fullwidth ion-icon {
+     font-size: 22px;
+   }
+   
+   /* ==========================================================================
+      3. TABLET & DESKTOP WIDESCREEN ADAPTATION QUERY (MD Breakpoint)
+      ========================================================================== */
+   @media (min-width: 768px) {
+     .kpi-main-responsive-row {
+       flex-direction: row !important; /* Converts column back into side-by-side split row view */
+       justify-content: space-between !important;
+       gap: 0;
+     }
+     
+     .kpi-left-responsive-col {
+       width: auto !important;
+     }
+     
+     .kpi-right-responsive-col {
+       width: auto !important;
+       display: flex;
+       justify-content: flex-end; /* Pin trend badge completely to the right corner */
+     }
+   
+     .kpi-amount-text h1 {
+       font-size: 3.8rem !important; /* Restore large, premium text sizes when width permits */
+       letter-spacing: -0.03em;
+     }
+     
+     .kpi-main-icon {
+       width: 88px;
+       height: 88px;
+     }
+   }
+   
+   /* Padding scale transitions for tiny mobile layouts */
+   @media (max-width: 480px) {
+     .kpi-card-content-wrapper {
+       --padding-start: 20px !important;
+       --padding-end: 20px !important;
+       --padding-top: 24px !important;
+       --padding-bottom: 24px !important;
+     }
+     
+     .kpi-amount-text h1 {
+       font-size: 2.4rem !important; /* Fallback scaling factor for micro smartphone displays */
+     }
+   }
 
-/* Specifically target the 'invisible' class Ionic uses during transitions */
-.ion-page-invisible {
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-/* Dashboard Layout */
-.dashboard-content {
-  --background: #F9FAFB;
-  background: #F9FAFB;
-}
-
-.dashboard-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  min-height: 100%; 
-  width: 100%;
-}
-
-/* Header Section */
-.dashboard-header-section {
-  text-align: center;
-  margin-bottom: 16px;
-}
-
-.dashboard-title {
-  font-family: 'Inter', sans-serif;
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #222;
-  margin: 0;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-/* KPI Card */
-.dashboard-kpi-card {
-  background: #fff;
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.kpi-card-content {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-
-.kpi-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, #0056D2, #007BFF);
-  border-radius: 16px;
-  color: #fff;
-}
-
-.kpi-info {
-  flex: 1;
-}
-
-.kpi-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #666;
-  margin: 0 0 8px 0;
-}
-
-.kpi-amount {
-  font-family: 'Inter', sans-serif;
-  font-size: 3rem;
-  font-weight: 800;
-  color: #007BFF;
-  margin: 0;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-}
-
-.kpi-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 0.9rem;
-  color: #666;
-  margin-top: 8px;
-}
-
-.kpi-change {
-  color: #28A745;
-  font-weight: 600;
-}
-
-.kpi-action {
-  width: 100%;
-}
-
-.start-sale-button {
-  --background: #0056D2;
-  --background-hover: #1f5bd9;
-  --background-activated: #224fcc;
-  --border-radius: 14px;
-  --font-weight: 700;
-  --color: #fff;
-  font-family: 'Inter', sans-serif;
-  text-transform: none;
-  height: 48px;
-  font-size: 1rem;
-}
-
-/* Small KPI Card */
-.dashboard-small-kpi-card {
-  background: #fff;
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* Daily Sales Card */
-.dashboard-daily-sales-card {
-  background: #fff;
-  border-radius: 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  height: fit-content;
-}
-
-.daily-sales-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.daily-sales-title {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #666;
-  margin: 0;
-}
-
-.daily-sales-date {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.daily-sales-amount {
-  font-family: 'Inter', sans-serif;
-  font-size: 2.5rem;
-  font-weight: 800;
-  color: #007BFF;
-  margin: 0;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-}
-
-/* Metrics Grid */
-.dashboard-metrics-grid {
-  padding: 0;
-  margin: 0;
-}
-
-.dashboard-metrics-grid ion-row {
-  margin-bottom: 16px;
-}
-
-.dashboard-metrics-grid ion-row:last-child {
-  margin-bottom: 0;
-}
-
-/* Centered Button Container */
-.centered-button-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 24px 0;
-  padding: 0 24px;
-}
-
-.start-sale-button-main {
-  --background: #007BFF;
-  --background-hover: #0056D2;
-  --background-activated: #004085;
-  --border-radius: 16px;
-  --font-weight: 800;
-  --color: #fff;
-  font-family: 'Inter', sans-serif;
-  text-transform: none;
-  height: 56px;
-  font-size: 1.2rem;
-  max-width: 300px;
-  box-shadow: 0 8px 24px rgba(0, 123, 255, 0.3);
-  transition: all 0.2s ease;
-}
-
-.start-sale-button-main:hover {
-  box-shadow: 0 12px 32px rgba(0, 123, 255, 0.4);
-  transform: translateY(-2px);
-}
-
-/* Cart Card */
-.dashboard-cart-card {
-  background: #fff;
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-  padding: 32px;
-}
-
-.dashboard-cart-card h3 {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #222;
-  margin: 0 0 24px 0;
-}
-
-.cart-items {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.cart-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #E5E5E5;
-}
-
-.cart-item:last-child {
-  border-bottom: none;
-}
-
-.cart-total {
-  text-align: right;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #222;
-  margin-bottom: 24px;
-}
-
-.cart-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.confirm-sale-button {
-  --background: #28A745;
-  --background-hover: #218838;
-  --background-activated: #1e7e34;
-  --border-radius: 14px;
-  --font-weight: 700;
-  --color: #fff;
-  font-family: 'Inter', sans-serif;
-  text-transform: none;
-  height: 48px;
-}
-
-/* Activity Card */
+   /* ==========================================================================
+   RECENT ACTIVITY CONTAINER CARD
+   ========================================================================== */
 .dashboard-activity-card {
-  background: #fff;
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-  padding: 32px;
+  margin: 0 !important;
+  border-radius: 24px !important;
+  background: #ffffff !important;
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.02),
+    0 2px 8px rgba(0, 0, 0, 0.01) !important;
+  overflow: hidden;
 }
 
-.dashboard-activity-card h3 {
+.activity-card-header {
+  padding: 32px 32px 16px 32px !important;
+  background: transparent;
+}
+
+.activity-card-title {
   font-family: 'Inter', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #222;
-  margin: 0 0 24px 0;
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  color: #1A202C !important;
 }
 
-.activity-timeline {
+.activity-card-content {
+  padding: 0 32px 32px 32px !important;
+}
+
+.activity-ion-list {
+  background: transparent !important;
+  padding: 0 !important;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  position: relative;
-  padding-left: 32px;
+  gap: 12px; /* Uniform structural card rows gap spacing */
 }
 
-.activity-timeline::before {
-  content: '';
-  position: absolute;
-  left: 16px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #E5E5E5;
+/* ==========================================================================
+   ACTIVITY ROWS AND TIMELINE INDICATORS
+   ========================================================================== */
+.activity-list-item {
+  --background: #F9FAFB !important; /* Soft premium item backgrounds */
+  --background-hover: #F3F4F6 !important;
+  --border-radius: 16px !important;
+  --padding-start: 16px !important;
+  --padding-end: 16px !important;
+  --inner-padding-end: 0 !important;
+  margin: 0 !important;
+  transition: all 0.2s ease-in-out;
 }
 
-.activity-item {
-  position: relative;
+/* Custom Circle Icon Background */
+.activity-icon-badge {
+  width: 48px;
+  height: 48px;
+  background: #EBF4FF;
+  border-radius: 14px;
   display: flex;
   align-items: center;
-  padding: 16px 0;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  border-bottom: 1px solid #E5E5E5;
-}
-
-.activity-item:last-child {
-  border-bottom: none;
-}
-
-.activity-item:hover {
-  background-color: rgba(0, 86, 210, 0.05);
-  border-radius: 8px;
-}
-
-.activity-item::before {
-  content: '';
-  position: absolute;
-  left: -32px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #007BFF;
-  z-index: 1;
-}
-
-.activity-icon {
-  font-size: 1.2rem;
-  margin-right: 16px;
-  z-index: 2;
-  position: relative;
-}
-
-.activity-content {
-  flex: 1;
-  font-size: 0.95rem;
-  color: #222;
-  font-family: 'Inter', sans-serif;
-}
-
-.no-activity {
-  color: #666;
-  font-style: italic;
-}
-
-.show-more {
   justify-content: center;
-  padding-top: 16px;
+  color: #0056D2;
+  margin-right: 16px !important;
+  flex-shrink: 0;
 }
 
-.show-more ion-button {
-  --color: #0056D2;
-  font-weight: 600;
+.activity-icon-badge ion-icon {
+  font-size: 22px;
 }
 
-/* Dashboard Card */
-.dashboard-card {
-  background: #fff;
-  border-radius: 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  padding: 32px;
+.style-grid-fullwidth {
+  width: 100%;
 }
 
-/* Chart Container */
-.chart-container {
+/* Typography Matrix Configurations */
+.activity-text-stack {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
+  margin: 0 !important;
 }
 
-.chart-pie {
-  width: 100%;
-  max-width: 300px;
-  height: 300px;
+.activity-amount-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1A202C;
+}
+
+.activity-method-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #718096;
+  margin-top: 2px;
+}
+
+.activity-timestamp {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #A0AEC0;
+}
+
+.activity-item-chevron {
+  font-size: 18px;
+  color: #CBD5E0;
+  margin-left: 12px;
+}
+
+/* Empty State Configurations */
+.no-activity-item {
+  --background: #F9FAFB !important;
+  --border-radius: 16px !important;
+  color: #718096;
+  font-weight: 600;
+  text-align: center;
+}
+
+.no-activity-icon {
+  color: #A0AEC0;
+  font-size: 24px;
+}
+
+/* ==========================================================================
+   BOTTOM CTA SEE MORE SECTION
+   ========================================================================== */
+.activity-see-more-box {
   display: flex;
   justify-content: center;
-  align-items: center;
-}
-
-.chart-labels {
+  margin-top: 20px;
   width: 100%;
-  max-width: 400px;
 }
 
-.chart-label {
-  font-size: 0.9rem;
-  color: #333;
-  font-weight: 600;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  margin-bottom: 8px;
-}
-
-/* Chart Legend */
-.chart-legend {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 16px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  color: #666;
+.activity-view-all-btn {
+  --color: #0056D2 !important;
   font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: none;
 }
 
-/* Responsive Design */
+/* ==========================================================================
+   RESPONSIVE DESIGN LAYOUT MEDIA QUERIES
+   ========================================================================== */
 @media (max-width: 768px) {
-  .dashboard-container {
-    padding: 16px 24px;
-    gap: 24px;
+  .activity-card-header {
+    padding: 24px 24px 12px 24px !important;
   }
-
-  .dashboard-title {
-    font-size: 2rem;
-  }
-
-  .dashboard-kpi-card {
-    padding: 24px;
-  }
-
-  .dashboard-small-kpi-card {
-    padding: 20px;
-  }
-
-  .dashboard-daily-sales-card {
-    padding: 20px;
-  }
-
-  .kpi-card-content {
-    flex-direction: column;
-    text-align: center;
-    gap: 16px;
-  }
-
-  .kpi-amount {
-    font-size: 2.5rem;
-  }
-
-  .daily-sales-amount {
-    font-size: 2rem;
-  }
-
-  .dashboard-cart-card,
-  .dashboard-activity-card {
-    padding: 24px;
-  }
-
-  .activity-timeline {
-    padding-left: 24px;
-  }
-
-  .chart-legend {
-    flex-direction: column;
-    gap: 8px;
+  
+  .activity-card-content {
+    padding: 0 24px 24px 24px !important;
   }
 }
+
+/* Mobile-Specific Adaptations for Data Stacking */
+@media (max-width: 576px) {
+  .activity-primary-data {
+    margin-bottom: 4px; /* Space out values vertically on narrow viewports */
+  }
   
+  .activity-timestamp {
+    font-size: 0.8rem; /* Scale stamp slightly downwards */
+  }
+
+  .activity-icon-badge {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    margin-right: 12px !important;
+  }
+  
+  .activity-icon-badge ion-icon {
+    font-size: 18px;
+  }
+}

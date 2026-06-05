@@ -1,17 +1,23 @@
 ﻿import React from 'react';
 import {
+  IonCard,
+  IonCardContent,
+  IonButton,
+  IonIcon,
   IonGrid,
   IonRow,
   IonCol,
-  IonButton,
-  IonIcon,
-  IonCard,
-  IonCardContent,
-  IonCardHeader,
-  IonCardTitle,
+  IonText,
 } from '@ionic/react';
-import { waterOutline, calendarOutline, calendar } from 'ionicons/icons';
-import { formatCurrencyWithSymbol, formatDate } from '../../../utils/formatters';
+import {
+  calendarOutline,
+  cartOutline,
+  trendingUpOutline,
+} from 'ionicons/icons';
+import {
+  formatCurrencyWithSymbol,
+  formatDate,
+} from '../../../utils/formatters';
 
 interface MetricsGridProps {
   calculateDailySales: () => number;
@@ -25,62 +31,69 @@ interface MetricsGridProps {
 
 const MetricsGrid: React.FC<MetricsGridProps> = ({
   calculateDailySales,
-  calculateMonthlyTotal,
-  calculateTotal,
-  currentMonthYear,
-  currentUser,
   percentageChange,
   handleStartSeller,
 }) => {
   return (
-    <IonGrid className="dashboard-metrics-grid">
-      <IonRow>
-        {/* Daily Sales Card */}
-        <IonCol size="12" size-md="6">
-          <IonCard className="dashboard-small-kpi-card">
-            <IonCardContent className="kpi-card-content">
-              <div className="kpi-icon">
-                <IonIcon icon={calendarOutline} size="large" />
+    <IonCard className="dashboard-kpi-card">
+      <IonCardContent className="kpi-card-content-wrapper">
+        <IonGrid className="ion-no-padding">
+          
+          {/* Main Content Area */}
+          <IonRow className="kpi-main-responsive-row ion-align-items-center">
+            
+            {/* Left side content: Icon & Text Info */}
+            <IonCol size="12" size-md="auto" className="kpi-left-responsive-col">
+              <div className="kpi-main-icon">
+                <IonIcon icon={calendarOutline} />
               </div>
-              <div className="kpi-info">
-                <IonCardTitle className="kpi-label">Ventas Diarias</IonCardTitle>
-                <div className="kpi-amount">{formatCurrencyWithSymbol(calculateDailySales())}</div>
-                <div className="kpi-meta">
+              
+              <div className="kpi-info-block">
+                <IonText className="kpi-label-text">
+                  <span>Ventas Hoy</span>
+                </IonText>
+                <IonText className="kpi-amount-text">
+                  <h1>{formatCurrencyWithSymbol(calculateDailySales())}</h1>
+                </IonText>
+                <div className="kpi-date-text">
+                  <IonIcon icon={calendarOutline} />
                   <span>{formatDate(new Date())}</span>
                 </div>
               </div>
-            </IonCardContent>
-          </IonCard>
-        </IonCol>
-        {/* Monthly Total Card */}
-        <IonCol size="12" size-md="6">
-          <IonCard className="dashboard-small-kpi-card">
-            <IonCardContent className="kpi-card-content">
-              <div className="kpi-icon">
-                <IonIcon icon={calendar} size="large" />
-              </div>
-              <div className="kpi-info">
-                <IonCardTitle className="kpi-label">Total Mensual</IonCardTitle>
-                <div className="kpi-amount">{formatCurrencyWithSymbol(calculateMonthlyTotal())}</div>
-                <div className="kpi-meta">
-                  <span>{currentMonthYear}</span>
+            </IonCol>
+
+            {/* Right side content: Trend Capsule */}
+            <IonCol size="12" size-md="auto" className="kpi-right-responsive-col">
+              <div className="kpi-trend-badge-box">
+                <div className="trend-badge-icon-circle">
+                  <IonIcon icon={trendingUpOutline} />
+                </div>
+                <div className="trend-badge-text-stack">
+                  <span className="trend-percentage-value">{percentageChange}</span>
+                  <span className="trend-label-sub">vs. ayer</span>
                 </div>
               </div>
-            </IonCardContent>
-          </IonCard>
-        </IonCol>
-      </IonRow>
-      {/* CTA Section */}
-      <IonRow>
-        <IonCol size="12">
-          <div className="dashboard-cta-section">
-            <IonButton expand="block" className="start-sale-button primary-cta" onClick={handleStartSeller}>
-              Iniciar Venta
-            </IonButton>
-          </div>
-        </IonCol>
-      </IonRow>
-    </IonGrid>
+            </IonCol>
+
+          </IonRow>
+
+          {/* Bottom Button Area */}
+          <IonRow className="ion-margin-top">
+            <IonCol size="12">
+              <IonButton
+                expand="block"
+                className="start-sale-button-fullwidth"
+                onClick={handleStartSeller}
+              >
+                <IonIcon slot="start" icon={cartOutline} />
+                Iniciar Venta
+              </IonButton>
+            </IonCol>
+          </IonRow>
+
+        </IonGrid>
+      </IonCardContent>
+    </IonCard>
   );
 };
 
