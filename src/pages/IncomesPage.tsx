@@ -26,8 +26,9 @@ import { fetchAllLaundry } from '../api/laundryApi';
 import { fetchTicket } from '../api/ticketApi';
 import { ReceiptService } from '../services/ReceiptService';
 
-import { waterOutline } from 'ionicons/icons';
+import { calendar, waterOutline } from 'ionicons/icons';
 import { postIncomeAction } from '../api/incomeApi';
+import { formatCurrencyWithSymbol } from '../utils/formatters';
 
 
 interface Income {
@@ -40,15 +41,6 @@ interface Income {
   clientId: number;
   companyId: number;
 }
-
-// 👇 This interface is not used in this file; you can delete it if you want
-// interface MetricsGridProps {
-//   calculateTotal: () => number;
-//   currentMonthYear: string;
-//   currentUser: string;
-//   percentageChange: string;
-//   handleStartSeller: () => void;
-// }
 
 const IncomesPage: React.FC = () => {
   const history = useHistory();
@@ -190,6 +182,16 @@ const IncomesPage: React.FC = () => {
     return totalIncome;
   };
 
+  const calculateMonthlyTotal = () => {
+    const now = new Date();
+    return allIncome
+      .filter((income) => {
+        const d = new Date(income.paymentDate);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, income) => sum + (Number(income.total) || 0), 0);
+  };
+
   // 🔹 NEW: define the values you are using in the KPI card
   const currentMonthYear = new Date().toLocaleDateString('es-ES', {
     month: 'long',
@@ -219,15 +221,17 @@ const IncomesPage: React.FC = () => {
 
           {/* Monthly income metric (like Laundry MetricsGrid monthly total) */}
           <IonRow>
-            <IonCol size="12">
+            
+            {/* Monthly Total Card */}
+            <IonCol size="12" size-md="6">
               <IonCard className="dashboard-small-kpi-card">
                 <IonCardContent className="kpi-card-content">
                   <div className="kpi-icon">
-                    <IonIcon icon={waterOutline} size="large" />
+                    <IonIcon icon={calendar} size="large" />
                   </div>
                   <div className="kpi-info">
                     <IonCardTitle className="kpi-label">Total Mensual</IonCardTitle>
-                    <div className="kpi-amount">${calculateTotal().toFixed(2)}</div>
+                    <div className="kpi-amount">{formatCurrencyWithSymbol(calculateMonthlyTotal())}</div>
                     <div className="kpi-meta">
                       <span>{currentMonthYear}</span>
                     </div>

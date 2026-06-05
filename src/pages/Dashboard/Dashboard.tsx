@@ -3,8 +3,12 @@ import {
   IonContent,
   IonToast,
   IonPage,
+  IonButton,
+  IonIcon,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import './Dashboard.css';
+import { refreshOutline } from 'ionicons/icons';
 
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
@@ -48,11 +52,16 @@ const Dashboard: React.FC = () => {
     handleLogoutConfirm,
     handleShowReceipt,
     getTitleFromPath,
+    refreshDashboardData,
   } = useDashboard();
 
   useEffect(() => {
     console.log("🧺 Dashboard component MOUNTED");
   }, []);
+
+  useIonViewWillEnter(() => {
+    refreshDashboardData();
+  });
 
   useEffect(() => {
     console.log("🧺 Dashboard data update:", {
@@ -61,6 +70,14 @@ const Dashboard: React.FC = () => {
       showCart,
     });
   }, [allIncome?.length, pieData, showCart]);
+
+  const handleManualRefresh = () => {
+    refreshDashboardData();
+    setShowToast(false);
+    setTimeout(() => {
+      setShowToast(true);
+    }, 50);
+  };
 
   return (
     <IonPage>
@@ -72,6 +89,17 @@ const Dashboard: React.FC = () => {
 
       <IonContent fullscreen={true} style={{ '--background': '#F9FAFB' }} className="dashboard-content">
         <div className="dashboard-container">
+          <div className="dashboard-tools-row">
+            <IonButton
+              fill="outline"
+              size="small"
+              className="dashboard-refresh-button"
+              onClick={handleManualRefresh}
+            >
+              <IonIcon slot="start" icon={refreshOutline} />
+              Actualizar dashboard
+            </IonButton>
+          </div>
 
           {/* ✅ Metrics Grid ALWAYS visible */}
           <MetricsGrid
@@ -123,7 +151,7 @@ const Dashboard: React.FC = () => {
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => setShowToast(false)}
-          message={toastMessage}
+          message={toastMessage || 'Dashboard actualizado'}
           duration={2000}
           color={toastMessage.includes('Error') ? 'danger' : 'success'}
         />

@@ -15,6 +15,7 @@ import {
 } from './receipt/adapters';
 import { formatClientName, getPaymentMethodText, normalizePaymentMethod } from './receipt/normalizers';
 import { generatePrintHTML } from './receipt/printTemplate';
+import { generateMobileReceiptHTML } from './receipt/mobileTemplate';
 import { generateReceiptBlob, printReceipt } from './receipt/printRuntime';
 import { COMPANY_INFO } from './receipt/companyInfo';
 
@@ -42,6 +43,10 @@ export class ReceiptService {
 
   static generatePrintHTML(data: UnifiedReceiptData, options: PrintOptions = {}): string {
     return generatePrintHTML(data, options);
+  }
+
+  static generateMobileReceiptHTML(data: UnifiedReceiptData): string {
+    return generateMobileReceiptHTML(data);
   }
 
   static printReceipt(data: UnifiedReceiptData, options: PrintOptions = {}): void {
