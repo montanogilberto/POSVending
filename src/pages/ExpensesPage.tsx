@@ -139,7 +139,7 @@ const ExpensesPage: React.FC = () => {
       <Header
         screenTitle="Egresos"
         showBackButton={true}
-        backButtonHref="/dashboard"
+        backButtonHref="/Laundry"
         presentAlertPopover={() => {}}
         presentMailPopover={() => {}}
       />

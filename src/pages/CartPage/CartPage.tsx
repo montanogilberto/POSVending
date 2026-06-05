@@ -349,7 +349,7 @@ const CartPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" />
+            <IonBackButton defaultHref="/Laundry" />
           </IonButtons>
           <IonTitle>Carrito</IonTitle>
           <IonButtons slot="end">

@@ -14,7 +14,7 @@ import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import LogoutAlert from '../../components/Alerts/LogoutAlert';
 import MailPopover from '../../components/PopOver/MailPopover';
-import LaundryChart from '../../components/dashboardChart';
+import LaundryChart from '../../components/LaundryChart';
 
 import { useDashboard } from './hooks/useDashboard';
 import MetricsGrid from './components/MetricsGrid';

@@ -134,7 +134,7 @@ const ProductsManagementPage: React.FC = () => {
         screenTitle="Productos"
         showBackButton={true}
         backButtonText="Menú"
-        backButtonHref="/dashboard"
+        backButtonHref="/laundry"
       />
 
       <IonContent className="products-content">

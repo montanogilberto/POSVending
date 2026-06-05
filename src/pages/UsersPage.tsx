@@ -218,7 +218,7 @@ const UsersPage: React.FC = () => {
         screenTitle="Usuarios"
         showBackButton={true}
         backButtonText="Menú"
-        backButtonHref="/dashboard"
+        backButtonHref="/Laundry"
       />
 
       <IonContent className="users-content">
