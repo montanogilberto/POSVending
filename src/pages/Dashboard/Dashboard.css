@@ -1,5 +1,5 @@
 /* ==========================================================================
-   1. CORE RUNTIME STYLING & CONTAINERS
+   1. HIGH-FIDELITY DESIGN SYSTEM CONTAINERS
    ========================================================================== */
    #root-outlet, 
    ion-router-outlet, 
@@ -15,7 +15,6 @@
    
    .dashboard-content {
      --background: #F9FAFB;
-     background: #F9FAFB;
    }
    
    .dashboard-container {
@@ -29,106 +28,128 @@
    }
    
    /* ==========================================================================
-      2. HIGH-FIDELITY KPI HERO CARD
+      2. ADAPTIVE KPI CARD STYLING
       ========================================================================== */
    .dashboard-kpi-card {
-     background: #ffffff !important;
-     border-radius: 24px !important;
-     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.015), 0 2px 6px rgba(0, 0, 0, 0.015) !important;
      margin: 0 !important;
-     padding: 0 !important;
+     border-radius: 24px !important;
      overflow: hidden;
+     --background: #ffffff;
+     box-shadow: 
+       0 10px 30px rgba(0, 0, 0, 0.02),
+       0 2px 8px rgba(0, 0, 0, 0.01) !important;
    }
    
    .kpi-card-content-wrapper {
-     padding: 32px !important;
-     display: flex;
-     flex-direction: column;
-     gap: 28px; /* Spacing down to the action button */
+     --padding-start: 32px !important;
+     --padding-end: 32px !important;
+     --padding-top: 32px !important;
+     --padding-bottom: 32px !important;
    }
    
-   .kpi-card-main-row {
+   /* Flexbox alignments for responsive layout adaptation */
+   .kpi-main-responsive-row {
      display: flex !important;
-     justify-content: space-between !important;
+     flex-direction: column !important; /* Stack components vertically on mobile first */
      align-items: flex-start !important;
+     gap: 20px;
      width: 100%;
    }
    
-   .kpi-card-content-left {
-     display: flex;
-     align-items: center;
+   .kpi-left-responsive-col {
+     display: flex !important;
+     align-items: center !important;
      gap: 24px;
+     width: 100%;
    }
    
-   /* Deep Blue App Icon Block */
-   .kpi-icon-container {
+   /* Big Blue Branding Calendar Container */
+   .kpi-main-icon {
+     width: 84px;
+     height: 84px;
+     background: #0056D2;
+     border-radius: 22px;
      display: flex;
      align-items: center;
      justify-content: center;
-     width: 88px;
-     height: 88px;
-     background: #0056D2;
-     border-radius: 22px;
      color: #ffffff;
+     flex-shrink: 0;
    }
    
-   .kpi-icon-container ion-icon {
-     font-size: 40px;
+   .kpi-main-icon ion-icon {
+     font-size: 38px;
    }
    
-   /* Typographic Scale Modifications */
    .kpi-info-block {
      display: flex;
      flex-direction: column;
    }
    
    .kpi-label-text {
-     font-family: 'Inter', -apple-system, sans-serif;
+     font-family: 'Inter', sans-serif;
      font-size: 1.15rem;
-     font-weight: 700; /* Bold titles like mockup */
+     font-weight: 700;
      color: #1A202C;
-     margin-bottom: 2px;
    }
    
-   .kpi-amount-text {
-     font-family: 'Inter', -apple-system, sans-serif;
-     font-size: 3.8rem; /* Expanded text sizing */
-     font-weight: 800;   /* Ultra-bold display weight */
-     color: #0056D2;     /* Core matching blue hue */
-     margin: 0;
-     line-height: 1.05;
-     letter-spacing: -0.03em;
+   /* Base Mobile-First Typography Configuration */
+   .kpi-amount-text h1 {
+     font-family: 'Inter', sans-serif;
+     font-size: 2.8rem !important; /* Scaled down slightly for mobile safety */
+     font-weight: 800 !important;
+     color: #0056D2 !important;
+     margin: 4px 0 !important;
+     line-height: 1.1;
+     letter-spacing: -0.02em;
+     white-space: nowrap; /* Prevents single number breaks on narrow layout viewports */
    }
    
-   .kpi-meta-date {
+   .kpi-date-text {
      display: flex;
      align-items: center;
      gap: 6px;
-     font-size: 0.95rem;
      color: #718096;
+     font-size: 0.95rem;
      font-weight: 600;
-     margin-top: 6px;
    }
    
-   .meta-icon {
+   .kpi-date-text ion-icon {
      font-size: 16px;
      color: #718096;
+   }
+   
+   /* Responsive Right Container Placement rules */
+   .kpi-right-responsive-col {
+     width: 100%;
+     display: flex;
+     justify-content: flex-start; /* Left align trend block when stacked on mobile screens */
    }
    
    /* Premium High-Fidelity Green Trend Capsule */
    .kpi-trend-badge-box {
      display: flex;
      align-items: center;
-     gap: 10px;
-     background: #F0FDF4 !important; /* Soft mockup teal-green container */
-     padding: 12px 18px;
+     gap: 12px;
+     background: #E6F4EA !important;
+     padding: 10px 16px;
      border-radius: 18px;
      border: 1px solid #DCFCE7;
+     display: inline-flex !important;
    }
    
-   .trend-icon-glyph {
-     font-size: 24px;
-     color: #16A34A;
+   .trend-badge-icon-circle {
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     width: 28px;
+     height: 28px;
+     background: #CEEAD6;
+     color: #137333;
+     border-radius: 50%;
+   }
+   
+   .trend-badge-icon-circle ion-icon {
+     font-size: 18px;
    }
    
    .trend-badge-text-stack {
@@ -139,29 +160,29 @@
    .trend-percentage-value {
      font-size: 1.1rem;
      font-weight: 700;
-     color: #16A34A;
+     color: #137333;
      line-height: 1.1;
    }
    
    .trend-label-sub {
      font-size: 0.85rem;
-     color: #9CA3AF;
+     color: #5F6368;
      font-weight: 600;
    }
    
-   /* Seamless Full-Width CTA Action Button Configuration */
+   /* Full-Width Core CTA Action Button */
    .start-sale-button-fullwidth {
      --background: #0056D2 !important;
      --background-hover: #0046b0 !important;
      --color: #ffffff !important;
      --border-radius: 16px !important;
-     font-family: 'Inter', -apple-system, sans-serif;
+     font-family: 'Inter', sans-serif;
      font-weight: 700;
      font-size: 1.2rem;
      text-transform: none;
      height: 58px;
      width: 100% !important;
-     margin: 0 !important;
+     margin: 12px 0 0 0 !important;
      box-shadow: 0 4px 14px rgba(0, 86, 210, 0.15);
    }
    
@@ -170,37 +191,221 @@
    }
    
    /* ==========================================================================
-      3. DATA LAYER PRESENTATION (CHART MODULE)
+      3. TABLET & DESKTOP WIDESCREEN ADAPTATION QUERY (MD Breakpoint)
       ========================================================================== */
-   .dashboard-card {
-     background: #ffffff;
-     border-radius: 24px;
-     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.015);
-     padding: 32px;
-   }
-   
-   /* Responsive Scaling Layers */
-   @media (max-width: 768px) {
-     .dashboard-container {
-       padding: 20px;
-       gap: 24px;
+   @media (min-width: 768px) {
+     .kpi-main-responsive-row {
+       flex-direction: row !important; /* Converts column back into side-by-side split row view */
+       justify-content: space-between !important;
+       gap: 0;
+     }
+     
+     .kpi-left-responsive-col {
+       width: auto !important;
+     }
+     
+     .kpi-right-responsive-col {
+       width: auto !important;
+       display: flex;
+       justify-content: flex-end; /* Pin trend badge completely to the right corner */
      }
    
+     .kpi-amount-text h1 {
+       font-size: 3.8rem !important; /* Restore large, premium text sizes when width permits */
+       letter-spacing: -0.03em;
+     }
+     
+     .kpi-main-icon {
+       width: 88px;
+       height: 88px;
+     }
+   }
+   
+   /* Padding scale transitions for tiny mobile layouts */
+   @media (max-width: 480px) {
      .kpi-card-content-wrapper {
-       padding: 24px !important;
+       --padding-start: 20px !important;
+       --padding-end: 20px !important;
+       --padding-top: 24px !important;
+       --padding-bottom: 24px !important;
      }
-   
-     .kpi-card-main-row {
-       flex-direction: column !important;
-       align-items: flex-start !important;
-       gap: 20px;
-     }
-   
-     .kpi-amount-text {
-       font-size: 2.8rem;
-     }
-   
-     .kpi-trend-badge-box {
-       align-self: flex-start;
+     
+     .kpi-amount-text h1 {
+       font-size: 2.4rem !important; /* Fallback scaling factor for micro smartphone displays */
      }
    }
+
+   /* ==========================================================================
+   RECENT ACTIVITY CONTAINER CARD
+   ========================================================================== */
+.dashboard-activity-card {
+  margin: 0 !important;
+  border-radius: 24px !important;
+  background: #ffffff !important;
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.02),
+    0 2px 8px rgba(0, 0, 0, 0.01) !important;
+  overflow: hidden;
+}
+
+.activity-card-header {
+  padding: 32px 32px 16px 32px !important;
+  background: transparent;
+}
+
+.activity-card-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  color: #1A202C !important;
+}
+
+.activity-card-content {
+  padding: 0 32px 32px 32px !important;
+}
+
+.activity-ion-list {
+  background: transparent !important;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Uniform structural card rows gap spacing */
+}
+
+/* ==========================================================================
+   ACTIVITY ROWS AND TIMELINE INDICATORS
+   ========================================================================== */
+.activity-list-item {
+  --background: #F9FAFB !important; /* Soft premium item backgrounds */
+  --background-hover: #F3F4F6 !important;
+  --border-radius: 16px !important;
+  --padding-start: 16px !important;
+  --padding-end: 16px !important;
+  --inner-padding-end: 0 !important;
+  margin: 0 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Custom Circle Icon Background */
+.activity-icon-badge {
+  width: 48px;
+  height: 48px;
+  background: #EBF4FF;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0056D2;
+  margin-right: 16px !important;
+  flex-shrink: 0;
+}
+
+.activity-icon-badge ion-icon {
+  font-size: 22px;
+}
+
+.style-grid-fullwidth {
+  width: 100%;
+}
+
+/* Typography Matrix Configurations */
+.activity-text-stack {
+  display: flex;
+  flex-direction: column;
+  margin: 0 !important;
+}
+
+.activity-amount-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1A202C;
+}
+
+.activity-method-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #718096;
+  margin-top: 2px;
+}
+
+.activity-timestamp {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #A0AEC0;
+}
+
+.activity-item-chevron {
+  font-size: 18px;
+  color: #CBD5E0;
+  margin-left: 12px;
+}
+
+/* Empty State Configurations */
+.no-activity-item {
+  --background: #F9FAFB !important;
+  --border-radius: 16px !important;
+  color: #718096;
+  font-weight: 600;
+  text-align: center;
+}
+
+.no-activity-icon {
+  color: #A0AEC0;
+  font-size: 24px;
+}
+
+/* ==========================================================================
+   BOTTOM CTA SEE MORE SECTION
+   ========================================================================== */
+.activity-see-more-box {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.activity-view-all-btn {
+  --color: #0056D2 !important;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: none;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN LAYOUT MEDIA QUERIES
+   ========================================================================== */
+@media (max-width: 768px) {
+  .activity-card-header {
+    padding: 24px 24px 12px 24px !important;
+  }
+  
+  .activity-card-content {
+    padding: 0 24px 24px 24px !important;
+  }
+}
+
+/* Mobile-Specific Adaptations for Data Stacking */
+@media (max-width: 576px) {
+  .activity-primary-data {
+    margin-bottom: 4px; /* Space out values vertically on narrow viewports */
+  }
+  
+  .activity-timestamp {
+    font-size: 0.8rem; /* Scale stamp slightly downwards */
+  }
+
+  .activity-icon-badge {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    margin-right: 12px !important;
+  }
+  
+  .activity-icon-badge ion-icon {
+    font-size: 18px;
+  }
+}

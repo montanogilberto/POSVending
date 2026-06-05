@@ -2,11 +2,21 @@
 import {
   IonCard,
   IonCardHeader,
-  IonCardSubtitle,
+  IonCardTitle,
   IonCardContent,
   IonButton,
+  IonList,
+  IonItem,
+  IonIcon,
+  IonLabel,
+  IonText,
+  IonNote,
+  IonGrid,
+  IonRow,
+  IonCol,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
+import { receiptOutline, arrowForwardOutline, alertCircleOutline } from 'ionicons/icons';
 import { Income } from '../types';
 
 interface RecentActivityProps {
@@ -19,40 +29,87 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ allIncome, onShowReceip
 
   return (
     <IonCard className="dashboard-activity-card">
-      <IonCardHeader>
-        <IonCardSubtitle>Actividad Reciente</IonCardSubtitle>
+      <IonCardHeader className="activity-card-header">
+        <IonCardTitle className="activity-card-title">Actividad Reciente</IonCardTitle>
       </IonCardHeader>
-      <IonCardContent>
-        <div className="activity-timeline">
+      
+      <IonCardContent className="activity-card-content">
+        <IonList lines="none" className="activity-ion-list">
           {allIncome.length === 0 ? (
-            <div className="activity-item no-activity">
-              ÔØî Sin actividad ÔÇö (ayer)
-            </div>
+            <IonItem className="no-activity-item">
+              <IonIcon slot="start" icon={alertCircleOutline} className="no-activity-icon" />
+              <IonLabel>
+                <p>Sin actividad (ayer)</p>
+              </IonLabel>
+            </IonItem>
           ) : (
             allIncome.slice(0, 10).map((income, i) => {
               const utcDate = new Date(income.paymentDate);
-              // Hermosillo is UTC-7, so subtract 7 hours from UTC
+              // Hermosillo is UTC-7
               const hermosilloDate = new Date(utcDate.getTime() - (7 * 60 * 60 * 1000));
-              const time = hermosilloDate.toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+              const time = hermosilloDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
               const date = hermosilloDate.toLocaleDateString('es-ES');
+              
               return (
-                <div key={i} className="activity-item" onClick={() => onShowReceipt(income.incomeId)}>
-                  <span className="activity-icon">🧺</span>
-                  <div className="activity-content">
-                    <span>Ingreso$ {income.total.toFixed(2)} ({income.paymentMethod}, {date} {time})</span>
+                <IonItem 
+                  key={i} 
+                  button 
+                  detail={false}
+                  className="activity-list-item" 
+                  onClick={() => onShowReceipt(income.incomeId)}
+                >
+                  {/* Left Side: Modern Rounded Icon Badge */}
+                  <div slot="start" className="activity-icon-badge">
+                    <IonIcon icon={receiptOutline} />
                   </div>
-                </div>
+
+                  {/* Center-Right Responsive Matrix Grid */}
+                  <IonGrid className="ion-no-padding style-grid-fullwidth">
+                    <IonRow className="ion-align-items-center ion-justify-content-between">
+                      
+                      {/* Left Typography Cluster */}
+                      <IonCol size="12" size-sm="auto" className="activity-primary-data">
+                        <IonLabel className="activity-text-stack">
+                          <IonText className="activity-amount-label">
+                            Ingreso ${income.total.toFixed(2)}
+                          </IonText>
+                          <IonNote className="activity-method-subtitle">
+                            {income.paymentMethod}
+                          </IonNote>
+                        </IonLabel>
+                      </IonCol>
+
+                      {/* Right Typography Cluster */}
+                      <IonCol size="12" size-sm="auto" className="activity-secondary-data ion-text-start ion-text-sm-end">
+                        <IonNote className="activity-timestamp">
+                          {date} • {time}
+                        </IonNote>
+                      </IonCol>
+
+                    </IonRow>
+                  </IonGrid>
+
+                  {/* Subtle chevron design layer for desktop pointers */}
+                  <IonIcon slot="end" icon={arrowForwardOutline} className="activity-item-chevron ion-hide-sm-down" />
+                </IonItem>
               );
             })
           )}
-          {allIncome.length > 10 && (
-            <div className="activity-item show-more">
-              <IonButton fill="clear" size="small" onClick={() => history.push('/movements')}>
-                Ver m├ís movimientos
-              </IonButton>
-            </div>
-          )}
-        </div>
+        </IonList>
+
+        {/* Footer Action Segment */}
+        {allIncome.length > 15 && (
+          <div className="activity-see-more-box">
+            <IonButton 
+              fill="clear" 
+              className="activity-view-all-btn"
+              onClick={() => history.push('/movements')}
+            >
+              Ver más movimientos
+              <IonIcon slot="end" icon={arrowForwardOutline} />
+            </IonButton>
+          </div>
+        )}
       </IonCardContent>
     </IonCard>
   );
