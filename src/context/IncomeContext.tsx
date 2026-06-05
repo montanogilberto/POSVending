@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { fetchAllLaundry } from '../api/laundryApi';
+import { fetchAllLaundry } from '../api/dashboardApi';
 
 interface Income {
   incomeId: number;

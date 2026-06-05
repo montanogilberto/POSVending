@@ -22,7 +22,7 @@ import Header from '../components/Header';
 import IncomesChart from '../components/IncomesChart';
 import IncomesFilters from '../components/IncomesFilters';
 import IncomesList from '../components/IncomesList';
-import { fetchAllLaundry } from '../api/laundryApi';
+import { fetchAllLaundry } from '../api/dashboardApi';
 import { fetchTicket } from '../api/ticketApi';
 import { ReceiptService } from '../services/ReceiptService';
 
@@ -206,7 +206,7 @@ const IncomesPage: React.FC = () => {
       <Header
         screenTitle="Incomes"
         showBackButton={true}
-        backButtonHref="/Laundry"
+        backButtonHref="/dashboard"
         presentAlertPopover={() => {}}
         presentMailPopover={() => {}}
       />

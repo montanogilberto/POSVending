@@ -15,7 +15,7 @@ const ConfirmationPage: React.FC = () => {
   
   const handleReturn = () => {
     clearOrder();
-    history.push('/Laundry');
+    history.push('/dashboard');
   };
   
     return (

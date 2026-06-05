@@ -30,6 +30,18 @@ interface UseReceiptPrintParams {
   onSummary?: (summary: ReceiptPrintSummary) => void;
 }
 
+const normalizeReceiptUrl = (url: string): string => {
+  const trimmed = String(url || '').trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    parsed.pathname = parsed.pathname.replace(/\/{2,}/g, '/');
+    return parsed.toString();
+  } catch {
+    return trimmed.replace(/([^:]\/)\/+/g, '$1');
+  }
+};
+
 export function useReceiptPrint({
   receiptData,
   ticketData,
@@ -118,7 +130,7 @@ export function useReceiptPrint({
         console.log('[ReceiptPrint][DB_TRACKING] Validate response', validateResponse);
 
         const existingTicket = validateResponse?.tickets?.[0];
-        const existingReceiptUrl = String(existingTicket?.receiptUrl || '').trim();
+        const existingReceiptUrl = normalizeReceiptUrl(String(existingTicket?.receiptUrl || '').trim());
 
         if (existingReceiptUrl) {
           receiptUrl = existingReceiptUrl;
@@ -165,7 +177,7 @@ export function useReceiptPrint({
             console.log('[ReceiptPrint][SAVE] Receipt HTML persisted response:', saveResponse);
 
             if (saveResponse) {
-              const savedUrl = String(saveResponse.receiptUrl || saveResponse.url || '').trim();
+              const savedUrl = normalizeReceiptUrl(String(saveResponse.receiptUrl || saveResponse.url || '').trim());
               const saveSucceeded = saveResponse.success !== false && !!savedUrl;
 
               console.log('[ReceiptPrint] Save status', { saveSucceeded, receiptUrl: savedUrl });
