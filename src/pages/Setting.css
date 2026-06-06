@@ -1,0 +1,158 @@
+.setting-content {
+  --background: #f4f5f8;
+}
+
+/* ── Role header ── */
+.setting-role-header {
+  background: #fff;
+  padding: 20px 16px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.setting-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.setting-shield-icon {
+  font-size: 22px;
+  color: var(--ion-color-primary);
+}
+
+.setting-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.setting-subtitle {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #888;
+}
+
+.setting-segment {
+  --background: #f4f5f8;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.setting-badge {
+  font-size: 10px;
+  margin-left: 4px;
+  min-width: 20px;
+  border-radius: 10px;
+}
+
+/* ── Module cards ── */
+.setting-modules {
+  padding: 12px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+
+.setting-module-card {
+  margin: 0;
+  border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+.setting-module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: row;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.setting-module-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.setting-module-chip {
+  font-size: 11px;
+  height: 22px;
+  margin: 0;
+}
+
+.setting-module-content {
+  padding: 4px 0 8px !important;
+}
+
+/* ── Feature items ── */
+.setting-feature-item {
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --inner-padding-end: 0;
+  --min-height: 52px;
+  --background: transparent;
+}
+
+.setting-feature-icon {
+  font-size: 20px;
+  margin-right: 4px;
+  transition: color 0.2s;
+}
+
+.setting-feature-icon.icon-active {
+  color: var(--ion-color-primary);
+}
+
+.setting-feature-icon.icon-inactive {
+  color: #bbb;
+}
+
+.setting-feature-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.setting-feature-code {
+  font-size: 11px !important;
+  color: #999 !important;
+  margin-top: 2px !important;
+  font-family: monospace;
+}
+
+/* ── Admin notice ── */
+.setting-admin-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 12px;
+  padding: 12px 14px;
+  background: #fff8e1;
+  border-left: 3px solid var(--ion-color-warning);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #7a6000;
+}
+
+.setting-admin-notice ion-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  color: var(--ion-color-warning);
+}
+
+/* ── Actions ── */
+.setting-actions {
+  display: flex;
+  gap: 10px;
+  padding: 16px 12px 32px;
+  justify-content: flex-end;
+}
+
+.setting-actions ion-button {
+  min-width: 120px;
+}
