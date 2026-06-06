@@ -316,7 +316,7 @@ const ClientsPage: React.FC = () => {
         screenTitle="Clientes"
         showBackButton={true}
         backButtonText="Menú"
-        backButtonHref="/Laundry"
+        backButtonHref="/dashboard"
       />
 
       <IonContent>

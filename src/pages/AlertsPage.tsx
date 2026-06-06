@@ -112,7 +112,7 @@ const AlertsPage: React.FC = () => {
         screenTitle={`Alertas ${unreadCount > 0 ? `(${unreadCount})` : ''}`}
         showBackButton={true}
         backButtonText="Menú"
-        backButtonHref="/Laundry"
+        backButtonHref="/dashboard"
       />
 
       <IonContent>

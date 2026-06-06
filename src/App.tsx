@@ -301,15 +301,6 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'sells') && (
-              <IonItem button routerLink="/sells">
-                <IonIcon icon={barChart} slot="start" />
-                <IonLabel>Ventas</IonLabel>
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
               <IonItem button onClick={handleLogout}>
                 <IonIcon icon={logOutOutline} slot="start" color="danger" />
                 <IonLabel color="danger">Cerrar sesión</IonLabel>
