@@ -1,0 +1,48 @@
+.supplier-page {
+  --ion-background-color: #f4f5f8;
+}
+
+.supplier-list {
+  background: transparent;
+  padding: 10px;
+}
+
+.supplier-card {
+  margin-bottom: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.supplier-card IonCardHeader {
+  padding-bottom: 0;
+}
+
+.supplier-card IonCardTitle {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.supplier-card IonCardSubtitle {
+  color: #666;
+}
+
+.supplier-card IonCardContent p {
+  margin: 5px 0;
+  color: #333;
+  font-size: 0.9em;
+}
+
+.supplier-card IonButton {
+  margin-top: 10px;
+  --padding-start: 8px;
+  --padding-end: 8px;
+}
+
+.supplier-card IonButton:first-of-type {
+  margin-right: 5px;
+}
+
+.ion-color-danger {
+  --ion-color-base: var(--ion-color-danger, #eb445a);
+  --ion-color-contrast: var(--ion-color-danger-contrast, #ffffff);
+}
