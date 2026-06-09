@@ -1,0 +1,90 @@
+/* src/pages/SupplierPage.css */
+
+.supplier-page {
+  --background: #f4f5f8; /* Light gray background */
+}
+
+.supplier-list {
+  background: var(--ion-color-light); /* White background for the list */
+  margin-top: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.supplier-item {
+  --padding-start: 16px;
+  --inner-padding-end: 8px;
+  --min-height: 60px;
+  border-bottom: 1px solid var(--ion-color-step-150, #d7d8da); /* Light separator */
+}
+
+.supplier-item:last-child {
+  border-bottom: none;
+}
+
+.supplier-item ion-label h2 {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
+.supplier-item ion-label p {
+  font-size: 0.9em;
+  color: var(--ion-color-medium);
+  margin-top: 4px;
+}
+
+.supplier-item ion-button {
+  margin-inline-start: 8px;
+}
+
+ion-modal {
+  --width: 90%;
+  --height: auto;
+  --border-radius: 10px;
+  --box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+ion-modal ion-header {
+  box-shadow: none;
+}
+
+ion-modal ion-toolbar {
+  --background: var(--ion-color-primary);
+  --color: #fff;
+}
+
+ion-modal ion-title {
+  color: #fff;
+  font-weight: bold;
+}
+
+ion-modal ion-content {
+  --background: #fff;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 20px;
+  --padding-bottom: 20px;
+}
+
+ion-input {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+  border: 1px solid var(--ion-color-medium-tint);
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+ion-toggle {
+  --track-background: var(--ion-color-medium);
+  --track-background-checked: var(--ion-color-success);
+}
+
+ion-searchbar {
+  --background: #fff;
+  --border-radius: 8px;
+  --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+}
