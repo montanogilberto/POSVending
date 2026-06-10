@@ -70,7 +70,10 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const skip    = () => { setErrors({}); setStep(s=>Math.min(s+1,5)); };
   const jump    = (t:number) => { if(t<step){ setErrors({}); setStep(t); } };
 
-  const addOpt    = () => upd('options',[...data.options,{name:'',optionType:'radio',choices:[]}]);
+  const countValidChoices = (choices: OptionChoice[]) =>
+    choices.filter((ch) => ch.name.trim() !== '').length;
+
+  const addOpt    = () => upd('options',[...data.options,{name:'',optionType:'radio',choices:[{name:'',extraPrice:0}]}]);
   const remOpt    = (i:number) => upd('options',data.options.filter((_,x)=>x!==i));
   const updOpt    = (i:number,f:keyof ProductOptionData,v:any) => upd('options',data.options.map((o,x)=>x===i?{...o,[f]:v}:o));
   const addCh     = (i:number) => upd('options',data.options.map((o,x)=>x===i?{...o,choices:[...o.choices,{name:'',extraPrice:0}]}:o));
@@ -78,27 +81,92 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const updCh     = (i:number,ci:number,f:keyof OptionChoice,v:any) => upd('options',data.options.map((o,x)=>x===i?{...o,choices:o.choices.map((c,cx)=>cx===ci?{...c,[f]:v}:c)}:o));
 
   const handleSubmit = async () => {
+    console.log('[ProductWizard] handleSubmit:start', {
+      step,
+      companyId,
+      categoryId: data.categoryId,
+      name: data.name,
+      optionsCount: data.options.length,
+    });
+
     setSubmitError('');
+
     try {
-      const sanitizedOptions = data.options
-        .filter((opt) => opt.name.trim() !== '')
+      const normalizedOptions = data.options.map((opt) => ({
+        ...opt,
+        name: opt.name.trim(),
+        choices: (opt.choices ?? []).map((ch) => ({
+          ...ch,
+          name: ch.name.trim(),
+          extraPrice: Number(ch.extraPrice || 0),
+        })),
+      }));
+
+      const sanitizedOptions = normalizedOptions
+        .filter((opt) => opt.name !== '')
         .map((opt) => ({
           action: 1,
           productOptionId: null,
-          optionKey: opt.name.trim().toLowerCase().replace(/\s+/g, '_'),
-          name: opt.name.trim(),
+          optionKey: opt.name.toLowerCase().replace(/\s+/g, '_'),
+          name: opt.name,
           type: opt.optionType,
           optionChoices: opt.choices
-            .filter((ch) => ch.name.trim() !== '')
+            .filter((ch) => ch.name !== '')
             .map((ch) => ({
               action: 1,
               productOptionChoiceId: null,
-              choiceKey: ch.name.trim().toLowerCase().replace(/\s+/g, '_'),
-              name: ch.name.trim(),
+              choiceKey: ch.name.toLowerCase().replace(/\s+/g, '_'),
+              name: ch.name,
               price: Number(ch.extraPrice || 0),
               description: '',
             })),
         }));
+
+      console.log('[ProductWizard] handleSubmit:sanitizedOptions', sanitizedOptions);
+
+      if (sanitizedOptions.length === 0) {
+        const msg = 'Debes agregar al menos una opción de producto.';
+        console.warn('[ProductWizard] handleSubmit:validationError:noOptions', { message: msg });
+        setSubmitError(msg);
+        return;
+      }
+
+      const invalidOptionIndex = sanitizedOptions.findIndex(
+        (opt) => !opt.name || !opt.optionKey || !opt.type || !Array.isArray(opt.optionChoices) || opt.optionChoices.length === 0
+      );
+
+      if (invalidOptionIndex !== -1) {
+        const msg = `La opción #${invalidOptionIndex + 1} debe tener nombre, tipo y al menos una opción hija.`;
+        console.warn('[ProductWizard] handleSubmit:validationError:invalidOption', {
+          invalidOptionIndex,
+          option: sanitizedOptions[invalidOptionIndex],
+          message: msg,
+        });
+        setSubmitError(msg);
+        return;
+      }
+
+      const invalidChoiceRef = (() => {
+        for (let oi = 0; oi < sanitizedOptions.length; oi += 1) {
+          const option = sanitizedOptions[oi];
+          const ci = option.optionChoices.findIndex(
+            (choice) => !choice.name || !choice.choiceKey || Number.isNaN(Number(choice.price))
+          );
+          if (ci !== -1) return { oi, ci };
+        }
+        return null;
+      })();
+
+      if (invalidChoiceRef) {
+        const msg = `La opción #${invalidChoiceRef.oi + 1}, elección #${invalidChoiceRef.ci + 1} requiere nombre y precio válido.`;
+        console.warn('[ProductWizard] handleSubmit:validationError:invalidChoice', {
+          invalidChoiceRef,
+          choice: sanitizedOptions[invalidChoiceRef.oi].optionChoices[invalidChoiceRef.ci],
+          message: msg,
+        });
+        setSubmitError(msg);
+        return;
+      }
 
       const productDescriptions = data.additionalDescription.trim()
         ? [{
@@ -112,12 +180,23 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         : [];
 
       const normalizedCompanyId = Number(companyId);
+      console.log('[ProductWizard] handleSubmit:companyId:normalized', {
+        rawCompanyId: companyId,
+        normalizedCompanyId,
+      });
+
       if (!Number.isFinite(normalizedCompanyId) || normalizedCompanyId <= 0) {
-        setSubmitError('No hay una empresa activa en sesión. Inicia sesión y selecciona una empresa.');
+        const msg = 'No hay una empresa activa en sesión. Inicia sesión y selecciona una empresa.';
+        console.warn('[ProductWizard] handleSubmit:invalidCompanyId', {
+          rawCompanyId: companyId,
+          normalizedCompanyId,
+          message: msg,
+        });
+        setSubmitError(msg);
         return;
       }
 
-      await createProduct({
+      const payload = {
         name: data.name.trim(),
         code: data.code.trim(),
         barCode: data.barCode.trim(),
@@ -145,10 +224,27 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         },
         productDescriptions,
         productOptions: sanitizedOptions,
-      } as any);
+      } as any;
+
+      console.log('[ProductWizard] handleSubmit:payload', payload);
+
+      const createResult = await createProduct(payload);
+      console.log('[ProductWizard] handleSubmit:createProduct:success', createResult);
+
       setShowSuccess(true);
-      setTimeout(() => { onSuccess?.(); onClose(); }, 2000);
-    } catch(e:any) { setSubmitError(e.message ?? 'Error al crear el producto'); }
+      console.log('[ProductWizard] handleSubmit:showSuccess:true');
+
+      setTimeout(() => {
+        console.log('[ProductWizard] handleSubmit:timeout:closing', {
+          hasOnSuccess: Boolean(onSuccess),
+        });
+        onSuccess?.();
+        onClose();
+      }, 2000);
+    } catch (e: any) {
+      console.error('[ProductWizard] handleSubmit:error', e);
+      setSubmitError(e.message ?? 'Error al crear el producto');
+    }
   };
 
   /* ── Step Indicator ── */
@@ -169,7 +265,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   );
 
   /* ── Step 1: Category ── */
-  const S1 = () => (
+  const renderS1 = () => (
     <div>
       <div className="wizard-step-header">
         <h2 className="wizard-step-title">Selecciona una categoría</h2>
@@ -192,7 +288,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   );
 
   /* ── Step 2: Basic Info ── */
-  const S2 = () => (
+  const renderS2 = () => (
     <div>
       <div className="wizard-step-header">
         <h2 className="wizard-step-title">Información del producto</h2>
@@ -228,7 +324,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   );
 
   /* ── Step 3: Price ── */
-  const S3 = () => {
+  const renderS3 = () => {
     const margin = data.salePrice && data.unitPrice ? (parseFloat(data.salePrice)||0)-(parseFloat(data.unitPrice)||0) : null;
     return (
       <div>
@@ -269,7 +365,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   };
 
   /* ── Step 4: Options ── */
-  const S4 = () => (
+  const renderS4 = () => (
     <div>
       <div className="wizard-step-header">
         <h2 className="wizard-step-title">Opciones de personalización</h2>
@@ -312,6 +408,11 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
                     ))}
                   </div>
                 )}
+                {countValidChoices(opt.choices) === 0 && (
+                  <p className="wizard-field-error" style={{ marginTop: 8 }}>
+                    Esta opción requiere al menos una opción visible con nombre.
+                  </p>
+                )}
                 <button className="wizard-add-choice-btn" onClick={()=>addCh(oi)}><IonIcon icon={add}/>Agregar opción</button>
               </div>
             </div>
@@ -324,7 +425,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   );
 
   /* ── Step 5: Optional ── */
-  const S5 = () => {
+  const renderS5 = () => {
     const sections = [
       { icon:'📋', cls:'blue',   title:'Forma del producto',      desc:'Cantidad y presentación',
         body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Cantidad</label><input className="wizard-input" placeholder="Ej. 500ml, 1kg..." value={data.formQuantity} onChange={e=>upd('formQuantity',e.target.value)}/></div> },
@@ -361,7 +462,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   };
 
   /* ── Step 6: Review ── */
-  const S6 = () => {
+  const renderS6 = () => {
     const rows1 = [{k:'Categoría',v:data.categoryName}];
     const rows2 = [{k:'Nombre',v:data.name},{k:'Código',v:data.code},{k:'Código de barras',v:data.barCode},{k:'Descripción',v:data.description},{k:'Fecha expiración',v:data.dateOfExpire}];
     const rows3 = [{k:'Precio de venta',v:data.salePrice?fmt(data.salePrice):''},{k:'Costo unitario',v:data.unitPrice?fmt(data.unitPrice):''},{k:'Stock inicial',v:data.stockQuantity}];
@@ -434,7 +535,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   };
 
   /* ── Success ── */
-  const Success = () => (
+  const renderSuccess = () => (
     <div className="wizard-success">
       <div className="wizard-success-icon">✅</div>
       <h2>¡Producto creado!</h2>
@@ -470,8 +571,17 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     </div>
   );
 
-  /* ── Render ── */
-  const stepContent = [<S1/>,<S2/>,<S3/>,<S4/>,<S5/>,<S6/>];
+  const renderStepContent = () => {
+    switch (step) {
+      case 0: return renderS1();
+      case 1: return renderS2();
+      case 2: return renderS3();
+      case 3: return renderS4();
+      case 4: return renderS5();
+      case 5: return renderS6();
+      default: return renderS1();
+    }
+  };
 
   return (
     <IonModal isOpen={isOpen} onDidDismiss={onClose} className="wizard-modal">
@@ -490,7 +600,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
 
       <IonContent className="wizard-content">
         <div className="wizard-scroll-content">
-          {showSuccess ? <Success/> : stepContent[step]}
+          {showSuccess ? renderSuccess() : renderStepContent()}
         </div>
       </IonContent>
 

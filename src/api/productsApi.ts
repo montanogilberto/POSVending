@@ -162,11 +162,33 @@ export const createOrUpdateProduct = async (data: CreateProductRequest): Promise
     body: JSON.stringify(data),
   });
 
+  const parsedBody = (await parseResponseBody(response)) as any;
+
   if (!response.ok) {
-    throw new Error('Failed to create or update product');
+    const httpErrorMessage =
+      parsedBody?.result?.[0]?.msg ||
+      parsedBody?.message ||
+      `Failed to create or update product (HTTP ${response.status})`;
+    throw new Error(httpErrorMessage);
   }
 
-  return response.json();
+  const firstResult = parsedBody?.result?.[0];
+  const value = String(firstResult?.value ?? '').toLowerCase().trim();
+  const msg = String(firstResult?.msg ?? '').trim();
+  const error = String(firstResult?.error ?? '').trim();
+
+  // Backend business-level error can come with HTTP 200:
+  // value="msg", msg="action is required (1=insert, 2=update, 3=delete).", error="1"
+  const isBusinessError =
+    (value === 'msg' && !!msg) ||
+    error === '1' ||
+    /required|error|invalid/i.test(msg);
+
+  if (isBusinessError) {
+    throw new Error(msg || 'Database error while saving product');
+  }
+
+  return parsedBody as CreateProductResponse;
 };
 
 export const getAllProducts = async (): Promise<Product[]> => {

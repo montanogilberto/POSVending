@@ -45,8 +45,20 @@ const ProductsManagementPage: React.FC = () => {
 
   // ── Data fetch ────────────────────────────────────────────────────────
   useEffect(() => {
+    console.log('[Products][Management] mount -> fetchProducts');
     fetchProducts();
   }, [fetchProducts]);
+
+  useEffect(() => {
+    console.log('[Products][Management] state:productsList', {
+      count: productsList.length,
+      ids: productsList.map((p) => p.productId),
+    });
+  }, [productsList]);
+
+  useEffect(() => {
+    console.log('[Products][Management] state:loading/error', { loading, error });
+  }, [loading, error]);
 
   // ── Popover handlers ──────────────────────────────────────────────────
   const presentAlertPopover = (e: React.MouseEvent) =>
@@ -60,39 +72,74 @@ const ProductsManagementPage: React.FC = () => {
 
   // ── CRUD handlers ─────────────────────────────────────────────────────
   const handleDelete = (product: Product) => {
+    console.log('[Products][Management] action:delete:open-confirm', {
+      productId: product.productId,
+      name: product.name,
+    });
     setSelectedProduct(product);
     setShowDeleteAlert(true);
   };
 
   const confirmDelete = async () => {
     if (selectedProduct) {
-      await removeProduct(selectedProduct.productId);
-      setSelectedProduct(null);
+      console.log('[Products][Management] action:delete:confirm', {
+        productId: selectedProduct.productId,
+        name: selectedProduct.name,
+      });
+      try {
+        await removeProduct(selectedProduct.productId);
+        console.log('[Products][Management] action:delete:success', {
+          productId: selectedProduct.productId,
+        });
+      } catch (e) {
+        console.error('[Products][Management] action:delete:error', e);
+      } finally {
+        setSelectedProduct(null);
+      }
+    } else {
+      console.log('[Products][Management] action:delete:confirm without selectedProduct');
     }
     setShowDeleteAlert(false);
   };
 
   const handleCreate = () => {
+    console.log('[Products][Management] action:create:open-wizard');
     setEditingProduct(null);
     setShowWizard(true);
   };
 
   const handleEdit = (product: Product) => {
+    console.log('[Products][Management] action:edit:open-form', {
+      productId: product.productId,
+      name: product.name,
+    });
     setEditingProduct(product);
     setShowForm(true);
   };
 
   const handleFormClose = () => {
+    console.log('[Products][Management] action:form:close', {
+      hadEditingProduct: Boolean(editingProduct),
+      editingProductId: editingProduct?.productId,
+    });
     setShowForm(false);
     setEditingProduct(null);
   };
 
   const handleWizardClose = () => {
+    console.log('[Products][Management] action:wizard:close');
     setShowWizard(false);
   };
 
   // ── Filtered + sorted product list ────────────────────────────────────
   const filteredProducts = useMemo(() => {
+    console.log('[Products][Management] compute:filteredProducts:start', {
+      totalProducts: productsList.length,
+      searchText,
+      activeFilter,
+      sortAsc,
+    });
+
     let result = [...productsList];
 
     // Text search: name, code, barcode
@@ -119,6 +166,9 @@ const ProductsManagementPage: React.FC = () => {
       return sortAsc ? cmp : -cmp;
     });
 
+    console.log('[Products][Management] compute:filteredProducts:end', {
+      visibleCount: result.length,
+    });
     return result;
   }, [productsList, searchText, activeFilter, sortAsc]);
 
@@ -148,13 +198,23 @@ const ProductsManagementPage: React.FC = () => {
               className="products-searchbar"
               placeholder="Buscar por nombre, código o código de barras"
               value={searchText}
-              onIonInput={(e) => setSearchText(e.detail.value ?? '')}
+              onIonInput={(e) => {
+                const value = e.detail.value ?? '';
+                console.log('[Products][Management] action:search', { value });
+                setSearchText(value);
+              }}
               debounce={200}
               animated={false}
             />
             <button
               className={`products-icon-btn${sortAsc ? '' : ' active'}`}
-              onClick={() => setSortAsc((prev) => !prev)}
+              onClick={() =>
+                setSortAsc((prev) => {
+                  const next = !prev;
+                  console.log('[Products][Management] action:toggle-sort', { previous: prev, next });
+                  return next;
+                })
+              }
               title={sortAsc ? 'Orden A→Z' : 'Orden Z→A'}
               aria-label="Cambiar orden"
             >
@@ -173,19 +233,28 @@ const ProductsManagementPage: React.FC = () => {
           <div className="products-chips-row">
             <button
               className={`products-chip${activeFilter === 'all' ? ' active' : ''}`}
-              onClick={() => setActiveFilter('all')}
+              onClick={() => {
+                console.log('[Products][Management] action:set-filter', { filter: 'all' });
+                setActiveFilter('all');
+              }}
             >
               Todos
             </button>
             <button
               className={`products-chip${activeFilter === 'withBarcode' ? ' active' : ''}`}
-              onClick={() => setActiveFilter('withBarcode')}
+              onClick={() => {
+                console.log('[Products][Management] action:set-filter', { filter: 'withBarcode' });
+                setActiveFilter('withBarcode');
+              }}
             >
               Con código de barras
             </button>
             <button
               className={`products-chip${activeFilter === 'noCategory' ? ' active' : ''}`}
-              onClick={() => setActiveFilter('noCategory')}
+              onClick={() => {
+                console.log('[Products][Management] action:set-filter', { filter: 'noCategory' });
+                setActiveFilter('noCategory');
+              }}
             >
               Sin categoría
             </button>
@@ -219,8 +288,8 @@ const ProductsManagementPage: React.FC = () => {
               </span>
             </div>
           ) : (
-            filteredProducts.map((product) => (
-              <div key={product.productId} className="product-card">
+            filteredProducts.map((product, index) => (
+              <div key={product.productId ?? `${product.code || product.name || 'product'}-${index}`} className="product-card">
                 <div className="product-card-body">
                   {/* ── Left: info ── */}
                   <div className="product-card-info">
@@ -319,14 +388,20 @@ const ProductsManagementPage: React.FC = () => {
         {/* ── Delete confirmation alert ── */}
         <IonAlert
           isOpen={showDeleteAlert}
-          onDidDismiss={() => setShowDeleteAlert(false)}
+          onDidDismiss={() => {
+            console.log('[Products][Management] action:delete-alert:dismiss');
+            setShowDeleteAlert(false);
+          }}
           header="Eliminar producto"
           message={`¿Estás seguro de que quieres eliminar "${selectedProduct?.name}"? Esta acción no se puede deshacer.`}
           buttons={[
             {
               text: 'Cancelar',
               role: 'cancel',
-              handler: () => setShowDeleteAlert(false),
+              handler: () => {
+                console.log('[Products][Management] action:delete:cancel');
+                setShowDeleteAlert(false);
+              },
             },
             {
               text: 'Eliminar',
