@@ -4,6 +4,13 @@ import { Product } from '../data/type_products';
 import { getProductsByCompany, getOneProduct, createOrUpdateProduct, deleteProduct, CreateProductRequest, GetOneProductRequest, DeleteProductRequest } from '../api/productsApi';
 import { useUser } from '../components/UserContext';
 
+type CreateProductInput = Omit<Product, 'productId' | 'createdAt' | 'updatedAt'> & {
+  productForm?: any;
+  productDetails?: any;
+  productDescriptions?: any[];
+  productOptions?: any[];
+};
+
 interface ProductContextType {
   productsList: Product[];
   productsDetail: Product | null;
@@ -16,7 +23,7 @@ interface ProductContextType {
   clearAllProducts: () => void;
   fetchProducts: () => Promise<void>;
   fetchProductById: (productId: number) => Promise<void>;
-  createProduct: (productData: Omit<Product, 'productId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  createProduct: (productData: CreateProductInput) => Promise<void>;
   updateProduct: (productId: number, productData: Partial<Product>) => Promise<void>;
   removeProduct: (productId: number) => Promise<void>;
 }
@@ -83,7 +90,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const createProduct = async (productData: Omit<Product, 'productId' | 'createdAt' | 'updatedAt'>) => {
+  const createProduct = async (productData: CreateProductInput) => {
     setLoading(true);
     setError(null);
     try {
@@ -109,8 +116,14 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await createOrUpdateProduct(request);
       await fetchProducts(); // Refresh list
     } catch (err) {
-      setError('Failed to create product');
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Failed to create product';
+      setError(message);
+      console.error('[ProductContext.createProduct] Failed to create product', {
+        requestCompanyId: Number(productData.companyId || companyId),
+        requestCategoryId: Number(productData.categoryId || 0),
+        error: err,
+      });
+      throw err;
     } finally {
       setLoading(false);
     }
