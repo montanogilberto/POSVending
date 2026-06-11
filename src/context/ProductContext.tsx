@@ -57,7 +57,14 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setError(null);
     try {
       const products = await getProductsByCompany(normalizedCompanyId);
-      setProductsList(products);
+      const normalizedProducts = (products ?? []).map((p: any) => {
+        const resolvedProductId = Number(p?.productId ?? p?.id ?? 0);
+        return {
+          ...p,
+          productId: Number.isFinite(resolvedProductId) && resolvedProductId > 0 ? resolvedProductId : p?.productId,
+        } as Product;
+      });
+      setProductsList(normalizedProducts);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch products';
       setError(message);
@@ -72,10 +79,18 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [companyId]);
 
   const fetchProductById = async (productId: number) => {
+    const normalizedProductId = Number(productId);
+
+    if (!Number.isFinite(normalizedProductId) || normalizedProductId <= 0) {
+      setError('Invalid product identifier');
+      console.warn('[ProductContext.fetchProductById] Invalid productId', { productId });
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const request: GetOneProductRequest = { products: [{ productId }] };
+      const request: GetOneProductRequest = { products: [{ productId: normalizedProductId }] };
       const products = await getOneProduct(request);
       if (products.length > 0) {
         setProductsDetail(products[0]);
@@ -135,28 +150,39 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const request: CreateProductRequest = {
         products: [{
+          action: '2',
           productId,
+          companyId: Number(productData.companyId || companyId),
+          categoryId: Number(productData.categoryId || 0),
           name: productData.name || '',
-          code: productData.code || '',
-          dateOfExpire: productData.dateOfExpire || '',
-          productFormId: productData.productFormId || 0,
-          manufactureId: productData.manufactureId || 0,
-          description: productData.description || '',
           barCode: productData.barCode || '',
-          categoryId: productData.categoryId || 0,
-          // Use context companyId as fallback
-          companyId: productData.companyId || companyId,
-          action: '2' // Update
+          code: productData.code || '',
+          dateOfExpire: productData.dateOfExpire || null,
+          manufactureId: productData.manufactureId ?? null,
+          description: productData.description || '',
+          productFormId: productData.productFormId || 0,
+          productForm: (productData as any).productForm ?? undefined,
+          productDetails: (productData as any).productDetails ?? undefined,
+          productDescriptions: (productData as any).productDescriptions ?? [],
+          productOptions: (productData as any).productOptions ?? [],
         }]
       };
+
       await createOrUpdateProduct(request);
-      await fetchProducts(); // Refresh list
+      await fetchProducts();
       if (productsDetail && productsDetail.productId === productId) {
-        await fetchProductById(productId); // Refresh detail if it's the current one
+        await fetchProductById(productId);
       }
     } catch (err) {
-      setError('Failed to update product');
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Failed to update product';
+      setError(message);
+      console.error('[ProductContext.updateProduct] Failed to update product', {
+        productId,
+        requestCompanyId: Number(productData.companyId || companyId),
+        requestCategoryId: Number(productData.categoryId || 0),
+        error: err,
+      });
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -166,15 +192,28 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setLoading(true);
     setError(null);
     try {
-      const request: DeleteProductRequest = { products: [{ productId }] };
+      const normalizedCompanyId = Number(companyId);
+      const request: DeleteProductRequest = {
+        products: [{
+          productId,
+          ...(Number.isFinite(normalizedCompanyId) && normalizedCompanyId > 0
+            ? { companyId: normalizedCompanyId, action: 3 }
+            : { action: 3 }),
+        }],
+      };
       await deleteProduct(request);
       setProductsList(productsList.filter(p => p.productId !== productId));
       if (productsDetail && productsDetail.productId === productId) {
         setProductsDetail(null);
       }
     } catch (err) {
-      setError('Failed to delete product');
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Failed to delete product';
+      setError(message);
+      console.error('[ProductContext.removeProduct] Failed to delete product', {
+        productId,
+        error: err,
+      });
+      throw err;
     } finally {
       setLoading(false);
     }

@@ -142,6 +142,8 @@ export interface GetOneProductResponse {
 export interface DeleteProductRequest {
   products: Array<{
     productId: number;
+    companyId?: number;
+    action?: number | string;
   }>;
 }
 
@@ -154,6 +156,7 @@ export interface DeleteProductResponse {
 }
 
 export const createOrUpdateProduct = async (data: CreateProductRequest): Promise<CreateProductResponse> => {
+  console.log('[productsApi.createOrUpdateProduct] payload', data);
   const response = await fetch(`${API_BASE_URL}/products`, {
     method: 'POST',
     headers: {
@@ -320,17 +323,104 @@ export const getOneProduct = async (data: GetOneProductRequest): Promise<Product
 };
 
 export const deleteProduct = async (data: DeleteProductRequest): Promise<DeleteProductResponse> => {
-  const response = await fetch(`${API_BASE_URL}/delete_products`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
+  const normalizedProductId = Number(data?.products?.[0]?.productId ?? 0);
+  const normalizedCompanyIdRaw = data?.products?.[0]?.companyId;
+  const normalizedCompanyId = Number(normalizedCompanyIdRaw ?? 0);
+  const hasValidCompanyId = Number.isFinite(normalizedCompanyId) && normalizedCompanyId > 0;
+
+  console.log('[productsApi.deleteProduct] incoming payload', {
+    originalPayload: data,
+    extractedProductId: normalizedProductId,
+    extractedCompanyId: hasValidCompanyId ? normalizedCompanyId : null,
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to delete product');
+  const candidateRequests: Array<{
+    endpoint: string;
+    payload: unknown;
+    note: string;
+  }> = [
+    {
+      endpoint: `${API_BASE_URL}/delete_products`,
+      payload: data,
+      note: 'primary endpoint with canonical payload',
+    },
+    {
+      endpoint: `${API_BASE_URL}/products`,
+      payload: {
+        products: [{
+          action: 3,
+          productId: normalizedProductId,
+          ...(hasValidCompanyId ? { companyId: normalizedCompanyId } : {}),
+        }],
+      },
+      note: 'fallback: products endpoint action=3 with numeric action (+companyId when available)',
+    },
+    {
+      endpoint: `${API_BASE_URL}/products`,
+      payload: {
+        products: [{
+          action: '3',
+          productId: normalizedProductId,
+          ...(hasValidCompanyId ? { companyId: normalizedCompanyId } : {}),
+        }],
+      },
+      note: 'fallback: products endpoint action="3" with string action (+companyId when available)',
+    },
+  ];
+
+  let lastError: Error | null = null;
+
+  for (const candidate of candidateRequests) {
+    console.log('[productsApi.deleteProduct] trying candidate', {
+      endpoint: candidate.endpoint,
+      note: candidate.note,
+      payload: candidate.payload,
+    });
+
+    const response = await fetch(candidate.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(candidate.payload),
+    });
+
+    const parsedBody = (await parseResponseBody(response)) as any;
+
+    if (!response.ok) {
+      console.warn('[productsApi.deleteProduct] Candidate failed', {
+        endpoint: candidate.endpoint,
+        note: candidate.note,
+        status: response.status,
+        statusText: response.statusText,
+        responseBody: parsedBody,
+      });
+      lastError = new Error(`Delete candidate failed (HTTP ${response.status})`);
+      continue;
+    }
+
+    const firstResult = parsedBody?.result?.[0];
+    const value = String(firstResult?.value ?? '').toLowerCase().trim();
+    const msg = String(firstResult?.msg ?? '').trim();
+    const error = String(firstResult?.error ?? '').trim();
+
+    const isBusinessError =
+      (value === 'msg' && !!msg) ||
+      error === '1' ||
+      /required|error|invalid|not found/i.test(msg);
+
+    if (isBusinessError) {
+      console.warn('[productsApi.deleteProduct] Candidate business error', {
+        endpoint: candidate.endpoint,
+        note: candidate.note,
+        result: firstResult,
+      });
+      lastError = new Error(msg || 'Database error while deleting product');
+      continue;
+    }
+
+    return parsedBody as DeleteProductResponse;
   }
 
-  return response.json();
+  throw lastError ?? new Error('Failed to delete product');
 };

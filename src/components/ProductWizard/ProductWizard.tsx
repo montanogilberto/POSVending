@@ -4,6 +4,7 @@ import { close, add, trash, checkmarkCircle, chevronForward, checkmark } from 'i
 import { fetchCategoriesByCompany } from '../../utils/apiUtils';
 import { useProduct } from '../../context/ProductContext';
 import { useUser } from '../UserContext';
+import { Product } from '../../data/type_products';
 import './ProductWizard.css';
 
 interface OptionChoice { name: string; extraPrice: number; }
@@ -16,7 +17,13 @@ interface WizardData {
   formQuantity: string; additionalDescription: string; packingName: string; packingPresentationName: string;
 }
 interface CategoryItem { categoryId: number; name: string; }
-export interface ProductWizardProps { isOpen: boolean; onClose: () => void; onSuccess?: () => void; }
+export interface ProductWizardProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  product?: Product | null;
+  mode?: 'create' | 'view' | 'edit';
+}
 
 const STEPS = ['Categoría','Producto','Precio','Opciones','Adicional','Resumen'];
 const INIT: WizardData = {
@@ -25,8 +32,8 @@ const INIT: WizardData = {
   formQuantity:'', additionalDescription:'', packingName:'', packingPresentationName:'',
 };
 
-const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { createProduct, loading } = useProduct();
+const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSuccess, product, mode }) => {
+  const { createProduct, updateProduct, loading } = useProduct();
   const { companyId } = useUser();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<WizardData>(INIT);
@@ -36,10 +43,63 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [openOpt, setOpenOpt] = useState<Record<number,boolean>>({});
+  const effectiveMode: 'create' | 'view' | 'edit' = mode ?? (product?.productId ? 'edit' : 'create');
+  const isReadOnly = effectiveMode === 'view';
 
   useEffect(() => {
-    if (isOpen) { setStep(0); setData(INIT); setErrors({}); setShowSuccess(false); setSubmitError(''); setOpenOpt({}); loadCats(); }
-  }, [isOpen]);
+    if (!isOpen) return;
+
+    setStep(0);
+    setErrors({});
+    setShowSuccess(false);
+    setSubmitError('');
+    setOpenOpt({});
+    loadCats();
+
+    if (product) {
+      const anyProduct = product as any;
+      const details = product.details?.[0] ?? anyProduct.productDetails?.[0];
+      const allDescriptions = product.descriptions ?? anyProduct.productDescriptions ?? [];
+      const principalDescription =
+        allDescriptions.find((d: any) => d.is_principal === '1') ?? allDescriptions[0];
+
+      const sourceOptions = product.options ?? anyProduct.productOptions ?? [];
+      const mappedOptions: ProductOptionData[] = sourceOptions.map((opt: any) => ({
+        name: opt.name ?? '',
+        optionType: (opt.type === 'checkbox' ? 'checkbox' : 'radio'),
+        choices: (opt.choices ?? opt.optionChoices ?? []).map((ch: any) => ({
+          name: ch.name ?? '',
+          extraPrice: Number(ch.price ?? 0),
+        })),
+      }));
+
+      const normalizedDateOfExpire =
+        product.dateOfExpire && product.dateOfExpire !== '1900-01-01'
+          ? String(product.dateOfExpire).slice(0, 10)
+          : '';
+
+      setData({
+        categoryId: Number(product.categoryId || 0),
+        categoryName: product.category?.name ?? '',
+        name: String((product as any).name ?? ''),
+        code: String((product as any).code ?? ''),
+        barCode: String((product as any).barCode ?? ''),
+        description: String((product as any).description ?? ''),
+        dateOfExpire: normalizedDateOfExpire,
+        salePrice: details?.salePrice != null ? String(details.salePrice) : '0',
+        unitPrice: details?.unitPrice != null ? String(details.unitPrice) : '0',
+        stockQuantity: details?.stockQuantity != null ? String(details.stockQuantity) : '0',
+        options: mappedOptions,
+        formQuantity: product.form?.quantity ?? '',
+        additionalDescription: principalDescription?.Dosage ?? '',
+        packingName: '',
+        packingPresentationName: '',
+      });
+      return;
+    }
+
+    setData(INIT);
+  }, [isOpen, product]);
 
   const loadCats = async () => {
     setCatLoading(true);
@@ -65,7 +125,14 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     setErrors(e); return Object.keys(e).length===0;
   };
 
-  const goNext  = () => { if(validate()) setStep(s=>Math.min(s+1,5)); };
+  const goNext  = () => {
+    if (isReadOnly) {
+      setErrors({});
+      setStep(s => Math.min(s + 1, 5));
+      return;
+    }
+    if (validate()) setStep(s=>Math.min(s+1,5));
+  };
   const goBack  = () => { setErrors({}); setStep(s=>Math.max(s-1,0)); };
   const skip    = () => { setErrors({}); setStep(s=>Math.min(s+1,5)); };
   const jump    = (t:number) => { if(t<step){ setErrors({}); setStep(t); } };
@@ -73,14 +140,15 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const countValidChoices = (choices: OptionChoice[]) =>
     choices.filter((ch) => ch.name.trim() !== '').length;
 
-  const addOpt    = () => upd('options',[...data.options,{name:'',optionType:'radio',choices:[{name:'',extraPrice:0}]}]);
-  const remOpt    = (i:number) => upd('options',data.options.filter((_,x)=>x!==i));
-  const updOpt    = (i:number,f:keyof ProductOptionData,v:any) => upd('options',data.options.map((o,x)=>x===i?{...o,[f]:v}:o));
-  const addCh     = (i:number) => upd('options',data.options.map((o,x)=>x===i?{...o,choices:[...o.choices,{name:'',extraPrice:0}]}:o));
-  const remCh     = (i:number,ci:number) => upd('options',data.options.map((o,x)=>x===i?{...o,choices:o.choices.filter((_,cx)=>cx!==ci)}:o));
-  const updCh     = (i:number,ci:number,f:keyof OptionChoice,v:any) => upd('options',data.options.map((o,x)=>x===i?{...o,choices:o.choices.map((c,cx)=>cx===ci?{...c,[f]:v}:c)}:o));
+  const addOpt    = () => { if (isReadOnly) return; upd('options',[...data.options,{name:'',optionType:'radio',choices:[{name:'',extraPrice:0}]}]); };
+  const remOpt    = (i:number) => { if (isReadOnly) return; upd('options',data.options.filter((_,x)=>x!==i)); };
+  const updOpt    = (i:number,f:keyof ProductOptionData,v:any) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,[f]:v}:o)); };
+  const addCh     = (i:number) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,choices:[...o.choices,{name:'',extraPrice:0}]}:o)); };
+  const remCh     = (i:number,ci:number) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,choices:o.choices.filter((_,cx)=>cx!==ci)}:o)); };
+  const updCh     = (i:number,ci:number,f:keyof OptionChoice,v:any) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,choices:o.choices.map((c,cx)=>cx===ci?{...c,[f]:v}:c)}:o)); };
 
   const handleSubmit = async () => {
+    if (isReadOnly) return;
     console.log('[ProductWizard] handleSubmit:start', {
       step,
       companyId,
@@ -168,14 +236,17 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         return;
       }
 
+      const allDescriptions = (product as any)?.descriptions ?? (product as any)?.productDescriptions ?? [];
+      const firstDescription = allDescriptions?.[0];
+
       const productDescriptions = data.additionalDescription.trim()
         ? [{
-            action: 1,
-            productDescriptionId: null,
+            action: product?.productId ? 2 : 1,
+            productDescriptionId: firstDescription?.productDescriptionId ?? null,
             Dosage: data.additionalDescription.trim(),
-            measurementId: null,
+            measurementId: firstDescription?.measurementId ?? null,
             is_principal: '1',
-            activeIngredientId: null,
+            activeIngredientId: firstDescription?.activeIngredientId ?? null,
           }]
         : [];
 
@@ -196,7 +267,10 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         return;
       }
 
+      const isEdit = Boolean(product?.productId);
+
       const payload = {
+        productId: product?.productId ?? null,
         name: data.name.trim(),
         code: data.code.trim(),
         barCode: data.barCode.trim(),
@@ -204,32 +278,54 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         dateOfExpire: data.dateOfExpire || '',
         categoryId: data.categoryId,
         companyId: normalizedCompanyId,
-        productFormId: 0,
-        manufactureId: 0,
+        productFormId: product?.productFormId ?? 0,
+        manufactureId: product?.manufactureId ?? 0,
         productForm: data.formQuantity.trim()
           ? {
-              action: 1,
-              productFormId: null,
+              action: isEdit ? 2 : 1,
+              productFormId: product?.form?.productFormId ?? null,
               quantity: data.formQuantity.trim(),
-              productPackingPresentationId: null,
-              productsPackingTypeId: null,
+              productPackingPresentationId: product?.form?.productPackingPresentationId ?? null,
+              productsPackingTypeId: product?.form?.productsPackingTypeId ?? null,
             }
           : undefined,
         productDetails: {
-          action: 1,
-          productDetailId: null,
+          action: isEdit ? 2 : 1,
+          productDetailId: (product as any)?.details?.[0]?.productDetailId ?? (product as any)?.productDetails?.[0]?.productDetailId ?? null,
           stockQuantity: Number(data.stockQuantity || 0),
           unitPrice: Number(data.unitPrice || 0),
           salePrice: Number(data.salePrice || 0),
         },
         productDescriptions,
-        productOptions: sanitizedOptions,
+        productOptions: sanitizedOptions.map((opt: any, index: number) => {
+          const sourceOptions = (product as any)?.options ?? (product as any)?.productOptions ?? [];
+          const existingOption = sourceOptions[index];
+          const existingChoices = existingOption?.choices ?? existingOption?.optionChoices ?? [];
+          return {
+            ...opt,
+            action: isEdit ? 2 : 1,
+            productOptionId: existingOption?.productOptionId ?? null,
+            optionChoices: (opt.optionChoices ?? []).map((choice: any, choiceIndex: number) => {
+              const existingChoice = existingChoices[choiceIndex];
+              return {
+                ...choice,
+                action: isEdit ? 2 : 1,
+                productOptionChoiceId: existingChoice?.productOptionChoiceId ?? null,
+              };
+            }),
+          };
+        }),
       } as any;
 
       console.log('[ProductWizard] handleSubmit:payload', payload);
 
-      const createResult = await createProduct(payload);
-      console.log('[ProductWizard] handleSubmit:createProduct:success', createResult);
+      if (isEdit && product?.productId) {
+        const updateResult = await updateProduct(product.productId, payload);
+        console.log('[ProductWizard] handleSubmit:updateProduct:success', updateResult);
+      } else {
+        const createResult = await createProduct(payload);
+        console.log('[ProductWizard] handleSubmit:createProduct:success', createResult);
+      }
 
       setShowSuccess(true);
       console.log('[ProductWizard] handleSubmit:showSuccess:true');
@@ -275,8 +371,9 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
        cats.length===0 ? <div className="wizard-no-cats"><p>No se encontraron categorías</p></div> :
        <div className="wizard-category-grid">
          {cats.map(cat=>(
-           <button key={cat.categoryId} className={`wizard-category-card${data.categoryId===cat.categoryId?' selected':''}`}
-             onClick={()=>{ upd('categoryId',cat.categoryId); upd('categoryName',cat.name); }}>
+             <button key={cat.categoryId} className={`wizard-category-card${data.categoryId===cat.categoryId?' selected':''}`}
+             onClick={()=>{ if (isReadOnly) return; upd('categoryId',cat.categoryId); upd('categoryName',cat.name); }}
+             disabled={isReadOnly}>
              <div className="wizard-cat-icon">🏷️</div>
              <span className="wizard-cat-name">{cat.name}</span>
              {data.categoryId===cat.categoryId && <div className="wizard-cat-check"><IonIcon icon={checkmarkCircle}/></div>}
@@ -297,27 +394,27 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
       <div className="wizard-form">
         <div className="wizard-field">
           <label className="wizard-label">Nombre <span className="required">*</span></label>
-          <input className={`wizard-input${errors.name?' error':''}`} placeholder="Ej. El Buchón" value={data.name} onChange={e=>upd('name',e.target.value)}/>
+          <input className={`wizard-input${errors.name?' error':''}`} placeholder="Ej. El Buchón" value={data.name} onChange={e=>upd('name',e.target.value)} disabled={isReadOnly}/>
           {errors.name && <span className="wizard-field-error">{errors.name}</span>}
         </div>
         <div className="wizard-field-row">
           <div className="wizard-field">
             <label className="wizard-label">Código <span className="required">*</span></label>
-            <input className={`wizard-input${errors.code?' error':''}`} placeholder="Ej. PROD001" value={data.code} onChange={e=>upd('code',e.target.value)}/>
+            <input className={`wizard-input${errors.code?' error':''}`} placeholder="Ej. PROD001" value={data.code} onChange={e=>upd('code',e.target.value)} disabled={isReadOnly}/>
             {errors.code && <span className="wizard-field-error">{errors.code}</span>}
           </div>
           <div className="wizard-field">
             <label className="wizard-label">Código de barras</label>
-            <input className="wizard-input" placeholder="Ej. 7501234567890" value={data.barCode} onChange={e=>upd('barCode',e.target.value)}/>
+            <input className="wizard-input" placeholder="Ej. 7501234567890" value={data.barCode} onChange={e=>upd('barCode',e.target.value)} disabled={isReadOnly}/>
           </div>
         </div>
         <div className="wizard-field">
           <label className="wizard-label">Descripción</label>
-          <textarea className="wizard-textarea" placeholder="Describe brevemente el producto..." rows={3} value={data.description} onChange={e=>upd('description',e.target.value)}/>
+          <textarea className="wizard-textarea" placeholder="Describe brevemente el producto..." rows={3} value={data.description} onChange={e=>upd('description',e.target.value)} disabled={isReadOnly}/>
         </div>
         <div className="wizard-field">
           <label className="wizard-label">Fecha de expiración</label>
-          <input className="wizard-input" type="date" value={data.dateOfExpire} onChange={e=>upd('dateOfExpire',e.target.value)}/>
+          <input className="wizard-input" type="date" value={data.dateOfExpire} onChange={e=>upd('dateOfExpire',e.target.value)} disabled={isReadOnly}/>
         </div>
       </div>
     </div>
@@ -337,7 +434,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
             <label className="wizard-label">Precio de venta (MXN) <span className="required">*</span></label>
             <div className="wizard-input-prefix">
               <span className="prefix">$</span>
-              <input className={`wizard-input with-prefix${errors.salePrice?' error':''}`} type="number" min="0" step="0.01" placeholder="0.00" value={data.salePrice} onChange={e=>upd('salePrice',e.target.value)}/>
+              <input className={`wizard-input with-prefix${errors.salePrice?' error':''}`} type="number" min="0" step="0.01" placeholder="0.00" value={data.salePrice} onChange={e=>upd('salePrice',e.target.value)} disabled={isReadOnly}/>
             </div>
             {errors.salePrice && <span className="wizard-field-error">{errors.salePrice}</span>}
           </div>
@@ -345,12 +442,12 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
             <label className="wizard-label">Precio unitario / Costo (MXN)</label>
             <div className="wizard-input-prefix">
               <span className="prefix">$</span>
-              <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="0.00" value={data.unitPrice} onChange={e=>upd('unitPrice',e.target.value)}/>
+              <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="0.00" value={data.unitPrice} onChange={e=>upd('unitPrice',e.target.value)} disabled={isReadOnly}/>
             </div>
           </div>
           <div className="wizard-field">
             <label className="wizard-label">Cantidad en stock</label>
-            <input className="wizard-input" type="number" min="0" placeholder="0" value={data.stockQuantity} onChange={e=>upd('stockQuantity',e.target.value)}/>
+            <input className="wizard-input" type="number" min="0" placeholder="0" value={data.stockQuantity} onChange={e=>upd('stockQuantity',e.target.value)} disabled={isReadOnly}/>
           </div>
           {data.salePrice && (
             <div className="wizard-price-summary">
@@ -376,17 +473,17 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
           <div key={oi} className="wizard-option-card">
             <div className="wizard-option-header">
               <span className="wizard-option-num">Opción {oi+1}</span>
-              <button className="wizard-remove-btn" onClick={()=>remOpt(oi)}><IonIcon icon={trash}/></button>
+              <button className="wizard-remove-btn" onClick={()=>remOpt(oi)} disabled={isReadOnly}><IonIcon icon={trash}/></button>
             </div>
             <div className="wizard-option-body">
               <div className="wizard-option-row">
                 <div className="wizard-field">
                   <label className="wizard-label">Nombre de la opción</label>
-                  <input className="wizard-input" placeholder="Ej. Tamaño, Sabor..." value={opt.name} onChange={e=>updOpt(oi,'name',e.target.value)}/>
+                  <input className="wizard-input" placeholder="Ej. Tamaño, Sabor..." value={opt.name} onChange={e=>updOpt(oi,'name',e.target.value)} disabled={isReadOnly}/>
                 </div>
                 <div className="wizard-field">
                   <label className="wizard-label">Tipo</label>
-                  <select className="wizard-select" value={opt.optionType} onChange={e=>updOpt(oi,'optionType',e.target.value as 'radio'|'checkbox')}>
+                  <select className="wizard-select" value={opt.optionType} onChange={e=>updOpt(oi,'optionType',e.target.value as 'radio'|'checkbox')} disabled={isReadOnly}>
                     <option value="radio">Radio (1 opción)</option>
                     <option value="checkbox">Checkbox (múltiple)</option>
                   </select>
@@ -398,12 +495,12 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
                   <div className="wizard-choices-list">
                     {opt.choices.map((ch,ci)=>(
                       <div key={ci} className="wizard-choice-row">
-                        <input className="wizard-input" placeholder="Ej. Grande..." value={ch.name} onChange={e=>updCh(oi,ci,'name',e.target.value)}/>
+                        <input className="wizard-input" placeholder="Ej. Grande..." value={ch.name} onChange={e=>updCh(oi,ci,'name',e.target.value)} disabled={isReadOnly}/>
                         <div className="wizard-input-prefix">
                           <span className="prefix">$</span>
-                          <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="0.00" value={ch.extraPrice===0?'':ch.extraPrice} onChange={e=>updCh(oi,ci,'extraPrice',parseFloat(e.target.value)||0)}/>
+                          <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="0.00" value={ch.extraPrice===0?'':ch.extraPrice} onChange={e=>updCh(oi,ci,'extraPrice',parseFloat(e.target.value)||0)} disabled={isReadOnly}/>
                         </div>
-                        <button className="wizard-remove-btn" onClick={()=>remCh(oi,ci)}><IonIcon icon={trash}/></button>
+                        <button className="wizard-remove-btn" onClick={()=>remCh(oi,ci)} disabled={isReadOnly}><IonIcon icon={trash}/></button>
                       </div>
                     ))}
                   </div>
@@ -413,12 +510,12 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
                     Esta opción requiere al menos una opción visible con nombre.
                   </p>
                 )}
-                <button className="wizard-add-choice-btn" onClick={()=>addCh(oi)}><IonIcon icon={add}/>Agregar opción</button>
+                {!isReadOnly && <button className="wizard-add-choice-btn" onClick={()=>addCh(oi)}><IonIcon icon={add}/>Agregar opción</button>}
               </div>
             </div>
           </div>
         ))}
-        <button className="wizard-add-option-btn" onClick={addOpt}><IonIcon icon={add}/>Agregar grupo de opciones</button>
+        {!isReadOnly && <button className="wizard-add-option-btn" onClick={addOpt}><IonIcon icon={add}/>Agregar grupo de opciones</button>}
       </div>
       {data.options.length===0 && <p className="wizard-skip-hint">Si el producto no tiene opciones, puedes omitir este paso.</p>}
     </div>
@@ -428,13 +525,13 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const renderS5 = () => {
     const sections = [
       { icon:'📋', cls:'blue',   title:'Forma del producto',      desc:'Cantidad y presentación',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Cantidad</label><input className="wizard-input" placeholder="Ej. 500ml, 1kg..." value={data.formQuantity} onChange={e=>upd('formQuantity',e.target.value)}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Cantidad</label><input className="wizard-input" placeholder="Ej. 500ml, 1kg..." value={data.formQuantity} onChange={e=>upd('formQuantity',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'📝', cls:'green',  title:'Descripción adicional',   desc:'Información técnica',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Descripción técnica</label><textarea className="wizard-textarea" rows={3} placeholder="Información adicional..." value={data.additionalDescription} onChange={e=>upd('additionalDescription',e.target.value)}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Descripción técnica</label><textarea className="wizard-textarea" rows={3} placeholder="Información adicional..." value={data.additionalDescription} onChange={e=>upd('additionalDescription',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'📦', cls:'orange', title:'Empaque',                 desc:'Tipo de empaque',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre del empaque</label><input className="wizard-input" placeholder="Ej. Caja, Bolsa..." value={data.packingName} onChange={e=>upd('packingName',e.target.value)}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre del empaque</label><input className="wizard-input" placeholder="Ej. Caja, Bolsa..." value={data.packingName} onChange={e=>upd('packingName',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'🎁', cls:'purple', title:'Presentación de empaque', desc:'Presentación o tamaño',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre de la presentación</label><input className="wizard-input" placeholder="Ej. Individual, Pack x6..." value={data.packingPresentationName} onChange={e=>upd('packingPresentationName',e.target.value)}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre de la presentación</label><input className="wizard-input" placeholder="Ej. Individual, Pack x6..." value={data.packingPresentationName} onChange={e=>upd('packingPresentationName',e.target.value)} disabled={isReadOnly}/></div> },
     ];
     return (
       <div>
@@ -546,6 +643,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   /* ── Footer ── */
   const isOptionalStep = step===3 || step===4;
   const isLastStep     = step===5;
+  const isEditMode = effectiveMode === 'edit';
 
   const Footer = () => (
     <div className="wizard-footer">
@@ -555,7 +653,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         </button>
       )}
       <div className="wizard-footer-spacer"/>
-      {isOptionalStep && !showSuccess && (
+      {isOptionalStep && !showSuccess && !isReadOnly && (
         <button className="wizard-footer-skip" onClick={skip}>Omitir</button>
       )}
       {!isLastStep && !showSuccess && (
@@ -563,9 +661,9 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
           Siguiente <IonIcon icon={chevronForward}/>
         </button>
       )}
-      {isLastStep && !showSuccess && (
+      {isLastStep && !showSuccess && !isReadOnly && (
         <button className="wizard-footer-submit" onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Creando...' : '✓ Crear producto'}
+          {loading ? (isEditMode ? 'Guardando...' : 'Creando...') : (isEditMode ? '✓ Guardar cambios' : '✓ Crear producto')}
         </button>
       )}
     </div>
@@ -587,7 +685,9 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     <IonModal isOpen={isOpen} onDidDismiss={onClose} className="wizard-modal">
       <IonHeader>
         <IonToolbar>
-          <IonTitle className="wizard-modal-title">Nuevo Producto</IonTitle>
+          <IonTitle className="wizard-modal-title">
+            {isReadOnly ? 'Ver producto' : isEditMode ? 'Editar producto' : 'Nuevo Producto'}
+          </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={onClose} fill="clear">
               <IonIcon icon={close}/>
