@@ -68,6 +68,7 @@ import ReceiptPage from './pages/Receipt/ReceiptPage';
 import Login from './pages/Authentication/Login';
 import ForgotPassword from './pages/Authentication/ForgotPassword';
 import CreateAccount from './pages/Authentication/CreateAccount';
+import SupplierPage from './pages/SupplierPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -347,6 +348,7 @@ const AppShell: React.FC = () => {
             <Route exact path="/">
               <Redirect to="/login" />
             </Route>
+            <PrivateRoute exact path="/suppliers" component={SupplierPage} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
