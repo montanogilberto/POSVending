@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   IonPage,
   IonContent,
@@ -22,7 +22,15 @@ import './ProductsManagementPage.css';
 type FilterType = 'all' | 'withBarcode' | 'noCategory';
 
 const ProductsManagementPage: React.FC = () => {
-  const { productsList, loading, error, fetchProducts, removeProduct } = useProduct();
+  const {
+    productsList,
+    productsDetail,
+    loading,
+    error,
+    fetchProducts,
+    fetchProductById,
+    removeProduct,
+  } = useProduct();
 
   // ── UI state ──────────────────────────────────────────────────────────
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -30,6 +38,8 @@ const ProductsManagementPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [wizardMode, setWizardMode] = useState<'create' | 'view' | 'edit'>('create');
+  const pendingEditProductIdRef = useRef<number | null>(null);
 
   // ── Search / filter / sort state ──────────────────────────────────────
   const [searchText, setSearchText] = useState('');
@@ -59,6 +69,21 @@ const ProductsManagementPage: React.FC = () => {
   useEffect(() => {
     console.log('[Products][Management] state:loading/error', { loading, error });
   }, [loading, error]);
+
+  useEffect(() => {
+    const pendingId = pendingEditProductIdRef.current;
+    if (!pendingId || !productsDetail || productsDetail.productId !== pendingId) return;
+
+    console.log('[Products][Management] action:edit:full-detail-loaded', {
+      productId: productsDetail.productId,
+      optionsCount: (productsDetail as any).productOptions?.length ?? productsDetail.options?.length ?? 0,
+      detailsCount: (productsDetail as any).productDetails?.length ?? productsDetail.details?.length ?? 0,
+      descriptionsCount: (productsDetail as any).productDescriptions?.length ?? productsDetail.descriptions?.length ?? 0,
+    });
+
+    setEditingProduct(productsDetail as Product);
+    pendingEditProductIdRef.current = null;
+  }, [productsDetail]);
 
   // ── Popover handlers ──────────────────────────────────────────────────
   const presentAlertPopover = (e: React.MouseEvent) =>
@@ -92,7 +117,10 @@ const ProductsManagementPage: React.FC = () => {
           productId: selectedProduct.productId,
         });
       } catch (e) {
-        console.error('[Products][Management] action:delete:error', e);
+        console.error('[Products][Management] action:delete:error', {
+          productId: selectedProduct.productId,
+          error: e,
+        });
       } finally {
         setSelectedProduct(null);
       }
@@ -105,16 +133,70 @@ const ProductsManagementPage: React.FC = () => {
   const handleCreate = () => {
     console.log('[Products][Management] action:create:open-wizard');
     setEditingProduct(null);
+    setWizardMode('create');
     setShowWizard(true);
   };
 
-  const handleEdit = (product: Product) => {
-    console.log('[Products][Management] action:edit:open-form', {
-      productId: product.productId,
+  const handleEdit = async (product: Product) => {
+    const resolvedProductId = Number((product as any)?.productId ?? (product as any)?.id ?? 0);
+
+    if (!Number.isFinite(resolvedProductId) || resolvedProductId <= 0) {
+      console.warn('[Products][Management] action:edit:invalid-product-id', {
+        product,
+      });
+      return;
+    }
+
+    console.log('[Products][Management] action:edit:open-wizard', {
+      productId: resolvedProductId,
       name: product.name,
     });
-    setEditingProduct(product);
-    setShowForm(true);
+
+    const normalizedProduct = { ...product, productId: resolvedProductId } as Product;
+    pendingEditProductIdRef.current = resolvedProductId;
+    setEditingProduct(normalizedProduct);
+    setWizardMode('edit');
+    setShowWizard(true);
+
+    try {
+      await fetchProductById(resolvedProductId);
+    } catch (e) {
+      console.error('[Products][Management] action:edit:fetch-full:error', {
+        productId: resolvedProductId,
+        error: e,
+      });
+    }
+  };
+
+  const handleOpenDetails = async (product: Product) => {
+    const resolvedProductId = Number((product as any)?.productId ?? (product as any)?.id ?? 0);
+
+    if (!Number.isFinite(resolvedProductId) || resolvedProductId <= 0) {
+      console.warn('[Products][Management] action:details:invalid-product-id', {
+        product,
+      });
+      return;
+    }
+
+    console.log('[Products][Management] action:details:open-from-card:view-mode', {
+      productId: resolvedProductId,
+      name: product.name,
+    });
+
+    const normalizedProduct = { ...product, productId: resolvedProductId } as Product;
+    pendingEditProductIdRef.current = resolvedProductId;
+    setEditingProduct(normalizedProduct);
+    setWizardMode('view');
+    setShowWizard(true);
+
+    try {
+      await fetchProductById(resolvedProductId);
+    } catch (e) {
+      console.error('[Products][Management] action:details:fetch-full:error', {
+        productId: resolvedProductId,
+        error: e,
+      });
+    }
   };
 
   const handleFormClose = () => {
@@ -124,11 +206,18 @@ const ProductsManagementPage: React.FC = () => {
     });
     setShowForm(false);
     setEditingProduct(null);
+    setWizardMode('create');
   };
 
   const handleWizardClose = () => {
-    console.log('[Products][Management] action:wizard:close');
+    console.log('[Products][Management] action:wizard:close', {
+      hadEditingProduct: Boolean(editingProduct),
+      editingProductId: editingProduct?.productId,
+    });
+    pendingEditProductIdRef.current = null;
     setShowWizard(false);
+    setEditingProduct(null);
+    setWizardMode('create');
   };
 
   // ── Filtered + sorted product list ────────────────────────────────────
@@ -292,7 +381,19 @@ const ProductsManagementPage: React.FC = () => {
               <div key={product.productId ?? `${product.code || product.name || 'product'}-${index}`} className="product-card">
                 <div className="product-card-body">
                   {/* ── Left: info ── */}
-                  <div className="product-card-info">
+                  <div
+                    className="product-card-info"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleOpenDetails(product)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        void handleOpenDetails(product);
+                      }
+                    }}
+                    aria-label={`Abrir detalles de ${product.name}`}
+                  >
                     <h3 className="product-name">{product.name}</h3>
 
                     {product.description && (
@@ -354,7 +455,10 @@ const ProductsManagementPage: React.FC = () => {
                   <div className="product-card-actions">
                     <button
                       className="product-action-btn edit"
-                      onClick={() => handleEdit(product)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleEdit(product);
+                      }}
                       title="Editar producto"
                       aria-label="Editar"
                     >
@@ -362,7 +466,10 @@ const ProductsManagementPage: React.FC = () => {
                     </button>
                     <button
                       className="product-action-btn delete"
-                      onClick={() => handleDelete(product)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(product);
+                      }}
                       title="Eliminar producto"
                       aria-label="Eliminar"
                     >
@@ -422,6 +529,8 @@ const ProductsManagementPage: React.FC = () => {
           isOpen={showWizard}
           onClose={handleWizardClose}
           onSuccess={fetchProducts}
+          product={editingProduct}
+          mode={wizardMode}
         />
       </IonContent>
 
