@@ -20,6 +20,8 @@ import {
   IonAlert,
   IonSearchbar,
   IonToggle,
+  IonInfiniteScrollContent,
+  IonInfiniteScroll,
 } from '@ionic/react';
 import { add, create, trash, people, call, mail, location, personCircle, toggle as toggleIcon } from 'ionicons/icons';
 import Header from '../components/Header';
@@ -198,22 +200,28 @@ const SupplierPage: React.FC = () => {
     setShowDeleteAlert(true);
   };
 
-  const onNewInputChange = (e: CustomEvent<InputInputEventDetail | ToggleChangeEventDetail>, field: keyof Partial<Omit<Supplier, 'supplierId' | 'created_At' | 'updated_at'>>) => {
+  const onNewInputChange = (
+    e: CustomEvent<InputInputEventDetail>,
+    field: keyof Partial<Omit<Supplier, 'supplierId' | 'created_At' | 'updated_at'>>
+  ) => {
     const value = e.detail.value;
-    if (field === 'active') {
-      setNewSupplierData({ ...newSupplierData, [field]: (e.detail.checked ? '1' : '0') });
-    } else {
-      setNewSupplierData({ ...newSupplierData, [field]: value });
-    }
+    setNewSupplierData({ ...newSupplierData, [field]: value });
   };
 
-  const onEditInputChange = (e: CustomEvent<InputInputEventDetail | ToggleChangeEventDetail>, field: keyof Partial<Omit<Supplier, 'supplierId' | 'created_At' | 'updated_at'>>) => {
+  const onNewToggleChange = (e: CustomEvent<ToggleChangeEventDetail>) => {
+    setNewSupplierData({ ...newSupplierData, active: e.detail.checked ? '1' : '0' });
+  };
+
+  const onEditInputChange = (
+    e: CustomEvent<InputInputEventDetail>,
+    field: keyof Partial<Omit<Supplier, 'supplierId' | 'created_At' | 'updated_at'>>
+  ) => {
     const value = e.detail.value;
-    if (field === 'active') {
-      setEditSupplierData({ ...editSupplierData, [field]: (e.detail.checked ? '1' : '0') });
-    } else {
-      setEditSupplierData({ ...editSupplierData, [field]: value });
-    }
+    setEditSupplierData({ ...editSupplierData, [field]: value });
+  };
+
+  const onEditToggleChange = (e: CustomEvent<ToggleChangeEventDetail>) => {
+    setEditSupplierData({ ...editSupplierData, active: e.detail.checked ? '1' : '0' });
   };
 
 
@@ -369,7 +377,7 @@ const SupplierPage: React.FC = () => {
                   <IonLabel>Activo</IonLabel>
                   <IonToggle
                     checked={newSupplierData.active === '1'}
-                    onIonChange={(e: CustomEvent<ToggleChangeEventDetail>) => onNewInputChange(e, 'active')}
+                    onIonChange={(e: CustomEvent<ToggleChangeEventDetail>) => onNewToggleChange(e)}
                     color="primary"
                   />
                 </IonItem>
@@ -433,7 +441,7 @@ const SupplierPage: React.FC = () => {
                   <IonLabel>Activo</IonLabel>
                   <IonToggle
                     checked={editSupplierData.active === '1'}
-                    onIonChange={(e: CustomEvent<ToggleChangeEventDetail>) => onEditInputChange(e, 'active')}
+                    onIonChange={(e: CustomEvent<ToggleChangeEventDetail>) => onEditToggleChange(e)}
                     color="primary"
                   />
                 </IonItem>

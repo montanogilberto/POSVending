@@ -41,6 +41,7 @@ import {
   person,
   menu,
   water,
+  storefrontOutline,
 } from 'ionicons/icons';
 
 import Vending from './pages/Vending';
@@ -217,6 +218,15 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/categories">
                 <IonIcon icon={grid} slot="start" />
                 <IonLabel>Categorías</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'suppliers') && (
+              <IonItem button routerLink="/suppliers">
+                <IonIcon icon={storefrontOutline} slot="start" />
+                <IonLabel>Proveedores</IonLabel>
               </IonItem>
               )}
             </IonMenuToggle>
