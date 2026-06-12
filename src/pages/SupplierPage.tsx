@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useContext } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   IonPage,
   IonContent,
@@ -25,7 +25,7 @@ import { add, create, trash, people, call, mail, location, personCircle, toggle 
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
-import { UserContext } from '../components/UserContext';
+import { useUser } from '../components/UserContext';
 import {
   Supplier,
   getAllSuppliers,
@@ -44,7 +44,7 @@ const toHermosillo = (utc: string | undefined): string => {
 const PAGE_SIZE = 20;
 
 const SupplierPage: React.FC = () => {
-  const { user } = useContext(UserContext);
+  const user = useUser();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [filteredSuppliers, setFilteredSuppliers] = useState<Supplier[]>([]);
   const [displayedSuppliers, setDisplayedSuppliers] = useState<Supplier[]>([]);
