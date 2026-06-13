@@ -41,7 +41,9 @@ import {
   person,
   menu,
   water,
-} from 'ionicons/icons';
+} from 'ionicons/icons';,
+  cashOutline,
+}
 
 import Vending from './pages/Vending';
 import Setting from './pages/Setting';
@@ -68,6 +70,7 @@ import ReceiptPage from './pages/Receipt/ReceiptPage';
 import Login from './pages/Authentication/Login';
 import ForgotPassword from './pages/Authentication/ForgotPassword';
 import CreateAccount from './pages/Authentication/CreateAccount';
+import LoanPage from './pages/LoanPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -347,6 +350,7 @@ const AppShell: React.FC = () => {
             <Route exact path="/">
               <Redirect to="/login" />
             </Route>
+            <PrivateRoute exact path="/loans" component={LoanPage} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
