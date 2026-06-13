@@ -31,6 +31,7 @@ import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
 import { Loan, getAllLoans, createLoan, updateLoan, deleteLoan } from '../api/loanApi';
+import { Client } from '../api/clientsApi';
 import ClientSelector from '../components/ClientSelector';
 
 const toHermosillo = (utc: string | undefined): string => {
@@ -53,7 +54,7 @@ const LoanPage: React.FC = () => {
     showMailPopover: boolean;
     event?: Event;
   }>({ showAlertPopover: false, showMailPopover: false });
-  const [selectedClient, setSelectedClient] = useState<{ clientId: number; first_name: string; last_name: string } | null>(null);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
 
   const ITEMS_PER_LOAD = 20;
@@ -157,7 +158,13 @@ const LoanPage: React.FC = () => {
   const presentEditModal = (loan: Loan) => {
     setEditingLoan(loan);
     // Placeholder for client name, ideally fetch client details
-    setSelectedClient({ clientId: loan.clientId, first_name: 'Cliente', last_name: `(${loan.clientId})` });
+    setSelectedClient({
+      clientId: loan.clientId,
+      first_name: 'Cliente',
+      last_name: `(${loan.clientId})`,
+      cellphone: '',
+      email: '',
+    });
     setShowModal(true);
   };
 
@@ -190,9 +197,11 @@ const LoanPage: React.FC = () => {
   const dismissMailPopover = () =>
     setPopoverState({ ...popoverState, showMailPopover: false });
 
-  const handleClientSelection = (client: { clientId: number; first_name: string; last_name: string }) => {
+  const handleClientSelection = (client: Client | null) => {
     setSelectedClient(client);
-    setEditingLoan((prev) => ({ ...prev, clientId: client.clientId }));
+    if (client) {
+      setEditingLoan((prev) => ({ ...prev, clientId: client.clientId }));
+    }
     setShowClientSelector(false);
   };
 

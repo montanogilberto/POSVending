@@ -41,9 +41,9 @@ import {
   person,
   menu,
   water,
-} from 'ionicons/icons';,
   cashOutline,
-}
+} from 'ionicons/icons';
+  
 
 import Vending from './pages/Vending';
 import Setting from './pages/Setting';
@@ -268,6 +268,15 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/egresos">
                 <IonIcon icon={barChart} slot="start" />
                 <IonLabel>Egresos</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'loans') && (
+              <IonItem button routerLink="/loans">
+                <IonIcon icon={cashOutline} slot="start" />
+                <IonLabel>Préstamos</IonLabel>
               </IonItem>
               )}
             </IonMenuToggle>
