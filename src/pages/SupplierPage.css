@@ -1,51 +1,61 @@
-.supplier-page {
-  --ion-background-color: #f4f5f8;
+/* SupplierPage.css */
+
+.supplier-form {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid var(--ion-color-medium);
+  border-radius: 8px;
+  background-color: var(--ion-background-color);
 }
 
-.supplier-list {
-  background: var(--ion-background-color);
-  padding: 0;
-}
-
-.supplier-item {
-  --background: #ffffff;
+.supplier-form ion-item {
+  --background: var(--ion-background-color);
+  --border-color: var(--ion-color-light);
+  --highlight-background: var(--ion-color-light);
   margin-bottom: 10px;
+  border-radius: 5px;
+}
+
+.supplier-form ion-input {
+  --padding-start: 10px;
+  --padding-end: 10px;
+}
+
+.supplier-form ion-button {
+  margin-top: 15px;
+}
+
+ion-list {
+  background: var(--ion-background-color);
+}
+
+ion-item {
+  --background: var(--ion-background-color);
+  --border-color: var(--ion-color-light);
+  --highlight-background: var(--ion-color-light);
+  margin-bottom: 8px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+ion-item h2 {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: var(--ion-color-primary);
+}
+
+ion-item p {
+  font-size: 0.9em;
+  color: var(--ion-color-medium-shade);
+}
+
+ion-searchbar {
+  --background: var(--ion-background-color);
+  --color: var(--ion-color-dark);
+  --placeholder-color: var(--ion-color-medium-shade);
+  --icon-color: var(--ion-color-medium);
+  --clear-button-color: var(--ion-color-medium);
+  border: 1px solid var(--ion-color-light);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  align-items: center;
-}
-
-.supplier-item ion-label h2 {
-  font-size: 1.1em;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 5px;
-}
-
-.supplier-item ion-label p {
-  font-size: 0.9em;
-  color: #666;
-  margin: 2px 0;
-}
-
-.supplier-item ion-button {
-  --padding-start: 8px;
-  --padding-end: 8px;
-}
-
-.supplier-item ion-icon {
-  font-size: 1.2em;
-}
-
-/* Adjust modal content padding */
-ion-modal ion-content {
-  --padding-start: 16px;
-  --padding-end: 16px;
-  --padding-top: 16px;
-  --padding-bottom: 16px;
-}
-
-/* Ensure inputs have proper spacing */
-ion-item {
-  margin-bottom: 10px;
 }
