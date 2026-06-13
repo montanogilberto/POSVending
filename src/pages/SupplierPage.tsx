@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonPage, IonContent, IonList, IonItem, IonLabel, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonFab, IonFabButton, IonIcon, IonModal,
@@ -9,7 +9,7 @@ import { add, pencil, trash, peopleOutline } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
-import { UserContext } from '../components/UserContext';
+import { useUser } from '../components/UserContext';
 import {
   getAllSuppliers,
   createSupplier,
@@ -41,8 +41,7 @@ const SupplierPage: React.FC = () => {
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
   const [page, setPage] = useState(0);
 
-  const { user } = useContext(UserContext);
-  const companyId = user?.companyId;
+  const { companyId } = useUser();
 
   const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({ showAlertPopover: false, showMailPopover: false });
 

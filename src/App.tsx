@@ -42,9 +42,7 @@ import {
   menu,
   water,
   storefrontOutline,
-} from 'ionicons/icons';,
-  peopleOutline,
-}
+} from 'ionicons/icons';
 
 import Vending from './pages/Vending';
 import Setting from './pages/Setting';
@@ -361,7 +359,6 @@ const AppShell: React.FC = () => {
               <Redirect to="/login" />
             </Route>
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
-            <PrivateRoute path="/suppliers" component={SupplierPage} authenticated={true} rolesAllowed={['Admin', 'Manager']} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
