@@ -22,7 +22,8 @@ export type UiFeature =
   | 'sells'
   | 'laundry'
   | 'pos'
-  | 'scannerqr';
+  | 'scannerqr'
+  | 'loans';
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
@@ -30,7 +31,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'clients', 'products', 'categories',
     'alerts', 'emails',
     'users', 'ingresos', 'egresos',
-    'iot', 'settings', 'sells',
+    'iot', 'settings', 'sells', 'loans'
   ],
   manager: [
     'laundry', 'pos', 'scannerqr',

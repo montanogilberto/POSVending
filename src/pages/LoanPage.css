@@ -1,0 +1,114 @@
+.loans-page {
+  --background: var(--ion-color-light);
+}
+
+.loans-searchbar {
+  --border-radius: 12px;
+  --background: #F4F6F9;
+  margin-bottom: 16px;
+}
+
+.loans-list {
+  background: var(--ion-background-color, #ffffff);
+  padding: 0;
+}
+
+.loan-card {
+  margin: 0 !important;
+  border-radius: 16px !important;
+  margin-bottom: 16px !important;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.loan-card-content {
+  padding: 16px !important;
+}
+
+.loan-card-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.loan-card-row:last-child {
+  margin-bottom: 0;
+}
+
+.loan-number {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: var(--ion-color-primary, #0056D2);
+  margin-bottom: 4px;
+}
+
+.loan-status {
+  font-size: 0.9em;
+  color: var(--ion-color-medium, #6B7280);
+  margin-bottom: 10px;
+  display: block;
+}
+
+.meta-label {
+  font-size: 0.8em;
+  font-weight: 700;
+  color: var(--ion-color-dark, #374151);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.meta-value {
+  font-size: 0.9em;
+  color: var(--ion-color-dark-shade, #1F2937);
+  margin-top: 0;
+}
+
+.loan-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.action-button {
+  --border-radius: 10px;
+  font-weight: 600;
+  height: 38px;
+}
+
+.edit-button {
+  --border-color: var(--ion-color-primary, #0056D2);
+  --color: var(--ion-color-primary, #0056D2);
+}
+
+.delete-button {
+  --border-color: var(--ion-color-danger, #EB445A);
+  --color: var(--ion-color-danger, #EB445A);
+}
+
+.loan-modal {
+  --width: 90%;
+  --height: 90%;
+  --border-radius: 14px;
+  --box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.loan-modal h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: var(--ion-color-dark);
+}
+
+.client-selector-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --background: var(--ion-color-light);
+  border: 1px solid var(--ion-color-medium-shade);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.client-selector-item ion-label {
+  padding-left: 10px;
+}
