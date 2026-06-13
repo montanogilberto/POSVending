@@ -8,8 +8,8 @@ export interface Supplier {
   phone?: string;
   email?: string;
   address?: string;
-  active: string;
-  created_At: string;
+  active: string; // '1' or '0'
+  created_At?: string;
   updated_at?: string;
 }
 
@@ -23,16 +23,14 @@ export async function getAllSuppliers(companyId: number): Promise<Supplier[]> {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      plural: [{ companyId: companyId }],
-    }),
+    body: JSON.stringify({ suppliers: [{ companyId }] }),
   });
 
   if (!response.ok) {
     throw new Error(await response.text());
   }
   const data: SupplierApiResponse = await response.json();
-  return data.suppliers;
+  return data.suppliers || [];
 }
 
 export async function createSupplier(data: Omit<Supplier, 'supplierId' | 'created_At' | 'updated_at'>): Promise<Supplier> {
@@ -41,16 +39,14 @@ export async function createSupplier(data: Omit<Supplier, 'supplierId' | 'create
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      action: 1, // INSERT
-      ...data,
-    }),
+    body: JSON.stringify({ action: 1, ...data }),
   });
 
   if (!response.ok) {
     throw new Error(await response.text());
   }
-  return await response.json();
+  const result = await response.json();
+  return result.result[0];
 }
 
 export async function updateSupplier(supplierId: number, data: Partial<Omit<Supplier, 'created_At' | 'updated_at'>>): Promise<Supplier> {
@@ -59,32 +55,27 @@ export async function updateSupplier(supplierId: number, data: Partial<Omit<Supp
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      action: 2, // UPDATE
-      supplierId,
-      ...data,
-    }),
+    body: JSON.stringify({ action: 2, supplierId, ...data }),
   });
 
   if (!response.ok) {
     throw new Error(await response.text());
   }
-  return await response.json();
+  const result = await response.json();
+  return result.result[0];
 }
 
-export async function deleteSupplier(supplierId: number): Promise<void> {
+export async function deleteSupplier(supplierId: number, companyId: number): Promise<void> {
   const response = await fetch(`${BASE_URL}/suppliers`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      action: 3, // DELETE
-      supplierId,
-    }),
+    body: JSON.stringify({ action: 3, supplierId, companyId }),
   });
 
   if (!response.ok) {
     throw new Error(await response.text());
   }
+  await response.text();
 }
