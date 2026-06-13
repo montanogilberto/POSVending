@@ -1,2 +1,92 @@
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';\n\nexport interface Supplier {\n  supplierId: number;\n  companyId: number;\n  supplierName: string;\n  contactName?: string;\n  phone?: string;\n  email?: string;\n  address?: string;\n  active: string; // '1' or '0'\n  created_At: string;\n  updated_at?: string;\n}\n\nexport interface SupplierApiResponse {\n  suppliers: Supplier[];\n}\n\nexport async function getAllSuppliers(companyId: number): Promise<Supplier[]> {\n  try {\n    const response = await fetch(`${BASE_URL}/all_suppliers`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n      },\n      body: JSON.stringify({ suppliers: [{ companyId }] }),\n    });\n\n    if (!response.ok) {\n      throw new Error(await response.text());\n    }\n    const result: SupplierApiResponse = await response.json();\n    return result.suppliers;\n  } catch (err) {\n    throw new Error((err as Error).message ?? 'Error fetching suppliers');\n  }\n}\n\nexport async function getSupplierById(companyId: number, supplierId: number): Promise<Supplier> {\n  try {\n    const response = await fetch(`${BASE_URL}/one_suppliers`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n      },\n      body: JSON.stringify({ companyId, supplierId }),\n    });\n\n    if (!response.ok) {\n      throw new Error(await response.text());\n    }\n    const result: SupplierApiResponse = await response.json();\n    if (!result.suppliers || result.suppliers.length === 0) {\n      throw new Error('Supplier not found');\n    }\n    return result.suppliers[0];\n  } catch (err) {\n    throw new Error((err as Error).message ?? 'Error fetching supplier by ID');\n  }\n}\n\nexport async function createSupplier(data: Omit<Supplier, 'supplierId' | 'created_At' | 'updated_at'>): Promise<Supplier> {\n  try {\n    const response = await fetch(`${BASE_URL}/suppliers`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n      },\
-      body: JSON.stringify({ action: 1, ...data }),\n    });\n\n    if (!response.ok) {\n      throw new Error(await response.text());\n    }\n    const result = await response.json();\n    // Assuming the API returns the created supplier, or at least a success message\n    // For now, we'll return a mock or re-fetch if needed. Adjust based on actual SP output.\n    return result;\n  } catch (err) {\n    throw new Error((err as Error).message ?? 'Error creating supplier');\n  }\n}\n\nexport async function updateSupplier(supplierId: number, data: Partial<Omit<Supplier, 'created_At' | 'updated_at' | 'companyId'>>): Promise<Supplier> {\n  try {\n    const response = await fetch(`${BASE_URL}/suppliers`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n      },\n      body: JSON.stringify({ action: 2, supplierId, ...data }),\n    });\n\n    if (!response.ok) {\n      throw new Error(await response.text());\n    }\n    const result = await response.json();\n    // Assuming the API returns the updated supplier, or at least a success message.\n    // Adjust based on actual SP output.\n    return result;\n  } catch (err) {\n    throw new Error((err as Error).message ?? 'Error updating supplier');\n  }\n}\n\nexport async function deleteSupplier(supplierId: number): Promise<void> {\n  try {\n    const response = await fetch(`${BASE_URL}/suppliers`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n      },\n      body: JSON.stringify({ action: 3, supplierId }),\n    });\n\n    if (!response.ok) {\n      throw new Error(await response.text());\n    }\n    // Assuming successful deletion returns an empty response or a success message\n    // No need to parse JSON if the response is empty\n  } catch (err) {\n    throw new Error((err as Error).message ?? 'Error deleting supplier');\n  }\n}\n
+import { POS_GMO_BACKEND_URL } from '../utils/constants';
+import { getCurrentUserCompanyId } from '../utils/auth';
+
+export interface Supplier {
+  supplierId: number;
+  companyId: number;
+  supplierName: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  active: '0' | '1';
+  created_At: string;
+  updated_at?: string;
+}
+
+export interface SupplierApiResponse {
+  suppliers: Supplier[];
+}
+
+export const createSupplier = async (supplier: Omit<Supplier, 'supplierId' | 'created_At' | 'updated_at'>): Promise<Supplier> => {
+  const response = await fetch(`${POS_GMO_BACKEND_URL}/suppliers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 1, ...supplier, companyId: getCurrentUserCompanyId() }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to create supplier');
+  }
+  const data = await response.json();
+  return data.suppliers[0]; // Assuming the API returns the created supplier within a 'suppliers' array
+};
+
+export const updateSupplier = async (supplier: Partial<Supplier> & { supplierId: number }): Promise<Supplier> => {
+  const response = await fetch(`${POS_GMO_BACKEND_URL}/suppliers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 2, ...supplier, companyId: getCurrentUserCompanyId() }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update supplier');
+  }
+  const data = await response.json();
+  return data.suppliers[0];
+};
+
+export const deleteSupplier = async (supplierId: number): Promise<void> => {
+  const response = await fetch(`${POS_GMO_BACKEND_URL}/suppliers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 3, supplierId, companyId: getCurrentUserCompanyId() }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete supplier');
+  }
+};
+
+export const fetchAllSuppliers = async (): Promise<Supplier[]> => {
+  const response = await fetch(`${POS_GMO_BACKEND_URL}/all_suppliers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ plural: [{ companyId: getCurrentUserCompanyId() }] }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch suppliers');
+  }
+  const data: SupplierApiResponse = await response.json();
+  return data.suppliers || [];
+};
+
+export const fetchOneSupplier = async (supplierId: number): Promise<Supplier | null> => {
+  const response = await fetch(`${POS_GMO_BACKEND_URL}/one_suppliers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ supplierId, companyId: getCurrentUserCompanyId() }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch supplier');
+  }
+  const data: SupplierApiResponse = await response.json();
+  return data.suppliers && data.suppliers.length > 0 ? data.suppliers[0] : null;
+};
