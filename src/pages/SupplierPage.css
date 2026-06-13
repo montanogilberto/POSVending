@@ -1,110 +1,51 @@
 .supplier-page {
-  --background: #f4f6f9;
-}
-
-.supplier-search-container {
-  padding: 14px 16px 10px;
-  background: #ffffff;
-}
-
-.supplier-searchbar {
-  --border-radius: 12px;
-  --background: #F4F6F9;
-  box-shadow: none !important;
+  --ion-background-color: #f4f5f8;
 }
 
 .supplier-list {
-  padding: 14px 16px;
-  background: var(--ion-background-color, #ffffff);
+  background: var(--ion-background-color);
+  padding: 0;
 }
 
-.supplier-card {
-  margin: 0 !important;
-  border-radius: 16px !important;
-  box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.08);
-  margin-bottom: 12px !important;
-}
-
-.supplier-card-content {
-  padding: 16px !important;
-}
-
-.supplier-card-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.supplier-left {
-  flex-shrink: 0;
-}
-
-.supplier-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.supplier-avatar {
-  font-size: 40px;
-  color: var(--ion-color-primary, #0056D2);
-}
-
-.supplier-name {
-  font-size: 16px;
-  font-weight: 700;
-  margin-top: 0;
-  margin-bottom: 4px;
-  color: #1F2937;
-}
-
-.supplier-subtitle {
-  font-size: 13px;
-  color: #6B7280;
-  margin-bottom: 4px;
-}
-
-.supplier-meta-badge {
-  display: inline-flex;
+.supplier-item {
+  --background: #ffffff;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   align-items: center;
-  font-size: 12px;
-  color: #374151;
-  margin-right: 8px;
-  margin-bottom: 4px;
 }
 
-.supplier-meta-badge ion-icon {
-  margin-right: 4px;
-  font-size: 14px;
-  color: #9CA3AF;
-}
-
-.supplier-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.action-button {
-  --border-radius: 10px;
+.supplier-item ion-label h2 {
+  font-size: 1.1em;
   font-weight: 600;
-  height: 32px;
-  width: 32px;
-  --padding-start: 0;
-  --padding-end: 0;
+  color: #333;
+  margin-bottom: 5px;
 }
 
-.edit-button {
-  --border-color: var(--ion-color-primary, #0056D2);
-  --color: var(--ion-color-primary, #0056D2);
+.supplier-item ion-label p {
+  font-size: 0.9em;
+  color: #666;
+  margin: 2px 0;
 }
 
-.delete-button {
-  --border-color: var(--ion-color-danger, #EB445A);
-  --color: var(--ion-color-danger, #EB445A);
+.supplier-item ion-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
 }
 
-.supplier-modal {
-  --width: 100%;
-  --height: 100%;
-  --border-radius: 0;
+.supplier-item ion-icon {
+  font-size: 1.2em;
+}
+
+/* Adjust modal content padding */
+ion-modal ion-content {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 16px;
+  --padding-bottom: 16px;
+}
+
+/* Ensure inputs have proper spacing */
+ion-item {
+  margin-bottom: 10px;
 }
