@@ -1,132 +1,157 @@
+/* src/pages/SupplierPage.css */
+
 .suppliers-page {
-  --ion-background-color: #f4f5f8;
+  --background: #f4f6f9; /* Light gray background for the page */
 }
 
-.search-container {
+.suppliers-search-container {
   padding: 14px 16px 10px;
-  background: var(--ion-background-color, #ffffff);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  margin-bottom: 10px;
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0; /* Separator from content */
 }
 
 .suppliers-searchbar {
   --border-radius: 12px;
   --background: #F4F6F9;
+  --placeholder-color: #9E9E9E;
+  padding: 0;
   box-shadow: none;
 }
 
 .suppliers-list {
-  padding: 0 16px;
-  background: transparent;
+  background: var(--ion-background-color, #ffffff);
+  padding: 14px 16px;
 }
 
-.supplier-card {
-  margin: 10px 0 !important;
+.suppliers-card {
+  margin: 0 0 16px 0 !important; /* Remove default margins and add bottom margin */
   border-radius: 16px !important;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --background: #ffffff;
 }
 
-.supplier-card-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.suppliers-card-content {
   padding: 16px !important;
 }
 
-.supplier-main {
-  flex: 1;
-  min-width: 0;
+.suppliers-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --inner-border-width: 0;
+  align-items: flex-start; /* Align icon and text at the top */
 }
 
-.supplier-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
+.suppliers-icon {
+  font-size: 28px;
+  color: var(--ion-color-primary, #0056D2);
+  margin-right: 12px;
+  padding-top: 4px; /* Adjust alignment with text */
 }
 
-.supplier-name {
+.suppliers-name {
   font-size: 18px;
   font-weight: 700;
-  color: var(--ion-color-primary, #0056D2);
+  color: #333333;
   margin-bottom: 4px;
 }
 
-.supplier-meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 5px;
+.suppliers-contact,
+.suppliers-phone,
+.suppliers-email,
+.suppliers-address,
+.suppliers-active,
+.suppliers-created-at,
+.suppliers-updated-at {
+  font-size: 13px;
+  color: #6B7280;
+  margin-bottom: 2px;
+  white-space: normal; /* Allow text to wrap */
 }
 
-.supplier-meta-badge {
-  display: inline-flex;
-  align-items: center;
-  background: #e0e0e0;
-  border-radius: 5px;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: #333;
-}
-
-.supplier-actions {
+.suppliers-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-left: 10px;
+  align-items: flex-end;
+  margin-left: auto;
 }
 
 .action-button {
   --border-radius: 10px;
   font-weight: 600;
   height: 36px;
-  width: 36px;
+  margin: 4px 0;
+  --padding-start: 8px;
+  --padding-end: 8px;
 }
 
 .edit-button {
-  --border-color: var(--ion-color-primary, #0056D2);
+  --background: transparent;
   --color: var(--ion-color-primary, #0056D2);
 }
 
 .delete-button {
-  --border-color: var(--ion-color-danger, #eb445a);
+  --background: transparent;
   --color: var(--ion-color-danger, #eb445a);
 }
 
-.supplier-modal {
+.empty-state {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-style: italic;
+}
+
+.suppliers-modal {
   --width: 90%;
-  --height: 90%;
+  --height: auto;
   --border-radius: 16px;
+  --box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-.supplier-modal ion-header {
-  border-bottom: 1px solid #ddd;
+.suppliers-modal .ion-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-.supplier-modal ion-title {
+.suppliers-modal .ion-card-header {
+  padding-bottom: 0;
+}
+
+.suppliers-modal .ion-card-title {
   font-size: 20px;
   font-weight: bold;
+  color: #333;
 }
 
-.supplier-input {
-  margin-bottom: 15px;
-  --highlight-color-focused: var(--ion-color-primary);
+.suppliers-modal .ion-card-content {
+  flex-grow: 1;
+  padding-top: 10px;
 }
 
-.supplier-toggle-item {
-  margin-bottom: 15px;
+.suppliers-modal .ion-item {
   --inner-padding-end: 0;
+  --padding-start: 0;
+  --min-height: 48px;
 }
 
-.supplier-action-button {
-  margin-top: 20px;
-  --border-radius: 10px;
+.suppliers-modal .ion-label {
+  font-size: 14px;
+  color: #666;
 }
 
-.add-supplier-fab {
-  --background: var(--ion-color-primary, #0056D2);
-  --background-activated: var(--ion-color-primary-shade, #0044a8);
+.suppliers-modal .ion-input {
+  --padding-start: 0;
+  font-size: 16px;
+  color: #333;
 }
 
-.supplier-delete-alert .delete-button-alert {
+.suppliers-modal .ion-toggle {
+  --background-checked: var(--ion-color-primary);
+  --handle-background-checked: #ffffff;
+}
+
+.required-asterisk {
   color: var(--ion-color-danger);
+  margin-left: 2px;
 }
