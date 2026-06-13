@@ -9,7 +9,7 @@ export interface Supplier {
   email?: string;
   address?: string;
   active: string; // '1' or '0'
-  created_At?: string;
+  created_At: string;
   updated_at?: string;
 }
 
@@ -18,7 +18,7 @@ export interface SupplierApiResponse {
 }
 
 export async function getAllSuppliers(companyId: number): Promise<Supplier[]> {
-  const response = await fetch(`${BASE_URL}/all_suppliers`, {
+  const res = await fetch(`${BASE_URL}/all_suppliers`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -26,15 +26,15 @@ export async function getAllSuppliers(companyId: number): Promise<Supplier[]> {
     body: JSON.stringify({ suppliers: [{ companyId }] }),
   });
 
-  if (!response.ok) {
-    throw new Error(await response.text());
+  if (!res.ok) {
+    throw new Error(await res.text());
   }
-  const data: SupplierApiResponse = await response.json();
-  return data.suppliers || [];
+  const data: SupplierApiResponse = await res.json();
+  return data.suppliers;
 }
 
 export async function createSupplier(data: Omit<Supplier, 'supplierId' | 'created_At' | 'updated_at'>): Promise<Supplier> {
-  const response = await fetch(`${BASE_URL}/suppliers`, {
+  const res = await fetch(`${BASE_URL}/suppliers`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -42,40 +42,49 @@ export async function createSupplier(data: Omit<Supplier, 'supplierId' | 'create
     body: JSON.stringify({ action: 1, ...data }),
   });
 
-  if (!response.ok) {
-    throw new Error(await response.text());
+  if (!res.ok) {
+    throw new Error(await res.text());
   }
-  const result = await response.json();
-  return result.result[0];
+  const result = await res.json();
+  if (result.suppliers && result.suppliers.length > 0) {
+    return result.suppliers[0];
+  } else {
+    throw new Error('Failed to create supplier or no supplier returned.');
+  }
 }
 
-export async function updateSupplier(supplierId: number, data: Partial<Omit<Supplier, 'created_At' | 'updated_at'>>): Promise<Supplier> {
-  const response = await fetch(`${BASE_URL}/suppliers`, {
+export async function updateSupplier(id: number, data: Partial<Omit<Supplier, 'created_At' | 'updated_at'>>): Promise<Supplier> {
+  const res = await fetch(`${BASE_URL}/suppliers`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ action: 2, supplierId, ...data }),
+    body: JSON.stringify({ action: 2, supplierId: id, ...data }),
   });
 
-  if (!response.ok) {
-    throw new Error(await response.text());
+  if (!res.ok) {
+    throw new Error(await res.text());
   }
-  const result = await response.json();
-  return result.result[0];
+  const result = await res.json();
+  if (result.suppliers && result.suppliers.length > 0) {
+    return result.suppliers[0];
+  } else {
+    throw new Error('Failed to update supplier or no supplier returned.');
+  }
 }
 
-export async function deleteSupplier(supplierId: number, companyId: number): Promise<void> {
-  const response = await fetch(`${BASE_URL}/suppliers`, {
+export async function deleteSupplier(id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/suppliers`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ action: 3, supplierId, companyId }),
+    body: JSON.stringify({ action: 3, supplierId: id }),
   });
 
-  if (!response.ok) {
-    throw new Error(await response.text());
+  if (!res.ok) {
+    throw new Error(await res.text());
   }
-  await response.text();
+  // No content expected for delete, but parse to ensure no error messages are missed
+  await res.json();
 }
