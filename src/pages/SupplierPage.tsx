@@ -1,35 +1,40 @@
-import React, { useState, useEffect, useMemo, useContext } from 'react';
-import {
+import React, { useState, useEffect, useContext } from 'react';
+import { 
   IonPage,
   IonContent,
-  IonButton,
-  IonIcon,
   IonList,
   IonItem,
   IonLabel,
-  IonCard,
-  IonCardContent,
-  IonSearchbar,
-  IonFab,
-  IonFabButton,
-  IonModal,
   IonInput,
-  IonAlert,
-  IonToast,
+  IonButton,
+  IonIcon,
+  IonModal,
   IonLoading,
-  IonSelect,
-  IonSelectOption,
+  IonToast,
+  IonAlert,
+  IonSearchbar,
+  IonButtons,
+  IonTitle,
+  IonToolbar,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
+  IonToggle
 } from '@ionic/react';
-import { addOutline, createOutline, trashOutline, personCircleOutline } from 'ionicons/icons';
+import { addOutline, pencilOutline, trashOutline, closeOutline, saveOutline } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
-import { UserContext } from '../components/UserContext';
-import { Supplier, getAllSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../api/supplierApi';
+import UserContext from '../components/UserContext';
+import {
+  Supplier,
+  getAllSuppliers,
+  createSupplier,
+  updateSupplier,
+  deleteSupplier
+} from '../api/supplierApi';
 import { SearchbarInputEventDetail } from '@ionic/core';
-import { InputInputEventDetail } from '@ionic/core';
-import IonInfiniteScroll from '@ionic/react/dist/types/components/IonInfiniteScroll';
-import IonInfiniteScrollContent from '@ionic/react/dist/types/components/IonInfiniteScrollContent';
+import { InputChangeEventDetail } from '@ionic/core/dist/types/components/ion-input/ion-input';
+import { ToggleChangeEventDetail } from '@ionic/core/dist/types/components/ion-toggle/ion-toggle';
 
 const toHermosillo = (utc: string | undefined): string => {
   if (!utc) return '';
@@ -37,167 +42,171 @@ const toHermosillo = (utc: string | undefined): string => {
   return new Date(d.getTime() - 7 * 60 * 60 * 1000).toLocaleString();
 };
 
-const ITEMS_PER_LOAD = 20;
-
 const SupplierPage: React.FC = () => {
   const { user } = useContext(UserContext);
   const companyId = user?.companyId;
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [filteredSuppliers, setFilteredSuppliers] = useState<Supplier[]>([]);
   const [displayedSuppliers, setDisplayedSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [searchText, setSearchText] = useState('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState<Partial<Supplier> | null>(null);
-  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasMoreItems, setHasMoreItems] = useState(true);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [searchText, setSearchText] = useState<string>('');
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState<boolean>(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [supplierToDelete, setSupplierToDelete] = useState<number | null>(null);
+  const [editMode, setEditMode] = useState<boolean>(false);
+  const [newSupplierName, setNewSupplierName] = useState<string>('');
+  const [newContactName, setNewContactName] = useState<string>('');
+  const [newPhone, setNewPhone] = useState<string>('');
+  const [newEmail, setNewEmail] = useState<string>('');
+  const [newAddress, setNewAddress] = useState<string>('');
+  const [newActive, setNewActive] = useState<boolean>(true);
 
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>(
-    { showAlertPopover: false, showMailPopover: false }
-  );
+  const [popoverState, setPopoverState] = useState<{ 
+    showAlertPopover: boolean; 
+    showMailPopover: boolean; 
+    event?: Event; 
+  }>({ showAlertPopover: false, showMailPopover: false });
 
-  const presentAlertPopover = (e: React.MouseEvent) =>
+  const presentAlertPopover = (e: React.MouseEvent) => 
     setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () =>
+  const dismissAlertPopover = () => 
     setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) =>
+  const presentMailPopover = (e: React.MouseEvent) => 
     setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () =>
+  const dismissMailPopover = () => 
     setPopoverState({ ...popoverState, showMailPopover: false });
 
-  const fetchSuppliers = async (companyId: number, text: string = '') => {
+  const itemsPerPage = 20;
+  const [page, setPage] = useState<number>(1);
+
+  const fetchSuppliers = async () => {
+    if (!companyId) {
+      setError('Company ID not found. Please log in again.');
+      return;
+    }
     setLoading(true);
-    setError('');
     try {
-      const data = await getAllSuppliers(companyId, text);
-      setSuppliers(data);
+      const fetchedSuppliers = await getAllSuppliers(companyId);
+      const filtered = fetchedSuppliers.filter(supplier =>
+        supplier.supplierName.toLowerCase().includes(searchText.toLowerCase())
+      );
+      setSuppliers(filtered);
+      setDisplayedSuppliers(filtered.slice(0, itemsPerPage));
       setPage(1);
-      setHasMoreItems(true);
-      setDisplayedSuppliers(data.slice(0, ITEMS_PER_LOAD));
-      if (data.length <= ITEMS_PER_LOAD) {
-        setHasMoreItems(false);
-      }
     } catch (err) {
-      setError((err as Error).message ?? 'Error desconocido al cargar proveedores');
+      setError((err as Error).message ?? 'Error loading suppliers');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (companyId) {
-      fetchSuppliers(companyId, searchText);
-    }
+    fetchSuppliers();
   }, [companyId, searchText]);
 
   const loadMoreItems = () => {
-    const newPage = page + 1;
-    const newItems = filteredSuppliers.slice(0, newPage * ITEMS_PER_LOAD);
-    setDisplayedSuppliers(newItems);
-    setPage(newPage);
-    if (newItems.length >= filteredSuppliers.length) {
-      setHasMoreItems(false);
-    }
+    const nextPage = page + 1;
+    const newItems = suppliers.slice(page * itemsPerPage, nextPage * itemsPerPage);
+    setDisplayedSuppliers(prev => [...prev, ...newItems]);
+    setPage(nextPage);
   };
 
-  useEffect(() => {
-    const filtered = suppliers.filter(supplier =>
-      supplier.supplierName.toLowerCase().includes(searchText.toLowerCase()) ||
-      supplier.contactName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      supplier.email?.toLowerCase().includes(searchText.toLowerCase()) ||
-      supplier.phone?.toLowerCase().includes(searchText.toLowerCase())
-    );
-    setFilteredSuppliers(filtered);
-    setDisplayedSuppliers(filtered.slice(0, ITEMS_PER_LOAD));
-    setPage(1);
-    setHasMoreItems(filtered.length > ITEMS_PER_LOAD);
-  }, [suppliers, searchText]);
-
-
-  const handleSearchChange = (e: CustomEvent<SearchbarInputEventDetail>) => {
+  const handleSearch = (e: CustomEvent<SearchbarInputEventDetail>) => {
     setSearchText(e.detail.value!);
   };
 
   const openCreateModal = () => {
-    setEditingSupplier({ active: '1' }); // Default active to '1' for new supplier
-    setShowCreateModal(true);
+    setEditMode(false);
+    setSelectedSupplier(null);
+    setNewSupplierName('');
+    setNewContactName('');
+    setNewPhone('');
+    setNewEmail('');
+    setNewAddress('');
+    setNewActive(true);
+    setIsModalOpen(true);
   };
 
-  const editSupplier = (supplier: Supplier) => {
-    setEditingSupplier({ ...supplier });
-    setShowCreateModal(true);
+  const openEditModal = (supplier: Supplier) => {
+    setEditMode(true);
+    setSelectedSupplier(supplier);
+    setNewSupplierName(supplier.supplierName);
+    setNewContactName(supplier.contactName || '');
+    setNewPhone(supplier.phone || '');
+    setNewEmail(supplier.email || '');
+    setNewAddress(supplier.address || '');
+    setNewActive(supplier.active === '1');
+    setIsModalOpen(true);
   };
 
-  const closeCreateModal = () => {
-    setShowCreateModal(false);
-    setEditingSupplier(null);
+  const handleModalDismiss = () => {
+    setIsModalOpen(false);
+    setSelectedSupplier(null);
+    setNewSupplierName('');
+    setNewContactName('');
+    setNewPhone('');
+    setNewEmail('');
+    setNewAddress('');
+    setNewActive(true);
   };
 
-  const handleInputChange = (e: CustomEvent<InputInputEventDetail>) => {
-    const { name, value } = e.target as HTMLIonInputElement;
-    setEditingSupplier(prev => ({ ...prev, [name!]: value }));
-  };
-
-  const handleSelectChange = (e: CustomEvent) => {
-    const { name, value } = e.target as HTMLIonSelectElement;
-    setEditingSupplier(prev => ({ ...prev, [name!]: value }));
-  };
-
-  const saveSupplier = async () => {
-    if (!editingSupplier?.supplierName || !editingSupplier?.active || !companyId) {
-      setError('El nombre del proveedor y el estado activo son obligatorios.');
+  const handleSaveSupplier = async () => {
+    if (!companyId) {
+      setError('Company ID is missing.');
       return;
     }
     setLoading(true);
     setError('');
     try {
-      if (editingSupplier.supplierId) {
-        // Update existing supplier
-        await updateSupplier(editingSupplier.supplierId, { ...editingSupplier, companyId });
-        setError('Proveedor actualizado exitosamente.');
+      const supplierData = {
+        companyId,
+        supplierName: newSupplierName,
+        contactName: newContactName,
+        phone: newPhone,
+        email: newEmail,
+        address: newAddress,
+        active: newActive ? '1' : '0',
+      };
+
+      if (editMode && selectedSupplier) {
+        await updateSupplier(selectedSupplier.supplierId, supplierData);
       } else {
-        // Create new supplier
-        await createSupplier({ ...editingSupplier as Omit<Supplier, 'supplierId'>, companyId });
-        setError('Proveedor creado exitosamente.');
+        await createSupplier(supplierData);
       }
-      closeCreateModal();
-      if (companyId) await fetchSuppliers(companyId);
+      handleModalDismiss();
+      await fetchSuppliers();
     } catch (err) {
-      setError((err as Error).message ?? 'Error al guardar el proveedor');
+      setError((err as Error).message ?? 'Error saving supplier');
     } finally {
       setLoading(false);
     }
   };
 
-  const confirmDeleteSupplier = (supplier: Supplier) => {
-    setSupplierToDelete(supplier);
-    setShowDeleteAlert(true);
+  const handleDeleteClick = (supplierId: number) => {
+    setSupplierToDelete(supplierId);
+    setIsDeleteAlertOpen(true);
   };
 
-  const deleteSelectedSupplier = async () => {
-    if (supplierToDelete && companyId) {
-      setLoading(true);
-      setError('');
-      try {
-        await deleteSupplier(supplierToDelete.supplierId, companyId);
-        setError('Proveedor eliminado exitosamente.');
-        if (companyId) await fetchSuppliers(companyId);
-      } catch (err) {
-        setError((err as Error).message ?? 'Error al eliminar el proveedor');
-      } finally {
-        setLoading(false);
-        setSupplierToDelete(null);
-        setShowDeleteAlert(false);
-      }
+  const confirmDelete = async () => {
+    if (supplierToDelete === null) return;
+    setLoading(true);
+    setError('');
+    try {
+      await deleteSupplier(supplierToDelete);
+      await fetchSuppliers();
+    } catch (err) {
+      setError((err as Error).message ?? 'Error deleting supplier');
+    } finally {
+      setLoading(false);
+      setSupplierToDelete(null);
+      setIsDeleteAlertOpen(false);
     }
   };
 
   return (
-    <IonPage>
+    <IonPage className="supplier-page">
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
@@ -214,184 +223,137 @@ const SupplierPage: React.FC = () => {
         onDidDismiss={dismissMailPopover}
       />
 
-      <IonContent className="ion-padding supplier-page">
-        <IonLoading isOpen={loading} message={'Cargando proveedores...'}
-        />
-
+      <IonContent fullscreen className="ion-padding">
+        <IonLoading isOpen={loading} message={'Cargando proveedores...'} />
         <IonToast
           isOpen={!!error}
           message={error}
-          duration={3000}
+          duration={5000}
           onDidDismiss={() => setError('')}
           color="danger"
         />
 
-        <div className="supplier-search-container">
-          <IonSearchbar
-            placeholder="Buscar proveedores..."
-            value={searchText}
-            onIonInput={handleSearchChange}
-            debounce={300}
-            className="supplier-searchbar"
-          />
-        </div>
+        <IonSearchbar
+          value={searchText}
+          onIonInput={handleSearch}
+          placeholder="Buscar por nombre de proveedor"
+          debounce={300}
+        />
+
+        <IonButton expand="block" onClick={openCreateModal} className="ion-margin-bottom">
+          <IonIcon slot="start" icon={addOutline} />
+          Agregar Nuevo Proveedor
+        </IonButton>
 
         <IonList className="supplier-list">
-          {displayedSuppliers.map(supplier => (
-            <IonCard key={supplier.supplierId} className="supplier-card">
-              <IonCardContent className="supplier-card-content">
-                <div className="supplier-card-row">
-                  <div className="supplier-left">
-                    <IonIcon icon={personCircleOutline} className="supplier-avatar" />
-                  </div>
-                  <div className="supplier-main">
-                    <h2 className="supplier-name">{supplier.supplierName}</h2>
-                    {supplier.contactName && (
-                      <p className="supplier-subtitle">
-                        Contacto: {supplier.contactName}
-                      </p>
-                    )}
-                    {supplier.phone && (
-                      <p className="supplier-meta-badge">
-                        Teléfono: {supplier.phone}
-                      </p>
-                    )}
-                    {supplier.email && (
-                      <p className="supplier-meta-badge">
-                        Email: {supplier.email}
-                      </p>
-                    )}
-                    {supplier.address && (
-                      <p className="supplier-meta-badge">
-                        Dirección: {supplier.address}
-                      </p>
-                    )}
-                    <p className="supplier-meta-badge">
-                      Estado: {supplier.active === '1' ? 'Activo' : 'Inactivo'}
-                    </p>
-                  </div>
-                  <div className="supplier-actions">
-                    <IonButton
-                      fill="clear"
-                      color="primary"
-                      onClick={() => editSupplier(supplier)}
-                      className="action-button edit-button"
-                    >
-                      <IonIcon icon={createOutline} slot="icon-only" />
-                    </IonButton>
-                    <IonButton
-                      fill="clear"
-                      color="danger"
-                      onClick={() => confirmDeleteSupplier(supplier)}
-                      className="action-button delete-button"
-                    >
-                      <IonIcon icon={trashOutline} slot="icon-only" />
-                    </IonButton>
-                  </div>
-                </div>
-              </IonCardContent>
-            </IonCard>
+          {displayedSuppliers.map((supplier) => (
+            <IonItem key={supplier.supplierId} className="supplier-item">
+              <IonLabel>
+                <h2>{supplier.supplierName}</h2>
+                {supplier.contactName && <p>Contacto: {supplier.contactName}</p>}
+                {supplier.phone && <p>Teléfono: {supplier.phone}</p>}
+                {supplier.email && <p>Email: {supplier.email}</p>}
+                {supplier.address && <p>Dirección: {supplier.address}</p>}
+                <p>Estado: {supplier.active === '1' ? 'Activo' : 'Inactivo'}</p>
+                <p>Creado: {toHermosillo(supplier.created_At)}</p>
+                {supplier.updated_at && <p>Actualizado: {toHermosillo(supplier.updated_at)}</p>}
+              </IonLabel>
+              <IonButton fill="clear" onClick={() => openEditModal(supplier)}>
+                <IonIcon slot="icon-only" icon={pencilOutline} />
+              </IonButton>
+              <IonButton fill="clear" color="danger" onClick={() => handleDeleteClick(supplier.supplierId)}>
+                <IonIcon slot="icon-only" icon={trashOutline} />
+              </IonButton>
+            </IonItem>
           ))}
+
           <IonInfiniteScroll
             onIonInfinite={(ev: CustomEvent<void>) => {
               loadMoreItems();
               (ev.target as HTMLIonInfiniteScrollElement).complete();
             }}
             threshold="100px"
-            disabled={!hasMoreItems}
+            disabled={displayedSuppliers.length === suppliers.length}
           >
-            <IonInfiniteScrollContent
-              loadingText="Cargando más proveedores..."
-            ></IonInfiniteScrollContent>
+            <IonInfiniteScrollContent loadingText="Cargando más proveedores..."></IonInfiniteScrollContent>
           </IonInfiniteScroll>
         </IonList>
 
-        <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={openCreateModal}>
-            <IonIcon icon={addOutline} />
-          </IonFabButton>
-        </IonFab>
-
-        <IonModal isOpen={showCreateModal} onDidDismiss={closeCreateModal} className="supplier-modal">
-          <Header
-            presentAlertPopover={presentAlertPopover}
-            presentMailPopover={presentMailPopover}
-            screenTitle={editingSupplier?.supplierId ? "Editar Proveedor" : "Crear Proveedor"}
-          />
+        <IonModal isOpen={isModalOpen} onDidDismiss={handleModalDismiss}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>{editMode ? 'Editar Proveedor' : 'Agregar Proveedor'}</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={handleModalDismiss}>
+                  <IonIcon icon={closeOutline} />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
           <IonContent className="ion-padding">
             <IonList>
               <IonItem>
                 <IonLabel position="floating">Nombre del Proveedor</IonLabel>
                 <IonInput
-                  name="supplierName"
-                  value={editingSupplier?.supplierName}
-                  onIonInput={handleInputChange}
+                  value={newSupplierName}
+                  onIonChange={(e: CustomEvent<InputChangeEventDetail>) => setNewSupplierName(e.detail.value!)}
                   required
-                ></IonInput>
+                />
               </IonItem>
               <IonItem>
                 <IonLabel position="floating">Nombre de Contacto</IonLabel>
                 <IonInput
-                  name="contactName"
-                  value={editingSupplier?.contactName}
-                  onIonInput={handleInputChange}
-                ></IonInput>
+                  value={newContactName}
+                  onIonChange={(e: CustomEvent<InputChangeEventDetail>) => setNewContactName(e.detail.value!)}
+                />
               </IonItem>
               <IonItem>
                 <IonLabel position="floating">Teléfono</IonLabel>
                 <IonInput
-                  name="phone"
-                  value={editingSupplier?.phone}
-                  onIonInput={handleInputChange}
-                ></IonInput>
+                  value={newPhone}
+                  onIonChange={(e: CustomEvent<InputChangeEventDetail>) => setNewPhone(e.detail.value!)}
+                  type="tel"
+                />
               </IonItem>
               <IonItem>
                 <IonLabel position="floating">Email</IonLabel>
                 <IonInput
-                  name="email"
+                  value={newEmail}
+                  onIonChange={(e: CustomEvent<InputChangeEventDetail>) => setNewEmail(e.detail.value!)}
                   type="email"
-                  value={editingSupplier?.email}
-                  onIonInput={handleInputChange}
-                ></IonInput>
+                />
               </IonItem>
               <IonItem>
                 <IonLabel position="floating">Dirección</IonLabel>
                 <IonInput
-                  name="address"
-                  value={editingSupplier?.address}
-                  onIonInput={handleInputChange}
-                ></IonInput>
+                  value={newAddress}
+                  onIonChange={(e: CustomEvent<InputChangeEventDetail>) => setNewAddress(e.detail.value!)}
+                />
               </IonItem>
               <IonItem>
-                <IonLabel>Estado</IonLabel>
-                <IonSelect
-                  name="active"
-                  value={editingSupplier?.active}
-                  onIonChange={handleSelectChange}
-                  interface="popover"
-                >
-                  <IonSelectOption value="1">Activo</IonSelectOption>
-                  <IonSelectOption value="0">Inactivo</IonSelectOption>
-                </IonSelect>
+                <IonLabel>Activo</IonLabel>
+                <IonToggle
+                  checked={newActive}
+                  onIonChange={(e: CustomEvent<ToggleChangeEventDetail>) => setNewActive(e.detail.checked)}
+                  slot="end"
+                />
               </IonItem>
             </IonList>
-            <IonButton expand="block" onClick={saveSupplier} className="ion-margin-top">
+            <IonButton expand="block" onClick={handleSaveSupplier} className="ion-margin-top">
+              <IonIcon slot="start" icon={saveOutline} />
               Guardar Proveedor
-            </IonButton>
-            <IonButton expand="block" fill="outline" onClick={closeCreateModal} className="ion-margin-top">
-              Cancelar
             </IonButton>
           </IonContent>
         </IonModal>
 
         <IonAlert
-          isOpen={showDeleteAlert}
-          onDidDismiss={() => setShowDeleteAlert(false)}
+          isOpen={isDeleteAlertOpen}
+          onDidDismiss={() => setIsDeleteAlertOpen(false)}
           header={'Confirmar Eliminación'}
-          message={`¿Estás seguro de que quieres eliminar el proveedor ${supplierToDelete?.supplierName}?`}
+          message={'¿Estás seguro de que quieres eliminar este proveedor?'}
           buttons={[
             { text: 'Cancelar', role: 'cancel' },
-            { text: 'Eliminar', handler: deleteSelectedSupplier, cssClass: 'danger' },
+            { text: 'Eliminar', handler: confirmDelete, cssClass: 'danger' },
           ]}
         />
       </IonContent>
