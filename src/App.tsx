@@ -42,7 +42,9 @@ import {
   menu,
   water,
   storefrontOutline,
-} from 'ionicons/icons';
+} from 'ionicons/icons';,
+  peopleOutline,
+}
 
 import Vending from './pages/Vending';
 import Setting from './pages/Setting';
