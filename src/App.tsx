@@ -41,7 +41,10 @@ import {
   person,
   menu,
   water,
-} from 'ionicons/icons';
+  storefrontOutline,
+} from 'ionicons/icons';,
+  peopleOutline,
+}
 
 import Vending from './pages/Vending';
 import Setting from './pages/Setting';
@@ -68,6 +71,7 @@ import ReceiptPage from './pages/Receipt/ReceiptPage';
 import Login from './pages/Authentication/Login';
 import ForgotPassword from './pages/Authentication/ForgotPassword';
 import CreateAccount from './pages/Authentication/CreateAccount';
+import SupplierPage from './pages/SupplierPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -220,6 +224,15 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'suppliers') && (
+              <IonItem button routerLink="/suppliers">
+                <IonIcon icon={storefrontOutline} slot="start" />
+                <IonLabel>Proveedores</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
             <IonItemDivider>Mensajes</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
@@ -347,6 +360,8 @@ const AppShell: React.FC = () => {
             <Route exact path="/">
               <Redirect to="/login" />
             </Route>
+            <PrivateRoute exact path="/suppliers" component={SupplierPage} />
+            <PrivateRoute path="/suppliers" component={SupplierPage} authenticated={true} rolesAllowed={['Admin', 'Manager']} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
