@@ -1,0 +1,89 @@
+/* ClientFaceRecognitionPage.css */
+
+.client-face-recognition-page-content {
+  --background: var(--ion-color-light-shade, #f4f5f8);
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Align content to the top */
+  min-height: 100%; /* Ensure content takes full height */
+}
+
+.client-face-recognition-card {
+  width: 100%;
+  max-width: 500px; /* Constrain width for better readability on large screens */
+  margin: 20px auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.client-face-recognition-card ion-card-header {
+  padding-bottom: 0;
+}
+
+.client-face-recognition-card ion-card-title {
+  font-size: 1.4em;
+  font-weight: bold;
+  color: var(--ion-color-primary, #0056D2);
+}
+
+.client-face-recognition-card ion-card-content {
+  padding: 16px;
+}
+
+.client-face-recognition-card p {
+  color: #555;
+  font-size: 0.9em;
+  margin-bottom: 15px;
+}
+
+.client-face-recognition-card ion-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --background: transparent;
+}
+
+.client-face-recognition-card ion-radio-group {
+  border: 1px solid var(--ion-color-medium-tint, #dcdcdc);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--ion-item-background, #fff);
+}
+
+.client-face-recognition-card ion-radio {
+  --color-checked: var(--ion-color-primary);
+}
+
+.client-face-recognition-card ion-button {
+  margin-top: 10px;
+}
+
+.client-face-recognition-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px; /* Space between back and next/finish buttons */
+}
+
+.captured-image-thumbnail {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 10px auto;
+  border-radius: 8px;
+  border: 1px solid var(--ion-color-medium-tint, #dcdcdc);
+}
+
+.verified-text {
+  color: var(--ion-color-success);
+  font-weight: bold;
+}
+
+.not-verified-text {
+  color: var(--ion-color-danger);
+  font-weight: bold;
+}
+
+/* Ensure the custom header takes up space */
+.client-face-recognition-page-content {
+  padding-top: var(--ion-safe-area-top, 0);
+}
