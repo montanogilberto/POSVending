@@ -1,0 +1,254 @@
+.supplier-page {
+  --background: var(--ion-background-color, #f4f6f9);
+}
+
+.search-container {
+  padding: 14px 16px 10px;
+  background: #ffffff;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  margin-bottom: 10px;
+}
+
+.supplier-searchbar {
+  --border-radius: 12px;
+  --background: #f4f6f9;
+  box-shadow: none;
+}
+
+.supplier-list {
+  padding: 14px 16px;
+  background: var(--ion-background-color, #f4f6f9);
+}
+
+.supplier-card {
+  margin: 0 !important;
+  margin-bottom: 10px !important;
+  border-radius: 16px !important;
+  background: var(--ion-background-color, #ffffff);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  overflow: hidden;
+}
+
+.supplier-card:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.07) !important;
+  transform: translateY(-1px);
+}
+
+.supplier-card-content {
+  padding: 16px !important;
+}
+
+.supplier-card-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.supplier-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.supplier-header {
+  padding-top: 0;
+  padding-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.supplier-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ion-color-dark, #1f2937);
+  margin-bottom: 4px;
+}
+
+.supplier-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.supplier-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.supplier-meta-badge {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+}
+
+.meta-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #9ca3af;
+}
+
+.meta-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.empty {
+  color: #c4c9d4;
+  font-style: italic;
+}
+
+.supplier-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.action-button {
+  --border-radius: 10px;
+  font-weight: 600;
+  min-height: 34px;
+  min-width: 96px;
+  text-transform: none;
+  letter-spacing: 0.2px;
+}
+
+.action-button ion-icon {
+  margin-right: 6px;
+}
+
+.edit-button {
+  --border-color: var(--ion-color-primary, #0056d2);
+  --color: var(--ion-color-primary, #0056d2);
+}
+
+.delete-button {
+  --border-color: var(--ion-color-danger, #dc3545);
+  --color: var(--ion-color-danger, #dc3545);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  color: var(--ion-color-medium, #6c757d);
+  margin-bottom: 16px;
+}
+
+.supplier-modal {
+  --border-radius: 12px;
+}
+
+.modal-toolbar {
+  --background: linear-gradient(135deg, #0056d2 0%, #007bff 100%);
+  --color: #ffffff;
+  padding: 8px 6px;
+}
+
+.modal-title {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.modal-subtitle {
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 12px 16px;
+}
+
+.modal-subtitle ion-text {
+  font-size: 14px;
+}
+
+.modal-content {
+  --background: #f8f9fa;
+}
+
+.form-container {
+  padding: 24px;
+}
+
+.form-item {
+  margin-bottom: 16px;
+  --background: #ffffff;
+  border-radius: 12px;
+  --border-color: #dee2e6;
+  --highlight-height: 0;
+  transition: all 0.25s ease;
+}
+
+.form-item.outline {
+  --border-width: 2px;
+  --inner-border-width: 0;
+}
+
+.form-item:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.primary-button {
+  --background: linear-gradient(135deg, #0056d2 0%, #007bff 100%);
+  --border-radius: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  min-height: 50px;
+  box-shadow: 0 6px 16px rgba(0, 86, 210, 0.35);
+}
+
+.primary-button ion-icon {
+  margin-right: 8px;
+}
+
+.required {
+  color: var(--ion-color-danger);
+  margin-left: 2px;
+}
+
+@media (max-width: 768px) {
+  .supplier-actions {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  .supplier-card-row {
+    flex-direction: column;
+  }
+
+  .action-button {
+    min-width: 88px;
+  }
+}
+
+@media (max-width: 576px) {
+  .form-container {
+    padding: 16px;
+  }
+
+  .modal-toolbar {
+    padding: 12px;
+  }
+
+  .modal-title {
+    font-size: 18px;
+  }
+
+  .modal-subtitle {
+    padding: 8px 16px;
+  }
+}

@@ -41,6 +41,7 @@ import {
   person,
   menu,
   water,
+  storefrontOutline,
   cashOutline,
 } from 'ionicons/icons';
   
@@ -70,6 +71,7 @@ import ReceiptPage from './pages/Receipt/ReceiptPage';
 import Login from './pages/Authentication/Login';
 import ForgotPassword from './pages/Authentication/ForgotPassword';
 import CreateAccount from './pages/Authentication/CreateAccount';
+import SupplierPage from './pages/SupplierPage';
 import LoanPage from './pages/LoanPage';
 
 /* Core/Theme CSS */
@@ -223,6 +225,15 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'suppliers') && (
+              <IonItem button routerLink="/suppliers">
+                <IonIcon icon={storefrontOutline} slot="start" />
+                <IonLabel>Proveedores</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
             <IonItemDivider>Mensajes</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
@@ -359,6 +370,7 @@ const AppShell: React.FC = () => {
             <Route exact path="/">
               <Redirect to="/login" />
             </Route>
+            <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
           </IonRouterOutlet>
 
