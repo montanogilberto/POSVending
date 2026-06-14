@@ -44,6 +44,8 @@ import {
   storefrontOutline,
   cashOutline,
 } from 'ionicons/icons';,
+  peopleOutline,
+}
   shieldCheckmarkOutline,
 }
   
