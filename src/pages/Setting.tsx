@@ -86,6 +86,7 @@ const MODULES: ModuleDef[] = [
       { code: 'egresos',  label: 'Egresos',       icon: trendingDownOutline },
       { code: 'sells',    label: 'Ventas',        icon: cartOutline },
       { code: 'settings', label: 'Configuración', icon: settingsOutline },
+      { code: 'loans', label: 'Préstamos', icon: cashOutline },
     ],
   },
   {
