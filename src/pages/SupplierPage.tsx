@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import './SupplierPage.css';
 import {
   IonPage, IonContent, IonList, IonItem, IonLabel, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonFab, IonFabButton, IonIcon, IonModal,
   IonInput, IonButton, IonAlert, IonLoading, IonToast, IonSearchbar,
-  IonInfiniteScroll, IonInfiniteScrollContent, IonTextarea, IonToggle
+  IonInfiniteScroll, IonInfiniteScrollContent, IonTextarea, IonToggle,
+  IonHeader, IonToolbar, IonButtons, IonTitle, IonText
 } from '@ionic/react';
-import { add, pencil, trash, peopleOutline } from 'ionicons/icons';
+import { add, pencil, trash, peopleOutline, arrowBack, save } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
@@ -192,9 +194,12 @@ const SupplierPage: React.FC = () => {
 
         <IonList className="supplier-list">
           {displayedSuppliers.length === 0 && !loading && !error ? (
-            <IonItem>
-              <IonLabel>No hay proveedores que mostrar.</IonLabel>
-            </IonItem>
+            <div className="empty-state">
+              <IonIcon icon={peopleOutline} className="empty-icon" />
+              <IonText color="medium">
+                <p>{searchText ? 'No se encontraron proveedores' : 'No hay proveedores registrados'}</p>
+              </IonText>
+            </div>
           ) : (
             displayedSuppliers.map(supplier => (
               <IonCard key={supplier.supplierId} className="supplier-card">
@@ -257,7 +262,8 @@ const SupplierPage: React.FC = () => {
                           setShowEditModal(true);
                         }}
                       >
-                        <IonIcon icon={pencil} slot="icon-only" />
+                        <IonIcon icon={pencil} slot="start" />
+                        Editar
                       </IonButton>
                       <IonButton
                         fill="outline"
@@ -269,7 +275,8 @@ const SupplierPage: React.FC = () => {
                           setShowDeleteAlert(true);
                         }}
                       >
-                        <IonIcon icon={trash} slot="icon-only" />
+                        <IonIcon icon={trash} slot="start" />
+                        Eliminar
                       </IonButton>
                     </div>
                   </div>
@@ -294,147 +301,169 @@ const SupplierPage: React.FC = () => {
 
         {/* Create Supplier Modal */}
         <IonModal isOpen={showCreateModal} onDidDismiss={() => setShowCreateModal(false)} className="supplier-modal">
-          <IonContent>
-            <IonCard>
-              <IonCardHeader>
-                <IonCardTitle>Crear Nuevo Proveedor</IonCardTitle>
-              </IonCardHeader>
-              <IonCardContent>
-                <IonItem>
-                  <IonLabel position="floating">Nombre del Proveedor <span className="required">*</span></IonLabel>
-                  <IonInput
-                    name="supplierName"
-                    value={editingSupplier?.supplierName}
-                    onIonChange={handleChange}
-                    required
-                    type="text"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="floating">Nombre de Contacto</IonLabel>
-                  <IonInput
-                    name="contactName"
-                    value={editingSupplier?.contactName}
-                    onIonChange={handleChange}
-                    type="text"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="floating">Teléfono</IonLabel>
-                  <IonInput
-                    name="phone"
-                    value={editingSupplier?.phone}
-                    onIonChange={handleChange}
-                    type="tel"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="floating">Email</IonLabel>
-                  <IonInput
-                    name="email"
-                    value={editingSupplier?.email}
-                    onIonChange={handleChange}
-                    type="email"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="floating">Dirección</IonLabel>
-                  <IonTextarea
-                    name="address"
-                    value={editingSupplier?.address}
-                    onIonChange={handleChange}
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel>Activo</IonLabel>
-                  <IonToggle
-                    name="active"
-                    checked={editingSupplier?.active === '1'}
-                    onIonChange={handleChange}
-                    slot="end"
-                  />
-                </IonItem>
-                <IonButton expand="block" onClick={handleSave} className="ion-margin-top">
-                  Guardar Proveedor
+          <IonHeader className="ion-no-border">
+            <IonToolbar className="modal-toolbar">
+              <IonButtons slot="start">
+                <IonButton fill="clear" onClick={() => setShowCreateModal(false)}>
+                  <IonIcon icon={arrowBack} />
+                </IonButton>
+              </IonButtons>
+              <IonTitle className="modal-title">Agregar Proveedor</IonTitle>
+            </IonToolbar>
+            <div className="modal-subtitle">
+              <IonText color="medium">Registra un nuevo proveedor en el sistema</IonText>
+            </div>
+          </IonHeader>
+          <IonContent className="modal-content">
+            <div className="form-container">
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Nombre del Proveedor <span className="required">*</span></IonLabel>
+                <IonInput
+                  name="supplierName"
+                  value={editingSupplier?.supplierName}
+                  onIonChange={handleChange}
+                  required
+                  type="text"
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Nombre de Contacto</IonLabel>
+                <IonInput
+                  name="contactName"
+                  value={editingSupplier?.contactName}
+                  onIonChange={handleChange}
+                  type="text"
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Teléfono</IonLabel>
+                <IonInput
+                  name="phone"
+                  value={editingSupplier?.phone}
+                  onIonChange={handleChange}
+                  type="tel"
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Email</IonLabel>
+                <IonInput
+                  name="email"
+                  value={editingSupplier?.email}
+                  onIonChange={handleChange}
+                  type="email"
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Dirección</IonLabel>
+                <IonTextarea
+                  name="address"
+                  value={editingSupplier?.address}
+                  onIonChange={handleChange}
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel>Activo</IonLabel>
+                <IonToggle
+                  name="active"
+                  checked={editingSupplier?.active === '1'}
+                  onIonChange={handleChange}
+                  slot="end"
+                />
+              </IonItem>
+              <div className="button-container">
+                <IonButton expand="block" size="large" className="primary-button" onClick={handleSave}>
+                  <IonIcon icon={save} slot="start" />
+                  GUARDAR PROVEEDOR
                 </IonButton>
                 <IonButton expand="block" fill="clear" onClick={() => setShowCreateModal(false)}>
                   Cancelar
                 </IonButton>
-              </IonCardContent>
-            </IonCard>
+              </div>
+            </div>
           </IonContent>
         </IonModal>
 
         {/* Edit Supplier Modal */}
         <IonModal isOpen={showEditModal} onDidDismiss={() => setShowEditModal(false)} className="supplier-modal">
-          <IonContent>
-            <IonCard>
-              <IonCardHeader>
-                <IonCardTitle>Editar Proveedor</IonCardTitle>
-              </IonCardHeader>
-              <IonCardContent>
-                <IonItem>
-                  <IonLabel position="floating">Nombre del Proveedor <span className="required">*</span></IonLabel>
-                  <IonInput
-                    name="supplierName"
-                    value={editingSupplier?.supplierName}
-                    onIonChange={handleChange}
-                    required
-                    type="text"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="floating">Nombre de Contacto</IonLabel>
-                  <IonInput
-                    name="contactName"
-                    value={editingSupplier?.contactName}
-                    onIonChange={handleChange}
-                    type="text"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="floating">Teléfono</IonLabel>
-                  <IonInput
-                    name="phone"
-                    value={editingSupplier?.phone}
-                    onIonChange={handleChange}
-                    type="tel"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="floating">Email</IonLabel>
-                  <IonInput
-                    name="email"
-                    value={editingSupplier?.email}
-                    onIonChange={handleChange}
-                    type="email"
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel position="floating">Dirección</IonLabel>
-                  <IonTextarea
-                    name="address"
-                    value={editingSupplier?.address}
-                    onIonChange={handleChange}
-                  />
-                </IonItem>
-                <IonItem>
-                  <IonLabel>Activo</IonLabel>
-                  <IonToggle
-                    name="active"
-                    checked={editingSupplier?.active === '1'}
-                    onIonChange={handleChange}
-                    slot="end"
-                  />
-                </IonItem>
-                <IonButton expand="block" onClick={handleSave} className="ion-margin-top">
-                  Actualizar Proveedor
+          <IonHeader className="ion-no-border">
+            <IonToolbar className="modal-toolbar">
+              <IonButtons slot="start">
+                <IonButton fill="clear" onClick={() => setShowEditModal(false)}>
+                  <IonIcon icon={arrowBack} />
+                </IonButton>
+              </IonButtons>
+              <IonTitle className="modal-title">Editar Proveedor</IonTitle>
+            </IonToolbar>
+            <div className="modal-subtitle">
+              <IonText color="medium">Actualiza la información del proveedor</IonText>
+            </div>
+          </IonHeader>
+          <IonContent className="modal-content">
+            <div className="form-container">
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Nombre del Proveedor <span className="required">*</span></IonLabel>
+                <IonInput
+                  name="supplierName"
+                  value={editingSupplier?.supplierName}
+                  onIonChange={handleChange}
+                  required
+                  type="text"
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Nombre de Contacto</IonLabel>
+                <IonInput
+                  name="contactName"
+                  value={editingSupplier?.contactName}
+                  onIonChange={handleChange}
+                  type="text"
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Teléfono</IonLabel>
+                <IonInput
+                  name="phone"
+                  value={editingSupplier?.phone}
+                  onIonChange={handleChange}
+                  type="tel"
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Email</IonLabel>
+                <IonInput
+                  name="email"
+                  value={editingSupplier?.email}
+                  onIonChange={handleChange}
+                  type="email"
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel position="floating">Dirección</IonLabel>
+                <IonTextarea
+                  name="address"
+                  value={editingSupplier?.address}
+                  onIonChange={handleChange}
+                />
+              </IonItem>
+              <IonItem className="form-item outline">
+                <IonLabel>Activo</IonLabel>
+                <IonToggle
+                  name="active"
+                  checked={editingSupplier?.active === '1'}
+                  onIonChange={handleChange}
+                  slot="end"
+                />
+              </IonItem>
+              <div className="button-container">
+                <IonButton expand="block" size="large" className="primary-button" onClick={handleSave}>
+                  <IonIcon icon={save} slot="start" />
+                  ACTUALIZAR PROVEEDOR
                 </IonButton>
                 <IonButton expand="block" fill="clear" onClick={() => setShowEditModal(false)}>
                   Cancelar
                 </IonButton>
-              </IonCardContent>
-            </IonCard>
+              </div>
+            </div>
           </IonContent>
         </IonModal>
 

@@ -21,9 +21,10 @@ export async function getAllSuppliers(companyId: number): Promise<Supplier[]> {
   const res = await fetch(`${BASE_URL}/all_suppliers`, {
     method: 'POST',
     headers: {
+      accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ suppliers: [{ companyId }] }),
+    body: JSON.stringify({ supplier: { companyId: String(companyId) } }),
   });
 
   if (!res.ok) {
