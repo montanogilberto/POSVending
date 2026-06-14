@@ -43,7 +43,9 @@ import {
   water,
   storefrontOutline,
   cashOutline,
-} from 'ionicons/icons';
+} from 'ionicons/icons';,
+  shieldCheckmarkOutline,
+}
   
 
 import Vending from './pages/Vending';
@@ -73,6 +75,7 @@ import ForgotPassword from './pages/Authentication/ForgotPassword';
 import CreateAccount from './pages/Authentication/CreateAccount';
 import SupplierPage from './pages/SupplierPage';
 import LoanPage from './pages/LoanPage';
+import ClientFaceRecognitionPage from './pages/ClientFaceRecognitionPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -372,6 +375,7 @@ const AppShell: React.FC = () => {
             </Route>
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
+            <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
