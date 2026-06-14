@@ -1,89 +1,105 @@
-/* ClientFaceRecognitionPage.css */
+.client-face-recognition-page {
+  --ion-background-color: #f4f6f9;
+}
 
-.client-face-recognition-page-content {
-  --background: var(--ion-color-light-shade, #f4f5f8);
+.client-face-recognition-content {
   padding: 16px;
+}
+
+.client-face-recognition-wizard-container {
   display: flex;
-  justify-content: center;
-  align-items: flex-start; /* Align content to the top */
-  min-height: 100%; /* Ensure content takes full height */
+  flex-direction: column;
+  gap: 16px;
+  max-width: 600px; /* Constrain width for better readability */
+  margin: 0 auto; /* Center the wizard */
 }
 
-.client-face-recognition-card {
-  width: 100%;
-  max-width: 500px; /* Constrain width for better readability on large screens */
-  margin: 20px auto;
-  border-radius: 12px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+.client-face-recognition-step-card {
+  margin: 0 !important; /* Override default IonCard margin */
+  border-radius: 16px !important;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.client-face-recognition-card ion-card-header {
+.client-face-recognition-step-card-header {
   padding-bottom: 0;
 }
 
-.client-face-recognition-card ion-card-title {
-  font-size: 1.4em;
+.client-face-recognition-step-card-title {
+  font-size: 20px;
   font-weight: bold;
   color: var(--ion-color-primary, #0056D2);
 }
 
-.client-face-recognition-card ion-card-content {
-  padding: 16px;
+.client-face-recognition-step-card-content {
+  padding-top: 8px;
+  color: #374151;
 }
 
-.client-face-recognition-card p {
-  color: #555;
-  font-size: 0.9em;
-  margin-bottom: 15px;
+.client-face-recognition-navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
 }
 
-.client-face-recognition-card ion-item {
-  --padding-start: 0;
-  --inner-padding-end: 0;
-  --background: transparent;
-}
-
-.client-face-recognition-card ion-radio-group {
-  border: 1px solid var(--ion-color-medium-tint, #dcdcdc);
-  border-radius: 8px;
-  padding: 10px;
-  background: var(--ion-item-background, #fff);
-}
-
-.client-face-recognition-card ion-radio {
-  --color-checked: var(--ion-color-primary);
-}
-
-.client-face-recognition-card ion-button {
+.client-face-recognition-radio-group {
   margin-top: 10px;
 }
 
-.client-face-recognition-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px; /* Space between back and next/finish buttons */
+.client-face-recognition-radio-item {
+  --inner-padding-end: 0;
+  --inner-border-width: 0;
+  --padding-start: 0;
+  border-bottom: 1px solid var(--ion-color-light-shade, #e6e6e6);
 }
 
-.captured-image-thumbnail {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 10px auto;
+.client-face-recognition-radio-item:last-child {
+  border-bottom: none;
+}
+
+.client-face-recognition-input {
+  --padding-start: 10px;
+  --padding-end: 10px;
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+  margin-top: 10px;
+  border: 1px solid #ddd;
   border-radius: 8px;
-  border: 1px solid var(--ion-color-medium-tint, #dcdcdc);
 }
 
-.verified-text {
-  color: var(--ion-color-success);
+.client-face-recognition-button {
+  --border-radius: 10px;
+  font-weight: 600;
+}
+
+.client-face-recognition-verification-status {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 18px;
   font-weight: bold;
 }
 
-.not-verified-text {
-  color: var(--ion-color-danger);
-  font-weight: bold;
+.client-face-recognition-verification-status.success {
+  color: var(--ion-color-success, #28ba62);
 }
 
-/* Ensure the custom header takes up space */
-.client-face-recognition-page-content {
-  padding-top: var(--ion-safe-area-top, 0);
+.client-face-recognition-verification-status.fail {
+  color: var(--ion-color-danger, #eb445a);
+}
+
+.client-face-recognition-contract-text {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fdfdfd;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.client-face-recognition-checkbox-item {
+  margin-top: 10px;
+  --inner-padding-end: 0;
+  --inner-border-width: 0;
 }
