@@ -9,15 +9,15 @@ export interface ClientFaceRecognition {
   confidenceScore: number;
   isVerified: boolean;
   contractAccepted: boolean;
-  acceptedAt: string;
-  contractPdfBlobUrl?: string; // Optional field for contract PDF URL
+  acceptedAt: string; // datetime
+  created_At?: string; // datetime
+  updated_at?: string; // datetime
 }
 
 export interface ClientFaceRecognitionListResponse {
   clientFaceRecognitions: ClientFaceRecognition[];
 }
 
-// Specific interfaces for connector endpoints
 export interface FaceVerificationRequest {
   companyId: number;
   documentType: 'INE' | 'Passport' | 'Driver License';
@@ -41,92 +41,72 @@ export interface ContractSubmissionRequest {
   confidenceScore: number;
   isVerified: boolean;
   contractAccepted: boolean;
-  acceptedAt: string; // ISO 8601 string
-  contractPdfBase64?: string; // Optional: if PDF is to be uploaded
-  contractPdfBlobUrl?: string; // Optional: if PDF is already uploaded or not needed
+  acceptedAt: string;
+  contractPdfBase64?: string;
 }
 
 // GET ALL -- POST /all_clientFaceRecognitions
-// Body: { "clientFaceRecognitions": [{ "companyId": companyId }] }
-// Response: { "clientFaceRecognitions": ClientFaceRecognition[] }  <-- unwrap .clientFaceRecognitions before returning
 export async function getAllClientFaceRecognitions(companyId: number): Promise<ClientFaceRecognition[]> {
   const res = await fetch(BASE_URL + "/all_clientFaceRecognitions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ "clientFaceRecognitions": [{ "companyId": companyId }] }),
   });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+  if (!res.ok) throw new Error(await res.text());
   const data: ClientFaceRecognitionListResponse = await res.json();
-  return data.clientFaceRecognitions ?? [];   // guard: SP returns {} on empty table
+  return data.clientFaceRecognitions ?? [];
 }
 
 // CREATE -- POST /clientFaceRecognitions
-// Body: { "clientFaceRecognitions": [{ "action": 1, "companyId": ..., ...fields }] }
-export async function createClientFaceRecognition(payload: Omit<ClientFaceRecognition, "clientFaceRecognitionId">): Promise<ClientFaceRecognition> {
+export async function createClientFaceRecognition(payload: Omit<ClientFaceRecognition, "clientFaceRecognitionId" | "created_At" | "updated_at">): Promise<ClientFaceRecognition> {
   const res = await fetch(BASE_URL + "/clientFaceRecognitions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ "clientFaceRecognitions": [{ "action": 1, ...payload }] }),
   });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+  if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
 
 // UPDATE -- POST /clientFaceRecognitions
-// Body: { "clientFaceRecognitions": [{ "action": 2, "clientFaceRecognitionId": id, ...fields }] }
-export async function updateClientFaceRecognition(id: number, payload: Partial<ClientFaceRecognition>): Promise<ClientFaceRecognition> {
+export async function updateClientFaceRecognition(id: number, payload: Partial<Omit<ClientFaceRecognition, "clientFaceRecognitionId" | "created_At" | "updated_at">>): Promise<ClientFaceRecognition> {
   const res = await fetch(BASE_URL + "/clientFaceRecognitions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ "clientFaceRecognitions": [{ "action": 2, "clientFaceRecognitionId": id, ...payload }] }),
   });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+  if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
 
 // DELETE -- POST /clientFaceRecognitions
-// Body: { "clientFaceRecognitions": [{ "action": 3, "clientFaceRecognitionId": id, "companyId": companyId }] }
 export async function deleteClientFaceRecognition(id: number, companyId: number): Promise<void> {
   const res = await fetch(BASE_URL + "/clientFaceRecognitions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ "clientFaceRecognitions": [{ "action": 3, "clientFaceRecognitionId": id, "companyId": companyId }] }),
   });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+  if (!res.ok) throw new Error(await res.text());
 }
 
-// CONNECTOR: VERIFY -- POST /api/client-face-recognition/verify
+// CONNECTOR: VERIFY -- POST /api/clientFaceRecognition/verify
 export async function verifyClientFaceRecognition(payload: FaceVerificationRequest): Promise<FaceVerificationResponse> {
-  const res = await fetch(BASE_URL + "/api/client-face-recognition/verify", {
+  const res = await fetch(BASE_URL + "/api/clientFaceRecognition/verify", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
+  if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
 
-// CONNECTOR: CONTRACT -- POST /api/client-face-recognition/contract
-export async function contractClientFaceRecognition(payload: ContractSubmissionRequest): Promise<ClientFaceRecognition> {
-  const res = await fetch(BASE_URL + "/api/client-face-recognition/contract", {
+// CONNECTOR: CONTRACT -- POST /api/clientFaceRecognition/contract
+export async function submitContractClientFaceRecognition(payload: ContractSubmissionRequest): Promise<ClientFaceRecognition> {
+  const res = await fetch(BASE_URL + "/api/clientFaceRecognition/contract", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(await res.text());
-  }
-  // The backend for this connector route directly uses clientFaceRecognitions_sp,
-  // which returns a single ClientFaceRecognition object (not wrapped in an array or plural key).
+  if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
