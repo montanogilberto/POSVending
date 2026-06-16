@@ -378,6 +378,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
             <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
+            <PrivateRoute exact path="/client-face-recognition" component={ClientFaceRecognitionPage} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
