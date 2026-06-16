@@ -1,39 +1,36 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   IonPage,
   IonContent,
+  IonButton,
   IonLoading,
   IonToast,
   IonCard,
   IonCardHeader,
   IonCardTitle,
   IonCardContent,
-  IonButton,
-  IonButtons,
-  IonIcon,
   IonRadioGroup,
   IonRadio,
+  IonListHeader,
   IonLabel,
+  IonList,
   IonItem,
   IonCheckbox,
 } from '@ionic/react';
-import { chevronBackOutline, chevronForwardOutline, cameraOutline, documentTextOutline, shieldCheckmarkOutline, readerOutline } from 'ionicons/icons';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
+import { AuthContext } from '../context/AuthContext';
 import {
-  ClientFaceRecognition,
-  createClientFaceRecognition,
   verifyClientFaceRecognition,
   submitContractClientFaceRecognition,
-  FaceVerificationRequest,
   FaceVerificationResponse,
   ContractSubmissionRequest,
 } from '../api/clientFaceRecognitionApi';
-import { UserContext } from '../components/UserContext';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'; // Assuming Capacitor Camera is available and configured
 
-// UTC-7 date conversion
+import './ClientFaceRecognitionPage.css';
+
 const toHermosillo = (utc: string | undefined): string => {
   if (!utc) return '';
   const d = new Date(utc.includes('Z') ? utc : utc + 'Z');
@@ -41,7 +38,8 @@ const toHermosillo = (utc: string | undefined): string => {
 };
 
 const ClientFaceRecognitionPage: React.FC = () => {
-  const { companyId } = useContext(UserContext);
+  const { user } = useContext(AuthContext);
+  const companyId = user?.companyId || 0;
 
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -64,133 +62,43 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const dismissMailPopover = () =>
     setPopoverState({ ...popoverState, showMailPopover: false });
 
-  const [formData, setFormData] = useState<{
-    documentType: 'INE' | 'Passport' | 'Driver License' | '';
-    idFrontImageBase64: string;
-    clientSelfieBase64: string;
-    idFrontImageBlobUrl: string; // Store blob URLs after verification
-    clientSelfieBlobUrl: string; // Store blob URLs after verification
-    confidenceScore: number;
-    isVerified: boolean;
-    contractAccepted: boolean;
-    acceptedAt: string;
-  }> ({
-    documentType: '',
-    idFrontImageBase64: '',
-    clientSelfieBase64: '',
-    idFrontImageBlobUrl: '',
-    clientSelfieBlobUrl: '',
-    confidenceScore: 0,
-    isVerified: false,
-    contractAccepted: false,
-    acceptedAt: '',
-  });
+  // Step 1: Document Selection
+  const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
 
-  // Mock contract terms (replace with actual terms)
-  const contractTerms = `\n    Términos y Condiciones del Servicio de Verificación Biométrica\n    1. Aceptación de los Términos: Al utilizar este servicio, usted acepta estar sujeto a estos términos y condiciones.\n    2. Recopilación de Datos: Se recopilarán imágenes de su documento de identificación y un selfie para fines de verificación biométrica. Estos datos serán tratados con la máxima confidencialidad y seguridad.\n    3. Uso de la Información: La información biométrica se utilizará exclusivamente para validar su identidad contra el documento proporcionado y para fines de cumplimiento normativo. No se compartirá con terceros sin su consentimiento explícito, salvo que sea requerido por ley.\n    4. Almacenamiento de Datos: Sus imágenes y resultados de verificación se almacenarán de forma segura en Azure Blob Storage, con acceso restringido y cifrado, por un período determinado según la política de retención de datos de la empresa.\n    5. Consentimiento para el Procesamiento: Usted da su consentimiento para el procesamiento de sus datos biométricos tal como se describe en esta sección.\n    6. Exactitud de la Información: Usted es responsable de proporcionar información precisa y veraz.\n    7. Modificaciones a los Términos: La empresa se reserva el derecho de modificar estos términos en cualquier momento. Se le notificará sobre cualquier cambio significativo.\n    8. Jurisdicción: Cualquier disputa que surja de estos términos se regirá por las leyes de México.\n    He leído y acepto los términos y condiciones.\n  `;
+  // Step 2: Camera Capture
+  const [idFrontImageBase64, setIdFrontImageBase64] = useState<string>('');
+  const [clientSelfieBase64, setClientSelfieBase64] = useState<string>('');
+  const [idFrontImageBlobUrl, setIdFrontImageBlobUrl] = useState<string>('');
+  const [clientSelfieBlobUrl, setClientSelfieBlobUrl] = useState<string>('');
 
-  const handleNextStep = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      setShowToast(false);
-      setToastMessage('');
+  // Step 3: Biometric Verification
+  const [confidenceScore, setConfidenceScore] = useState<number>(0);
+  const [isVerified, setIsVerified] = useState<boolean>(false);
 
-      if (currentStep === 1) {
-        if (!formData.documentType) {
-          throw new Error('Please select a document type.');
-        }
-      } else if (currentStep === 2) {
-        if (!formData.idFrontImageBase64 || !formData.clientSelfieBase64) {
-          throw new Error('Please capture both ID front image and client selfie.');
-        }
-        // Call the verify connector API
-        const verifyPayload: FaceVerificationRequest = {
-          companyId: companyId!, // Assuming companyId is always available
-          documentType: formData.documentType,
-          idFrontImageBase64: formData.idFrontImageBase64,
-          clientSelfieBase64: formData.clientSelfieBase64,
-        };
-        const response: FaceVerificationResponse = await verifyClientFaceRecognition(verifyPayload);
-        if (response.error) {
-          throw new Error(response.error);
-        }
-        setFormData((prev) => ({
-          ...prev,
-          confidenceScore: response.confidenceScore,
-          isVerified: response.isVerified,
-          idFrontImageBlobUrl: response.idFrontImageBlobUrl,
-          clientSelfieBlobUrl: response.clientSelfieBlobUrl,
-        }));
-        if (!response.isVerified) {
-          setShowToast(true);
-          setToastMessage('Biometric verification failed. Please try again.');
-          return; // Stay on this step or go to a specific error step
-        }
-      } else if (currentStep === 3) {
-        if (!formData.isVerified) {
-          throw new Error('Biometric verification not passed.');
-        }
-      } else if (currentStep === 4) {
-        if (!formData.contractAccepted) {
-          throw new Error('You must accept the contract terms to proceed.');
-        }
-        // Submit the final contract
-        const submissionPayload: ContractSubmissionRequest = {
-          companyId: companyId!,
-          documentType: formData.documentType,
-          idFrontImageBlobUrl: formData.idFrontImageBlobUrl,
-          clientSelfieBlobUrl: formData.clientSelfieBlobUrl,
-          confidenceScore: formData.confidenceScore,
-          isVerified: formData.isVerified,
-          contractAccepted: formData.contractAccepted,
-          acceptedAt: new Date().toISOString(), // UTC timestamp
-          // contractPdfBase64: '', // If we had a PDF generated in a previous step
-        };
-        await submitContractClientFaceRecognition(submissionPayload);
-        setShowToast(true);
-        setToastMessage('Client face recognition and contract submitted successfully!');
-        // Optionally reset form or navigate
-        setCurrentStep(1); // Reset wizard
-        setFormData({ // Clear form data
-            documentType: '',
-            idFrontImageBase64: '',
-            clientSelfieBase64: '',
-            idFrontImageBlobUrl: '',
-            clientSelfieBlobUrl: '',
-            confidenceScore: 0,
-            isVerified: false,
-            contractAccepted: false,
-            acceptedAt: '',
-        });
-        setLoading(false);
-        return; // Exit function after final submission
-      }
-      setCurrentStep(currentStep + 1);
-    } catch (err) {
-      setError((err as Error).message ?? 'Error desconocido');
+  // Step 4: Contract Agreement
+  const [contractAccepted, setContractAccepted] = useState<boolean>(false);
+  const [acceptedAt, setAcceptedAt] = useState<string>('');
+
+  const handleNextStep = () => {
+    // Basic validation before moving to the next step
+    if (currentStep === 1 && !documentType) {
+      setError('Please select a document type.');
       setShowToast(true);
-      setToastMessage((err as Error).message ?? 'Error desconocido');
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
-
-  const handleBackStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+    if (currentStep === 2 && (!idFrontImageBase64 || !clientSelfieBase64)) {
+      setError('Please capture both ID front image and a selfie.');
+      setShowToast(true);
+      return;
     }
+    setCurrentStep((prev) => prev + 1);
   };
 
-  const handleDocumentTypeChange = (e: CustomEvent) => {
-    setFormData((prev) => ({ ...prev, documentType: e.detail.value }));
+  const handlePrevStep = () => {
+    setCurrentStep((prev) => prev - 1);
   };
 
-  const handleContractAcceptedChange = (e: CustomEvent) => {
-    setFormData((prev) => ({ ...prev, contractAccepted: e.detail.checked }));
-  };
-
-  const takePhoto = async (imageType: 'idFront' | 'selfie') => {
+  const takePicture = async (setImageBase64: React.Dispatch<React.SetStateAction<string>>) => {
     try {
       const photo = await Camera.getPhoto({
         quality: 90,
@@ -198,32 +106,105 @@ const ClientFaceRecognitionPage: React.FC = () => {
         resultType: CameraResultType.Base64,
         source: CameraSource.Camera,
       });
-
       if (photo.base64String) {
-        if (imageType === 'idFront') {
-          setFormData((prev) => ({ ...prev, idFrontImageBase64: photo.base64String }));
-          setShowToast(true);
-          setToastMessage('ID Front image captured!');
-        } else {
-          setFormData((prev) => ({ ...prev, clientSelfieBase64: photo.base64String }));
-          setShowToast(true);
-          setToastMessage('Client Selfie Captured!');
-        }
+        setImageBase64(`data:image/jpeg;base64,${photo.base64String}`);
       }
     } catch (err) {
-      setError((err as Error).message ?? 'Failed to capture photo');
+      setError((err as Error).message ?? 'Error capturing image');
       setShowToast(true);
-      setToastMessage((err as Error).message ?? 'Failed to capture photo');
     }
   };
 
+  const handleVerify = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response: FaceVerificationResponse = await verifyClientFaceRecognition({
+        companyId,
+        documentType,
+        idFrontImageBase64: idFrontImageBase64.split(',')[1], // Remove data URI prefix
+        clientSelfieBase64: clientSelfieBase64.split(',')[1], // Remove data URI prefix
+      });
+      setConfidenceScore(response.confidenceScore);
+      setIsVerified(response.isVerified);
+      setIdFrontImageBlobUrl(response.idFrontImageBlobUrl);
+      setClientSelfieBlobUrl(response.clientSelfieBlobUrl);
+      if (response.error) {
+        setError(response.error);
+        setShowToast(true);
+      } else {
+        setToastMessage('Verification complete!');
+        setShowToast(true);
+        handleNextStep(); // Move to next step on successful verification
+      }
+    } catch (err) {
+      setError((err as Error).message ?? 'Error during biometric verification');
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitContract = async () => {
+    if (!contractAccepted) {
+      setError('Please accept the contract terms to proceed.');
+      setShowToast(true);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const now = new Date().toISOString();
+      setAcceptedAt(now);
+
+      const payload: ContractSubmissionRequest = {
+        companyId,
+        documentType,
+        idFrontImageBlobUrl,
+        clientSelfieBlobUrl,
+        confidenceScore,
+        isVerified,
+        contractAccepted: true,
+        acceptedAt: now,
+        // contractPdfBase64: 'optional base64 PDF string if generated client-side',
+      };
+
+      const response = await submitContractClientFaceRecognition(payload);
+
+      if (response.error) {
+        setError(response.error);
+        setToastMessage(`Contract submission failed: ${response.msg || ''}`);
+        setShowToast(true);
+      } else {
+        setToastMessage('Contract accepted and submitted successfully!');
+        setShowToast(true);
+        // Reset wizard or navigate away
+        setCurrentStep(1);
+        setDocumentType('');
+        setIdFrontImageBase64('');
+        setClientSelfieBase64('');
+        setIdFrontImageBlobUrl('');
+        setClientSelfieBlobUrl('');
+        setConfidenceScore(0);
+        setIsVerified(false);
+        setContractAccepted(false);
+        setAcceptedAt('');
+      }
+    } catch (err) {
+      setError((err as Error).message ?? 'Error submitting contract');
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <IonPage className="client-face-recognition-page">
+    <IonPage>
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle="Verificación Facial del Cliente — POS GMO"
+        screenTitle="Reconocimiento Facial — POS GMO"
       />
       <AlertPopover
         isOpen={popoverState.showAlertPopover}
@@ -236,146 +217,149 @@ const ClientFaceRecognitionPage: React.FC = () => {
         onDidDismiss={dismissMailPopover}
       />
 
-      <IonContent className="client-face-recognition-content">
-        <IonLoading isOpen={loading} message="Cargando..." />
-        <IonToast
-          isOpen={showToast}
-          message={toastMessage}
-          duration={3000}
-          onDidDismiss={() => setShowToast(false)}
-          color={error ? "danger" : "success"}
-        />
+      <IonLoading isOpen={loading} message={'Please wait...'} />
+      <IonToast
+        isOpen={showToast}
+        message={toastMessage || error}
+        duration={3000}
+        onDidDismiss={() => {
+          setShowToast(false);
+          setToastMessage('');
+          setError('');
+        }}
+        color={error ? 'danger' : 'success'}
+      />
 
-        <div className="client-face-recognition-wizard-container">
-          {currentStep === 1 && (
+      <IonContent fullscreen className="ion-padding client-face-recognition-page">
+        {
+          currentStep === 1 && (
             <IonCard className="client-face-recognition-step-card">
-              <IonCardHeader className="client-face-recognition-step-card-header">
-                <IonCardTitle className="client-face-recognition-step-card-title">
-                  <IonIcon icon={documentTextOutline} className="ion-margin-end" />
-                  DocumentSelectionStep
-                </IonCardTitle>
+              <IonCardHeader>
+                <IonCardTitle>DocumentSelectionStep</IonCardTitle>
               </IonCardHeader>
-              <IonCardContent className="client-face-recognition-step-card-content">
-                <p>IonRadioGroup selecting documentType from: INE, Passport, or Driver License.</p>
-                <IonRadioGroup
-                  value={formData.documentType}
-                  onIonChange={handleDocumentTypeChange}
-                  className="client-face-recognition-radio-group"
-                >
-                  <IonItem className="client-face-recognition-radio-item">
-                    <IonLabel>INE</IonLabel>
-                    <IonRadio value="INE" />
-                  </IonItem>
-                  <IonItem className="client-face-recognition-radio-item">
-                    <IonLabel>Passport</IonLabel>
-                    <IonRadio value="Passport" />
-                  </IonItem>
-                  <IonItem className="client-face-recognition-radio-item">
-                    <IonLabel>Driver License</IonLabel>
-                    <IonRadio value="Driver License" />
-                  </IonItem>
-                </IonRadioGroup>
-              </IonCardContent>
-            </IonCard>
-          )}
-
-          {currentStep === 2 && (
-            <IonCard className="client-face-recognition-step-card">
-              <IonCardHeader className="client-face-recognition-step-card-header">
-                <IonCardTitle className="client-face-recognition-step-card-title">
-                  <IonIcon icon={cameraOutline} className="ion-margin-end" />
-                  CameraCaptureStep
-                </IonCardTitle>
-              </IonCardHeader>
-              <IonCardContent className="client-face-recognition-step-card-content">
-                <p>Capacitor Camera interface capturing 2 separate images: idFrontImageBlobUrl and clientSelfieBlobUrl.</p>
-                <IonButton expand="block" onClick={() => takePhoto('idFront')} className="ion-margin-top client-face-recognition-button">
-                  <IonIcon icon={cameraOutline} slot="start" />
-                  Capture ID Front Image
+              <IonCardContent>
+                <p>IonRadioGroup letting the user select documentType from: INE, Passport, or Driver License.</p>
+                <IonList className="client-face-recognition-radio-list">
+                  <IonListHeader>
+                    <IonLabel>Select Document Type</IonLabel>
+                  </IonListHeader>
+                  <IonRadioGroup
+                    value={documentType}
+                    onIonChange={(e: CustomEvent<{
+                      value: 'INE' | 'Passport' | 'Driver License';
+                    }>) => setDocumentType(e.detail.value)}
+                  >
+                    <IonItem>
+                      <IonLabel>INE</IonLabel>
+                      <IonRadio value="INE"></IonRadio>
+                    </IonItem>
+                    <IonItem>
+                      <IonLabel>Passport</IonLabel>
+                      <IonRadio value="Passport"></IonRadio>
+                    </IonItem>
+                    <IonItem>
+                      <IonLabel>Driver License</IonLabel>
+                      <IonRadio value="Driver License"></IonRadio>
+                    </IonItem>
+                  </IonRadioGroup>
+                </IonList>
+                <IonButton expand="block" onClick={handleNextStep} className="ion-margin-top">
+                  Next
                 </IonButton>
-                {formData.idFrontImageBase64 && (
-                  <p className="ion-text-center ion-margin-top">ID Front Image Captured!</p>
-                )}
-                <IonButton expand="block" onClick={() => takePhoto('selfie')} className="ion-margin-top client-face-recognition-button">
-                  <IonIcon icon={cameraOutline} slot="start" />
-                  Capture Client Selfie
+              </IonCardContent>
+            </IonCard>
+          )
+        }
+
+        {
+          currentStep === 2 && (
+            <IonCard className="client-face-recognition-step-card">
+              <IonCardHeader>
+                <IonCardTitle>CameraCaptureStep</IonCardTitle>
+              </IonCardHeader>
+              <IonCardContent>
+                <p>Capacitor Camera interface capturing two separate images: idFrontImageBlobUrl (document front) and clientSelfieBlobUrl (live selfie).</p>
+                <IonButton expand="block" onClick={() => takePicture(setIdFrontImageBase64)} className="ion-margin-bottom">
+                  Capture ID Front
                 </IonButton>
-                {formData.clientSelfieBase64 && (
-                  <p className="ion-text-center ion-margin-top">Client Selfie Captured!</p>
+                {idFrontImageBase64 && (
+                  <img src={idFrontImageBase64} alt="ID Front" className="captured-image" />
                 )}
+                <IonButton expand="block" onClick={() => takePicture(setClientSelfieBase64)} className="ion-margin-top ion-margin-bottom">
+                  Capture Selfie
+                </IonButton>
+                {clientSelfieBase64 && (
+                  <img src={clientSelfieBase64} alt="Client Selfie" className="captured-image" />
+                )}
+                <IonButton expand="block" onClick={handlePrevStep} fill="outline" className="ion-margin-top">
+                  Back
+                </IonButton>
+                <IonButton expand="block" onClick={handleNextStep} className="ion-margin-top">
+                  Next
+                </IonButton>
+              </IonCardContent>
+            /
+          )
+        }
+
+        {
+          currentStep === 3 && (
+            <IonCard className="client-face-recognition-step-card">
+              <IonCardHeader>
+                <IonCardTitle>BiometricVerificationStep</IonCardTitle>
+              </IonCardHeader>
+              <IonCardContent>
+                <p>Calls the verify endpoint, displays matching progress, then shows confidenceScore and isVerified result. IonLoading while the API call is in flight.</p>
+                <IonButton expand="block" onClick={handleVerify} disabled={loading}>
+                  Verify Biometrics
+                </IonButton>
+                {confidenceScore > 0 && (
+                  <div className="ion-margin-top">
+                    <p><strong>Confidence Score:</strong> {confidenceScore.toFixed(4)}</p>
+                    <p><strong>Verification Status:</strong> {isVerified ? 'Verified' : 'Not Verified'}</p>
+                  </div>
+                )}
+                <IonButton expand="block" onClick={handlePrevStep} fill="outline" className="ion-margin-top">
+                  Back
+                </IonButton>
               </IonCardContent>
             </IonCard>
-          )}
+          )
+        }
 
-          {currentStep === 3 && (
+        {
+          currentStep === 4 && (
             <IonCard className="client-face-recognition-step-card">
-              <IonCardHeader className="client-face-recognition-step-card-header">
-                <IonCardTitle className="client-face-recognition-step-card-title">
-                  <IonIcon icon={shieldCheckmarkOutline} className="ion-margin-end" />
-                  BiometricVerificationStep
-                </IonCardTitle>
+              <IonCardHeader>
+                <IonCardTitle>ContractAgreementStep</IonCardTitle>
               </IonCardHeader>
-              <IonCardContent className="client-face-recognition-step-card-content">
-                <p>Displays matching progress status along with the resulting AI confirmation metric (isVerified).</p>
-                {loading ? (
-                    <p className="ion-text-center">Verifying biometrics...</p>
-                ) : (
-                    <>
-                        <div className={`client-face-recognition-verification-status ${formData.isVerified ? 'success' : 'fail'}`}>
-                            {formData.isVerified ? 'Verification Successful!' : 'Verification Failed!'}
-                        </div>
-                        <p className="ion-text-center">Confidence Score: {(formData.confidenceScore * 100).toFixed(2)}%</p>
-                    </>
-                )}
-              </IonCardContent>
-            </IonCard>
-          )}
-
-          {currentStep === 4 && (
-            <IonCard className="client-face-recognition-step-card">
-              <IonCardHeader className="client-face-recognition-step-card-header">
-                <IonCardTitle className="client-face-recognition-step-card-title">
-                  <IonIcon icon={readerOutline} className="ion-margin-end" />
-                  ContractAgreementStep
-                </IonCardTitle>
-              </IonCardHeader>
-              <IonCardContent className="client-face-recognition-step-card-content">
-                <p>Presents terms and conditions text bound to an IonCheckbox indicating contractAccepted.</p>
-                <div className="client-face-recognition-contract-text">
-                  <h3>Términos y Condiciones</h3>
-                  <p>{contractTerms}</p>
-                </div>
-                <IonItem lines="none" className="client-face-recognition-checkbox-item">
+              <IonCardContent>
+                <p>Displays contract terms in a scrollable IonContent block. IonCheckbox bound to contractAccepted. Submit button calls the contract endpoint and records acceptedAt.</p>
+                <IonContent className="contract-terms-content ion-padding" scrollY={true}>
+                  <p><strong>Contract Terms and Conditions:</strong></p>
+                  <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+                  <p>...</p>
+                  <p>By checking the box below, you acknowledge that you have read, understood, and agree to all the terms and conditions stated in this contract.</p>
+                </IonContent>
+                <IonItem>
                   <IonLabel>I accept the contract terms</IonLabel>
                   <IonCheckbox
-                    slot="start"
-                    checked={formData.contractAccepted}
-                    onIonChange={handleContractAcceptedChange}
+                    checked={contractAccepted}
+                    onIonChange={(e: CustomEvent<{
+                      checked: boolean;
+                    }>) => setContractAccepted(e.detail.checked)}
                   />
                 </IonItem>
+                <IonButton expand="block" onClick={handlePrevStep} fill="outline" className="ion-margin-top">
+                  Back
+                </IonButton>
+                <IonButton expand="block" onClick={handleSubmitContract} disabled={!contractAccepted || loading} className="ion-margin-top">
+                  Submit Contract
+                </IonButton>
               </IonCardContent>
             </IonCard>
-          )}
-
-          <div className="client-face-recognition-navigation-buttons">
-            {currentStep > 1 && (
-              <IonButton onClick={handleBackStep} fill="outline" className="client-face-recognition-button">
-                <IonIcon icon={chevronBackOutline} slot="start" />
-                Back
-              </IonButton>
-            )}
-            {currentStep < 4 ? (
-              <IonButton onClick={handleNextStep} expand={currentStep === 1 ? "block" : undefined} className="client-face-recognition-button">
-                Next
-                <IonIcon icon={chevronForwardOutline} slot="end" />
-              </IonButton>
-            ) : (
-              <IonButton onClick={handleNextStep} expand="block" className="client-face-recognition-button">
-                Submit Contract
-              </IonButton>
-            )}
-          </div>
-        </div>
+          )
+        }
       </IonContent>
     </IonPage>
   );
