@@ -44,7 +44,8 @@ import {
   storefrontOutline,
   cashOutline,
   peopleOutline,
-  shieldCheckmarkOutline
+  shieldCheckmarkOutline,
+  personCircle
 }
   from 'ionicons/icons';
   
@@ -207,6 +208,15 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/clients">
                 <IonIcon icon={people} slot="start" />
                 <IonLabel>Clientes</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/clientFaceRecognitions">
+                <IonIcon icon={personCircle} slot="start" />
+                <IonLabel>Cliente Reconocimiento Facial</IonLabel>
               </IonItem>
               )}
             </IonMenuToggle>
@@ -377,7 +387,6 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
             <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
-            <PrivateRoute exact path="/client-face-recognition" component={ClientFaceRecognitionPage} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
