@@ -43,11 +43,10 @@ import {
   water,
   storefrontOutline,
   cashOutline,
-} from 'ionicons/icons';,
   peopleOutline,
+  shieldCheckmarkOutline
 }
-  shieldCheckmarkOutline,
-}
+  from 'ionicons/icons';
   
 
 import Vending from './pages/Vending';

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonPage,
   IonContent,
@@ -21,7 +21,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
-import { AuthContext } from '../context/AuthContext';
+import { useUser } from '../components/UserContext';
 import {
   verifyClientFaceRecognition,
   submitContractClientFaceRecognition,
@@ -38,8 +38,7 @@ const toHermosillo = (utc: string | undefined): string => {
 };
 
 const ClientFaceRecognitionPage: React.FC = () => {
-  const { user } = useContext(AuthContext);
-  const companyId = user?.companyId || 0;
+  const { companyId } = useUser();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -78,6 +77,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // Step 4: Contract Agreement
   const [contractAccepted, setContractAccepted] = useState<boolean>(false);
   const [acceptedAt, setAcceptedAt] = useState<string>('');
+
 
   const handleNextStep = () => {
     // Basic validation before moving to the next step
@@ -298,7 +298,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
                   Next
                 </IonButton>
               </IonCardContent>
-            /
+            </IonCard>
           )
         }
 
