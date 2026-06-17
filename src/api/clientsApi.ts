@@ -14,6 +14,7 @@ export interface Client {
 export interface CreateClientRequest {
   clients: Array<{
     clientId: number;
+    companyId?: number;
     first_name: string;
     last_name: string;
     cellphone: string;

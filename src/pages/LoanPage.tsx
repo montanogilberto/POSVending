@@ -33,6 +33,7 @@ import MailPopover from '../components/PopOver/MailPopover';
 import { Loan, getAllLoans, createLoan, updateLoan, deleteLoan } from '../api/loanApi';
 import { Client } from '../api/clientsApi';
 import ClientSelector from '../components/ClientSelector';
+import { useUser } from '../components/UserContext';
 
 const toHermosillo = (utc: string | undefined): string => {
   if (!utc) return '';
@@ -61,7 +62,7 @@ const LoanPage: React.FC = () => {
   const [displayedLoans, setDisplayedLoans] = useState<Loan[]>([]);
   const [page, setPage] = useState(1);
 
-  const companyId = 1; // Assuming a default companyId for now. In a real app, this would come from context/auth.
+  const { companyId } = useUser();
 
   const filteredLoans = useMemo(() => {
     return loans.filter((loan) =>

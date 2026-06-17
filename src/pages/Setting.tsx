@@ -87,6 +87,7 @@ const MODULES: ModuleDef[] = [
       { code: 'sells',    label: 'Ventas',        icon: cartOutline },
       { code: 'settings', label: 'Configuración', icon: settingsOutline },
       { code: 'loans', label: 'Préstamos', icon: cashOutline },
+      { code: 'clientFaceRecognitions', label: 'Reconocimiento Facial', icon: shieldCheckmarkOutline },
     ],
   },
   {

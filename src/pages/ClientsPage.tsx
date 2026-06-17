@@ -30,9 +30,11 @@ import { add, trash, pencil, arrowBack, person, mail, checkmarkCircle, closeCirc
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
-import { Client, getAllClients, createOrUpdateClient } from '../api/clientsApi';
+import { useUser } from '../components/UserContext';
+import { Client, getAllClients, createOrUpdateClient, CreateClientRequest } from '../api/clientsApi';
 
 const ClientsPage: React.FC = () => {
+  const { companyId } = useUser();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -225,13 +227,14 @@ const ClientsPage: React.FC = () => {
     if (createIsValid) {
       try {
         const clientId = Date.now(); // Generate a unique numeric ID using the current timestamp
-        const requestData = {
+        const requestData: CreateClientRequest = {
           clients: [{
             clientId,
             first_name: newClient.first_name!,
             last_name: newClient.last_name!,
             cellphone: newClient.cellphone!,
             email: newClient.email!,
+            companyId,
             action: "1" // "1" for create
           }]
         };
@@ -271,13 +274,14 @@ const ClientsPage: React.FC = () => {
   const handleUpdateClient = async () => {
     if (editIsValid) {
       try {
-        const requestData = {
+        const requestData: CreateClientRequest = {
           clients: [{
             clientId: editingClient.clientId!,
             first_name: editingClient.first_name!,
             last_name: editingClient.last_name!,
             cellphone: editingClient.cellphone!,
             email: editingClient.email!,
+            companyId,
             action: "2" // "2" for update
           }]
         };
