@@ -25,7 +25,8 @@ export type UiFeature =
   | 'pos'
   | 'scannerqr'
   | 'loans'
-  | 'clientFaceRecognitions';
+  | 'clientFaceRecognitions'
+  | 'clientDashboards';
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
