@@ -36,6 +36,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'users', 'ingresos', 'egresos',
     'iot', 'settings', 'sells', 'loans',
     'clientFaceRecognitions',
+    'clientDashboards',
   ],
   manager: [
     'laundry', 'pos', 'scannerqr',
