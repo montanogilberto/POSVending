@@ -1,0 +1,99 @@
+
+.client-dashboard-page {
+  --background: #f4f6f9;
+}
+
+.client-dashboard-card {
+  margin: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.client-dashboard-card IonCardHeader {
+  padding-bottom: 0;
+}
+
+.client-dashboard-card IonCardTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--ion-color-dark-shade, #333);
+}
+
+.client-dashboard-card IonCardContent {
+  padding-top: 10px;
+}
+
+.client-dashboard-item {
+  --padding-start: 0;
+  --padding-end: 0;
+  --inner-padding-end: 0;
+  --background: transparent;
+  align-items: flex-start;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.client-dashboard-item IonLabel {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.client-dashboard-item h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 4px;
+  color: var(--ion-color-dark, #000);
+}
+
+.client-dashboard-item p {
+  font-size: 0.875rem;
+  color: var(--ion-color-medium-shade, #666);
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.client-dashboard-item IonNote {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium, #999);
+}
+
+.summary-icon {
+  font-size: 1.5rem;
+  color: var(--ion-color-primary, #0056D2);
+  margin-inline-end: 12px;
+}
+
+.summary-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ion-color-dark, #000);
+}
+
+.client-dashboard-action-button {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  --border-radius: 8px;
+  --box-shadow: none;
+  font-weight: 600;
+}
+
+.client-dashboard-empty-state {
+  display: block;
+  text-align: center;
+  padding: 20px;
+  color: var(--ion-color-medium, #999);
+  font-style: italic;
+}
+
+/* Specific card styles */
+.financial-summary-card .client-dashboard-item {
+  --padding-start: 12px;
+  --padding-end: 12px;
+}
+
+.recent-activity-card .activity-item,
+.active-loans-card .loan-item {
+  padding-inline-start: 0;
+  padding-inline-end: 0;
+}
