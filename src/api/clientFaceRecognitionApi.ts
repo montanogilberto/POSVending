@@ -1,28 +1,53 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? "https://smartloansbackend.azurewebsites.net";
 
 export interface ClientFaceRecognition {
-  clientFaceRecognitionId: number;
+  clientFaceRecognitionId?: number;
   companyId: number;
+  clientId: number;
   documentType: string;
   idFrontImageBlobUrl: string;
+  idBackImageBlobUrl?: string;
+  azureSessionId?: string;
   clientSelfieBlobUrl: string;
   confidenceScore: number;
   isVerified: boolean;
+
+  // Legal Contract Data
   contractAccepted: boolean;
-  acceptedAt: string;
-  created_At?: string;
-  updated_at?: string;
+  contractPdfBlobUrl?: string;
+  contractAcceptedAt?: string;
+
+  // Legal Pagaré Data
+  pagareAccepted: boolean;
+  pagarePdfBlobUrl?: string;
+  pagareAcceptedAt?: string;
+  hasPhysicalPagare: boolean;
+  physicalPagareVerifiedAt?: string;
+
+  // Audit Fields
+  isActive?: boolean;
+  createdBy?: number;
+  createdAt?: string;
+  updatedBy?: number;
+  updatedAt?: string;
 }
 
 export interface ClientFaceRecognitionListResponse {
   clientFaceRecognitions: ClientFaceRecognition[];
 }
 
+export interface CreateLivenessSessionResponse {
+  sessionId: string;
+  authToken: string;
+}
+
 export interface FaceVerificationRequest {
   companyId: number;
+  clientId: number;
   documentType: string;
   idFrontImageBase64: string;
-  clientSelfieBase64: string;
+  idBackImageBase64: string;
+  azureSessionId: string;
 }
 
 export interface FaceVerificationResponse {
@@ -35,14 +60,25 @@ export interface FaceVerificationResponse {
 
 export interface ContractSubmissionRequest {
   companyId: number;
+  clientId: number;
   documentType: string;
   idFrontImageBlobUrl: string;
   clientSelfieBlobUrl: string;
   confidenceScore: number;
   isVerified: boolean;
+
+  // Contract
   contractAccepted: boolean;
-  acceptedAt: string;
-  contractPdfBase64?: string;
+  contractPdfBase64: string;
+  contractAcceptedAt: string;
+
+  // Pagaré
+  pagareAccepted: boolean;
+  pagarePdfBase64: string;
+  hasPhysicalPagare: boolean;
+
+  // Audit/User context
+  userId: number;
 }
 
 export interface ContractSubmissionResponse {
@@ -52,52 +88,73 @@ export interface ContractSubmissionResponse {
 }
 
 // GET ALL -- POST /all_clientFaceRecognitions
-// Body: { "clientFaceRecognitions": [{ "companyId": companyId }] }
-// Response: { "clientFaceRecognitions": ClientFaceRecognition[] }  <-- unwrap .clientFaceRecognitions before returning
 export async function getAllClientFaceRecognitions(companyId: number): Promise<ClientFaceRecognition[]> {
   const res = await fetch(BASE_URL + "/all_clientFaceRecognitions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ "clientFaceRecognitions": [{ "companyId": companyId }] }),
+    body: JSON.stringify({ clientFaceRecognitions: [{ companyId }] }),
   });
   if (!res.ok) throw new Error(await res.text());
   const data: ClientFaceRecognitionListResponse = await res.json();
-  return data.clientFaceRecognitions ?? [];   // guard: SP returns {} on empty table
+  return data.clientFaceRecognitions ?? [];
 }
 
 // CREATE -- POST /clientFaceRecognitions
-// Body: { "clientFaceRecognitions": [{ "action": 1, "companyId": ..., ...fields }] }
 export async function createClientFaceRecognition(payload: Omit<ClientFaceRecognition, "clientFaceRecognitionId">): Promise<ClientFaceRecognition> {
   const res = await fetch(BASE_URL + "/clientFaceRecognitions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ "clientFaceRecognitions": [{ "action": 1, ...payload }] }),
+    body: JSON.stringify({ clientFaceRecognitions: [{ action: 1, ...payload }] }),
   });
   if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
 
 // UPDATE -- POST /clientFaceRecognitions
-// Body: { "clientFaceRecognitions": [{ "action": 2, "clientFaceRecognitionId": id, ...fields }] }
 export async function updateClientFaceRecognition(id: number, payload: Partial<ClientFaceRecognition>): Promise<ClientFaceRecognition> {
   const res = await fetch(BASE_URL + "/clientFaceRecognitions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ "clientFaceRecognitions": [{ "action": 2, "clientFaceRecognitionId": id, ...payload }] }),
+    body: JSON.stringify({ clientFaceRecognitions: [{ action: 2, clientFaceRecognitionId: id, ...payload }] }),
   });
   if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
 
 // DELETE -- POST /clientFaceRecognitions
-// Body: { "clientFaceRecognitions": [{ "action": 3, "clientFaceRecognitionId": id, "companyId": companyId }] }
 export async function deleteClientFaceRecognition(id: number, companyId: number): Promise<void> {
   const res = await fetch(BASE_URL + "/clientFaceRecognitions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ "clientFaceRecognitions": [{ "action": 3, "clientFaceRecognitionId": id, "companyId": companyId }] }),
+    body: JSON.stringify({ clientFaceRecognitions: [{ action: 3, clientFaceRecognitionId: id, companyId }] }),
   });
   if (!res.ok) throw new Error(await res.text());
+}
+
+// CREATE SESSION -- POST /api/clientFaceRecognition/create-session
+export async function createClientFaceRecognitionSession(companyId?: number, clientId?: number): Promise<CreateLivenessSessionResponse> {
+  const payload = {
+    companyId: companyId ?? null,
+    clientId: clientId ?? null,
+    source: "web",
+    createdAt: new Date().toISOString(),
+  };
+
+  console.log("[FaceRecognition][create-session] Request URL:", BASE_URL + "/api/clientFaceRecognition/create-session");
+  console.log("[FaceRecognition][create-session] Request payload:", payload);
+
+  const res = await fetch(BASE_URL + "/api/clientFaceRecognition/create-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await res.text();
+  console.log("[FaceRecognition][create-session] Response status:", res.status);
+  console.log("[FaceRecognition][create-session] Response body:", raw);
+
+  if (!res.ok) throw new Error(raw || `create-session failed with status ${res.status}`);
+  return JSON.parse(raw);
 }
 
 // VERIFY -- POST /api/clientFaceRecognition/verify

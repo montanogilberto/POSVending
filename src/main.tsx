@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { UserProvider } from './components/UserContext';
 import { CartProvider } from './context/CartContext';
+import { defineCustomElements } from '@ionic/pwa-elements/loader';
 
 // NOTE:
 // Removed manual chrome.runtime listener/lastError polling.
@@ -12,6 +13,7 @@ import { CartProvider } from './context/CartContext';
 // and are unrelated to core app rendering/auth logic.
 
 // ── Render ────────────────────────────────────────────────────────────────
+defineCustomElements(window);
 console.log("🔵 App root rendered with UserProvider & CartProvider");
 const container = document.getElementById('root');
 const root = createRoot(container!);
