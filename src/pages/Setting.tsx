@@ -69,6 +69,7 @@ const MODULES: ModuleDef[] = [
       { code: 'products',   label: 'Productos',  icon: cubeOutline },
       { code: 'categories', label: 'Categorías', icon: gridOutline },
       { code: 'suppliers', label: 'Proveedores', icon: peopleOutline },
+      { code: 'clientDashboards', label: 'Dashboard Cliente', icon: peopleOutline },
     ],
   },
   {
