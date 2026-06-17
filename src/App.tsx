@@ -78,6 +78,7 @@ import CreateAccount from './pages/Authentication/CreateAccount';
 import SupplierPage from './pages/SupplierPage';
 import LoanPage from './pages/LoanPage';
 import ClientFaceRecognitionPage from './pages/ClientFaceRecognitionPage';
+import ClientDashboardPage from './pages/ClientDashboardPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -387,6 +388,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
             <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
+            <PrivateRoute exact path="/client-dashboard" component={ClientDashboardPage} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
