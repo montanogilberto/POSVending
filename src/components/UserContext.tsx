@@ -15,6 +15,7 @@ export interface AuthData {
   companyName: string;
   branchId: number;
   branchName: string;
+  clientId: number;
   roleCode: RoleCode;
   roleName: string;
 }
@@ -41,6 +42,7 @@ const DEFAULT_AUTH: AuthData = {
   companyName: '',
   branchId: 0,
   branchName: '',
+  clientId: 0,
   roleCode: 'employee',
   roleName: 'Empleado',
 };

@@ -44,6 +44,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     avatarUrl: string;
     defaultCompanyId: number;
     defaultBranchId: number;
+    clientId: number;
     roleCode: ReturnType<typeof normalizeRoleCode>;
     roleName: string;
   } | null>(null);
@@ -101,6 +102,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
       const defaultCompanyId = parseUserId(result.companyId);
       const defaultBranchId = parseUserId(result.branchId);
+      const clientId = parseUserId(result.clientId);
       const roleCode = normalizeRoleCode(result.roleCode);
       const roleName = result.roleName?.trim() || roleCode;
 
@@ -111,6 +113,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         avatarUrl,
         defaultCompanyId,
         defaultBranchId,
+        clientId,
         roleCode,
         roleName,
       };
@@ -120,6 +123,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         userId:    pendingUserRef.current.userId,
         username:  pendingUserRef.current.username,
         avatarUrl: pendingUserRef.current.avatarUrl,
+        clientId:  pendingUserRef.current.clientId,
         roleCode:  pendingUserRef.current.roleCode,
         roleName:  pendingUserRef.current.roleName,
       });
@@ -159,6 +163,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       companyName,
       branchId:    branchId || pending.defaultBranchId,
       branchName,
+      clientId:    pending.clientId,
       roleCode,
       roleName,
     });
