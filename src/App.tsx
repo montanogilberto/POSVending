@@ -78,6 +78,7 @@ import CreateAccount from './pages/Authentication/CreateAccount';
 import SupplierPage from './pages/SupplierPage';
 import LoanPage from './pages/LoanPage';
 import ClientFaceRecognitionPage from './pages/ClientFaceRecognitionPage';
+import ClientDashboardPage from './pages/ClientDashboardPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -213,7 +214,7 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'clients') && (
+              {canAccess(roleCode, 'clientFaceRecognitions') && (
               <IonItem button routerLink="/clientFaceRecognitions">
                 <IonIcon icon={personCircle} slot="start" />
                 <IonLabel>Cliente Reconocimiento Facial</IonLabel>
@@ -229,6 +230,17 @@ const AppShell: React.FC = () => {
               </IonItem>
               )}
             </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clientDashboards') && (
+              <IonItem button routerLink="/client-dashboard">
+                <IonIcon icon={cube} slot="start" />
+                <IonLabel>Client Dashboard</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'categories') && (
@@ -387,6 +399,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
             <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
+            <PrivateRoute exact path="/client-dashboard" component={ClientDashboardPage} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
