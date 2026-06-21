@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 import { Redirect, Route, useHistory } from 'react-router-dom';
 import {
   IonApp,
@@ -160,6 +162,50 @@ const AppShell: React.FC = () => {
       cancelled = true;
     };
   }, [userId, avatarUrl, setAvatarUrl]);
+
+  useEffect(() => {
+    if (!userId || !Capacitor.isNativePlatform()) return;
+
+    const registerPush = async () => {
+      let permission = await PushNotifications.checkPermissions();
+      if (permission.receive === 'prompt') {
+        permission = await PushNotifications.requestPermissions();
+      }
+      if (permission.receive !== 'granted') return;
+
+      await PushNotifications.register();
+
+      PushNotifications.addListener('registration', async (token) => {
+        const platform = Capacitor.getPlatform(); // 'android' | 'ios'
+        try {
+          await fetch(`${import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net'}/registerDevice`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-worker-key': import.meta.env.VITE_WORKER_KEY ?? '',
+            },
+            body: JSON.stringify({
+              userId,
+              token: token.value,
+              platform,
+            }),
+          });
+        } catch {
+          // registration failure is non-fatal
+        }
+      });
+
+      PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        console.log('[Push] Foreground notification:', notification);
+      });
+    };
+
+    registerPush();
+
+    return () => {
+      PushNotifications.removeAllListeners();
+    };
+  }, [userId]);
 
   console.log("🏠 AppShell rendered for user:", username, companyName, branchName);
 
