@@ -77,6 +77,7 @@ const MODULES: ModuleDef[] = [
     features: [
       { code: 'alerts', label: 'Alertas',  icon: notificationsOutline },
       { code: 'emails', label: 'Correos',  icon: mailOutline },
+      { code: 'pushNotifications', label: 'Notificaciones', icon: notificationsOutline },
     ],
   },
   {
