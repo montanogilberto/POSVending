@@ -53,7 +53,7 @@ export async function createPushNotification(payload: Omit<PushNotification, "pu
 
 // UPDATE -- POST /pushNotifications
 // Body: { "pushNotifications": [{ "action": 2, "pushNotificationId": id, ...fields }] }
-export async function updatePushNotification(id: number, payload: Partial<Omit<PushNotification, "created_At" | "updated_at" | "isSent" | "sentAt">): Promise<PushNotification> {
+export async function updatePushNotification(id: number, payload: Partial<Omit<PushNotification, "created_At" | "updated_at" | "isSent" | "sentAt">>): Promise<PushNotification> {
   const res = await fetch(BASE_URL + "/pushNotifications", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

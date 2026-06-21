@@ -241,7 +241,14 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
-            
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'pushNotifications') && (
+              <IonItem button routerLink="/pushNotifications">
+                <IonIcon icon={shieldCheckmarkOutline} slot="start" />
+                <IonLabel>Notificaciones Push</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'categories') && (

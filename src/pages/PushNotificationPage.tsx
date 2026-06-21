@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { IonPage, IonContent, IonList, IonItem, IonLabel, IonText, IonLoading, IonToast, IonFab, IonFabButton, IonIcon, IonAlert, IonModal, IonInput, IonSelect, IonSelectOption, IonDatetime, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSearchbar, DatetimeChangeEventDetail, InputInputEventDetail, SelectChangeEventDetail } from '@ionic/react';
+import { IonPage, IonContent, IonList, IonItem, IonLabel, IonText, IonLoading, IonToast, IonFab, IonFabButton, IonIcon, IonAlert, IonModal, IonInput, IonSelect, IonSelectOption, IonDatetime, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSearchbar, IonButton, IonInfiniteScroll, IonInfiniteScrollContent, DatetimeChangeEventDetail, InputInputEventDetail, SelectChangeEventDetail } from '@ionic/react';
 import { addOutline, notificationsOutline, createOutline, trashOutline, eyeOutline } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
@@ -350,8 +350,6 @@ const PushNotificationPage: React.FC = () => {
                 <IonDatetime
                   value={selectedNotification?.scheduledAt}
                   onIonChange={(e: CustomEvent<DatetimeChangeEventDetail>) => setSelectedNotification({ ...selectedNotification!, scheduledAt: e.detail.value! as string })}
-                  displayFormat="DD MMM YYYY HH:mm"
-                  pickerFormat="YYYY-MM-DDTHH:mmZ"
                   minuteValues="0,15,30,45"
                 ></IonDatetime>
               </IonItem>
