@@ -24,15 +24,10 @@ const toHermosilloDate = (dateStr: string) => {
 };
 
 export const useDashboard = () => {
-  console.log("🔵 useLaundryDashboard hook called");
   const location = useLocation();
   const history = useHistory();
   const { allIncome, loadIncomes } = useIncome();
   const { companyId, userId, logout } = useUser();
-
-  //console.log("🔵 useLaundryDashboard - IncomeContext:", { allIncomeLength: allIncome?.length || 0 });
-
-  console.log("🔵 IncomeContext:", { allIncomeLength: allIncome?.length || 0 });
 
 
   // 🔹 UI State
@@ -60,16 +55,15 @@ export const useDashboard = () => {
 
   const refreshDashboardData = () => {
     const controller = new AbortController();
-    loadIncomes(controller.signal);
+    loadIncomes(controller.signal).catch(() => {});
     return () => controller.abort();
   };
 
-  // ✅ Load incomes
   useEffect(() => {
-    //console.log("🔵 useLaundryDashboard - Loading incomes...");
-    console.log("🔵 Loading incomes...");
     return refreshDashboardData();
-  }, [loadIncomes]);
+  // loadIncomes is stable (useCallback with no deps) — omitting it avoids double-fetch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ✅ Refresh on inactivity
   useInactivityTimer(300000, () => {
@@ -87,7 +81,6 @@ export const useDashboard = () => {
 
   // ✅ PIE CHART (🔥 FIXED — single source of truth)
   const pieData = useMemo(() => {
-    console.log("🔵 Computing pie chart, allIncome length:", allIncome?.length);
     if (!allIncome?.length) return null;
 
     const now = new Date();

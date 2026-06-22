@@ -117,7 +117,6 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
   ...rest
 }) => {
   const { isAuthenticated } = useUser();
-  console.log("🔒 PrivateRoute check:", rest.path, "isAuthenticated:", isAuthenticated);
 
   return (
     <Route
@@ -173,10 +172,8 @@ const AppShell: React.FC = () => {
       }
       if (permission.receive !== 'granted') return;
 
-      await PushNotifications.register();
-
       PushNotifications.addListener('registration', async (token) => {
-        const platform = Capacitor.getPlatform(); // 'android' | 'ios'
+        const platform = Capacitor.getPlatform();
         try {
           await fetch(`${import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net'}/registerDevice`, {
             method: 'POST',
@@ -198,6 +195,8 @@ const AppShell: React.FC = () => {
       PushNotifications.addListener('pushNotificationReceived', (notification) => {
         console.log('[Push] Foreground notification:', notification);
       });
+
+      await PushNotifications.register();
     };
 
     registerPush();
@@ -207,7 +206,6 @@ const AppShell: React.FC = () => {
     };
   }, [userId]);
 
-  console.log("🏠 AppShell rendered for user:", username, companyName, branchName);
 
   const handleLogout = () => {
     logout();

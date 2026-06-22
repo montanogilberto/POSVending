@@ -55,21 +55,9 @@ const Dashboard: React.FC = () => {
     refreshDashboardData,
   } = useDashboard();
 
-  useEffect(() => {
-    console.log("🧺 Dashboard component MOUNTED");
-  }, []);
-
   useIonViewWillEnter(() => {
     refreshDashboardData();
   });
-
-  useEffect(() => {
-    console.log("🧺 Dashboard data update:", {
-      allIncomeLength: allIncome?.length || 0,
-      pieData: !!pieData,
-      showCart,
-    });
-  }, [allIncome?.length, pieData, showCart]);
 
   const handleManualRefresh = () => {
     refreshDashboardData();
