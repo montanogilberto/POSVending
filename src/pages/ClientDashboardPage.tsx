@@ -59,6 +59,8 @@ import {
 import { useUser } from '../components/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../api/clientDashboardApi';
 import { Loan, getAllLoans, createLoan } from '../api/loanApi';
+
+const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';
 
 type Tab = 'home' | 'loans' | 'payments' | 'activity' | 'profile';
@@ -174,11 +176,25 @@ const ClientDashboardPage: React.FC = () => {
     return Math.min(100, Math.max(0, (activeLoanBalance / availableCredit) * 100));
   }, [availableCredit, activeLoanBalance]);
 
-  const creditScore = useMemo(() => {
-    if (utilizationPct < 30) return 780;
-    if (utilizationPct < 60) return 710;
-    return 640;
-  }, [utilizationPct]);
+  const [creditScore, setCreditScore] = useState<number | null>(null);
+  const [creditScoreLabel, setCreditScoreLabel] = useState('');
+
+  useEffect(() => {
+    if (!companyId || !clientId) return;
+    fetch(`${API_BASE_URL}/credit-score`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, companyId }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.score) {
+          setCreditScore(d.score);
+          setCreditScoreLabel(d.label ?? '');
+        }
+      })
+      .catch(() => {});
+  }, [companyId, clientId]);
 
   const activeLoans = loans.filter(l => l.loanStatus === 'Active');
   const paymentActivities = recentActivities.filter(a =>
@@ -269,7 +285,11 @@ const ClientDashboardPage: React.FC = () => {
         <IonCardHeader><IonCardTitle>Estado de Crédito</IonCardTitle></IonCardHeader>
         <IonCardContent>
           <div className="credit-score-wrap">
-            <div><p>Credit score</p><h2>{creditScore}</h2></div>
+            <div>
+              <p>Credit score</p>
+              <h2>{creditScore !== null ? creditScore : '—'}</h2>
+              {creditScoreLabel ? <small>{creditScoreLabel}</small> : null}
+            </div>
             <div><p>Utilización</p><h2>{utilizationPct.toFixed(0)}%</h2></div>
           </div>
           <div className="utilization-track">
@@ -521,7 +541,7 @@ const ClientDashboardPage: React.FC = () => {
           <IonItem><IonLabel><strong>Préstamos totales</strong></IonLabel><IonNote slot="end">{loans.length}</IonNote></IonItem>
           <IonItem><IonLabel><strong>Préstamos activos</strong></IonLabel><IonNote slot="end">{activeLoans.length}</IonNote></IonItem>
           <IonItem><IonLabel><strong>Crédito disponible</strong></IonLabel><IonNote slot="end">${availableCredit.toFixed(2)}</IonNote></IonItem>
-          <IonItem><IonLabel><strong>Score crediticio</strong></IonLabel><IonNote slot="end">{creditScore}</IonNote></IonItem>
+          <IonItem><IonLabel><strong>Score crediticio</strong></IonLabel><IonNote slot="end">{creditScore !== null ? `${creditScore} — ${creditScoreLabel}` : 'Calculando...'}</IonNote></IonItem>
         </IonList>
       </IonCardContent>
     </IonCard>

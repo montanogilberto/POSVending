@@ -29,11 +29,83 @@ import {
 import { useHistory, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { useUser } from '../components/UserContext';
-import {
-  createWalletTopUp, createRepaymentIntent, confirmPaymentIntent,
-  getConnectedAccount, createConnectedAccount, getOnboardingLink,
-  ConnectedAccount, PaymentTransaction,
-} from '../api/paymentGatewayApi';
+// ── Stripe / Payment types & fetchers (single-use, kept inline) ──────────────
+
+const _api = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+
+interface ConnectedAccount {
+  connectedAccountId: string;
+  clientId: number;
+  companyId: number;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  onboardingUrl?: string;
+}
+
+interface PaymentTransaction {
+  transactionId: number;
+  companyId: number;
+  loanId?: number;
+  fromClientId: number;
+  toClientId: number;
+  amount: number;
+  currency: string;
+  paymentType: string;
+  status: string;
+  stripePaymentIntentId?: string;
+  failureReason?: string;
+}
+
+interface PaymentIntentResponse {
+  clientSecret: string;
+  paymentIntentId: string;
+  transactionId: number;
+  amount: number;
+  currency: string;
+}
+
+async function createConnectedAccount(clientId: number, companyId: number, email: string): Promise<ConnectedAccount> {
+  const res = await fetch(`${_api}/stripe/connected-accounts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, email }) });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.account;
+}
+
+async function getConnectedAccount(clientId: number, companyId: number): Promise<ConnectedAccount | null> {
+  try {
+    const res = await fetch(`${_api}/stripe/connected-accounts/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId }) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.account;
+  } catch { return null; }
+}
+
+async function getOnboardingLink(clientId: number, companyId: number, returnUrl: string, refreshUrl: string): Promise<{ url: string }> {
+  const res = await fetch(`${_api}/stripe/onboarding-link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, returnUrl, refreshUrl }) });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function _createPaymentIntent(payload: object): Promise<PaymentIntentResponse> {
+  const res = await fetch(`${_api}/stripe/payment-intents`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function confirmPaymentIntent(paymentIntentId: string, companyId: number): Promise<PaymentTransaction> {
+  const res = await fetch(`${_api}/stripe/payment-intents/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentIntentId, companyId }) });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function createWalletTopUp(clientId: number, companyId: number, amountMXN: number): Promise<PaymentIntentResponse> {
+  return _createPaymentIntent({ companyId, fromClientId: clientId, toClientId: clientId, amount: Math.round(amountMXN * 100), paymentType: 'wallet_top_up', description: `Recarga de cartera — ${amountMXN.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })} MXN` });
+}
+
+function createRepaymentIntent(payload: { companyId: number; loanId: number; borrowerId: number; lenderId: number; amountMXN: number; installmentNumber?: number }): Promise<PaymentIntentResponse> {
+  return _createPaymentIntent({ companyId: payload.companyId, fromClientId: payload.borrowerId, toClientId: payload.lenderId, amount: Math.round(payload.amountMXN * 100), paymentType: 'loan_repayment', loanId: payload.loanId, description: `Pago préstamo ${payload.loanId} — cuota ${payload.installmentNumber ?? ''}`, metadata: { installmentNumber: String(payload.installmentNumber ?? 1) } });
+}
 import { createPushNotification } from '../api/pushNotificationsApi';
 import './LoanPaymentPage.css';
 

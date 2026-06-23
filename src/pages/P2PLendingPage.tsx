@@ -25,10 +25,79 @@ import {
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../components/UserContext';
 import { getAllClients, Client, ClientType } from '../api/clientsApi';
-import {
-  getAllLoanProposals, createLoanProposal, updateLoanProposal,
-  LoanProposal, ProposalStatus, getActiveLoanOffers, createLoanOffer, LoanOffer,
-} from '../api/loanProposalApi';
+const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+
+// ── Loan Proposal / Offer types & fetchers (single-use, kept inline) ─────────
+
+type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
+
+interface LoanProposal {
+  proposalId: number;
+  companyId: number;
+  lenderId: number;
+  borrowerId: number;
+  requestedAmount: number;
+  proposedRate: number;
+  termMonths: number;
+  status: ProposalStatus;
+  lenderNote?: string;
+  borrowerNote?: string;
+  pushNotificationId?: number;
+  respondedAt?: string;
+  expiresAt?: string;
+  created_At?: string;
+  updated_at?: string;
+}
+
+interface LoanOffer {
+  offerId: number;
+  companyId: number;
+  lenderId: number;
+  availableCapital: number;
+  minRate: number;
+  maxRate: number;
+  minTermMonths: number;
+  maxTermMonths: number;
+  description?: string;
+  isActive: boolean;
+  expiresAt?: string;
+  created_At?: string;
+}
+
+async function getAllLoanProposals(companyId: number, filters?: { lenderId?: number; borrowerId?: number; status?: ProposalStatus }): Promise<LoanProposal[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/all_loanProposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanProposals: [{ companyId, ...filters }] }) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.loanProposals ?? [];
+  } catch { return []; }
+}
+
+async function createLoanProposal(payload: Omit<LoanProposal, 'proposalId' | 'created_At' | 'updated_at'>): Promise<LoanProposal> {
+  const res = await fetch(`${API_BASE_URL}/loanProposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanProposals: [{ action: 1, ...payload }] }) });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function updateLoanProposal(proposalId: number, payload: Partial<LoanProposal>): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/loanProposals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanProposals: [{ action: 2, proposalId, ...payload }] }) });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+async function getActiveLoanOffers(companyId: number): Promise<LoanOffer[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/all_loanOffers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanOffers: [{ companyId, isActive: true }] }) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.loanOffers ?? [];
+  } catch { return []; }
+}
+
+async function createLoanOffer(payload: Omit<LoanOffer, 'offerId' | 'created_At'>): Promise<LoanOffer> {
+  const res = await fetch(`${API_BASE_URL}/loanOffers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanOffers: [{ action: 1, ...payload }] }) });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 import {
   getAllClientFaceRecognitions, ClientFaceRecognition,
 } from '../api/clientFaceRecognitionApi';
@@ -96,6 +165,7 @@ const P2PLendingPage: React.FC = () => {
   const [propNote,     setPropNote]     = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   // ── load data ───────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -113,6 +183,17 @@ const P2PLendingPage: React.FC = () => {
       setBiometrics(bio);
       const me = allClients.find(c => c.clientId === clientId) ?? null;
       setMyClient(me);
+      // Load wallet balance
+      if (clientId && companyId) {
+        fetch(`${API_BASE_URL}/wallet`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId, companyId }),
+        })
+          .then(r => r.json())
+          .then(d => { if (d.availableBalance !== undefined) setWalletBalance(d.availableBalance); })
+          .catch(() => {});
+      }
     } finally {
       setLoading(false);
     }
@@ -441,8 +522,8 @@ const P2PLendingPage: React.FC = () => {
           <div className="p2p-kpi-row">
             <div className="p2p-kpi">
               <IonIcon icon={walletOutline} />
-              <span className="p2p-kpi-val">{fmt(myOffers.reduce((s, o) => s + o.availableCapital, 0))}</span>
-              <span className="p2p-kpi-label">Capital publicado</span>
+              <span className="p2p-kpi-val">{walletBalance !== null ? fmt(walletBalance) : fmt(myOffers.reduce((s, o) => s + o.availableCapital, 0))}</span>
+              <span className="p2p-kpi-label">Saldo en cartera</span>
             </div>
             <div className="p2p-kpi">
               <IonIcon icon={notificationsOutline} />
