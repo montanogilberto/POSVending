@@ -88,6 +88,7 @@ import PushNotificationPage from './pages/PushNotificationPage';
 import P2PLendingPage from './pages/P2PLendingPage';
 import BorrowerOnboardingPage from './pages/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/LoanPaymentPage';
+import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -463,6 +464,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/p2p-lending" component={P2PLendingPage} />
             <PrivateRoute exact path="/borrower-onboarding" component={BorrowerOnboardingPage} />
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
+            <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
           </IonRouterOutlet>
 
