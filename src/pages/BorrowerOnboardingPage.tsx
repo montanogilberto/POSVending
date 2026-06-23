@@ -16,6 +16,23 @@ import {
 import SignaturePad from '../components/SignaturePad';
 import './BorrowerOnboardingPage.css';
 
+const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+
+async function uploadSignatureBlob(
+  signatureB64: string,
+  clientId: number,
+  companyId: number,
+  docType: 'pagare' | 'contract',
+): Promise<string> {
+  const res = await fetch(`${API_BASE_URL}/signatures/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId, signatureB64, docType }),
+  });
+  const data = await res.json();
+  return data.blobUrl as string;
+}
+
 const PAGARE_TEXT = `PAGARÉ
 
 Lugar y Fecha: _______________
@@ -127,10 +144,18 @@ const BorrowerOnboardingPage: React.FC = () => {
     try {
       const now = new Date().toISOString();
       if (record?.clientFaceRecognitionId) {
+        let blobUrl = record.pagarePdfBlobUrl ?? '';
+        if (signatureDataUrl && clientId && companyId) {
+          try {
+            blobUrl = await uploadSignatureBlob(signatureDataUrl, clientId, companyId, 'pagare');
+          } catch {
+            blobUrl = signatureDataUrl; // fallback to base64 if upload fails
+          }
+        }
         await updateClientFaceRecognition(record.clientFaceRecognitionId, {
           pagareAccepted: true,
           pagareAcceptedAt: now,
-          pagarePdfBlobUrl: signatureDataUrl ?? record.pagarePdfBlobUrl,
+          pagarePdfBlobUrl: blobUrl,
         });
         setRecord(r => r ? { ...r, pagareAccepted: true, pagareAcceptedAt: now } : r);
       }
