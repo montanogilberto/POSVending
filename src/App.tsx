@@ -48,7 +48,10 @@ import {
   cashOutline,
   peopleOutline,
   shieldCheckmarkOutline,
-  personCircle
+  personCircle,
+  cogOutline,
+  walletOutline,
+  constructOutline,
 }
   from 'ionicons/icons';
   
@@ -373,6 +376,35 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/loans">
                 <IonIcon icon={cashOutline} slot="start" />
                 <IonLabel>Préstamos</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'manufacturing') && (
+              <IonItem button routerLink="/manufacturing">
+                <IonIcon icon={cogOutline} slot="start" />
+                <IonLabel>Manufactura</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonItemDivider>Finanzas P2P</IonItemDivider>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/p2p-lending">
+                <IonIcon icon={walletOutline} slot="start" />
+                <IonLabel>Préstamos P2P</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/borrower-onboarding">
+                <IonIcon icon={constructOutline} slot="start" />
+                <IonLabel>Registro Prestatario</IonLabel>
               </IonItem>
               )}
             </IonMenuToggle>
