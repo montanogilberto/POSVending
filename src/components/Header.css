@@ -41,6 +41,13 @@
   max-width: 50%;
 }
 
+/* Hide title on mobile */
+@media (max-width: 791px) {
+  .screen-title {
+    display: none !important;
+  }
+}
+
 /* Hamburger: visible when side menu is overlay (< 792px split pane) */
 .header-menu-button {
   --color: var(--text-primary, #222);

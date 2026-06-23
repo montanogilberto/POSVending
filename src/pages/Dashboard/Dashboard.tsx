@@ -55,21 +55,9 @@ const Dashboard: React.FC = () => {
     refreshDashboardData,
   } = useDashboard();
 
-  useEffect(() => {
-    console.log("🧺 Dashboard component MOUNTED");
-  }, []);
-
   useIonViewWillEnter(() => {
     refreshDashboardData();
   });
-
-  useEffect(() => {
-    console.log("🧺 Dashboard data update:", {
-      allIncomeLength: allIncome?.length || 0,
-      pieData: !!pieData,
-      showCart,
-    });
-  }, [allIncome?.length, pieData, showCart]);
 
   const handleManualRefresh = () => {
     refreshDashboardData();
@@ -90,15 +78,10 @@ const Dashboard: React.FC = () => {
       <IonContent fullscreen={true} style={{ '--background': '#F9FAFB' }} className="dashboard-content">
         <div className="dashboard-container">
           <div className="dashboard-tools-row">
-            <IonButton
-              fill="outline"
-              size="small"
-              className="dashboard-refresh-button"
-              onClick={handleManualRefresh}
-            >
-              <IonIcon slot="start" icon={refreshOutline} />
-              Actualizar dashboard
-            </IonButton>
+            <button className="dashboard-refresh-button" onClick={handleManualRefresh}>
+              <IonIcon icon={refreshOutline} />
+              <span>Actualizar</span>
+            </button>
           </div>
 
           {/* ✅ Metrics Grid ALWAYS visible */}

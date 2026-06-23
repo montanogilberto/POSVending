@@ -25,7 +25,7 @@
 .wizard-step-indicator {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 16px 20px 12px;
   background: #ffffff;
   border-bottom: 1px solid #F1F5F9;

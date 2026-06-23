@@ -80,6 +80,15 @@
   padding: 4px;
 }
 
+.client-avatar-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(0, 86, 210, 0.2);
+  background: #f3f4f6;
+}
+
 .client-header {
   display: flex;
   align-items: center;
@@ -410,6 +419,128 @@
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-5px); }
   75% { transform: translateX(5px); }
+}
+
+/* ==========================================================================
+   Wizard Modal
+   ========================================================================== */
+
+.client-wizard-modal {
+  --border-radius: 0;
+  --width: 100%;
+  --height: 100%;
+}
+
+.wizard-step-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 2px 10px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 20px;
+  margin-right: 4px;
+}
+
+/* QR box in wizard step */
+.client-qr-box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  margin: 8px 0;
+}
+
+.client-qr-placeholder {
+  width: 200px;
+  height: 200px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+/* Wizard step body container */
+.wizard-step-body {
+  padding: 16px 20px 24px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* Step hero header */
+.wizard-step-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.wizard-step-icon-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.wizard-step-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 6px;
+}
+
+.wizard-step-desc {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+/* Summary box */
+.wizard-summary-box {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin: 16px 0;
+}
+
+.wizard-summary-box p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #374151;
+}
+
+/* Contract terms */
+.wizard-contract-terms {
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 16px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 12px 0 16px;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+/* Checkbox items */
+.wizard-checkbox-item {
+  --background: transparent;
+  --padding-start: 0;
+  margin-bottom: 8px;
+  font-size: 14px;
 }
 
 /* Responsive Modal */

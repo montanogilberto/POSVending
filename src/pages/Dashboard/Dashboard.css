@@ -26,6 +26,42 @@
      gap: 32px;
      width: 100%;
    }
+
+   .dashboard-tools-row {
+     display: flex;
+     justify-content: flex-end;
+   }
+
+   .dashboard-refresh-button {
+     display: inline-flex;
+     align-items: center;
+     gap: 6px;
+     padding: 8px 16px;
+     background: #ffffff;
+     border: 1.5px solid #e2e8f0;
+     border-radius: 99px;
+     font-size: 13px;
+     font-weight: 600;
+     color: #374151;
+     cursor: pointer;
+     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+     transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+   }
+
+   .dashboard-refresh-button ion-icon {
+     font-size: 15px;
+     color: #0056D2;
+   }
+
+   .dashboard-refresh-button:hover {
+     background: #f0f6ff;
+     border-color: #0056D2;
+     box-shadow: 0 2px 8px rgba(0,86,210,0.12);
+   }
+
+   .dashboard-refresh-button:active {
+     transform: scale(0.97);
+   }
    
    /* ==========================================================================
       2. ADAPTIVE KPI CARD STYLING

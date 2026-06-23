@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { RoleCode, normalizeRoleCode } from '../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../utils/formatters';
+import { ClientType } from '../api/clientsApi';
 
 // ── Storage key ────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'pos_gmo_auth';
@@ -16,6 +17,7 @@ export interface AuthData {
   branchId: number;
   branchName: string;
   clientId: number;
+  clientType?: ClientType;
   roleCode: RoleCode;
   roleName: string;
 }

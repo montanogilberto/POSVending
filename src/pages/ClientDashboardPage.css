@@ -328,11 +328,194 @@
 }
 
 @media (min-width: 768px) {
-  .dashboard-shell {
-    gap: 22px;
-  }
-
-  .hero-balance h1 {
-    font-size: 2.3rem;
-  }
+  .dashboard-shell { gap: 22px; }
+  .hero-balance h1 { font-size: 2.3rem; }
 }
+
+/* ── Loan cards ─────────────────────────────────────────────────────────── */
+.cd-loan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cd-loan-card {
+  background: #f9fbff;
+  border: 1px solid rgba(14, 26, 47, 0.07);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.cd-loan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.cd-loan-number {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0f1f38;
+  font-family: monospace;
+}
+
+.cd-loan-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cd-loan-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.cd-loan-amounts div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cd-loan-amounts small {
+  font-size: 0.72rem;
+  color: #74839f;
+}
+
+.cd-loan-amounts strong {
+  font-size: 0.96rem;
+  color: #0e1a2f;
+}
+
+.cd-loan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.76rem;
+  color: #74839f;
+}
+
+.cd-loan-meta ion-icon {
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.cd-loan-notes {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #8897b0;
+  font-style: italic;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+.cd-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: #8898b2;
+}
+
+.cd-empty-state ion-icon {
+  font-size: 2.2rem;
+  opacity: 0.45;
+}
+
+.cd-empty-state p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+/* ── Next payment card ──────────────────────────────────────────────────── */
+.cd-next-payment-card ion-card-content {
+  padding: 20px;
+}
+
+.cd-next-payment-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cd-next-payment-icon {
+  font-size: 2rem;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  padding: 10px;
+  border-radius: 14px;
+}
+
+.cd-next-payment-top h2 {
+  margin: 4px 0;
+  font-size: 1.6rem;
+  color: #0a1630;
+}
+
+.cd-next-payment-top p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #74839f;
+}
+
+/* ── Activity dot ───────────────────────────────────────────────────────── */
+.cd-activity-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2a5be7;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+/* ── Profile list ───────────────────────────────────────────────────────── */
+.cd-profile-list {
+  background: transparent;
+}
+
+.cd-profile-list ion-item {
+  --background: transparent;
+  --padding-start: 0;
+}
+
+/* ── Loan form modal ────────────────────────────────────────────────────── */
+.cd-loan-form {
+  padding: 4px 0 40px;
+}
+
+.cd-form-group {
+  margin-bottom: 16px;
+}
+
+.cd-form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.cd-form-input {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f9fafb;
+  --padding-start: 12px;
+  --padding-end: 12px;
+}
+
+.cd-loan-preview {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #1e40af;
+  margin-top: 4px;
+}
+
+.cd-loan-preview p { margin: 3px 0; }
+.cd-loan-preview strong { display: block; margin-bottom: 6px; font-size: 14px; }

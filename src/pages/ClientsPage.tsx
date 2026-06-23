@@ -1,20 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import './ClientsPage.css';
+import './ClientFaceRecognitionPage.css';
 import {
   IonPage,
   IonContent,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
-  IonButtons,
-  IonButton,
-  IonIcon,
-  IonList,
-  IonItem,
-  IonLabel,
   IonCard,
   IonCardContent,
-  IonCardHeader,
   IonCardTitle,
   IonFab,
   IonFabButton,
@@ -25,293 +16,908 @@ import {
   IonNote,
   IonText,
   IonSearchbar,
+  IonIcon,
+  IonButton,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
+  IonLabel,
+  IonItem,
+  IonList,
+  IonListHeader,
+  IonRadioGroup,
+  IonRadio,
+  IonCheckbox,
+  IonSpinner,
+  IonLoading,
 } from '@ionic/react';
-import { add, trash, pencil, arrowBack, person, mail, checkmarkCircle, closeCircle, call, save, personCircle, time } from 'ionicons/icons';
+import {
+  add,
+  trash,
+  pencil,
+  arrowBack,
+  person,
+  mail,
+  checkmarkCircle,
+  closeCircle,
+  call,
+  personCircle,
+  chevronForward,
+  chevronBack,
+  cameraOutline,
+  refreshOutline,
+  personOutline,
+  idCardOutline,
+  checkmark,
+  documentTextOutline,
+  shieldCheckmarkOutline,
+  clipboardOutline,
+  qrCodeOutline,
+  downloadOutline,
+  barChartOutline,
+  walletOutline,
+  calendarOutline,
+  shareOutline,
+  logoWhatsapp,
+  chatbubbleOutline,
+  copyOutline,
+  closeOutline,
+} from 'ionicons/icons';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { useHistory } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
 import { useUser } from '../components/UserContext';
-import { Client, getAllClients, createOrUpdateClient, CreateClientRequest } from '../api/clientsApi';
+import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest } from '../api/clientsApi';
+import {
+  verifyClientFaceRecognition,
+  submitContractClientFaceRecognition,
+  createClientFaceRecognitionSession,
+  getAllClientFaceRecognitions,
+  FaceVerificationResponse,
+  ContractSubmissionRequest,
+  ClientFaceRecognition,
+} from '../api/clientFaceRecognitionApi';
+
+type CaptureSubStep =
+  | 'doc-intro'
+  | 'front-capture'
+  | 'flip-instruction'
+  | 'back-capture'
+  | 'back-review'
+  | 'liveness-intro'
+  | 'liveness-active'
+  | 'processing';
+
+const WIZARD_STEPS = ['Cliente', 'Código QR', 'Documento', 'Captura', 'Verificación', 'Contrato'];
+
+const emptyErrors = {
+  first_name: '',
+  last_name: '',
+  email: { isValid: true, message: '' },
+  cellphone: '',
+};
 
 const ClientsPage: React.FC = () => {
   const { companyId } = useUser();
+  const history = useHistory();
+
+  // ── List state ─────────────────────────────────────────────────────────────
   const [clients, setClients] = useState<Client[]>([]);
+  const [clientSelfieMap, setClientSelfieMap] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedForDelete, setSelectedForDelete] = useState<Client | null>(null);
   const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
     showAlertPopover: false,
     showMailPopover: false,
   });
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newClient, setNewClient] = useState<Partial<Client>>({
-    first_name: '',
-    last_name: '',
-    email: '',
-    cellphone: '',
-  });
-  const [createErrors, setCreateErrors] = useState({
-    first_name: '',
-    last_name: '',
-    email: { isValid: true, message: '' },
-    cellphone: '',
-  });
+  // ── Wizard state ───────────────────────────────────────────────────────────
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardMode, setWizardMode] = useState<'create' | 'edit'>('create');
+  const [wizardStep, setWizardStep] = useState(0);
+  const [captureSubStep, setCaptureSubStep] = useState<CaptureSubStep>('doc-intro');
+  const [wizardLoading, setWizardLoading] = useState(false);
+  const [wizardError, setWizardError] = useState('');
 
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingClient, setEditingClient] = useState<Partial<Client>>({
-    first_name: '',
-    last_name: '',
-    email: '',
-    cellphone: '',
-  });
-  const [editErrors, setEditErrors] = useState({
-    first_name: '',
-    last_name: '',
-    email: { isValid: true, message: '' },
-    cellphone: '',
-  });
+  // Step 0 — client info
+  const [newClient, setNewClient] = useState<Partial<Client>>({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'borrower' });
+  const [createErrors, setCreateErrors] = useState(emptyErrors);
+  const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
-  // Search functionality
-  const [searchTerm, setSearchTerm] = useState('');
+  // Step 1 — QR (derived from createdClientId + newClient name, no extra state needed)
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrModalClient, setQrModalClient] = useState<Client | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareClient, setShareClient] = useState<Client | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
-  const presentAlertPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  };
+  // Step 2 — document
+  const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
 
+  // Step 3 — capture
+  const [idFrontImageBase64, setIdFrontImageBase64] = useState('');
+  const [idBackImageBase64, setIdBackImageBase64] = useState('');
+  const [azureSessionId, setAzureSessionId] = useState('');
+  const [livenessStatus, setLivenessStatus] = useState<'idle' | 'in-progress' | 'completed' | 'failed'>('idle');
+
+  // Step 3 — verification result
+  const [confidenceScore, setConfidenceScore] = useState(0);
+  const [isVerified, setIsVerified] = useState(false);
+  const [idFrontBlobUrl, setIdFrontBlobUrl] = useState('');
+  const [selfieBlobUrl, setSelfieBlobUrl] = useState('');
+
+  // Step 4 — contract
+  const [contractAccepted, setContractAccepted] = useState(false);
+  const [pagareAccepted, setPagareAccepted] = useState(false);
+  const [hasPhysicalPagare, setHasPhysicalPagare] = useState(false);
+  const [contractAcceptedAt, setContractAcceptedAt] = useState('');
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const presentAlertPopover = (e: React.MouseEvent) => setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
   const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-
-  const presentMailPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  };
-
+  const presentMailPopover = (e: React.MouseEvent) => setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
-  useEffect(() => {
-    loadClients();
-  }, []);
+  const toast = (msg: string) => { setToastMessage(msg); setShowToast(true); };
+
+  const validateEmail = (email: string) => {
+    if (!email.trim()) return { isValid: true, message: '' };
+    const ok = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+    return ok ? { isValid: true, message: 'Email válido' } : { isValid: false, message: 'Formato de email inválido (ej. nombre@dominio.com)' };
+  };
+
+  const validateCellphone = (v: string) => {
+    if (!v) return 'El teléfono es obligatorio';
+    const d = v.replace(/\D/g, '');
+    if (d.length < 10) return 'El teléfono debe tener al menos 10 dígitos';
+    return '';
+  };
+
+  const formatDate = (ds?: string) => {
+    if (!ds) return 'N/A';
+    return new Date(ds).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  // ── Load clients ───────────────────────────────────────────────────────────
+  useEffect(() => { loadClients(); }, []);
 
   const loadClients = async () => {
     setLoading(true);
     try {
-      const fetchedClients = await getAllClients();
+      const [fetchedClients, faceRecords] = await Promise.all([
+        getAllClients(),
+        getAllClientFaceRecognitions(Number(companyId)).catch(() => [] as ClientFaceRecognition[]),
+      ]);
       setClients(fetchedClients);
-    } catch (error) {
-      console.error('Error loading clients:', error);
-      setToastMessage('Error al cargar los clientes');
-      setShowToast(true);
-    } finally {
-      setLoading(false);
-    }
+      // Build clientId → most recent selfie URL map
+      const selfieMap: Record<number, string> = {};
+      faceRecords.forEach((r) => {
+        if (r.clientSelfieBlobUrl) selfieMap[r.clientId] = r.clientSelfieBlobUrl;
+      });
+      setClientSelfieMap(selfieMap);
+    } catch { toast('Error al cargar los clientes'); }
+    finally { setLoading(false); }
   };
 
-  // Filter clients based on search term
   const filteredClients = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return clients;
-    }
-    const term = searchTerm.toLowerCase().trim();
-    return clients.filter(client => 
-      client.first_name?.toLowerCase().includes(term) ||
-      client.last_name?.toLowerCase().includes(term) ||
-      client.cellphone?.includes(term) ||
-      client.email?.toLowerCase().includes(term)
+    const t = searchTerm.toLowerCase().trim();
+    if (!t) return clients;
+    return clients.filter(c =>
+      c.first_name?.toLowerCase().includes(t) ||
+      c.last_name?.toLowerCase().includes(t) ||
+      c.cellphone?.includes(t) ||
+      c.email?.toLowerCase().includes(t)
     );
   }, [clients, searchTerm]);
 
-  const handleDelete = (client: Client) => {
-    setSelectedClient(client);
-    setShowDeleteAlert(true);
+  // ── Delete ─────────────────────────────────────────────────────────────────
+  // ── App store links (update with real URLs once published) ───────────────
+  const PLAY_STORE_URL  = 'https://play.google.com/store/apps/details?id=com.lavanderia.gmo';
+  const APP_STORE_URL   = 'https://apps.apple.com/app/pos-gmo/id000000000';
+
+  const buildShareMessage = (client: Client): string => {
+    const name  = `${client.first_name} ${client.last_name}`;
+    const type  = client.clientType ?? 'borrower';
+    const store = `📱 Android: ${PLAY_STORE_URL}\n🍎 iOS: ${APP_STORE_URL}`;
+
+    if (type === 'lender') {
+      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para gestionar tu cartera de préstamos, ver el estado de tus acreditados y más.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta de prestamista y accede a tu dashboard de portfolio.`;
+    }
+    return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para consultar tu préstamo, ver tu estado de cuenta y realizar pagos fácilmente.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard.`;
   };
 
+  const openWhatsApp = (client: Client) => {
+    const phone = client.cellphone?.replace(/\D/g, '');
+    const msg   = encodeURIComponent(buildShareMessage(client));
+    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+  };
+
+  const openSMS = (client: Client) => {
+    const phone = client.cellphone?.replace(/\D/g, '');
+    const msg   = encodeURIComponent(buildShareMessage(client));
+    window.open(`sms:${phone}?body=${msg}`, '_blank');
+  };
+
+  const copyLink = async (client: Client) => {
+    await navigator.clipboard.writeText(buildShareMessage(client));
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  };
+
+  const handleDelete = (client: Client) => { setSelectedForDelete(client); setShowDeleteAlert(true); };
   const confirmDelete = async () => {
-    if (selectedClient) {
-      try {
-        setClients(clients.filter(c => c.clientId !== selectedClient.clientId));
-        setToastMessage('Cliente eliminado exitosamente');
-        setShowToast(true);
-      } catch (error) {
-        console.error('Error deleting client:', error);
-        setToastMessage('Error al eliminar el cliente');
-        setShowToast(true);
-      }
+    if (selectedForDelete) {
+      setClients(clients.filter(c => c.clientId !== selectedForDelete.clientId));
+      toast('Cliente eliminado exitosamente');
     }
     setShowDeleteAlert(false);
-    setSelectedClient(null);
+    setSelectedForDelete(null);
   };
 
-  const validateEmail = (email: string) => {
-    if (!email.trim()) return { isValid: true, message: '' }; // Email is not required
-
-    // More comprehensive email validation
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-
-    if (!emailRegex.test(email)) {
-      return {
-        isValid: false,
-        message: 'Por favor ingrese un email válido (ejemplo: nombre@dominio.com)'
-      };
-    }
-
-    return { isValid: true, message: 'Email válido' };
+  // ── Edit modal ─────────────────────────────────────────────────────────────
+  const handleEdit = (client: Client) => {
+    resetWizard();
+    setWizardMode('edit');
+    setNewClient({ first_name: client.first_name, last_name: client.last_name, email: client.email, cellphone: client.cellphone, clientType: client.clientType ?? 'borrower' });
+    setCreatedClientId(client.clientId);
+    setShowWizard(true);
   };
 
-  const validateCellphone = (cellphone: string) => {
-    if (!cellphone) return 'El teléfono es obligatorio';
-    const digitsOnly = cellphone.replace(/\D/g, '');
-    if (digitsOnly.length < 10) return 'El teléfono debe tener al menos 10 dígitos';
-    if (!/^\d+$/.test(digitsOnly)) return 'El teléfono solo puede contener números';
-    return '';
+  // ── Wizard helpers ─────────────────────────────────────────────────────────
+  const resetWizard = () => {
+    setWizardStep(0);
+    setCaptureSubStep('doc-intro');
+    setWizardError('');
+    setNewClient({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'borrower' });
+    setCreateErrors(emptyErrors);
+    setCreatedClientId(null);
+    setDocumentType('');
+    setIdFrontImageBase64('');
+    setIdBackImageBase64('');
+    setAzureSessionId('');
+    setLivenessStatus('idle');
+    setConfidenceScore(0);
+    setIsVerified(false);
+    setIdFrontBlobUrl('');
+    setSelfieBlobUrl('');
+    setContractAccepted(false);
+    setPagareAccepted(false);
+    setHasPhysicalPagare(false);
+    setContractAcceptedAt('');
   };
 
   const createIsValid = useMemo(() => {
-    const emailValidation = validateEmail(newClient.email || '');
-    const errors: any = {
-      first_name: newClient.first_name ? '' : 'El nombre es obligatorio',
-      last_name: newClient.last_name ? '' : 'El apellido es obligatorio',
-      email: emailValidation,
-      cellphone: validateCellphone(newClient.cellphone || ''),
-    };
-    return !Object.values(errors).some((error: any) =>
-      typeof error === 'string' ? error !== '' : !error.isValid
-    );
-  }, [newClient.first_name, newClient.last_name, newClient.email, newClient.cellphone]);
+    const e = validateEmail(newClient.email || '');
+    return !!(newClient.first_name && newClient.last_name && e.isValid && !validateCellphone(newClient.cellphone || ''));
+  }, [newClient]);
 
   useEffect(() => {
-    const emailValidation = validateEmail(newClient.email || '');
-    const errors: any = {
+    setCreateErrors({
       first_name: newClient.first_name ? '' : 'El nombre es obligatorio',
       last_name: newClient.last_name ? '' : 'El apellido es obligatorio',
-      email: emailValidation,
+      email: validateEmail(newClient.email || ''),
       cellphone: validateCellphone(newClient.cellphone || ''),
-    };
-    setCreateErrors(errors);
-  }, [newClient.first_name, newClient.last_name, newClient.email, newClient.cellphone]);
-
-  const validateCreateClient = () => createIsValid;
-
-  const editIsValid = useMemo(() => {
-    const emailValidation = validateEmail(editingClient.email || '');
-    const errors: any = {
-      first_name: editingClient.first_name ? '' : 'El nombre es obligatorio',
-      last_name: editingClient.last_name ? '' : 'El apellido es obligatorio',
-      email: emailValidation,
-      cellphone: validateCellphone(editingClient.cellphone || ''),
-    };
-    return !Object.values(errors).some((error: any) =>
-      typeof error === 'string' ? error !== '' : !error.isValid
-    );
-  }, [editingClient.first_name, editingClient.last_name, editingClient.email, editingClient.cellphone]);
-
-  useEffect(() => {
-    const emailValidation = validateEmail(editingClient.email || '');
-    const errors: any = {
-      first_name: editingClient.first_name ? '' : 'El nombre es obligatorio',
-      last_name: editingClient.last_name ? '' : 'El apellido es obligatorio',
-      email: emailValidation,
-      cellphone: validateCellphone(editingClient.cellphone || ''),
-    };
-    setEditErrors(errors);
-  }, [editingClient.first_name, editingClient.last_name, editingClient.email, editingClient.cellphone]);
-
-  const validateEditClient = () => editIsValid;
-
-  const handleCreate = () => {
-    setShowCreateModal(true);
-    setCreateErrors({ first_name: '', last_name: '', email: { isValid: true, message: '' }, cellphone: '' } as any);
-  };
-
-  const handleSaveClient = async () => {
-    if (createIsValid) {
-      try {
-        const clientId = Date.now(); // Generate a unique numeric ID using the current timestamp
-        const requestData: CreateClientRequest = {
-          clients: [{
-            clientId,
-            first_name: newClient.first_name!,
-            last_name: newClient.last_name!,
-            cellphone: newClient.cellphone!,
-            email: newClient.email!,
-            companyId,
-            action: "1" // "1" for create
-          }]
-        };
-
-        await createOrUpdateClient(requestData);
-        setToastMessage('Cliente agregado exitosamente');
-        setShowToast(true);
-        setShowCreateModal(false);
-        setNewClient({ first_name: '', last_name: '', email: '', cellphone: '' });
-        setCreateErrors({ first_name: '', last_name: '', email: { isValid: true, message: '' }, cellphone: '' });
-        loadClients(); // Refresh the list
-      } catch (error) {
-        console.error('Error creating client:', error);
-        setToastMessage('Error al agregar el cliente');
-        setShowToast(true);
-      }
-    }
-  };
-
-  const handleEdit = (client: Client) => {
-    setEditingClient(client);
-    setShowEditModal(true);
-    setEditErrors({ first_name: '', last_name: '', email: { isValid: true, message: '' }, cellphone: '' });
-  };
-
-  const handleEmailChange = (value: string, isCreate: boolean) => {
-    const validation = validateEmail(value);
-    if (isCreate) {
-      setCreateErrors((prev: any) => ({ ...prev, email: validation }));
-      setNewClient((prev: any) => ({ ...prev, email: value }));
-    } else {
-      setEditErrors((prev: any) => ({ ...prev, email: validation }));
-      setEditingClient((prev: any) => ({ ...prev, email: value }));
-    }
-  };
-
-  const handleUpdateClient = async () => {
-    if (editIsValid) {
-      try {
-        const requestData: CreateClientRequest = {
-          clients: [{
-            clientId: editingClient.clientId!,
-            first_name: editingClient.first_name!,
-            last_name: editingClient.last_name!,
-            cellphone: editingClient.cellphone!,
-            email: editingClient.email!,
-            companyId,
-            action: "2" // "2" for update
-          }]
-        };
-
-        await createOrUpdateClient(requestData);
-        setToastMessage('Cliente actualizado exitosamente');
-        setShowToast(true);
-        setShowEditModal(false);
-        setEditingClient({ first_name: '', last_name: '', email: '', cellphone: '' });
-        setEditErrors({ first_name: '', last_name: '', email: { isValid: true, message: '' }, cellphone: '' } as any);
-        loadClients(); // Refresh the list
-      } catch (error) {
-        console.error('Error updating client:', error);
-        setToastMessage('Error al actualizar el cliente');
-        setShowToast(true);
-      }
-    }
-  };
-
-  // Format date helper
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
     });
+  }, [newClient.first_name, newClient.last_name, newClient.email, newClient.cellphone]);
+
+  // Step 0 → Next: create or update client, then advance
+  const handleWizardNext0 = async () => {
+    if (!createIsValid) return;
+    setWizardLoading(true);
+    try {
+      if (wizardMode === 'edit' && createdClientId) {
+        const req: CreateClientRequest = {
+          clients: [{ clientId: createdClientId, first_name: newClient.first_name!, last_name: newClient.last_name!, cellphone: newClient.cellphone!, email: newClient.email!, companyId, clientType: newClient.clientType, action: '2' }],
+        };
+        await createOrUpdateClient(req);
+        loadClients();
+      } else if (!createdClientId) {
+        const clientId = Date.now();
+        const req: CreateClientRequest = {
+          clients: [{ clientId, first_name: newClient.first_name!, last_name: newClient.last_name!, cellphone: newClient.cellphone!, email: newClient.email!, companyId, clientType: newClient.clientType, action: '1' }],
+        };
+        await createOrUpdateClient(req);
+        setCreatedClientId(clientId);
+        loadClients();
+      }
+      setWizardStep(1);
+    } catch { toast(wizardMode === 'edit' ? 'Error al actualizar el cliente' : 'Error al crear el cliente'); }
+    finally { setWizardLoading(false); }
   };
 
+  const takePicture = async (setter: React.Dispatch<React.SetStateAction<string>>, onSuccess?: () => void) => {
+    try {
+      const photo = await Camera.getPhoto({ quality: 90, allowEditing: false, resultType: CameraResultType.Base64, source: CameraSource.Camera });
+      if (photo.base64String) {
+        setter(`data:image/jpeg;base64,${photo.base64String}`);
+        onSuccess?.();
+      }
+    } catch (err) {
+      toast((err as Error).message ?? 'Error al capturar la imagen');
+    }
+  };
+
+  const startLivenessSession = async () => {
+    setCaptureSubStep('liveness-active');
+    setLivenessStatus('in-progress');
+    try {
+      const { sessionId } = await createClientFaceRecognitionSession(Number(companyId), Number(createdClientId));
+      setAzureSessionId(sessionId);
+      setLivenessStatus('completed');
+      setCaptureSubStep('processing');
+      setTimeout(() => {
+        toast('Validación facial completada correctamente.');
+        setWizardStep(4);
+        setCaptureSubStep('doc-intro');
+      }, 1800);
+    } catch (err) {
+      setLivenessStatus('failed');
+      toast((err as Error).message ?? 'No se pudo iniciar la sesión de validación facial');
+      setCaptureSubStep('liveness-intro');
+    }
+  };
+
+  const handleVerify = async () => {
+    setWizardLoading(true);
+    try {
+      const res: FaceVerificationResponse = await verifyClientFaceRecognition({
+        companyId: Number(companyId),
+        clientId: Number(createdClientId),
+        documentType,
+        idFrontImageBase64: idFrontImageBase64.split(',')[1],
+        idBackImageBase64: idBackImageBase64.split(',')[1],
+        azureSessionId,
+      });
+      setConfidenceScore(res.confidenceScore);
+      setIsVerified(res.isVerified);
+      setIdFrontBlobUrl(res.idFrontImageBlobUrl);
+      setSelfieBlobUrl(res.clientSelfieBlobUrl);
+      if (res.error) { toast(res.error); }
+      else { toast('¡Verificación completada!'); setWizardStep(5); }
+    } catch (err) {
+      toast((err as Error).message ?? 'Error durante la verificación biométrica');
+    } finally { setWizardLoading(false); }
+  };
+
+  const handleSubmitContract = async () => {
+    if (!contractAccepted || !pagareAccepted) { toast('Por favor acepta los términos del contrato y el pagaré.'); return; }
+    setWizardLoading(true);
+    try {
+      const now = new Date().toISOString();
+      setContractAcceptedAt(now);
+      const payload: ContractSubmissionRequest = {
+        companyId: Number(companyId),
+        clientId: Number(createdClientId),
+        documentType,
+        idFrontImageBlobUrl: idFrontBlobUrl,
+        clientSelfieBlobUrl: selfieBlobUrl,
+        confidenceScore,
+        isVerified,
+        contractAccepted: true,
+        contractPdfBase64: btoa('Contrato de crédito aceptado electrónicamente'),
+        contractAcceptedAt: now,
+        pagareAccepted: true,
+        pagarePdfBase64: btoa('Pagaré aceptado electrónicamente'),
+        hasPhysicalPagare,
+        userId: 0,
+      };
+      const res = await submitContractClientFaceRecognition(payload);
+      if (res.error) { toast(`Error: ${res.msg || res.error}`); }
+      else {
+        toast('¡Cliente registrado con contrato enviado exitosamente!');
+        setShowWizard(false);
+        resetWizard();
+      }
+    } catch (err) {
+      toast((err as Error).message ?? 'Error al enviar el contrato');
+    } finally { setWizardLoading(false); }
+  };
+
+  const goBackWizard = () => {
+    if (wizardStep === 3 && captureSubStep !== 'doc-intro') {
+      const prev: Record<CaptureSubStep, CaptureSubStep> = {
+        'doc-intro': 'doc-intro',
+        'front-capture': 'doc-intro',
+        'flip-instruction': 'front-capture',
+        'back-capture': 'flip-instruction',
+        'back-review': 'back-capture',
+        'liveness-intro': 'back-review',
+        'liveness-active': 'liveness-intro',
+        'processing': 'liveness-active',
+      };
+      setCaptureSubStep(prev[captureSubStep]);
+    } else {
+      setWizardStep(s => Math.max(s - 1, 0));
+      setCaptureSubStep('doc-intro');
+    }
+  };
+
+  const jumpWizard = (target: number) => {
+    if (target < wizardStep) { setWizardStep(target); setCaptureSubStep('doc-intro'); }
+  };
+
+  // ── Wizard renderers ───────────────────────────────────────────────────────
+
+  const WizardStepBar = () => (
+    <div className="wizard-step-indicator">
+      {WIZARD_STEPS.map((s, i) => (
+        <React.Fragment key={s}>
+          <div className="wizard-step-item">
+            <button
+              className={`wizard-step-circle${i === wizardStep ? ' active' : ''}${i < wizardStep ? ' completed' : ''}`}
+              onClick={() => jumpWizard(i)}
+              style={{ cursor: i < wizardStep ? 'pointer' : 'default', border: 'none' }}
+            >
+              {i < wizardStep ? <IonIcon icon={checkmark} /> : i + 1}
+            </button>
+            <span className={`wizard-step-label${i === wizardStep ? ' active' : ''}${i < wizardStep ? ' completed' : ''}`}>{s}</span>
+          </div>
+          {i < WIZARD_STEPS.length - 1 && <div className={`wizard-step-connector${i < wizardStep ? ' completed' : ''}`} />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+
+  const renderStep0 = () => (
+    <div className="wizard-step-body">
+      <div className="wizard-step-header">
+        <div className="wizard-step-icon-wrap" style={{ background: '#e0f2fe' }}>
+          <IonIcon icon={personCircle} style={{ fontSize: 40, color: 'var(--ion-color-primary)' }} />
+        </div>
+        <h2 className="wizard-step-title">Datos del Cliente</h2>
+        <p className="wizard-step-desc">Ingresa la información personal del nuevo cliente.</p>
+      </div>
+
+      <IonItem className="form-item outline">
+        <IonIcon icon={person} slot="start" color="primary" />
+        <IonLabel position="floating">Nombre *</IonLabel>
+        <IonInput value={newClient.first_name} onIonInput={(e) => setNewClient(p => ({ ...p, first_name: e.detail.value! }))} />
+        {createErrors.first_name && <IonNote slot="helper" color="danger">{createErrors.first_name}</IonNote>}
+      </IonItem>
+
+      <IonItem className="form-item outline">
+        <IonIcon icon={person} slot="start" color="primary" />
+        <IonLabel position="floating">Apellido *</IonLabel>
+        <IonInput value={newClient.last_name} onIonInput={(e) => setNewClient(p => ({ ...p, last_name: e.detail.value! }))} />
+        {createErrors.last_name && <IonNote slot="helper" color="danger">{createErrors.last_name}</IonNote>}
+      </IonItem>
+
+      <IonItem className="form-item outline">
+        <IonIcon icon={call} slot="start" color="primary" />
+        <IonLabel position="floating">Teléfono *</IonLabel>
+        <IonInput type="tel" value={newClient.cellphone} onIonInput={(e) => setNewClient(p => ({ ...p, cellphone: e.detail.value! }))} />
+        {createErrors.cellphone && <IonNote slot="helper" color="danger">{createErrors.cellphone}</IonNote>}
+      </IonItem>
+
+      <IonItem className="form-item outline">
+        <IonIcon icon={mail} slot="start" color="primary" />
+        <IonLabel position="floating">Email</IonLabel>
+        <IonInput type="email" value={newClient.email} onIonInput={(e) => setNewClient(p => ({ ...p, email: e.detail.value! }))} />
+        {newClient.email && !createErrors.email.isValid && (
+          <>
+            <IonIcon icon={closeCircle} slot="end" color="danger" />
+            <IonNote slot="helper" color="danger">{createErrors.email.message}</IonNote>
+          </>
+        )}
+        {newClient.email && createErrors.email.isValid && (
+          <IonIcon icon={checkmarkCircle} slot="end" color="success" />
+        )}
+      </IonItem>
+
+      {/* Client type selector */}
+      <div style={{ margin: '14px 4px 0' }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: '#374151', margin: '0 0 8px' }}>Tipo de cliente:</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {([
+            { id: 'borrower', label: '📋 Acreditado', desc: 'Solicita préstamo', color: '#2563eb' },
+            { id: 'lender',   label: '💼 Prestamista', desc: 'Financia préstamos', color: '#15803d' },
+            { id: 'both',     label: '🔄 Ambos', desc: 'Acreditado y prestamista', color: '#7c3aed' },
+          ] as { id: ClientType; label: string; desc: string; color: string }[]).map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setNewClient(p => ({ ...p, clientType: t.id }))}
+              style={{
+                flex: 1, padding: '10px 6px', borderRadius: 12, border: `2px solid ${newClient.clientType === t.id ? t.color : '#e5e7eb'}`,
+                background: newClient.clientType === t.id ? `${t.color}14` : '#fff',
+                cursor: 'pointer', textAlign: 'center',
+              }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: newClient.clientType === t.id ? t.color : '#374151' }}>{t.label}</div>
+              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{t.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // QR value encodes enough to identify the client at any POS terminal
+  const qrValue = createdClientId
+    ? `CLIENT:${createdClientId}:${newClient.first_name} ${newClient.last_name}`
+    : '';
+
+  const renderStep1 = () => (
+    <div className="wizard-step-body">
+      <div className="wizard-step-header">
+        <div className="wizard-step-icon-wrap" style={{ background: '#f0fdf4' }}>
+          <IonIcon icon={qrCodeOutline} style={{ fontSize: 40, color: '#16a34a' }} />
+        </div>
+        <h2 className="wizard-step-title">Código QR del Cliente</h2>
+        <p className="wizard-step-desc">
+          Este código QR identifica al cliente en todos los puntos de venta. Imprímelo o guárdalo.
+        </p>
+      </div>
+
+      <div className="client-qr-box">
+        {qrValue ? (
+          <QRCodeSVG value={qrValue} size={200} level="H" includeMargin />
+        ) : (
+          <div className="client-qr-placeholder">Sin datos</div>
+        )}
+      </div>
+
+      <div className="wizard-summary-box" style={{ marginTop: 16 }}>
+        <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
+        <p><strong>Teléfono:</strong> {newClient.cellphone}</p>
+        {newClient.email && <p><strong>Email:</strong> {newClient.email}</p>}
+        <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>ID: {createdClientId}</p>
+      </div>
+    </div>
+  );
+
+  const renderStep2 = () => (
+    <div className="wizard-step-body">
+      <div className="wizard-step-header">
+        <div className="wizard-step-icon-wrap" style={{ background: '#fef3c7' }}>
+          <IonIcon icon={idCardOutline} style={{ fontSize: 40, color: '#d97706' }} />
+        </div>
+        <h2 className="wizard-step-title">Tipo de Documento</h2>
+        <p className="wizard-step-desc">Selecciona el documento de identificación oficial del cliente.</p>
+      </div>
+
+      <IonList className="client-face-recognition-radio-list ion-margin-top">
+        <IonListHeader><IonLabel>Identificación oficial</IonLabel></IonListHeader>
+        <IonRadioGroup value={documentType} onIonChange={(e) => setDocumentType(e.detail.value)}>
+          <IonItem>
+            <IonLabel>
+              <strong>INE</strong>
+              <p style={{ fontSize: 12, color: '#6b7280' }}>Credencial para votar</p>
+            </IonLabel>
+            <IonRadio value="INE" slot="end" />
+          </IonItem>
+          <IonItem>
+            <IonLabel>
+              <strong>Pasaporte</strong>
+              <p style={{ fontSize: 12, color: '#6b7280' }}>Pasaporte vigente</p>
+            </IonLabel>
+            <IonRadio value="Passport" slot="end" />
+          </IonItem>
+          <IonItem>
+            <IonLabel>
+              <strong>Licencia de Conducir</strong>
+              <p style={{ fontSize: 12, color: '#6b7280' }}>Licencia vigente</p>
+            </IonLabel>
+            <IonRadio value="Driver License" slot="end" />
+          </IonItem>
+        </IonRadioGroup>
+      </IonList>
+    </div>
+  );
+
+  const renderCaptureSubStep = () => {
+    if (captureSubStep === 'doc-intro') return (
+      <IonCard className="client-face-recognition-step-card cfr-capture-card">
+        <IonCardContent>
+          <h2 className="cfr-capture-title">Verifica tu documento</h2>
+          <p className="cfr-capture-desc">
+            Al dar clic en Capturar deberás autorizar el acceso a la cámara para escanear la
+            identificación original del cliente (no se permiten fotocopias).
+          </p>
+          <div className="cfr-illustration">
+            <div className="cfr-phone-id-illustration">
+              <IonIcon icon={idCardOutline} className="cfr-illus-id-icon" />
+            </div>
+          </div>
+        </IonCardContent>
+      </IonCard>
+    );
+
+    if (captureSubStep === 'front-capture') return (
+      <IonCard className="client-face-recognition-step-card cfr-capture-card">
+        <IonCardContent>
+          <h2 className="cfr-capture-title">Parte delantera</h2>
+          <p className="cfr-capture-desc">Muestre la parte delantera del documento a cámara.</p>
+          <div className="cfr-camera-frame">
+            {idFrontImageBase64
+              ? <img src={idFrontImageBase64} alt="Frente" className="cfr-camera-preview" />
+              : <div className="cfr-camera-placeholder"><IonIcon icon={idCardOutline} className="cfr-camera-guide-icon" /></div>}
+          </div>
+        </IonCardContent>
+      </IonCard>
+    );
+
+    if (captureSubStep === 'flip-instruction') return (
+      <IonCard className="client-face-recognition-step-card cfr-capture-card">
+        <IonCardContent>
+          <h2 className="cfr-capture-title">Voltea la identificación con la parte trasera hacia arriba</h2>
+          <div className="cfr-illustration">
+            <div className="cfr-flip-illustration">
+              <IonIcon icon={idCardOutline} className="cfr-illus-id-icon cfr-illus-id-back" />
+              <div className="cfr-flip-arrow">↺</div>
+            </div>
+          </div>
+        </IonCardContent>
+      </IonCard>
+    );
+
+    if (captureSubStep === 'back-capture') return (
+      <IonCard className="client-face-recognition-step-card cfr-capture-card">
+        <IonCardContent>
+          <h2 className="cfr-capture-title">Parte trasera</h2>
+          <p className="cfr-capture-desc">Muestre la parte trasera del documento a cámara.</p>
+          <div className="cfr-camera-frame">
+            {idBackImageBase64
+              ? <img src={idBackImageBase64} alt="Reverso" className="cfr-camera-preview" />
+              : <div className="cfr-camera-placeholder">
+                  <IonIcon icon={idCardOutline} className="cfr-camera-guide-icon" />
+                  <span className="cfr-camera-hint">Aleja el documento</span>
+                </div>}
+          </div>
+        </IonCardContent>
+      </IonCard>
+    );
+
+    if (captureSubStep === 'back-review') return (
+      <IonCard className="client-face-recognition-step-card cfr-capture-card">
+        <IonCardContent>
+          <h2 className="cfr-capture-title">Asegúrate de que la identificación sea legible</h2>
+          {idBackImageBase64 && <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
+        </IonCardContent>
+      </IonCard>
+    );
+
+    if (captureSubStep === 'liveness-intro') return (
+      <IonCard className="client-face-recognition-step-card cfr-capture-card">
+        <IonCardContent>
+          <h2 className="cfr-capture-title">Validación facial en vivo</h2>
+          <p className="cfr-capture-desc">
+            El cliente debe mirar directo a la cámara. Asegúrate de que no lleve gafas de sol,
+            gorras u otros elementos que tapen su cara.
+          </p>
+          <div className="cfr-illustration">
+            <div className="cfr-face-circle">
+              <IonIcon icon={personOutline} className="cfr-face-icon" />
+            </div>
+          </div>
+        </IonCardContent>
+      </IonCard>
+    );
+
+    if (captureSubStep === 'liveness-active') return (
+      <IonCard className="client-face-recognition-step-card cfr-capture-card">
+        <IonCardContent>
+          <h2 className="cfr-capture-title">Movimientos de cabeza</h2>
+          <p className="cfr-capture-desc">Coloca la cara al centro y mira a la cámara.</p>
+          <div className="cfr-camera-frame cfr-liveness-frame">
+            <div className="cfr-liveness-overlay">
+              <IonIcon icon={personOutline} className="cfr-liveness-face-icon" />
+            </div>
+            <div className="cfr-liveness-hint-badge">→ Mueve la cabeza hacia la derecha</div>
+          </div>
+        </IonCardContent>
+      </IonCard>
+    );
+
+    if (captureSubStep === 'processing') return (
+      <div className="cfr-processing-screen">
+        <IonSpinner name="crescent" className="cfr-processing-spinner" />
+        <h2 className="cfr-processing-title">Procesando...</h2>
+        <p className="cfr-processing-desc">Espera unos segundos</p>
+      </div>
+    );
+
+    return null;
+  };
+
+  const renderStep4 = () => (
+    <div className="wizard-step-body">
+      <div className="wizard-step-header">
+        <div className="wizard-step-icon-wrap" style={{ background: '#d1fae5' }}>
+          <IonIcon icon={shieldCheckmarkOutline} style={{ fontSize: 40, color: '#059669' }} />
+        </div>
+        <h2 className="wizard-step-title">Verificación Biométrica</h2>
+        <p className="wizard-step-desc">Confirma las capturas y ejecuta la verificación de identidad.</p>
+      </div>
+
+      <div className="id-preview-grid ion-margin-top">
+        <div className="id-preview-card">
+          <span className="id-preview-title">Frente</span>
+          {idFrontImageBase64
+            ? <img src={idFrontImageBase64} alt="Frente" className="captured-image captured-image-small" />
+            : <div className="id-preview-placeholder">Sin captura</div>}
+        </div>
+        <div className="id-preview-card">
+          <span className="id-preview-title">Reverso</span>
+          {idBackImageBase64
+            ? <img src={idBackImageBase64} alt="Reverso" className="captured-image captured-image-small" />
+            : <div className="id-preview-placeholder">Sin captura</div>}
+        </div>
+      </div>
+
+      <div className="wizard-summary-box">
+        <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
+        <p><strong>Documento:</strong> {documentType || '—'}</p>
+        <p><strong>Sesión de liveness:</strong> {azureSessionId ? 'Completada ✓' : 'Pendiente'}</p>
+      </div>
+    </div>
+  );
+
+  const renderStep5 = () => (
+    <div className="wizard-step-body">
+      <div className="wizard-step-header">
+        <div className="wizard-step-icon-wrap" style={{ background: '#ede9fe' }}>
+          <IonIcon icon={clipboardOutline} style={{ fontSize: 40, color: '#7c3aed' }} />
+        </div>
+        <h2 className="wizard-step-title">Aceptación de Contrato</h2>
+        <p className="wizard-step-desc">Revisa el resumen y acepta los términos para finalizar.</p>
+      </div>
+
+      <div className="wizard-summary-box">
+        <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
+        <p><strong>Teléfono:</strong> {newClient.cellphone}</p>
+        <p><strong>Documento:</strong> {documentType || '—'}</p>
+        <p><strong>Puntaje de confianza:</strong> {confidenceScore > 0 ? confidenceScore.toFixed(4) : '—'}</p>
+        <p><strong>Identidad verificada:</strong> {isVerified ? 'Sí ✓' : 'No'}</p>
+      </div>
+
+      <div className="wizard-contract-terms">
+        <p><strong>Términos y Condiciones del Contrato:</strong></p>
+        <p>
+          Al aceptar, el cliente reconoce haber leído, entendido y aceptado todos los términos
+          y condiciones del contrato de crédito, incluyendo tasas de interés, plazos de pago,
+          cargos por mora y condiciones de cancelación anticipada.
+        </p>
+      </div>
+
+      <IonItem lines="none" className="wizard-checkbox-item">
+        <IonCheckbox checked={contractAccepted} onIonChange={(e) => setContractAccepted(e.detail.checked)} slot="start" />
+        <IonLabel className="ion-text-wrap">Acepto los términos del contrato de crédito</IonLabel>
+      </IonItem>
+
+      <IonItem lines="none" className="wizard-checkbox-item">
+        <IonCheckbox checked={pagareAccepted} onIonChange={(e) => setPagareAccepted(e.detail.checked)} slot="start" />
+        <IonLabel className="ion-text-wrap">Acepto y firmo electrónicamente el pagaré</IonLabel>
+      </IonItem>
+
+      <IonItem lines="none" className="wizard-checkbox-item">
+        <IonCheckbox checked={hasPhysicalPagare} onIonChange={(e) => setHasPhysicalPagare(e.detail.checked)} slot="start" />
+        <IonLabel className="ion-text-wrap">El pagaré físico está en resguardo</IonLabel>
+      </IonItem>
+    </div>
+  );
+
+  const WizardFooter = () => {
+    if (wizardStep === 3) {
+      if (captureSubStep === 'processing' || captureSubStep === 'liveness-active') return null;
+
+      if (captureSubStep === 'doc-intro') return (
+        <div className="wizard-footer">
+          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
+          <div className="wizard-footer-spacer" />
+          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('front-capture')}>
+            Capturar <IonIcon icon={cameraOutline} />
+          </button>
+        </div>
+      );
+
+      if (captureSubStep === 'front-capture') return (
+        <div className="wizard-footer">
+          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
+          <div className="wizard-footer-spacer" />
+          <button className="wizard-footer-next" onClick={() => takePicture(setIdFrontImageBase64, () => setCaptureSubStep('flip-instruction'))}>
+            <IonIcon icon={cameraOutline} /> Capturar frente
+          </button>
+        </div>
+      );
+
+      if (captureSubStep === 'flip-instruction') return (
+        <div className="wizard-footer">
+          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
+          <div className="wizard-footer-spacer" />
+          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('back-capture')}>
+            Continuar <IonIcon icon={chevronForward} />
+          </button>
+        </div>
+      );
+
+      if (captureSubStep === 'back-capture') return (
+        <div className="wizard-footer">
+          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
+          <div className="wizard-footer-spacer" />
+          <button className="wizard-footer-next" onClick={() => takePicture(setIdBackImageBase64, () => setCaptureSubStep('back-review'))}>
+            <IonIcon icon={cameraOutline} /> Capturar reverso
+          </button>
+        </div>
+      );
+
+      if (captureSubStep === 'back-review') return (
+        <div className="wizard-footer">
+          <button className="wizard-footer-back" onClick={() => { setIdBackImageBase64(''); setCaptureSubStep('back-capture'); }}>
+            <IonIcon icon={refreshOutline} /> Repetir
+          </button>
+          <div className="wizard-footer-spacer" />
+          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('liveness-intro')}>
+            Continuar <IonIcon icon={chevronForward} />
+          </button>
+        </div>
+      );
+
+      if (captureSubStep === 'liveness-intro') return (
+        <div className="wizard-footer">
+          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
+          <div className="wizard-footer-spacer" />
+          <button className="wizard-footer-next" onClick={startLivenessSession}>
+            Iniciar validación <IonIcon icon={chevronForward} />
+          </button>
+        </div>
+      );
+
+      return null;
+    }
+
+    return (
+      <div className="wizard-footer">
+        {wizardStep > 0 && (
+          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
+        )}
+        <div className="wizard-footer-spacer" />
+        {wizardStep === 0 && (
+          <button className="wizard-footer-next" onClick={handleWizardNext0} disabled={!createIsValid || wizardLoading}>
+            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : <>Siguiente <IonIcon icon={chevronForward} /></>}
+          </button>
+        )}
+        {wizardStep === 1 && (
+          <button className="wizard-footer-next" onClick={() => setWizardStep(2)}>
+            Siguiente <IonIcon icon={chevronForward} />
+          </button>
+        )}
+        {wizardStep === 2 && (
+          <button className="wizard-footer-next" onClick={() => { if (!documentType) { toast('Selecciona un tipo de documento'); return; } setWizardStep(3); }}>
+            Siguiente <IonIcon icon={chevronForward} />
+          </button>
+        )}
+        {wizardStep === 4 && (
+          <button className="wizard-footer-submit" onClick={handleVerify} disabled={wizardLoading}>
+            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : 'Verificar biometría'}
+          </button>
+        )}
+        {wizardStep === 5 && (
+          <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || !pagareAccepted || wizardLoading}>
+            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : 'Enviar contrato ✓'}
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderWizardStep = () => {
+    if (wizardStep === 0) return renderStep0();
+    if (wizardStep === 1) return renderStep1();
+    if (wizardStep === 2) return renderStep2();
+    if (wizardStep === 3) return renderCaptureSubStep();
+    if (wizardStep === 4) return renderStep4();
+    return renderStep5();
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <IonPage>
       <Header
@@ -324,7 +930,6 @@ const ClientsPage: React.FC = () => {
       />
 
       <IonContent>
-        {/* Search Bar */}
         <div className="search-container">
           <IonSearchbar
             value={searchTerm}
@@ -334,303 +939,226 @@ const ClientsPage: React.FC = () => {
           />
         </div>
 
-        <IonList className="clients-list">
+        <div className="clients-list">
           {filteredClients.map((client) => (
             <IonCard key={client.clientId} className="client-card">
               <IonCardContent className="client-card-content">
                 <div className="client-card-row">
-                  {/* Left section */}
                   <div className="client-left">
-                    <IonIcon icon={personCircle} className="client-avatar" />
+                    {clientSelfieMap[client.clientId] ? (
+                      <img
+                        src={clientSelfieMap[client.clientId]}
+                        alt={`${client.first_name}`}
+                        className="client-avatar-photo"
+                      />
+                    ) : (
+                      <IonIcon icon={personCircle} className="client-avatar" />
+                    )}
                   </div>
-
-                  {/* Main section */}
                   <div className="client-main">
                     <div className="client-header">
-                      <IonCardTitle className="client-name">
-                        {client.first_name} {client.last_name}
-                      </IonCardTitle>
+                      <IonCardTitle className="client-name">{client.first_name} {client.last_name}</IonCardTitle>
                     </div>
-
-                    <p className="client-subtitle">
-                      {client.email || 'Sin correo registrado'}
-                    </p>
-
+                    <p className="client-subtitle">{client.email || 'Sin correo registrado'}</p>
                     <div className="client-meta-row">
                       <span className="client-meta-badge">
                         <span className="meta-label">Teléfono</span>
                         <span className="meta-value">{client.cellphone || '—'}</span>
                       </span>
-
-                      <span className="client-meta-badge">
-                        <span className="meta-label">Email</span>
-                        <span className={`meta-value${!client.email ? ' empty' : ''}`}>
-                          {client.email || 'No registrado'}
-                        </span>
-                      </span>
-
                       <span className="client-meta-badge">
                         <span className="meta-label">Creado</span>
                         <span className="meta-value">{formatDate(client.created_At)}</span>
                       </span>
                     </div>
                   </div>
-
-                  {/* Right section */}
                   <div className="client-actions">
-                    <IonButton
-                      fill="outline"
-                      size="small"
-                      color="primary"
-                      onClick={() => handleEdit(client)}
-                      className="action-button edit-button"
-                    >
-                      <IonIcon icon={pencil} slot="start" />
-                      Editar
+                    <IonButton fill="outline" size="small" color="success" onClick={() => { setQrModalClient(client); setShowQrModal(true); }} className="action-button">
+                      <IonIcon icon={qrCodeOutline} slot="start" /> QR
                     </IonButton>
-                    <IonButton
-                      fill="outline"
-                      size="small"
-                      color="danger"
-                      onClick={() => handleDelete(client)}
-                      className="action-button delete-button"
-                    >
-                      <IonIcon icon={trash} slot="start" />
-                      Eliminar
+                    <IonButton fill="outline" size="small" color="medium" onClick={() => { setShareClient(client); setShowShareModal(true); }} className="action-button">
+                      <IonIcon icon={shareOutline} slot="start" /> Invitar
+                    </IonButton>
+                    {/* Dashboard based on clientType */}
+                    {(client.clientType === 'borrower' || client.clientType === 'both' || !client.clientType) && (
+                      <IonButton fill="outline" size="small" color="tertiary" onClick={() => history.push(`/client-dashboard/${client.clientId}`)} className="action-button">
+                        <IonIcon icon={barChartOutline} slot="start" /> Dashboard
+                      </IonButton>
+                    )}
+                    {(client.clientType === 'lender' || client.clientType === 'both') && (
+                      <IonButton fill="outline" size="small" style={{ '--color': '#15803d', '--border-color': '#15803d' }} onClick={() => history.push(`/lender-dashboard/${client.clientId}`)} className="action-button">
+                        <IonIcon icon={walletOutline} slot="start" /> Portfolio
+                      </IonButton>
+                    )}
+                    <IonButton fill="outline" size="small" color="warning" onClick={() => history.push(`/client-followup/${client.clientId}`)} className="action-button">
+                      <IonIcon icon={calendarOutline} slot="start" /> Seguimiento
+                    </IonButton>
+                    <IonButton fill="outline" size="small" color="primary" onClick={() => handleEdit(client)} className="action-button edit-button">
+                      <IonIcon icon={pencil} slot="start" /> Editar
+                    </IonButton>
+                    <IonButton fill="outline" size="small" color="danger" onClick={() => handleDelete(client)} className="action-button delete-button">
+                      <IonIcon icon={trash} slot="start" /> Eliminar
                     </IonButton>
                   </div>
                 </div>
               </IonCardContent>
             </IonCard>
           ))}
-        </IonList>
+        </div>
 
-        {/* Empty State */}
         {filteredClients.length === 0 && !loading && (
           <div className="empty-state">
             <IonIcon icon={person} className="empty-icon" />
-            <IonText color="medium">
-              <p>{searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}</p>
-            </IonText>
+            <IonText color="medium"><p>{searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}</p></IonText>
           </div>
         )}
-
-        {/* Loading State */}
         {loading && (
           <div className="loading-state">
-            <IonText color="medium">
-              <p>Cargando clientes...</p>
-            </IonText>
+            <IonText color="medium"><p>Cargando clientes...</p></IonText>
           </div>
         )}
 
-        {/* Floating Action Button with Tooltip */}
         <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={handleCreate} aria-label="Nuevo cliente">
+          <IonFabButton onClick={() => { resetWizard(); setWizardMode('create'); setShowWizard(true); }} aria-label="Nuevo cliente">
             <IonIcon icon={add} />
           </IonFabButton>
         </IonFab>
 
-        <IonModal isOpen={showCreateModal} onDidDismiss={() => setShowCreateModal(false)} className="client-modal">
-          <IonHeader className="ion-no-border">
-            <IonToolbar className="modal-toolbar">
-              <IonButtons slot="start">
-                <IonButton fill="clear" onClick={() => setShowCreateModal(false)}>
-                  <IonIcon icon={arrowBack} />
-                </IonButton>
-              </IonButtons>
-              <IonTitle className="modal-title">Agregar Cliente</IonTitle>
-            </IonToolbar>
-            <div className="modal-subtitle">
-              <IonText color="medium">Registra un nuevo cliente en el sistema</IonText>
-            </div>
-          </IonHeader>
-          <IonContent className="modal-content">
-            <div className="form-container">
-              <IonItem className="form-item outline">
-                <IonIcon icon={person} slot="start" color="primary" />
-                <IonLabel position="floating">Nombre *</IonLabel>
-                <IonInput
-                  value={newClient.first_name}
-                  onIonChange={(e) => setNewClient(prev => ({ ...prev, first_name: e.detail.value! }))}
-                  color={createErrors.first_name ? 'danger' : 'primary'}
-                  className="modern-input"
-                />
-                {createErrors.first_name && (
-                  <IonNote slot="helper" color="danger">{createErrors.first_name}</IonNote>
-                )}
-              </IonItem>
-
-              <IonItem className="form-item outline">
-                <IonIcon icon={person} slot="start" color="primary" />
-                <IonLabel position="floating">Apellido *</IonLabel>
-                <IonInput
-                  value={newClient.last_name}
-                  onIonChange={(e) => setNewClient(prev => ({ ...prev, last_name: e.detail.value! }))}
-                  color={createErrors.last_name ? 'danger' : 'primary'}
-                  className="modern-input"
-                />
-                {createErrors.last_name && (
-                  <IonNote slot="helper" color="danger">{createErrors.last_name}</IonNote>
-                )}
-              </IonItem>
-
-              <IonItem className="form-item outline">
-                <IonIcon icon={mail} slot="start" color="primary" />
-                <IonLabel position="floating">Email</IonLabel>
-                <IonInput
-                  value={newClient.email}
-                  onIonChange={(e) => handleEmailChange(e.detail.value!, true)}
-                  color={createErrors.email.isValid ? (newClient.email ? 'success' : 'primary') : 'danger'}
-                  className="modern-input"
-                />
-                {newClient.email && createErrors.email.isValid && (
-                  <IonIcon icon={checkmarkCircle} slot="end" color="success" />
-                )}
-                {newClient.email && !createErrors.email.isValid && (
-                  <IonIcon icon={closeCircle} slot="end" color="danger" />
-                )}
-                {newClient.email && createErrors.email.isValid && (
-                  <IonNote slot="helper" color="success">Email válido</IonNote>
-                )}
-                {newClient.email && !createErrors.email.isValid && (
-                  <IonNote slot="helper" color="danger">Formato de email inválido (ej. nombre@dominio.com)</IonNote>
-                )}
-              </IonItem>
-
-              <IonItem className="form-item outline">
-                <IonIcon icon={call} slot="start" color="primary" />
-                <IonLabel position="floating">Teléfono *</IonLabel>
-                <IonInput
-                  value={newClient.cellphone}
-                  onIonChange={(e) => setNewClient(prev => ({ ...prev, cellphone: e.detail.value! }))}
-                  color={createErrors.cellphone ? 'danger' : 'primary'}
-                  className="modern-input"
-                  type="tel"
-                />
-                {createErrors.cellphone && (
-                  <IonNote slot="helper" color="danger">{createErrors.cellphone}</IonNote>
-                )}
-              </IonItem>
-
-              <div className="button-container">
-                <IonButton
-                  expand="block"
-                  size="large"
-                  className="primary-button"
-                  onClick={handleSaveClient}
-                  disabled={!createIsValid}
-                >
-                  <IonIcon icon={save} slot="start" />
-                  GUARDAR CLIENTE
-                </IonButton>
-              </div>
-            </div>
-          </IonContent>
-        </IonModal>
-
-        <IonModal isOpen={showEditModal} onDidDismiss={() => setShowEditModal(false)}>
-          <IonHeader>
-            <IonToolbar>
-              <IonTitle>Editar Cliente</IonTitle>
-              <IonButtons slot="end">
-                <IonButton onClick={() => setShowEditModal(false)}>Cerrar</IonButton>
-              </IonButtons>
-            </IonToolbar>
-          </IonHeader>
-          <IonContent>
-            <IonItem>
-              <IonLabel position="stacked">Nombre *</IonLabel>
-              <IonInput
-                value={editingClient.first_name}
-                onIonChange={(e) => setEditingClient(prev => ({ ...prev, first_name: e.detail.value! }))}
-                color={editErrors.first_name ? 'danger' : 'primary'}
-              />
-              {editErrors.first_name && <IonNote color="danger">{editErrors.first_name}</IonNote>}
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Apellido *</IonLabel>
-              <IonInput
-                value={editingClient.last_name}
-                onIonChange={(e) => setEditingClient(prev => ({ ...prev, last_name: e.detail.value! }))}
-                color={editErrors.last_name ? 'danger' : 'primary'}
-              />
-              {editErrors.last_name && <IonNote color="danger">{editErrors.last_name}</IonNote>}
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Email</IonLabel>
-              <IonInput
-                value={editingClient.email}
-                onIonChange={(e) => handleEmailChange(e.detail.value!, false)}
-                color={editErrors.email.isValid ? (editingClient.email ? 'success' : 'primary') : 'danger'}
-              />
-              {editingClient.email && (
-                <IonNote color={editErrors.email.isValid ? 'success' : 'danger'}>
-                  {editErrors.email.isValid ? '✅ Email válido' : '❌ Formato de email inválido'}
-                </IonNote>
-              )}
-              {!editErrors.email.isValid && (
-                <IonText color="danger">
-                  <small>{editErrors.email.message}</small>
-                </IonText>
-              )}
-            </IonItem>
-            <IonItem>
-              <IonLabel position="stacked">Teléfono *</IonLabel>
-              <IonInput
-                value={editingClient.cellphone}
-                onIonChange={(e) => setEditingClient({ ...editingClient, cellphone: e.detail.value! })}
-                color={editErrors.cellphone ? 'danger' : 'primary'}
-              />
-              {editErrors.cellphone && <IonNote color="danger">{editErrors.cellphone}</IonNote>}
-            </IonItem>
-            <IonButton expand="block" onClick={handleUpdateClient} disabled={!editIsValid}>
-              Actualizar
-            </IonButton>
-          </IonContent>
-        </IonModal>
-
+        {/* ── Delete Alert ────────────────────────────────────────────────── */}
         <IonAlert
           isOpen={showDeleteAlert}
           onDidDismiss={() => setShowDeleteAlert(false)}
           header="Confirmar eliminación"
-          message={`¿Estás seguro de que quieres eliminar al cliente ${selectedClient?.first_name} ${selectedClient?.last_name}?`}
+          message={`¿Eliminar al cliente ${selectedForDelete?.first_name} ${selectedForDelete?.last_name}?`}
           buttons={[
-            {
-              text: 'Cancelar',
-              role: 'cancel',
-              handler: () => setShowDeleteAlert(false),
-            },
-            {
-              text: 'Eliminar',
-              role: 'destructive',
-              handler: confirmDelete,
-            },
+            { text: 'Cancelar', role: 'cancel', handler: () => setShowDeleteAlert(false) },
+            { text: 'Eliminar', role: 'destructive', handler: confirmDelete },
           ]}
         />
 
-        <IonToast
-          isOpen={showToast}
-          onDidDismiss={() => setShowToast(false)}
-          message={toastMessage}
-          duration={2000}
-          color={toastMessage.includes('Error') ? 'danger' : 'success'}
-        />
+        <IonToast isOpen={showToast} onDidDismiss={() => setShowToast(false)} message={toastMessage} duration={2500} color={toastMessage.toLowerCase().includes('error') ? 'danger' : 'success'} />
       </IonContent>
 
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      {/* ── QR View Modal ──────────────────────────────────────────────────── */}
+      <IonModal isOpen={showQrModal} onDidDismiss={() => { setShowQrModal(false); setQrModalClient(null); }} breakpoints={[0, 0.6]} initialBreakpoint={0.6}>
+        <IonHeader className="ion-no-border">
+          <IonToolbar>
+            <IonTitle>Código QR</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowQrModal(false)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {qrModalClient && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingTop: 8 }}>
+              <QRCodeSVG
+                value={`CLIENT:${qrModalClient.clientId}:${qrModalClient.first_name} ${qrModalClient.last_name}`}
+                size={220}
+                level="H"
+                includeMargin
+              />
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 18 }}>{qrModalClient.first_name} {qrModalClient.last_name}</p>
+                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>{qrModalClient.cellphone}</p>
+                <p style={{ margin: '2px 0 0', color: '#9ca3af', fontSize: 12 }}>ID: {qrModalClient.clientId}</p>
+              </div>
+            </div>
+          )}
+        </IonContent>
+      </IonModal>
+
+      {/* ── Share / Invite Modal ───────────────────────────────────────────── */}
+      <IonModal isOpen={showShareModal} onDidDismiss={() => { setShowShareModal(false); setShareClient(null); setShareCopied(false); }} breakpoints={[0, 0.7]} initialBreakpoint={0.7}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Invitar a descargar la app</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowShareModal(false)}>
+                <IonIcon icon={closeOutline} slot="icon-only" />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {shareClient && (
+            <div>
+              {/* Client info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '12px 14px', background: '#f9fafb', borderRadius: 14, border: '1px solid #e5e7eb' }}>
+                {clientSelfieMap[shareClient.clientId]
+                  ? <img src={clientSelfieMap[shareClient.clientId]} alt="selfie" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
+                  : <IonIcon icon={personCircle} style={{ fontSize: 44, color: '#9ca3af' }} />}
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, color: '#111827' }}>{shareClient.first_name} {shareClient.last_name}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>{shareClient.cellphone}</p>
+                  <span style={{ fontSize: 11, background: shareClient.clientType === 'lender' ? '#dcfce7' : '#eff6ff', color: shareClient.clientType === 'lender' ? '#15803d' : '#2563eb', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
+                    {shareClient.clientType === 'lender' ? '💼 Prestamista' : shareClient.clientType === 'both' ? '🔄 Ambos' : '📋 Acreditado'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Message preview */}
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', margin: '0 0 8px' }}>Vista previa del mensaje:</p>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '12px 14px', fontSize: 13, color: '#14532d', whiteSpace: 'pre-line', marginBottom: 20, lineHeight: 1.6 }}>
+                {buildShareMessage(shareClient)}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <IonButton expand="block" shape="round" color="success" onClick={() => openWhatsApp(shareClient)}
+                  style={{ '--background': '#25D366', '--color': '#fff' }}>
+                  <IonIcon icon={logoWhatsapp} slot="start" />
+                  Enviar por WhatsApp
+                </IonButton>
+                <IonButton expand="block" shape="round" fill="outline" onClick={() => openSMS(shareClient)}>
+                  <IonIcon icon={chatbubbleOutline} slot="start" />
+                  Enviar por SMS
+                </IonButton>
+                <IonButton expand="block" shape="round" fill="outline" color="medium" onClick={() => copyLink(shareClient)}>
+                  <IonIcon icon={copyOutline} slot="start" />
+                  {shareCopied ? '✓ Mensaje copiado' : 'Copiar mensaje'}
+                </IonButton>
+              </div>
+
+              {/* Store links */}
+              <div style={{ marginTop: 20, padding: '10px 14px', background: '#f9fafb', borderRadius: 12, border: '1px solid #e5e7eb' }}>
+                <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Links de descarga</p>
+                <p style={{ margin: '3px 0', fontSize: 12, color: '#374151' }}>📱 Android: <span style={{ color: '#2563eb' }}>{PLAY_STORE_URL}</span></p>
+                <p style={{ margin: '3px 0', fontSize: 12, color: '#374151' }}>🍎 iOS: <span style={{ color: '#2563eb' }}>{APP_STORE_URL}</span></p>
+                <p style={{ margin: '8px 0 0', fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>⚠️ Actualiza los URLs cuando publiques en las tiendas.</p>
+              </div>
+            </div>
+          )}
+        </IonContent>
+      </IonModal>
+
+      {/* ── Create Wizard Modal ─────────────────────────────────────────────── */}
+      <IonModal isOpen={showWizard} onDidDismiss={() => { setShowWizard(false); resetWizard(); }} className="client-wizard-modal">
+        <IonHeader className="ion-no-border">
+          <IonToolbar className="modal-toolbar">
+            <IonButtons slot="start">
+              <IonButton fill="clear" onClick={() => { setShowWizard(false); resetWizard(); }}>
+                <IonIcon icon={arrowBack} style={{ color: 'white' }} />
+              </IonButton>
+            </IonButtons>
+            <IonTitle className="modal-title">{wizardMode === 'edit' ? 'Editar Cliente' : 'Nuevo Cliente'}</IonTitle>
+            <IonButtons slot="end">
+              <span className="wizard-step-badge">{wizardStep + 1} / {WIZARD_STEPS.length}</span>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+
+        <IonContent className="modal-content client-face-recognition-page">
+          <WizardStepBar />
+          {renderWizardStep()}
+        </IonContent>
+
+        <WizardFooter />
+      </IonModal>
+
+      <AlertPopover isOpen={popoverState.showAlertPopover} event={popoverState.event} onDidDismiss={dismissAlertPopover} />
+      <MailPopover isOpen={popoverState.showMailPopover} event={popoverState.event} onDidDismiss={dismissMailPopover} />
     </IonPage>
   );
 };
 
 export default ClientsPage;
-

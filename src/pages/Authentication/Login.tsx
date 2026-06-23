@@ -8,6 +8,7 @@ import { useHistory } from 'react-router-dom';
 import { eye, eyeOff } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
+import { getAllClients } from '../../api/clientsApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
 import { normalizeRoleCode } from '../../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
@@ -118,17 +119,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         roleName,
       };
 
-      // Pre-populate user fields in context (not yet authenticated)
-      setUserData({
-        userId:    pendingUserRef.current.userId,
-        username:  pendingUserRef.current.username,
-        avatarUrl: pendingUserRef.current.avatarUrl,
-        clientId:  pendingUserRef.current.clientId,
-        roleCode:  pendingUserRef.current.roleCode,
-        roleName:  pendingUserRef.current.roleName,
-      });
-
-      setShowCompanySelector(true);
+      // Auto-confirm using defaults — company/branch are defined at account creation
+      await handleCompanyConfirm(
+        defaultCompanyId,
+        '',
+        defaultBranchId,
+        '',
+      );
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error desconocido';
@@ -192,6 +189,21 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
     console.log('💰 [CashRegister][Login] Continue to dashboard without open-cash modal.');
     onLoginSuccess?.();
+    navigateAfterLogin(pending);
+  };
+
+  const navigateAfterLogin = async (pending: typeof pendingUserRef.current) => {
+    // If the user is linked to a client, check clientType and route accordingly
+    if (pending?.clientId) {
+      try {
+        const clients = await getAllClients();
+        const linked = clients.find(c => c.clientId === pending.clientId);
+        if (linked?.clientType === 'lender' || linked?.clientType === 'borrower' || linked?.clientType === 'both') {
+          history.push('/p2p-lending');
+          return;
+        }
+      } catch { /* fall through to dashboard */ }
+    }
     history.push('/dashboard');
   };
 
@@ -200,7 +212,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setShowOpenCashPrompt(false);
     setPendingNavigation(null);
     onLoginSuccess?.();
-    history.push('/dashboard');
+    navigateAfterLogin(pendingUserRef.current);
   };
 
   const handleConfirmOpenCash = async () => {
@@ -238,7 +250,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setShowOpenCashPrompt(false);
     setPendingNavigation(null);
     onLoginSuccess?.();
-    history.push('/dashboard');
+    navigateAfterLogin(pendingUserRef.current);
   };
 
   return (
