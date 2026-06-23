@@ -1,60 +1,359 @@
-/* src/pages/Authentication/CreateAccount.css 
-.login-container {
-    max-width: 400px;
-    margin: auto;
-    padding: 20px;
-    background-color: #fff;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    text-align: center;
-  }
-  
-  .login-header {
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 20px;
-  }
-  
-  .login-form {
-    display: flex;
-    flex-direction: column;
-  }
-  
+/* ── Step bar ─────────────────────────────────────────────────────────── */
+.ca-step-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 24px 0 8px;
+}
 
-  .login-form ion-label {
-    margin-bottom: 5px;
-  }
-  
+.ca-step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 72px;
+}
 
-  .login-form ion-input {
-    margin-bottom: 15px;
-  }
-  
-  .login-button {
-    background-color: #1877f2;
-    color: #fff;
-    padding: 10px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  .login-button:hover {
-    background-color: #115293;
-  }
-  
-  .login-footer {
-    margin-top: 20px;
-    font-size: 14px;
-    color: #555;
-  }
-  
-  .login-footer a {
-    color: #1877f2;
-    text-decoration: none;
-  }
-  
-  .login-footer a:hover {
-    text-decoration: underline;
-  }
-  */
+.ca-step-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  transition: background 0.2s;
+}
+
+.ca-step-circle.active {
+  background: var(--ion-color-primary, #2563eb);
+  color: white;
+}
+
+.ca-step-circle.done {
+  background: #10b981;
+  color: white;
+}
+
+.ca-step-label {
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.ca-step-label.active {
+  color: #111827;
+  font-weight: 600;
+}
+
+.ca-step-line {
+  flex: 1;
+  height: 2px;
+  background: #e5e7eb;
+  margin-bottom: 22px;
+  min-width: 20px;
+}
+
+.ca-step-line.done {
+  background: #10b981;
+}
+
+/* ── Step body ────────────────────────────────────────────────────────── */
+.ca-step-body {
+  padding: 16px 4px 8px;
+}
+
+.ca-step-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+.ca-step-desc {
+  font-size: 14px;
+  color: #6b7280;
+  text-align: center;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+/* ── Inputs ───────────────────────────────────────────────────────────── */
+.ca-input {
+  display: block;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  font-size: 15px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ca-input-error {
+  border-color: #ef4444 !important;
+}
+
+.ca-field-error {
+  color: #ef4444;
+  font-size: 12px;
+  margin: -10px 0 10px 2px;
+}
+
+.ca-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: -8px 0 12px;
+  line-height: 1.4;
+}
+
+.ca-password-wrap {
+  position: relative;
+}
+
+.ca-eye {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-60%);
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 20px;
+  z-index: 2;
+}
+
+/* ── Profile cards ────────────────────────────────────────────────────── */
+.ca-profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ca-profile-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 10px;
+  border: 2px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.12s;
+  position: relative;
+  text-align: center;
+}
+
+.ca-profile-card:hover {
+  border-color: var(--profile-color, #2563eb);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+
+.ca-profile-card.selected {
+  border-color: var(--profile-color, #2563eb);
+  background: color-mix(in srgb, var(--profile-color, #2563eb) 8%, white);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.ca-profile-emoji {
+  font-size: 32px;
+}
+
+.ca-profile-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ca-profile-desc {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.ca-profile-check {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 14px;
+  color: var(--profile-color, #2563eb);
+  font-weight: 700;
+}
+
+/* ── Modules summary ──────────────────────────────────────────────────── */
+.ca-modules-summary,
+.ca-modules-custom {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 4px;
+}
+
+.ca-modules-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 8px;
+}
+
+.ca-modules-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ca-module-tag {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.ca-modules-custom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.ca-modules-custom-header .ca-modules-title {
+  margin: 0;
+}
+
+.ca-select-all {
+  font-size: 13px;
+  color: var(--ion-color-primary, #2563eb);
+  border-bottom: none !important;
+  padding: 0 !important;
+}
+
+.ca-modules-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 6px 0 2px;
+}
+
+.ca-module-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+}
+
+.ca-module-checkbox:last-child {
+  border-bottom: none;
+}
+
+/* ── Company list ─────────────────────────────────────────────────────── */
+.ca-company-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 6px 0;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.ca-company-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  font-size: 14px;
+  color: #111827;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.ca-company-item:last-child { border-bottom: none; }
+.ca-company-item:hover { background: #f9fafb; }
+.ca-company-item.selected { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+
+.ca-company-name { flex: 1; }
+
+.ca-branch-header {
+  margin-bottom: 4px;
+}
+
+/* ── Summary box ──────────────────────────────────────────────────────── */
+.ca-summary-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.ca-summary-box p {
+  margin: 3px 0;
+}
+
+/* ── Submit button ────────────────────────────────────────────────────── */
+.ca-submit-btn {
+  --background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  --border-radius: 10px;
+  --color: white;
+  font-weight: 700;
+  height: 48px;
+  margin-top: 4px;
+}
+
+/* ── Footer nav ───────────────────────────────────────────────────────── */
+.ca-footer {
+  display: flex;
+  align-items: center;
+  margin-top: 20px;
+  gap: 8px;
+}
+
+.ca-btn-back,
+.ca-btn-next {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.ca-btn-back {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.ca-btn-next {
+  background: var(--ion-color-primary, #2563eb);
+  color: white;
+}
+
+.ca-btn-next:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -26,14 +26,18 @@ export interface ClientDashboardListResponse {
 }
 
 export async function getAllClientDashboards(companyId: number, clientId: number): Promise<ClientDashboard[]> {
-  const res = await fetch(BASE_URL + "/all_clientDashboards", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clientDashboards: [{ companyId, clientId }] }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const data: ClientDashboardListResponse = await res.json();
-  return data.clientDashboards ?? [];
+  try {
+    const res = await fetch(BASE_URL + "/all_clientDashboards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientDashboards: [{ companyId, clientId }] }),
+    });
+    if (!res.ok) return [];
+    const data: ClientDashboardListResponse = await res.json();
+    return data.clientDashboards ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function createClientDashboard(payload: Omit<ClientDashboard, "clientDashboardId" | "created_At">): Promise<ClientDashboard> {

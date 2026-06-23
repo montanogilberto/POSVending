@@ -24,28 +24,18 @@ export interface LoanApiResponse {
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
 
 export async function getAllLoans(companyId: number, searchTerm: string = ''): Promise<Loan[]> {
-  const url = `${BASE_URL}/all_loans`;
-  const body = {
-    loans: [
-      {
-        companyId: companyId,
-        ...(searchTerm && { loanNumber: searchTerm })
-      },
-    ],
-  };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    throw new Error(await res.text());
+  try {
+    const res = await fetch(`${BASE_URL}/all_loans`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loans: [{ companyId, ...(searchTerm && { loanNumber: searchTerm }) }] }),
+    });
+    if (!res.ok) return [];
+    const data: LoanApiResponse = await res.json();
+    return data.loans ?? [];
+  } catch {
+    return [];
   }
-  const data: LoanApiResponse = await res.json();
-  return data.loans;
 }
 
 export async function getOneLoan(loanId: number, companyId: number): Promise<Loan> {

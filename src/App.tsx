@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { Redirect, Route, useHistory } from 'react-router-dom';
 import {
@@ -81,7 +82,12 @@ import SupplierPage from './pages/SupplierPage';
 import LoanPage from './pages/LoanPage';
 import ClientFaceRecognitionPage from './pages/ClientFaceRecognitionPage';
 import ClientDashboardPage from './pages/ClientDashboardPage';
+import LenderDashboardPage from './pages/LenderDashboardPage';
+import ClientFollowUpPage from './pages/ClientFollowUpPage';
 import PushNotificationPage from './pages/PushNotificationPage';
+import P2PLendingPage from './pages/P2PLendingPage';
+import BorrowerOnboardingPage from './pages/BorrowerOnboardingPage';
+import LoanPaymentPage from './pages/LoanPaymentPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -192,8 +198,16 @@ const AppShell: React.FC = () => {
         }
       });
 
-      PushNotifications.addListener('pushNotificationReceived', (notification) => {
-        console.log('[Push] Foreground notification:', notification);
+      PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: Date.now(),
+            title: notification.title ?? 'Notificación',
+            body: notification.body ?? '',
+            channelId: 'push_notifications',
+            smallIcon: 'ic_launcher',
+          }],
+        });
       });
 
       await PushNotifications.register();
@@ -276,14 +290,6 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'clientDashboards') && (
-              <IonItem button routerLink="/client-dashboard">
-                <IonIcon icon={cube} slot="start" />
-                <IonLabel>Client Dashboard</IonLabel>
-              </IonItem>
-              )}
-            </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'pushNotifications') && (
@@ -451,7 +457,12 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
             <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
-            <PrivateRoute exact path="/client-dashboard" component={ClientDashboardPage} />
+            <PrivateRoute exact path="/client-dashboard/:clientId" component={ClientDashboardPage} />
+            <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
+            <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
+            <PrivateRoute exact path="/p2p-lending" component={P2PLendingPage} />
+            <PrivateRoute exact path="/borrower-onboarding" component={BorrowerOnboardingPage} />
+            <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
           </IonRouterOutlet>
 
@@ -459,16 +470,6 @@ const AppShell: React.FC = () => {
             <IonTabButton tab="dashboard" href="/dashboard">
               <IonIcon aria-hidden="true" icon={home} />
               <IonLabel>Dashboard</IonLabel>
-            </IonTabButton>
-
-            <IonTabButton tab="scannerqr" href="/scannerqr">
-              <IonIcon aria-hidden="true" icon={qrCode} />
-              <IonLabel>Lector QR</IonLabel>
-            </IonTabButton>
-
-            <IonTabButton tab="pos" href="/pos">
-              <IonIcon aria-hidden="true" icon={cash} />
-              <IonLabel>Vending POS</IonLabel>
             </IonTabButton>
 
             <div

@@ -1,0 +1,179 @@
+.lender-dashboard-content {
+  --background: #f9fafb;
+}
+
+.ld-profile-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 4px 12px;
+}
+
+.ld-avatar {
+  width: 58px;
+  height: 58px;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.ld-name {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f1f38;
+}
+
+.ld-type-badge {
+  background: rgba(21, 128, 61, 0.12);
+  color: #15803d;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.ld-kpi-grid { padding: 0; margin-bottom: 4px; }
+
+.ld-kpi-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px;
+  margin: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ld-kpi-card p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.ld-kpi-card h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.ld-card {
+  margin: 0 0 14px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.ld-collection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.ld-collection-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.ld-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ld-loan-item {
+  --background: #fff;
+  --padding-start: 14px;
+  --padding-end: 12px;
+  --border-radius: 14px;
+  margin: 4px 8px;
+  border: 1px solid #f3f4f6;
+  border-radius: 14px;
+}
+
+.ld-borrower-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: 1.5px solid #e5e7eb;
+  margin-right: 4px;
+}
+
+.ld-borrower-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.ld-loan-number {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 2px 0 4px;
+}
+
+.ld-loan-meta-row {
+  display: flex;
+  gap: 10px;
+  font-size: 0.76rem;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.ld-loan-meta-row ion-icon { vertical-align: middle; font-size: 0.85rem; }
+
+.ld-status-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 52px;
+}
+
+.ld-status-chip ion-icon { font-size: 1.1rem; }
+
+.ld-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 16px;
+  color: #9ca3af;
+}
+
+.ld-empty ion-icon { font-size: 2rem; opacity: 0.4; }
+.ld-empty p { margin: 0; font-size: 0.88rem; }
+
+.ld-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.88rem;
+}
+
+.ld-summary-row:last-child { border-bottom: none; }
+
+.ld-summary-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ld-summary-label { flex: 1; color: #374151; font-weight: 600; }
+.ld-summary-count { color: #6b7280; }
+.ld-summary-amount { font-weight: 700; margin-left: auto; }

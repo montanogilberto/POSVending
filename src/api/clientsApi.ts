@@ -1,5 +1,7 @@
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
+export type ClientType = 'borrower' | 'lender' | 'both';
+
 export interface Client {
   clientId: number;
   companyId?: number;
@@ -7,6 +9,7 @@ export interface Client {
   last_name: string;
   cellphone: string;
   email: string;
+  clientType?: ClientType;
   created_At?: string;
   updated_at?: string;
 }
@@ -19,6 +22,7 @@ export interface CreateClientRequest {
     last_name: string;
     cellphone: string;
     email: string;
+    clientType?: ClientType;
     action: string; // "1" for create, "2" for update
   }>;
 }

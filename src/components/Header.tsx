@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBackButton, IonBadge, IonMenuButton } from '@ionic/react';
 import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline } from 'ionicons/icons';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import './Header.css';
@@ -24,6 +26,21 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const history = useHistory();
   const { cart } = useCart();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const listenerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    PushNotifications.addListener('pushNotificationReceived', () => {
+      setUnreadCount((c) => c + 1);
+    }).then((handle) => { listenerRef.current = handle; });
+    return () => { listenerRef.current?.remove(); };
+  }, []);
+
+  const handleNotificationsClick = () => {
+    setUnreadCount(0);
+    history.push('/pushNotifications');
+  };
 
   // Calculate total quantity of products in cart
   const totalQuantity = cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -59,8 +76,15 @@ const Header: React.FC<HeaderProps> = ({
               )}
             </span>
           </IonButton>
-          <IonButton title="Notifications" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
-            <IonIcon icon={notificationsOutline} style={{ fontSize: '28px' }} />
+          <IonButton onClick={handleNotificationsClick} title="Notifications" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+            <span className="icon-with-badge">
+              <IonIcon icon={notificationsOutline} style={{ fontSize: '28px' }} />
+              {unreadCount > 0 && (
+                <IonBadge className="badge-side" color="danger">
+                  {unreadCount}
+                </IonBadge>
+              )}
+            </span>
           </IonButton>
           <IonButton onClick={presentMailPopover} title="Messages" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
             <IonIcon icon={mailOutline} style={{ fontSize: '28px' }} />

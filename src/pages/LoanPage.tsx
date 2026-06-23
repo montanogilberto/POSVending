@@ -87,8 +87,8 @@ const LoanPage: React.FC = () => {
     try {
       const data = await getAllLoans(companyId, searchText);
       setLoans(data);
-    } catch (err) {
-      setError((err as Error).message ?? 'Error al cargar préstamos');
+    } catch {
+      setLoans([]);
     } finally {
       setLoading(false);
     }

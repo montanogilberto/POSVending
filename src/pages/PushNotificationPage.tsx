@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IonPage, IonContent, IonList, IonItem, IonLabel, IonText, IonLoading, IonToast, IonFab, IonFabButton, IonIcon, IonAlert, IonModal, IonInput, IonSelect, IonSelectOption, IonDatetime, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSearchbar, IonButton, IonInfiniteScroll, IonInfiniteScrollContent, DatetimeChangeEventDetail, InputInputEventDetail, SelectChangeEventDetail } from '@ionic/react';
-import { addOutline, notificationsOutline, createOutline, trashOutline, eyeOutline } from 'ionicons/icons';
+import { addOutline, notificationsOutline, createOutline, trashOutline, eyeOutline, closeOutline } from 'ionicons/icons';
+import { IonHeader, IonToolbar, IonTitle, IonButtons } from '@ionic/react';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
@@ -84,9 +85,17 @@ const PushNotificationPage: React.FC = () => {
     setShowCreateModal(true);
   };
 
-  const handleDetailsClick = (notification: PushNotification) => {
+  const handleDetailsClick = async (notification: PushNotification) => {
     setSelectedNotification(notification);
     setShowDetailsModal(true);
+    if (!notification.isRead) {
+      try {
+        await updatePushNotification(notification.pushNotificationId, { isRead: true, companyId });
+        setPushNotifications((prev) =>
+          prev.map((n) => n.pushNotificationId === notification.pushNotificationId ? { ...n, isRead: true } : n)
+        );
+      } catch { }
+    }
   };
 
   const handleDeleteClick = (notification: PushNotification) => {
@@ -249,7 +258,16 @@ const PushNotificationPage: React.FC = () => {
 
         {/* Create/Edit Notification Modal */}
         <IonModal isOpen={showCreateModal} onDidDismiss={() => setShowCreateModal(false)} className="push-notifications-modal">
-          <Header screenTitle={selectedNotification ? 'Editar Notificación' : 'Crear Notificación'} presentAlertPopover={presentAlertPopover} presentMailPopover={presentMailPopover} />
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>{selectedNotification?.pushNotificationId ? 'Editar Notificación' : 'Crear Notificación'}</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowCreateModal(false)}>
+                  <IonIcon icon={closeOutline} slot="icon-only" />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
           <IonContent className="ion-padding">
             <form onSubmit={handleSaveNotification}>
               <IonItem>
@@ -369,7 +387,16 @@ const PushNotificationPage: React.FC = () => {
 
         {/* Notification Details Modal */}
         <IonModal isOpen={showDetailsModal} onDidDismiss={() => setShowDetailsModal(false)} className="push-notifications-modal">
-          <Header screenTitle="Detalles de Notificación" presentAlertPopover={presentAlertPopover} presentMailPopover={presentMailPopover} />
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Detalles de Notificación</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowDetailsModal(false)}>
+                  <IonIcon icon={closeOutline} slot="icon-only" />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
           <IonContent className="ion-padding">
             {selectedNotification && (
               <IonCard>
