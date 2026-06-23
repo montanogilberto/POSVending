@@ -33,6 +33,7 @@ import {
   settingsOutline,
   cartOutline,
   shieldCheckmarkOutline,
+  cogOutline,
 } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
@@ -78,6 +79,7 @@ const MODULES: ModuleDef[] = [
       { code: 'alerts', label: 'Alertas',  icon: notificationsOutline },
       { code: 'emails', label: 'Correos',  icon: mailOutline },
       { code: 'pushNotifications', label: 'Notificaciones', icon: notificationsOutline },
+      { code: 'manufacturing',     label: 'Manufactura',    icon: cogOutline },
     ],
   },
   {

@@ -48,7 +48,10 @@ import {
   cashOutline,
   peopleOutline,
   shieldCheckmarkOutline,
-  personCircle
+  personCircle,
+  cogOutline,
+  walletOutline,
+  constructOutline,
 }
   from 'ionicons/icons';
   
@@ -88,6 +91,7 @@ import PushNotificationPage from './pages/PushNotificationPage';
 import P2PLendingPage from './pages/P2PLendingPage';
 import BorrowerOnboardingPage from './pages/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/LoanPaymentPage';
+import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -376,6 +380,35 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'manufacturing') && (
+              <IonItem button routerLink="/manufacturing">
+                <IonIcon icon={cogOutline} slot="start" />
+                <IonLabel>Manufactura</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonItemDivider>Finanzas P2P</IonItemDivider>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/p2p-lending">
+                <IonIcon icon={walletOutline} slot="start" />
+                <IonLabel>Préstamos P2P</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/borrower-onboarding">
+                <IonIcon icon={constructOutline} slot="start" />
+                <IonLabel>Registro Prestatario</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
             <IonItemDivider>IOT</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
@@ -463,6 +496,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/p2p-lending" component={P2PLendingPage} />
             <PrivateRoute exact path="/borrower-onboarding" component={BorrowerOnboardingPage} />
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
+            <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
           </IonRouterOutlet>
 

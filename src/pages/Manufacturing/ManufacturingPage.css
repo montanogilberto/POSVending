@@ -1,0 +1,287 @@
+.mfg-section {
+  padding: 12px;
+}
+
+.mfg-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mfg-kpi {
+  background: var(--ion-card-background, #fff);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.mfg-kpi-val {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ion-text-color, #111);
+  line-height: 1.2;
+}
+
+.mfg-kpi-label {
+  display: block;
+  font-size: 0.68rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.mfg-subtitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 16px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mfg-machines-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.mfg-machine-card {
+  margin: 0;
+  border-radius: 12px;
+}
+
+.mfg-machine-card ion-card-content {
+  padding: 10px;
+}
+
+.mfg-machine-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mfg-machine-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.mfg-machine-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.mfg-machine-stats span {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mfg-wear-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mfg-wear-track {
+  flex: 1;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mfg-wear-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.mfg-machine-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.mfg-cycle-count {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* Queue */
+.mfg-queue-card {
+  margin: 4px 0;
+  border-radius: 10px;
+}
+
+.mfg-queue-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mfg-queue-type {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.mfg-queue-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Orders history */
+.mfg-order-card {
+  margin: 4px 0;
+  border-radius: 10px;
+}
+
+.mfg-order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mfg-cost-row {
+  display: flex;
+  gap: 16px;
+}
+
+.mfg-cost-label {
+  display: block;
+  font-size: 0.7rem;
+  color: #9ca3af;
+}
+
+.mfg-cost-val {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Profitability */
+.mfg-profit-summary {
+  margin: 0 0 8px;
+  border-radius: 12px;
+}
+
+.mfg-loss-alert {
+  margin-top: 8px;
+  padding: 8px;
+  background: #fef2f2;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mfg-service-card {
+  margin: 4px 0;
+  border-radius: 10px;
+}
+
+.mfg-service-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mfg-service-name {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.mfg-suggestion-card {
+  margin: 4px 0;
+  border-radius: 10px;
+  border-left: 3px solid #10b981;
+}
+
+.mfg-suggestion-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.mfg-suggestion-reason {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin: 2px 0 0;
+}
+
+.mfg-suggestion-prices {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mfg-old-price {
+  text-decoration: line-through;
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.mfg-new-price {
+  font-weight: 700;
+  color: #10b981;
+  font-size: 1rem;
+}
+
+/* Maintenance */
+.mfg-alert-card {
+  margin: 4px 0;
+  border-radius: 10px;
+  border-left: 3px solid #f59e0b;
+}
+
+.mfg-alert-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mfg-log-card {
+  margin: 4px 0;
+  border-radius: 10px;
+}
+
+.mfg-log-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Settings */
+.mfg-rates-note {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.mfg-empty {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.9rem;
+  padding: 24px;
+}
