@@ -422,23 +422,259 @@
 }
 
 /* ==========================================================================
-   Wizard Modal
+   Client Wizard Modal
    ========================================================================== */
 
 .client-wizard-modal {
-  --border-radius: 0;
-  --width: 100%;
-  --height: 100%;
+  --border-radius: 20px 20px 0 0;
+  --height: 95%;
 }
 
-.wizard-step-badge {
+.client-wizard-modal ion-header ion-toolbar {
+  --background: #ffffff;
+  --border-width: 0;
+  padding: 4px 8px;
+}
+
+.client-wizard-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.client-wizard-content {
+  --background: #F4F6F9;
+}
+
+.client-wizard-scroll-content {
+  padding: 20px 16px 32px;
+}
+
+/* Step indicator */
+.client-wizard-modal .wizard-step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px 20px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #F1F5F9;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 0;
+}
+
+.client-wizard-modal .wizard-step-indicator::-webkit-scrollbar {
+  display: none;
+}
+
+.client-wizard-modal .wizard-step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.client-wizard-modal .wizard-step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 13px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-  padding: 2px 10px;
-  background: rgba(255,255,255,0.18);
-  border-radius: 20px;
-  margin-right: 4px;
+  border: 2px solid #E5E7EB;
+  background: #ffffff;
+  color: #9CA3AF;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.client-wizard-modal .wizard-step-circle.active {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+.client-wizard-modal .wizard-step-circle.completed {
+  background: #059669;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+.client-wizard-modal .wizard-step-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9CA3AF;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+
+.client-wizard-modal .wizard-step-label.active {
+  color: #2563EB;
+}
+
+.client-wizard-modal .wizard-step-label.completed {
+  color: #059669;
+}
+
+.client-wizard-modal .wizard-step-connector {
+  width: 28px;
+  height: 2px;
+  background: #E5E7EB;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.client-wizard-modal .wizard-step-connector.completed {
+  background: #059669;
+}
+
+/* Footer navigation */
+.client-wizard-footer {
+  --background: #ffffff;
+  box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.08);
+}
+
+.client-wizard-footer::before {
+  display: none;
+}
+
+.client-wizard-footer-inner {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: #ffffff;
+  border-top: 1px solid #E8ECF0;
+}
+
+.client-wizard-footer-inner--single {
+  justify-content: stretch;
+}
+
+.client-wizard-btn-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 14px;
+  border: 1.5px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.client-wizard-btn-back ion-icon {
+  font-size: 18px;
+}
+
+.client-wizard-btn-back:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+}
+
+.client-wizard-btn-back:active {
+  transform: scale(0.98);
+}
+
+.client-wizard-btn-next,
+.client-wizard-btn-submit {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 28px;
+  border-radius: 14px;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.client-wizard-btn-next {
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 55%, #1D4ED8 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.38);
+}
+
+.client-wizard-btn-next ion-icon {
+  font-size: 18px;
+  opacity: 0.95;
+}
+
+.client-wizard-btn-next:hover {
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+}
+
+.client-wizard-btn-next:active {
+  transform: scale(0.98);
+}
+
+.client-wizard-btn-next:disabled {
+  background: linear-gradient(135deg, #CBD5E1 0%, #94A3B8 100%);
+  color: #F8FAFC;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.client-wizard-btn-submit {
+  background: linear-gradient(135deg, #10B981 0%, #059669 55%, #047857 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(5, 150, 105, 0.38);
+}
+
+.client-wizard-btn-submit ion-icon {
+  font-size: 18px;
+}
+
+.client-wizard-btn-submit:hover {
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.45);
+}
+
+.client-wizard-btn-submit:active {
+  transform: scale(0.98);
+}
+
+.client-wizard-btn-submit:disabled {
+  background: linear-gradient(135deg, #A7F3D0 0%, #6EE7B7 100%);
+  color: #ECFDF5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.client-wizard-footer-inner--single .client-wizard-btn-next,
+.client-wizard-footer-inner--single .client-wizard-btn-submit {
+  width: 100%;
+}
+
+.client-wizard-btn-spinner {
+  width: 22px;
+  height: 22px;
+  --color: #ffffff;
 }
 
 /* QR box in wizard step */
@@ -463,6 +699,24 @@
   justify-content: center;
   color: #9ca3af;
   font-size: 14px;
+}
+
+.client-qr-download-btn {
+  margin-top: 16px;
+  --border-radius: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.client-qr-modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding-top: 8px;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
 }
 
 /* Wizard step body container */

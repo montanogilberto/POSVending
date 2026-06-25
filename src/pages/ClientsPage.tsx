@@ -31,12 +31,12 @@ import {
   IonCheckbox,
   IonSpinner,
   IonLoading,
+  IonFooter,
 } from '@ionic/react';
 import {
   add,
   trash,
   pencil,
-  arrowBack,
   person,
   mail,
   checkmarkCircle,
@@ -63,6 +63,7 @@ import {
   chatbubbleOutline,
   copyOutline,
   closeOutline,
+  close,
 } from 'ionicons/icons';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useHistory } from 'react-router-dom';
@@ -72,6 +73,7 @@ import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
 import { useUser } from '../components/UserContext';
 import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest } from '../api/clientsApi';
+import { buildClientQrValue, downloadClientQrPdf } from '../utils/clientQrPdf';
 import {
   verifyClientFaceRecognition,
   submitContractClientFaceRecognition,
@@ -138,6 +140,7 @@ const ClientsPage: React.FC = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareClient, setShareClient] = useState<Client | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [qrDownloading, setQrDownloading] = useState(false);
 
   // Step 2 — document
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
@@ -167,6 +170,24 @@ const ClientsPage: React.FC = () => {
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
   const toast = (msg: string) => { setToastMessage(msg); setShowToast(true); };
+
+  const handleDownloadQrPdf = async (client: Pick<Client, 'clientId' | 'first_name' | 'last_name' | 'cellphone' | 'email'>) => {
+    setQrDownloading(true);
+    try {
+      await downloadClientQrPdf({
+        clientId: client.clientId,
+        firstName: client.first_name,
+        lastName: client.last_name,
+        cellphone: client.cellphone,
+        email: client.email,
+      });
+      toast('PDF descargado correctamente');
+    } catch {
+      toast('Error al generar el PDF del QR');
+    } finally {
+      setQrDownloading(false);
+    }
+  };
 
   const validateEmail = (email: string) => {
     if (!email.trim()) return { isValid: true, message: '' };
@@ -541,7 +562,7 @@ const ClientsPage: React.FC = () => {
 
   // QR value encodes enough to identify the client at any POS terminal
   const qrValue = createdClientId
-    ? `CLIENT:${createdClientId}:${newClient.first_name} ${newClient.last_name}`
+    ? buildClientQrValue(createdClientId, newClient.first_name ?? '', newClient.last_name ?? '')
     : '';
 
   const renderStep1 = () => (
@@ -570,6 +591,30 @@ const ClientsPage: React.FC = () => {
         {newClient.email && <p><strong>Email:</strong> {newClient.email}</p>}
         <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>ID: {createdClientId}</p>
       </div>
+
+      {qrValue && createdClientId && (
+        <IonButton
+          expand="block"
+          className="client-qr-download-btn"
+          onClick={() => handleDownloadQrPdf({
+            clientId: createdClientId,
+            first_name: newClient.first_name ?? '',
+            last_name: newClient.last_name ?? '',
+            cellphone: newClient.cellphone ?? '',
+            email: newClient.email ?? '',
+          })}
+          disabled={qrDownloading}
+        >
+          {qrDownloading ? (
+            <IonSpinner name="crescent" style={{ width: 18, height: 18 }} />
+          ) : (
+            <>
+              <IonIcon icon={downloadOutline} slot="start" />
+              Descargar QR como PDF
+            </>
+          )}
+        </IonButton>
+      )}
     </div>
   );
 
@@ -804,108 +849,185 @@ const ClientsPage: React.FC = () => {
     </div>
   );
 
+  const ClientWizardFooterBar: React.FC<{
+    showBack?: boolean;
+    onBack?: () => void;
+    backLabel?: string;
+    backIcon?: string;
+    primary: React.ReactNode;
+    onPrimary: () => void;
+    primaryDisabled?: boolean;
+    variant?: 'next' | 'submit';
+  }> = ({
+    showBack = true,
+    onBack,
+    backLabel = 'Atrás',
+    backIcon = chevronBack,
+    primary,
+    onPrimary,
+    primaryDisabled,
+    variant = 'next',
+  }) => (
+    <IonFooter className="client-wizard-footer">
+      <div className={`client-wizard-footer-inner${showBack ? '' : ' client-wizard-footer-inner--single'}`}>
+        {showBack && onBack && (
+          <button type="button" className="client-wizard-btn-back" onClick={onBack}>
+            <IonIcon icon={backIcon} />
+            <span>{backLabel}</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className={variant === 'submit' ? 'client-wizard-btn-submit' : 'client-wizard-btn-next'}
+          onClick={onPrimary}
+          disabled={primaryDisabled}
+        >
+          {primary}
+        </button>
+      </div>
+    </IonFooter>
+  );
+
   const WizardFooter = () => {
     if (wizardStep === 3) {
       if (captureSubStep === 'processing' || captureSubStep === 'liveness-active') return null;
 
-      if (captureSubStep === 'doc-intro') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('front-capture')}>
-            Capturar <IonIcon icon={cameraOutline} />
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'doc-intro') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={() => setCaptureSubStep('front-capture')}
+            primary={<>Capturar <IonIcon icon={cameraOutline} /></>}
+          />
+        );
+      }
 
-      if (captureSubStep === 'front-capture') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => takePicture(setIdFrontImageBase64, () => setCaptureSubStep('flip-instruction'))}>
-            <IonIcon icon={cameraOutline} /> Capturar frente
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'front-capture') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={() => takePicture(setIdFrontImageBase64, () => setCaptureSubStep('flip-instruction'))}
+            primary={<>Capturar frente <IonIcon icon={cameraOutline} /></>}
+          />
+        );
+      }
 
-      if (captureSubStep === 'flip-instruction') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('back-capture')}>
-            Continuar <IonIcon icon={chevronForward} />
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'flip-instruction') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={() => setCaptureSubStep('back-capture')}
+            primary={<>Continuar <IonIcon icon={chevronForward} /></>}
+          />
+        );
+      }
 
-      if (captureSubStep === 'back-capture') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => takePicture(setIdBackImageBase64, () => setCaptureSubStep('back-review'))}>
-            <IonIcon icon={cameraOutline} /> Capturar reverso
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'back-capture') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={() => takePicture(setIdBackImageBase64, () => setCaptureSubStep('back-review'))}
+            primary={<>Capturar reverso <IonIcon icon={cameraOutline} /></>}
+          />
+        );
+      }
 
-      if (captureSubStep === 'back-review') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={() => { setIdBackImageBase64(''); setCaptureSubStep('back-capture'); }}>
-            <IonIcon icon={refreshOutline} /> Repetir
-          </button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('liveness-intro')}>
-            Continuar <IonIcon icon={chevronForward} />
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'back-review') {
+        return (
+          <ClientWizardFooterBar
+            onBack={() => { setIdBackImageBase64(''); setCaptureSubStep('back-capture'); }}
+            backLabel="Repetir"
+            backIcon={refreshOutline}
+            onPrimary={() => setCaptureSubStep('liveness-intro')}
+            primary={<>Continuar <IonIcon icon={chevronForward} /></>}
+          />
+        );
+      }
 
-      if (captureSubStep === 'liveness-intro') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={startLivenessSession}>
-            Iniciar validación <IonIcon icon={chevronForward} />
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'liveness-intro') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={startLivenessSession}
+            primary={<>Iniciar validación <IonIcon icon={chevronForward} /></>}
+          />
+        );
+      }
 
       return null;
     }
 
-    return (
-      <div className="wizard-footer">
-        {wizardStep > 0 && (
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-        )}
-        <div className="wizard-footer-spacer" />
-        {wizardStep === 0 && (
-          <button className="wizard-footer-next" onClick={handleWizardNext0} disabled={!createIsValid || wizardLoading}>
-            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : <>Siguiente <IonIcon icon={chevronForward} /></>}
-          </button>
-        )}
-        {wizardStep === 1 && (
-          <button className="wizard-footer-next" onClick={() => setWizardStep(2)}>
-            Siguiente <IonIcon icon={chevronForward} />
-          </button>
-        )}
-        {wizardStep === 2 && (
-          <button className="wizard-footer-next" onClick={() => { if (!documentType) { toast('Selecciona un tipo de documento'); return; } setWizardStep(3); }}>
-            Siguiente <IonIcon icon={chevronForward} />
-          </button>
-        )}
-        {wizardStep === 4 && (
-          <button className="wizard-footer-submit" onClick={handleVerify} disabled={wizardLoading}>
-            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : 'Verificar biometría'}
-          </button>
-        )}
-        {wizardStep === 5 && (
-          <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || !pagareAccepted || wizardLoading}>
-            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : 'Enviar contrato ✓'}
-          </button>
-        )}
-      </div>
-    );
+    if (wizardStep === 0) {
+      return (
+        <ClientWizardFooterBar
+          showBack={false}
+          onPrimary={handleWizardNext0}
+          primaryDisabled={!createIsValid || wizardLoading}
+          primary={
+            wizardLoading
+              ? <IonSpinner name="crescent" className="client-wizard-btn-spinner" />
+              : <>Siguiente <IonIcon icon={chevronForward} /></>
+          }
+        />
+      );
+    }
+
+    if (wizardStep === 1) {
+      return (
+        <ClientWizardFooterBar
+          onBack={goBackWizard}
+          onPrimary={() => setWizardStep(2)}
+          primary={<>Siguiente <IonIcon icon={chevronForward} /></>}
+        />
+      );
+    }
+
+    if (wizardStep === 2) {
+      return (
+        <ClientWizardFooterBar
+          onBack={goBackWizard}
+          onPrimary={() => {
+            if (!documentType) { toast('Selecciona un tipo de documento'); return; }
+            setWizardStep(3);
+          }}
+          primary={<>Siguiente <IonIcon icon={chevronForward} /></>}
+        />
+      );
+    }
+
+    if (wizardStep === 4) {
+      return (
+        <ClientWizardFooterBar
+          onBack={goBackWizard}
+          onPrimary={handleVerify}
+          primaryDisabled={wizardLoading}
+          variant="submit"
+          primary={
+            wizardLoading
+              ? <IonSpinner name="crescent" className="client-wizard-btn-spinner" />
+              : 'Verificar biometría'
+          }
+        />
+      );
+    }
+
+    if (wizardStep === 5) {
+      return (
+        <ClientWizardFooterBar
+          onBack={goBackWizard}
+          onPrimary={handleSubmitContract}
+          primaryDisabled={!contractAccepted || !pagareAccepted || wizardLoading}
+          variant="submit"
+          primary={
+            wizardLoading
+              ? <IonSpinner name="crescent" className="client-wizard-btn-spinner" />
+              : <>Enviar contrato <IonIcon icon={checkmark} /></>
+          }
+        />
+      );
+    }
+
+    return null;
   };
 
   const renderWizardStep = () => {
@@ -1050,9 +1172,9 @@ const ClientsPage: React.FC = () => {
         </IonHeader>
         <IonContent className="ion-padding">
           {qrModalClient && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingTop: 8 }}>
+            <div className="client-qr-modal-content">
               <QRCodeSVG
-                value={`CLIENT:${qrModalClient.clientId}:${qrModalClient.first_name} ${qrModalClient.last_name}`}
+                value={buildClientQrValue(qrModalClient.clientId, qrModalClient.first_name, qrModalClient.last_name)}
                 size={220}
                 level="H"
                 includeMargin
@@ -1062,6 +1184,21 @@ const ClientsPage: React.FC = () => {
                 <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>{qrModalClient.cellphone}</p>
                 <p style={{ margin: '2px 0 0', color: '#9ca3af', fontSize: 12 }}>ID: {qrModalClient.clientId}</p>
               </div>
+              <IonButton
+                expand="block"
+                className="client-qr-download-btn"
+                onClick={() => handleDownloadQrPdf(qrModalClient)}
+                disabled={qrDownloading}
+              >
+                {qrDownloading ? (
+                  <IonSpinner name="crescent" style={{ width: 18, height: 18 }} />
+                ) : (
+                  <>
+                    <IonIcon icon={downloadOutline} slot="start" />
+                    Descargar QR como PDF
+                  </>
+                )}
+              </IonButton>
             </div>
           )}
         </IonContent>
@@ -1131,25 +1268,25 @@ const ClientsPage: React.FC = () => {
         </IonContent>
       </IonModal>
 
-      {/* ── Create Wizard Modal ─────────────────────────────────────────────── */}
+      {/* ── Client Wizard Modal ──────────────────────────────────────────────── */}
       <IonModal isOpen={showWizard} onDidDismiss={() => { setShowWizard(false); resetWizard(); }} className="client-wizard-modal">
-        <IonHeader className="ion-no-border">
-          <IonToolbar className="modal-toolbar">
-            <IonButtons slot="start">
-              <IonButton fill="clear" onClick={() => { setShowWizard(false); resetWizard(); }}>
-                <IonIcon icon={arrowBack} style={{ color: 'white' }} />
-              </IonButton>
-            </IonButtons>
-            <IonTitle className="modal-title">{wizardMode === 'edit' ? 'Editar Cliente' : 'Nuevo Cliente'}</IonTitle>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle className="client-wizard-modal-title">
+              {wizardMode === 'edit' ? 'Editar Cliente' : 'Nuevo Cliente'}
+            </IonTitle>
             <IonButtons slot="end">
-              <span className="wizard-step-badge">{wizardStep + 1} / {WIZARD_STEPS.length}</span>
+              <IonButton onClick={() => { setShowWizard(false); resetWizard(); }} fill="clear">
+                <IonIcon icon={close} />
+              </IonButton>
             </IonButtons>
           </IonToolbar>
         </IonHeader>
 
-        <IonContent className="modal-content client-face-recognition-page">
-          <WizardStepBar />
-          {renderWizardStep()}
+        <WizardStepBar />
+
+        <IonContent className="client-wizard-content client-face-recognition-page">
+          <div className="client-wizard-scroll-content">{renderWizardStep()}</div>
         </IonContent>
 
         <WizardFooter />
