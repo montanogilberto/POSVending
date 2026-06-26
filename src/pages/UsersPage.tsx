@@ -13,14 +13,11 @@ import {
   IonAlert,
   IonModal,
   IonInput,
-  IonItem,
-  IonLabel,
   IonSelect,
   IonSelectOption,
   IonAvatar,
   IonImg,
   IonSearchbar,
-  IonTextarea,
 } from '@ionic/react';
 import { add, trash, pencil, camera, personCircle } from 'ionicons/icons';
 import Header from '../components/Header';
@@ -331,73 +328,67 @@ const UsersPage: React.FC = () => {
         </IonFab>
 
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
-          <IonItem lines="none" className="users-modal-title-item">
-            <IonLabel className="users-modal-title">
+          <div className="users-modal-title-item">
+            <h2 className="users-modal-title">
               {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
-            </IonLabel>
-          </IonItem>
+            </h2>
+          </div>
           <IonContent>
-            <IonList>
-              <IonItem>
-                <IonLabel position="stacked">Nombre</IonLabel>
-                <IonInput
-                  value={formData.name}
-                  onIonChange={(e) => setFormData({ ...formData, name: e.detail.value! })}
-                  placeholder="Nombre completo"
-                />
-              </IonItem>
-              <IonItem>
-                <IonLabel position="stacked">Email</IonLabel>
-                <IonInput
-                  type="email"
-                  value={formData.email}
-                  onIonChange={(e) => setFormData({ ...formData, email: e.detail.value! })}
-                  placeholder="correo@ejemplo.com"
-                />
-              </IonItem>
-              <IonItem>
-                <IonLabel position="stacked">Rol</IonLabel>
-                <IonSelect
-                  value={formData.role}
-                  onIonChange={(e) => setFormData({ ...formData, role: e.detail.value })}
-                >
-                  <IonSelectOption value="employee">Empleado</IonSelectOption>
-                  <IonSelectOption value="manager">Gerente</IonSelectOption>
-                  <IonSelectOption value="admin">Administrador</IonSelectOption>
-                </IonSelect>
-              </IonItem>
-              <IonItem>
-                <IonLabel position="stacked">Estado</IonLabel>
-                <IonSelect
-                  value={formData.status}
-                  onIonChange={(e) => setFormData({ ...formData, status: e.detail.value })}
-                >
-                  <IonSelectOption value="active">Activo</IonSelectOption>
-                  <IonSelectOption value="inactive">Inactivo</IonSelectOption>
-                </IonSelect>
-              </IonItem>
-              <IonItem>
-                <IonLabel>Avatar</IonLabel>
-                <IonButton fill="clear" onClick={triggerFileInput}>
+            <div className="users-form-fields">
+              <IonInput
+                fill="outline"
+                label="Nombre"
+                labelPlacement="floating"
+                value={formData.name}
+                onIonChange={(e) => setFormData({ ...formData, name: e.detail.value! })}
+                placeholder="Nombre completo"
+              />
+              <IonInput
+                fill="outline"
+                label="Email"
+                labelPlacement="floating"
+                type="email"
+                value={formData.email}
+                onIonChange={(e) => setFormData({ ...formData, email: e.detail.value! })}
+                placeholder="correo@ejemplo.com"
+              />
+              <IonSelect
+                fill="outline"
+                label="Rol"
+                labelPlacement="floating"
+                value={formData.role}
+                onIonChange={(e) => setFormData({ ...formData, role: e.detail.value })}
+              >
+                <IonSelectOption value="employee">Empleado</IonSelectOption>
+                <IonSelectOption value="manager">Gerente</IonSelectOption>
+                <IonSelectOption value="admin">Administrador</IonSelectOption>
+              </IonSelect>
+              <IonSelect
+                fill="outline"
+                label="Estado"
+                labelPlacement="floating"
+                value={formData.status}
+                onIonChange={(e) => setFormData({ ...formData, status: e.detail.value })}
+              >
+                <IonSelectOption value="active">Activo</IonSelectOption>
+                <IonSelectOption value="inactive">Inactivo</IonSelectOption>
+              </IonSelect>
+              <div className="users-avatar-row">
+                <span className="users-avatar-label">Avatar</span>
+                <IonButton fill="outline" size="small" onClick={triggerFileInput}>
                   <IonIcon icon={camera} slot="start" />
                   {formData.avatar ? 'Cambiar avatar' : 'Seleccionar avatar'}
                 </IonButton>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  style={{ display: 'none' }}
-                />
-              </IonItem>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+              </div>
               {formData.avatar && (
-                <IonItem>
-                  <IonAvatar style={{ margin: '0 auto' }}>
+                <div className="users-avatar-preview">
+                  <IonAvatar>
                     <IonImg src={formData.avatar} />
                   </IonAvatar>
-                </IonItem>
+                </div>
               )}
-            </IonList>
+            </div>
 
             <div className="users-modal-actions">
               <IonButton onClick={() => setShowModal(false)} fill="outline">Cancelar</IonButton>

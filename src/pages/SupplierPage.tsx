@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './SupplierPage.css';
 import {
-  IonPage, IonContent, IonList, IonItem, IonLabel, IonCard, IonCardHeader,
+  IonPage, IonContent, IonList, IonLabel, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonFab, IonFabButton, IonIcon, IonModal,
   IonInput, IonButton, IonAlert, IonLoading, IonToast, IonSearchbar,
   IonInfiniteScroll, IonInfiniteScrollContent, IonTextarea, IonToggle,
@@ -315,61 +315,21 @@ const SupplierPage: React.FC = () => {
             </div>
           </IonHeader>
           <IonContent className="modal-content">
-            <div className="form-container">
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Nombre del Proveedor <span className="required">*</span></IonLabel>
-                <IonInput
-                  name="supplierName"
-                  value={editingSupplier?.supplierName}
-                  onIonChange={handleChange}
-                  required
-                  type="text"
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Nombre de Contacto</IonLabel>
-                <IonInput
-                  name="contactName"
-                  value={editingSupplier?.contactName}
-                  onIonChange={handleChange}
-                  type="text"
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Teléfono</IonLabel>
-                <IonInput
-                  name="phone"
-                  value={editingSupplier?.phone}
-                  onIonChange={handleChange}
-                  type="tel"
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Email</IonLabel>
-                <IonInput
-                  name="email"
-                  value={editingSupplier?.email}
-                  onIonChange={handleChange}
-                  type="email"
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Dirección</IonLabel>
-                <IonTextarea
-                  name="address"
-                  value={editingSupplier?.address}
-                  onIonChange={handleChange}
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel>Activo</IonLabel>
-                <IonToggle
-                  name="active"
-                  checked={editingSupplier?.active === '1'}
-                  onIonChange={handleChange}
-                  slot="end"
-                />
-              </IonItem>
+            <div className="form-container supplier-form-fields">
+              <IonInput fill="outline" label="Nombre del Proveedor *" labelPlacement="floating"
+                name="supplierName" value={editingSupplier?.supplierName} onIonChange={handleChange} required type="text" />
+              <IonInput fill="outline" label="Nombre de Contacto" labelPlacement="floating"
+                name="contactName" value={editingSupplier?.contactName} onIonChange={handleChange} type="text" />
+              <IonInput fill="outline" label="Teléfono" labelPlacement="floating"
+                name="phone" value={editingSupplier?.phone} onIonChange={handleChange} type="tel" />
+              <IonInput fill="outline" label="Email" labelPlacement="floating"
+                name="email" value={editingSupplier?.email} onIonChange={handleChange} type="email" />
+              <IonTextarea fill="outline" label="Dirección" labelPlacement="floating"
+                name="address" value={editingSupplier?.address} onIonChange={handleChange} autoGrow />
+              <div className="supplier-toggle-row">
+                <span className="supplier-toggle-label">Activo</span>
+                <IonToggle name="active" checked={editingSupplier?.active === '1'} onIonChange={handleChange} />
+              </div>
               <div className="button-container">
                 <IonButton expand="block" size="large" className="primary-button" onClick={handleSave}>
                   <IonIcon icon={save} slot="start" />
@@ -399,61 +359,21 @@ const SupplierPage: React.FC = () => {
             </div>
           </IonHeader>
           <IonContent className="modal-content">
-            <div className="form-container">
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Nombre del Proveedor <span className="required">*</span></IonLabel>
-                <IonInput
-                  name="supplierName"
-                  value={editingSupplier?.supplierName}
-                  onIonChange={handleChange}
-                  required
-                  type="text"
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Nombre de Contacto</IonLabel>
-                <IonInput
-                  name="contactName"
-                  value={editingSupplier?.contactName}
-                  onIonChange={handleChange}
-                  type="text"
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Teléfono</IonLabel>
-                <IonInput
-                  name="phone"
-                  value={editingSupplier?.phone}
-                  onIonChange={handleChange}
-                  type="tel"
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Email</IonLabel>
-                <IonInput
-                  name="email"
-                  value={editingSupplier?.email}
-                  onIonChange={handleChange}
-                  type="email"
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel position="floating">Dirección</IonLabel>
-                <IonTextarea
-                  name="address"
-                  value={editingSupplier?.address}
-                  onIonChange={handleChange}
-                />
-              </IonItem>
-              <IonItem className="form-item outline">
-                <IonLabel>Activo</IonLabel>
-                <IonToggle
-                  name="active"
-                  checked={editingSupplier?.active === '1'}
-                  onIonChange={handleChange}
-                  slot="end"
-                />
-              </IonItem>
+            <div className="form-container supplier-form-fields">
+              <IonInput fill="outline" label="Nombre del Proveedor *" labelPlacement="floating"
+                name="supplierName" value={editingSupplier?.supplierName} onIonChange={handleChange} required type="text" />
+              <IonInput fill="outline" label="Nombre de Contacto" labelPlacement="floating"
+                name="contactName" value={editingSupplier?.contactName} onIonChange={handleChange} type="text" />
+              <IonInput fill="outline" label="Teléfono" labelPlacement="floating"
+                name="phone" value={editingSupplier?.phone} onIonChange={handleChange} type="tel" />
+              <IonInput fill="outline" label="Email" labelPlacement="floating"
+                name="email" value={editingSupplier?.email} onIonChange={handleChange} type="email" />
+              <IonTextarea fill="outline" label="Dirección" labelPlacement="floating"
+                name="address" value={editingSupplier?.address} onIonChange={handleChange} autoGrow />
+              <div className="supplier-toggle-row">
+                <span className="supplier-toggle-label">Activo</span>
+                <IonToggle name="active" checked={editingSupplier?.active === '1'} onIonChange={handleChange} />
+              </div>
               <div className="button-container">
                 <IonButton expand="block" size="large" className="primary-button" onClick={handleSave}>
                   <IonIcon icon={save} slot="start" />

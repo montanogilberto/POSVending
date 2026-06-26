@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './ProductForm.css';
 import {
   IonModal,
   IonHeader,
@@ -8,8 +9,6 @@ import {
   IonButton,
   IonIcon,
   IonContent,
-  IonItem,
-  IonLabel,
   IonInput,
   IonTextarea,
   IonSelect,
@@ -111,88 +110,47 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
       <IonContent>
         <IonLoading isOpen={loading} message="Guardando producto..." />
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-          <IonItem>
-            <IonLabel position="stacked">Nombre *</IonLabel>
-            <IonInput
-              value={formData.name}
-              onIonChange={(e) => handleInputChange('name', e.detail.value!)}
-              required
-            />
-          </IonItem>
+          <div className="product-form-fields">
+            <IonInput fill="outline" label="Nombre *" labelPlacement="floating"
+              value={formData.name} onIonChange={(e) => handleInputChange('name', e.detail.value!)} required />
 
-          <IonItem>
-            <IonLabel position="stacked">Código *</IonLabel>
-            <IonInput
-              value={formData.code}
-              onIonChange={(e) => handleInputChange('code', e.detail.value!)}
-              required
-            />
-          </IonItem>
+            <IonInput fill="outline" label="Código *" labelPlacement="floating"
+              value={formData.code} onIonChange={(e) => handleInputChange('code', e.detail.value!)} required />
 
-          <IonItem>
-            <IonLabel position="stacked">Fecha de Expiración</IonLabel>
-            <IonDatetime
-              value={formData.dateOfExpire}
-              onIonChange={(e) => handleInputChange('dateOfExpire', Array.isArray(e.detail.value) ? e.detail.value[0] : e.detail.value || '')}
-              presentation="date"
-            />
-          </IonItem>
+            <div className="product-field-group">
+              <p className="product-field-label">Fecha de Expiración</p>
+              <IonDatetime
+                value={formData.dateOfExpire}
+                onIonChange={(e) => handleInputChange('dateOfExpire', Array.isArray(e.detail.value) ? e.detail.value[0] : e.detail.value || '')}
+                presentation="date"
+              />
+            </div>
 
-          <IonItem>
-            <IonLabel position="stacked">ID Forma del Producto</IonLabel>
-            <IonInput
-              type="number"
-              value={formData.productFormId}
-              onIonChange={(e) => handleInputChange('productFormId', parseInt(e.detail.value!))}
-            />
-          </IonItem>
+            <IonInput fill="outline" label="ID Forma del Producto" labelPlacement="floating"
+              type="number" value={formData.productFormId}
+              onIonChange={(e) => handleInputChange('productFormId', parseInt(e.detail.value!))} />
 
-          <IonItem>
-            <IonLabel position="stacked">ID Fabricante</IonLabel>
-            <IonInput
-              type="number"
-              value={formData.manufactureId}
-              onIonChange={(e) => handleInputChange('manufactureId', parseInt(e.detail.value!))}
-            />
-          </IonItem>
+            <IonInput fill="outline" label="ID Fabricante" labelPlacement="floating"
+              type="number" value={formData.manufactureId}
+              onIonChange={(e) => handleInputChange('manufactureId', parseInt(e.detail.value!))} />
 
-          <IonItem>
-            <IonLabel position="stacked">Descripción</IonLabel>
-            <IonTextarea
-              value={formData.description}
-              onIonChange={(e) => handleInputChange('description', e.detail.value!)}
-            />
-          </IonItem>
+            <IonTextarea fill="outline" label="Descripción" labelPlacement="floating"
+              value={formData.description} onIonChange={(e) => handleInputChange('description', e.detail.value!)} autoGrow />
 
-          <IonItem>
-            <IonLabel position="stacked">Código de Barras</IonLabel>
-            <IonInput
-              value={formData.barCode}
-              onIonChange={(e) => handleInputChange('barCode', e.detail.value!)}
-            />
-          </IonItem>
+            <IonInput fill="outline" label="Código de Barras" labelPlacement="floating"
+              value={formData.barCode} onIonChange={(e) => handleInputChange('barCode', e.detail.value!)} />
 
-          <IonItem>
-            <IonLabel position="stacked">ID Categoría</IonLabel>
-            <IonInput
-              type="number"
-              value={formData.categoryId}
-              onIonChange={(e) => handleInputChange('categoryId', parseInt(e.detail.value!))}
-            />
-          </IonItem>
+            <IonInput fill="outline" label="ID Categoría" labelPlacement="floating"
+              type="number" value={formData.categoryId}
+              onIonChange={(e) => handleInputChange('categoryId', parseInt(e.detail.value!))} />
 
-          <IonItem>
-            <IonLabel position="stacked">ID Compañía</IonLabel>
-            <IonInput
-              type="number"
-              value={sessionCompanyId}
-              readonly
-            />
-          </IonItem>
+            <IonInput fill="outline" label="ID Compañía" labelPlacement="floating"
+              type="number" value={sessionCompanyId} readonly />
 
-          <IonButton expand="block" type="submit" disabled={loading}>
-            {product ? 'Actualizar Producto' : 'Crear Producto'}
-          </IonButton>
+            <IonButton expand="block" type="submit" disabled={loading}>
+              {product ? 'Actualizar Producto' : 'Crear Producto'}
+            </IonButton>
+          </div>
         </form>
       </IonContent>
     </IonModal>

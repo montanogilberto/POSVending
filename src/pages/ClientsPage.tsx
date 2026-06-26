@@ -94,7 +94,29 @@ type CaptureSubStep =
   | 'liveness-active'
   | 'processing';
 
-const WIZARD_STEPS = ['Cliente', 'Código QR', 'Documento', 'Captura', 'Verificación', 'Contrato'];
+const WIZARD_STEPS = ['Cliente', 'Código QR', 'Documento', 'Captura', 'Verificación', 'Contrato', 'Cuenta'];
+
+const API_BASE = 'https://smartloansbackend.azurewebsites.net';
+
+async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
+  const res = await fetch(`${API_BASE}/stripe/connected-accounts`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId, email }),
+  });
+  return res.json();
+}
+
+async function stripeGetOnboardingLink(clientId: number, companyId: number) {
+  const res = await fetch(`${API_BASE}/stripe/onboarding-link`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      clientId, companyId,
+      returnUrl: 'http://localhost:8100/clients',
+      refreshUrl: 'http://localhost:8100/clients',
+    }),
+  });
+  return res.json();
+}
 
 const emptyErrors = {
   first_name: '',
@@ -141,6 +163,11 @@ const ClientsPage: React.FC = () => {
   const [shareClient, setShareClient] = useState<Client | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [qrDownloading, setQrDownloading] = useState(false);
+
+  // Step 6 — Stripe
+  const [stripeAccountId, setStripeAccountId] = useState('');
+  const [stripeOnboardingUrl, setStripeOnboardingUrl] = useState('');
+  const [stripeKycDone, setStripeKycDone] = useState(false);
 
   // Step 2 — document
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
@@ -313,6 +340,9 @@ const ClientsPage: React.FC = () => {
     setPagareAccepted(false);
     setHasPhysicalPagare(false);
     setContractAcceptedAt('');
+    setStripeAccountId('');
+    setStripeOnboardingUrl('');
+    setStripeKycDone(false);
   };
 
   const createIsValid = useMemo(() => {
@@ -433,9 +463,23 @@ const ClientsPage: React.FC = () => {
       const res = await submitContractClientFaceRecognition(payload);
       if (res.error) { toast(`Error: ${res.msg || res.error}`); }
       else {
-        toast('¡Cliente registrado con contrato enviado exitosamente!');
-        setShowWizard(false);
-        resetWizard();
+        toast('¡Contrato enviado! Configurando cuenta de pagos...');
+        // Create Stripe Connected Account for this client
+        try {
+          const acct = await stripeCreateAccount(
+            Number(createdClientId),
+            Number(companyId),
+            newClient.email ?? `client${createdClientId}@posgmo.mx`,
+          );
+          if (acct?.account?.connectedAccountId) {
+            setStripeAccountId(acct.account.connectedAccountId);
+          }
+          const link = await stripeGetOnboardingLink(Number(createdClientId), Number(companyId));
+          if (link?.url) setStripeOnboardingUrl(link.url);
+        } catch {
+          toast('Contrato guardado. No se pudo crear cuenta Stripe.');
+        }
+        setWizardStep(6);
       }
     } catch (err) {
       toast((err as Error).message ?? 'Error al enviar el contrato');
@@ -490,53 +534,69 @@ const ClientsPage: React.FC = () => {
   const renderStep0 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
-        <div className="wizard-step-icon-wrap" style={{ background: '#e0f2fe' }}>
-          <IonIcon icon={personCircle} style={{ fontSize: 40, color: 'var(--ion-color-primary)' }} />
-        </div>
-        <h2 className="wizard-step-title">Datos del Cliente</h2>
         <p className="wizard-step-desc">Ingresa la información personal del nuevo cliente.</p>
       </div>
 
-      <IonItem className="form-item outline">
-        <IonIcon icon={person} slot="start" color="primary" />
-        <IonLabel position="floating">Nombre *</IonLabel>
-        <IonInput value={newClient.first_name} onIonInput={(e) => setNewClient(p => ({ ...p, first_name: e.detail.value! }))} />
-        {createErrors.first_name && <IonNote slot="helper" color="danger">{createErrors.first_name}</IonNote>}
-      </IonItem>
+      <div className="wizard-form-fields">
+        <div className="wizard-field-group">
+          <IonInput
+            fill="outline"
+            label="Nombre *"
+            labelPlacement="floating"
+            value={newClient.first_name}
+            onIonInput={(e) => setNewClient(p => ({ ...p, first_name: e.detail.value! }))}
+            className={createErrors.first_name ? 'ion-invalid ion-touched' : ''}
+            errorText={createErrors.first_name}
+          />
+        </div>
 
-      <IonItem className="form-item outline">
-        <IonIcon icon={person} slot="start" color="primary" />
-        <IonLabel position="floating">Apellido *</IonLabel>
-        <IonInput value={newClient.last_name} onIonInput={(e) => setNewClient(p => ({ ...p, last_name: e.detail.value! }))} />
-        {createErrors.last_name && <IonNote slot="helper" color="danger">{createErrors.last_name}</IonNote>}
-      </IonItem>
+        <div className="wizard-field-group">
+          <IonInput
+            fill="outline"
+            label="Apellido *"
+            labelPlacement="floating"
+            value={newClient.last_name}
+            onIonInput={(e) => setNewClient(p => ({ ...p, last_name: e.detail.value! }))}
+            className={createErrors.last_name ? 'ion-invalid ion-touched' : ''}
+            errorText={createErrors.last_name}
+          />
+        </div>
 
-      <IonItem className="form-item outline">
-        <IonIcon icon={call} slot="start" color="primary" />
-        <IonLabel position="floating">Teléfono *</IonLabel>
-        <IonInput type="tel" value={newClient.cellphone} onIonInput={(e) => setNewClient(p => ({ ...p, cellphone: e.detail.value! }))} />
-        {createErrors.cellphone && <IonNote slot="helper" color="danger">{createErrors.cellphone}</IonNote>}
-      </IonItem>
+        <div className="wizard-field-group">
+          <IonInput
+            fill="outline"
+            label="Teléfono *"
+            labelPlacement="floating"
+            type="tel"
+            value={newClient.cellphone}
+            onIonInput={(e) => setNewClient(p => ({ ...p, cellphone: e.detail.value! }))}
+            className={createErrors.cellphone ? 'ion-invalid ion-touched' : ''}
+            errorText={createErrors.cellphone}
+          />
+        </div>
 
-      <IonItem className="form-item outline">
-        <IonIcon icon={mail} slot="start" color="primary" />
-        <IonLabel position="floating">Email</IonLabel>
-        <IonInput type="email" value={newClient.email} onIonInput={(e) => setNewClient(p => ({ ...p, email: e.detail.value! }))} />
-        {newClient.email && !createErrors.email.isValid && (
-          <>
-            <IonIcon icon={closeCircle} slot="end" color="danger" />
-            <IonNote slot="helper" color="danger">{createErrors.email.message}</IonNote>
-          </>
-        )}
-        {newClient.email && createErrors.email.isValid && (
-          <IonIcon icon={checkmarkCircle} slot="end" color="success" />
-        )}
-      </IonItem>
+        <div className="wizard-field-group">
+          <IonInput
+            fill="outline"
+            label="Email"
+            labelPlacement="floating"
+            type="email"
+            value={newClient.email}
+            onIonInput={(e) => setNewClient(p => ({ ...p, email: e.detail.value! }))}
+            className={newClient.email && !createErrors.email.isValid ? 'ion-invalid ion-touched' : ''}
+            errorText={newClient.email && !createErrors.email.isValid ? createErrors.email.message : undefined}
+          >
+            {newClient.email && createErrors.email.isValid && (
+              <IonIcon icon={checkmarkCircle} slot="end" color="success" aria-hidden="true" />
+            )}
+          </IonInput>
+        </div>
+      </div>
 
       {/* Client type selector */}
-      <div style={{ margin: '14px 4px 0' }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: '#374151', margin: '0 0 8px' }}>Tipo de cliente:</p>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div className="wizard-client-type-section">
+        <p className="wizard-client-type-label">Tipo de cliente:</p>
+        <div className="wizard-client-type-grid">
           {([
             { id: 'borrower', label: '📋 Acreditado', desc: 'Solicita préstamo', color: '#2563eb' },
             { id: 'lender',   label: '💼 Prestamista', desc: 'Financia préstamos', color: '#15803d' },
@@ -545,14 +605,16 @@ const ClientsPage: React.FC = () => {
             <button
               key={t.id}
               type="button"
+              className={`wizard-client-type-btn${newClient.clientType === t.id ? ' selected' : ''}`}
+              style={newClient.clientType === t.id
+                ? { borderColor: t.color, background: `${t.color}14` }
+                : undefined}
               onClick={() => setNewClient(p => ({ ...p, clientType: t.id }))}
-              style={{
-                flex: 1, padding: '10px 6px', borderRadius: 12, border: `2px solid ${newClient.clientType === t.id ? t.color : '#e5e7eb'}`,
-                background: newClient.clientType === t.id ? `${t.color}14` : '#fff',
-                cursor: 'pointer', textAlign: 'center',
-              }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: newClient.clientType === t.id ? t.color : '#374151' }}>{t.label}</div>
-              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{t.desc}</div>
+            >
+              <span className="wizard-client-type-btn-name" style={newClient.clientType === t.id ? { color: t.color } : undefined}>
+                {t.label}
+              </span>
+              <span className="wizard-client-type-btn-desc">{t.desc}</span>
             </button>
           ))}
         </div>
@@ -568,10 +630,6 @@ const ClientsPage: React.FC = () => {
   const renderStep1 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
-        <div className="wizard-step-icon-wrap" style={{ background: '#f0fdf4' }}>
-          <IonIcon icon={qrCodeOutline} style={{ fontSize: 40, color: '#16a34a' }} />
-        </div>
-        <h2 className="wizard-step-title">Código QR del Cliente</h2>
         <p className="wizard-step-desc">
           Este código QR identifica al cliente en todos los puntos de venta. Imprímelo o guárdalo.
         </p>
@@ -628,32 +686,32 @@ const ClientsPage: React.FC = () => {
         <p className="wizard-step-desc">Selecciona el documento de identificación oficial del cliente.</p>
       </div>
 
-      <IonList className="client-face-recognition-radio-list ion-margin-top">
-        <IonListHeader><IonLabel>Identificación oficial</IonLabel></IonListHeader>
-        <IonRadioGroup value={documentType} onIonChange={(e) => setDocumentType(e.detail.value)}>
-          <IonItem>
-            <IonLabel>
-              <strong>INE</strong>
-              <p style={{ fontSize: 12, color: '#6b7280' }}>Credencial para votar</p>
-            </IonLabel>
-            <IonRadio value="INE" slot="end" />
-          </IonItem>
-          <IonItem>
-            <IonLabel>
-              <strong>Pasaporte</strong>
-              <p style={{ fontSize: 12, color: '#6b7280' }}>Pasaporte vigente</p>
-            </IonLabel>
-            <IonRadio value="Passport" slot="end" />
-          </IonItem>
-          <IonItem>
-            <IonLabel>
-              <strong>Licencia de Conducir</strong>
-              <p style={{ fontSize: 12, color: '#6b7280' }}>Licencia vigente</p>
-            </IonLabel>
-            <IonRadio value="Driver License" slot="end" />
-          </IonItem>
-        </IonRadioGroup>
-      </IonList>
+      <div className="wizard-doc-type-list">
+        {([
+          { value: 'INE',            label: 'INE',                  desc: 'Credencial para votar',  icon: idCardOutline },
+          { value: 'Passport',       label: 'Pasaporte',            desc: 'Pasaporte vigente',      icon: documentTextOutline },
+          { value: 'Driver License', label: 'Licencia de Conducir', desc: 'Licencia vigente',       icon: idCardOutline },
+        ] as { value: typeof documentType; label: string; desc: string; icon: string }[]).map(opt => {
+          const selected = documentType === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              className={`wizard-doc-type-btn${selected ? ' selected' : ''}`}
+              onClick={() => setDocumentType(opt.value)}
+            >
+              <div className="wizard-doc-type-btn-icon">
+                <IonIcon icon={opt.icon} />
+              </div>
+              <div className="wizard-doc-type-btn-text">
+                <span className="wizard-doc-type-btn-name">{opt.label}</span>
+                <span className="wizard-doc-type-btn-desc">{opt.desc}</span>
+              </div>
+              <div className={`wizard-doc-type-btn-radio${selected ? ' selected' : ''}`} />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -832,20 +890,96 @@ const ClientsPage: React.FC = () => {
         </p>
       </div>
 
-      <IonItem lines="none" className="wizard-checkbox-item">
-        <IonCheckbox checked={contractAccepted} onIonChange={(e) => setContractAccepted(e.detail.checked)} slot="start" />
-        <IonLabel className="ion-text-wrap">Acepto los términos del contrato de crédito</IonLabel>
-      </IonItem>
+      <div className="wizard-checkbox-list">
+        {([
+          { checked: contractAccepted,  onChange: setContractAccepted,  label: 'Acepto los términos del contrato de crédito',     required: true },
+          { checked: pagareAccepted,    onChange: setPagareAccepted,    label: 'Acepto y firmo electrónicamente el pagaré',        required: true },
+          { checked: hasPhysicalPagare, onChange: setHasPhysicalPagare, label: 'El pagaré físico está en resguardo',              required: false },
+        ]).map((item, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`wizard-checkbox-card${item.checked ? ' checked' : ''}`}
+            onClick={() => item.onChange(!item.checked)}
+          >
+            <div className={`wizard-checkbox-box${item.checked ? ' checked' : ''}`}>
+              {item.checked && <IonIcon icon={checkmark} />}
+            </div>
+            <span className="wizard-checkbox-card-label">
+              {item.label}
+              {item.required && <span className="wizard-checkbox-required"> *</span>}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
-      <IonItem lines="none" className="wizard-checkbox-item">
-        <IonCheckbox checked={pagareAccepted} onIonChange={(e) => setPagareAccepted(e.detail.checked)} slot="start" />
-        <IonLabel className="ion-text-wrap">Acepto y firmo electrónicamente el pagaré</IonLabel>
-      </IonItem>
+  const renderStep6 = () => (
+    <div className="wizard-step-body">
+      <div className="wizard-step-header">
+        <div className="wizard-step-icon-wrap" style={{ background: '#F0FDF4' }}>
+          <IonIcon icon={walletOutline} style={{ fontSize: 40, color: '#059669' }} />
+        </div>
+        <h2 className="wizard-step-title">Cuenta de Pagos</h2>
+        <p className="wizard-step-desc">
+          El cliente necesita registrar su información bancaria para recibir o realizar pagos de préstamos.
+        </p>
+      </div>
 
-      <IonItem lines="none" className="wizard-checkbox-item">
-        <IonCheckbox checked={hasPhysicalPagare} onIonChange={(e) => setHasPhysicalPagare(e.detail.checked)} slot="start" />
-        <IonLabel className="ion-text-wrap">El pagaré físico está en resguardo</IonLabel>
-      </IonItem>
+      <div className="wizard-summary-box">
+        <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
+        <p><strong>Email:</strong> {newClient.email}</p>
+        {stripeAccountId && <p><strong>Cuenta Stripe:</strong> {stripeAccountId}</p>}
+        <p><strong>Estado KYC:</strong> {stripeKycDone ? '✅ Completado' : '⏳ Pendiente'}</p>
+      </div>
+
+      {stripeOnboardingUrl ? (
+        <div className="wizard-stripe-section">
+          <p className="wizard-stripe-desc">
+            Comparte este enlace con el cliente para que registre su tarjeta o cuenta CLABE en Stripe.
+            El proceso es seguro y tarda menos de 5 minutos.
+          </p>
+          <IonButton
+            expand="block"
+            className="wizard-stripe-btn"
+            onClick={() => window.open(stripeOnboardingUrl, '_blank')}
+          >
+            <IonIcon icon={walletOutline} slot="start" />
+            Abrir registro bancario
+          </IonButton>
+          <IonButton
+            expand="block"
+            fill="outline"
+            className="wizard-stripe-btn"
+            onClick={() => {
+              navigator.clipboard.writeText(stripeOnboardingUrl);
+              toast('Enlace copiado al portapapeles');
+            }}
+          >
+            <IonIcon icon={copyOutline} slot="start" />
+            Copiar enlace
+          </IonButton>
+          <div className="wizard-stripe-confirm">
+            <button
+              type="button"
+              className={`wizard-checkbox-card${stripeKycDone ? ' checked' : ''}`}
+              onClick={() => setStripeKycDone(!stripeKycDone)}
+            >
+              <div className={`wizard-checkbox-box${stripeKycDone ? ' checked' : ''}`}>
+                {stripeKycDone && <IonIcon icon={checkmark} />}
+              </div>
+              <span className="wizard-checkbox-card-label">El cliente completó su registro bancario</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="wizard-stripe-section">
+          <p className="wizard-stripe-desc" style={{ color: '#EF4444' }}>
+            No se pudo generar el enlace de registro. Puedes generarlo más tarde desde el perfil del cliente.
+          </p>
+        </div>
+      )}
     </div>
   );
 
@@ -1027,6 +1161,17 @@ const ClientsPage: React.FC = () => {
       );
     }
 
+    if (wizardStep === 6) {
+      return (
+        <ClientWizardFooterBar
+          showBack={false}
+          onPrimary={() => { setShowWizard(false); resetWizard(); loadClients(); }}
+          variant="submit"
+          primary={<>Finalizar <IonIcon icon={checkmark} /></>}
+        />
+      );
+    }
+
     return null;
   };
 
@@ -1036,7 +1181,8 @@ const ClientsPage: React.FC = () => {
     if (wizardStep === 2) return renderStep2();
     if (wizardStep === 3) return renderCaptureSubStep();
     if (wizardStep === 4) return renderStep4();
-    return renderStep5();
+    if (wizardStep === 5) return renderStep5();
+    return renderStep6();
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────

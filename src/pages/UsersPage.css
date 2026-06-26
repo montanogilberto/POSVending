@@ -225,14 +225,51 @@
 
 /* Modal (kept + aligned) */
 .users-modal-title-item {
-  --background: #ffffff;
-  margin-top: 8px;
+  background: #ffffff;
+  padding: 20px 20px 4px;
 }
 
 .users-modal-title {
   text-align: center;
   font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.users-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px 24px;
+}
+
+.users-form-fields ion-input,
+.users-form-fields ion-select {
+  --border-radius: 12px;
+}
+
+.users-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1.5px solid #E5E7EB;
+  background: #ffffff;
+}
+
+.users-avatar-label {
+  font-size: 15px;
   font-weight: 600;
+  color: #374151;
+  flex: 1;
+}
+
+.users-avatar-preview {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
 }
 
 .users-modal-actions {

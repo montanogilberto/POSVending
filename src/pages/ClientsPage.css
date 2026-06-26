@@ -760,6 +760,73 @@
   max-width: 320px;
 }
 
+/* Step 0 — form fields */
+.wizard-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.wizard-field-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.wizard-field-group ion-input {
+  --border-radius: 12px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  font-size: 15px;
+}
+
+/* Client type selector */
+.wizard-client-type-section {
+  margin-top: 20px;
+}
+
+.wizard-client-type-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  margin: 0 0 10px;
+}
+
+.wizard-client-type-grid {
+  display: flex;
+  gap: 10px;
+}
+
+.wizard-client-type-btn {
+  flex: 1;
+  padding: 12px 6px;
+  border-radius: 14px;
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.wizard-client-type-btn-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  line-height: 1.3;
+}
+
+.wizard-client-type-btn-desc {
+  font-size: 10px;
+  color: #6b7280;
+  line-height: 1.3;
+}
+
 /* Summary box */
 .wizard-summary-box {
   background: #f9fafb;
@@ -789,12 +856,179 @@
   line-height: 1.6;
 }
 
-/* Checkbox items */
-.wizard-checkbox-item {
-  --background: transparent;
-  --padding-start: 0;
-  margin-bottom: 8px;
+/* Step 2 — document type selector */
+.wizard-doc-type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.wizard-doc-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 2px solid #E5E7EB;
+  background: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wizard-doc-type-btn.selected {
+  border-color: #2563EB;
+  background: #EFF6FF;
+}
+
+.wizard-doc-type-btn-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #F1F5F9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+  color: #64748B;
+  transition: background 0.15s, color 0.15s;
+}
+
+.wizard-doc-type-btn.selected .wizard-doc-type-btn-icon {
+  background: #DBEAFE;
+  color: #2563EB;
+}
+
+.wizard-doc-type-btn-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wizard-doc-type-btn-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.wizard-doc-type-btn.selected .wizard-doc-type-btn-name {
+  color: #1D4ED8;
+}
+
+.wizard-doc-type-btn-desc {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.wizard-doc-type-btn-radio {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #D1D5DB;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+}
+
+.wizard-doc-type-btn-radio.selected {
+  border-color: #2563EB;
+  background: #2563EB;
+  box-shadow: inset 0 0 0 3px #ffffff;
+}
+
+/* Step 5 — contract checkboxes */
+.wizard-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.wizard-checkbox-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 2px solid #E5E7EB;
+  background: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wizard-checkbox-card.checked {
+  border-color: #059669;
+  background: #F0FDF4;
+}
+
+.wizard-checkbox-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid #D1D5DB;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.wizard-checkbox-box.checked {
+  border-color: #059669;
+  background: #059669;
+  color: #ffffff;
+}
+
+.wizard-checkbox-card-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.wizard-checkbox-card.checked .wizard-checkbox-card-label {
+  color: #065F46;
+}
+
+.wizard-checkbox-required {
+  color: #EF4444;
+  font-weight: 700;
+}
+
+/* Step 6 — Stripe onboarding */
+.wizard-stripe-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.wizard-stripe-desc {
+  font-size: 14px;
+  color: #4B5563;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.wizard-stripe-btn {
+  --border-radius: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.wizard-stripe-confirm {
+  margin-top: 4px;
 }
 
 /* Responsive Modal */
