@@ -1006,29 +1006,257 @@
   font-weight: 700;
 }
 
-/* Step 6 — Stripe onboarding */
+/* Step 6 — Payment account / Stripe */
+
+/* Status summary card */
+.wizard-stripe-status-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 2px solid #E5E7EB;
+  border-radius: 16px;
+  margin-bottom: 20px;
+}
+
+.wizard-stripe-status-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #F1F5F9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 22px;
+  color: #94A3B8;
+  transition: background 0.2s, color 0.2s;
+}
+
+.wizard-stripe-status-icon-wrap.done {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.wizard-stripe-status-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wizard-stripe-status-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wizard-stripe-status-sub {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.wizard-stripe-account-id {
+  font-size: 10px;
+  color: #9CA3AF;
+  font-family: monospace;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wizard-stripe-kyc-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: #F1F5F9;
+  color: #64748B;
+  border: 1.5px solid #E2E8F0;
+}
+
+.wizard-stripe-kyc-badge.done {
+  background: #D1FAE5;
+  color: #059669;
+  border-color: #6EE7B7;
+}
+
+/* Section wrapper */
 .wizard-stripe-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 8px;
 }
 
-.wizard-stripe-desc {
+/* URL preview box */
+.wizard-stripe-url-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+}
+
+.wizard-stripe-url-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  color: #64748B;
+}
+
+.wizard-stripe-url-text {
+  flex: 1;
+  font-size: 11px;
+  color: #475569;
+  word-break: break-all;
+  line-height: 1.4;
+  font-family: monospace;
+}
+
+/* Action cards grid */
+.wizard-stripe-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Action button — matches wizard-doc-type-btn pattern */
+.wizard-stripe-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 2px solid #E5E7EB;
+  background: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wizard-stripe-action-btn:active {
+  transform: scale(0.985);
+}
+
+.wizard-stripe-action-btn.primary {
+  border-color: #2563EB;
+  background: #EFF6FF;
+}
+
+.wizard-stripe-action-btn.primary:hover {
+  background: #DBEAFE;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+
+.wizard-stripe-action-btn:not(.primary):hover {
+  border-color: #CBD5E1;
+  background: #F8FAFC;
+}
+
+.wizard-stripe-action-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #F1F5F9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+  color: #64748B;
+  transition: background 0.15s, color 0.15s;
+}
+
+.wizard-stripe-action-btn.primary .wizard-stripe-action-icon-wrap {
+  background: #DBEAFE;
+  color: #2563EB;
+}
+
+.wizard-stripe-action-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wizard-stripe-action-name {
   font-size: 14px;
-  color: #4B5563;
-  line-height: 1.5;
-  margin: 0;
+  font-weight: 700;
+  color: #111827;
 }
 
-.wizard-stripe-btn {
-  --border-radius: 12px;
-  font-weight: 600;
-  text-transform: none;
+.wizard-stripe-action-btn.primary .wizard-stripe-action-name {
+  color: #1D4ED8;
 }
 
-.wizard-stripe-confirm {
+.wizard-stripe-action-desc {
+  font-size: 11px;
+  color: #6B7280;
+}
+
+.wizard-stripe-action-arrow {
+  font-size: 16px;
+  color: #9CA3AF;
+  flex-shrink: 0;
+}
+
+.wizard-stripe-action-btn.primary .wizard-stripe-action-arrow {
+  color: #60A5FA;
+}
+
+/* Error state card */
+.wizard-stripe-error-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: #FFF7F7;
+  border: 2px solid #FEE2E2;
+  border-radius: 14px;
   margin-top: 4px;
+}
+
+.wizard-stripe-error-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #FEE2E2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 22px;
+  color: #EF4444;
+}
+
+.wizard-stripe-error-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wizard-stripe-error-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #991B1B;
+}
+
+.wizard-stripe-error-desc {
+  font-size: 12px;
+  color: #B91C1C;
+  line-height: 1.4;
 }
 
 /* Responsive Modal */

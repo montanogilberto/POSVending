@@ -10,6 +10,7 @@ export interface Client {
   cellphone: string;
   email: string;
   clientType?: ClientType;
+  qrBlobUrl?: string;
   created_At?: string;
   updated_at?: string;
 }
@@ -105,6 +106,20 @@ export const getAllClients = async (): Promise<Client[]> => {
     console.warn('Unexpected API response structure:', data);
     return [];
   }
+};
+
+export const uploadClientQr = async (
+  clientId: number,
+  companyId: number | undefined,
+  qrBase64: string
+): Promise<{ qrBlobUrl: string }> => {
+  const res = await fetch(`${API_BASE_URL}/clients/upload-qr`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clients: [{ clientId, companyId, qrBase64 }] }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 };
 
 export const getOneClient = async (data: GetOneClientRequest): Promise<Client[]> => {

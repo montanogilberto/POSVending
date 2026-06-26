@@ -72,7 +72,8 @@ import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
 import { useUser } from '../components/UserContext';
-import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest } from '../api/clientsApi';
+import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr } from '../api/clientsApi';
+import QRCode from 'qrcode';
 import { buildClientQrValue, downloadClientQrPdf } from '../utils/clientQrPdf';
 import {
   verifyClientFaceRecognition,
@@ -83,6 +84,7 @@ import {
   ContractSubmissionRequest,
   ClientFaceRecognition,
 } from '../api/clientFaceRecognitionApi';
+import LoanCompletionRing from '../components/LoanCompletionRing';
 
 type CaptureSubStep =
   | 'doc-intro'
@@ -132,6 +134,7 @@ const ClientsPage: React.FC = () => {
   // ── List state ─────────────────────────────────────────────────────────────
   const [clients, setClients] = useState<Client[]>([]);
   const [clientSelfieMap, setClientSelfieMap] = useState<Record<number, string>>({});
+  const [faceRecordMap, setFaceRecordMap] = useState<Record<number, ClientFaceRecognition>>({});
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -156,7 +159,9 @@ const ClientsPage: React.FC = () => {
   const [createErrors, setCreateErrors] = useState(emptyErrors);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
-  // Step 1 — QR (derived from createdClientId + newClient name, no extra state needed)
+  // Step 1 — QR
+  const [qrBlobUrl, setQrBlobUrl] = useState('');
+  const [qrUploading, setQrUploading] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrModalClient, setQrModalClient] = useState<Client | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -245,14 +250,28 @@ const ClientsPage: React.FC = () => {
         getAllClientFaceRecognitions(Number(companyId)).catch(() => [] as ClientFaceRecognition[]),
       ]);
       setClients(fetchedClients);
-      // Build clientId → most recent selfie URL map
       const selfieMap: Record<number, string> = {};
+      const faceMap: Record<number, ClientFaceRecognition> = {};
       faceRecords.forEach((r) => {
         if (r.clientSelfieBlobUrl) selfieMap[r.clientId] = r.clientSelfieBlobUrl;
+        faceMap[r.clientId] = r;
       });
       setClientSelfieMap(selfieMap);
+      setFaceRecordMap(faceMap);
     } catch { toast('Error al cargar los clientes'); }
     finally { setLoading(false); }
+  };
+
+  const getLoanCompletion = (client: Client) => {
+    const face = faceRecordMap[client.clientId];
+    return [
+      { label: 'Información general', done: true },
+      { label: 'Código QR',           done: !!client.qrBlobUrl },
+      { label: 'Cuenta de pago',      done: false }, // requires Stripe check — shown in dashboard
+      { label: 'Biométrico',          done: !!face?.isVerified },
+      { label: 'Contrato',            done: !!face?.contractAccepted },
+      { label: 'Pagaré',              done: !!face?.pagareAccepted },
+    ];
   };
 
   const filteredClients = useMemo(() => {
@@ -343,6 +362,8 @@ const ClientsPage: React.FC = () => {
     setStripeAccountId('');
     setStripeOnboardingUrl('');
     setStripeKycDone(false);
+    setQrBlobUrl('');
+    setQrUploading(false);
   };
 
   const createIsValid = useMemo(() => {
@@ -509,6 +530,22 @@ const ClientsPage: React.FC = () => {
     if (target < wizardStep) { setWizardStep(target); setCaptureSubStep('doc-intro'); }
   };
 
+  // QR value encodes enough to identify the client at any POS terminal
+  const qrValue = createdClientId
+    ? buildClientQrValue(createdClientId, newClient.first_name ?? '', newClient.last_name ?? '')
+    : '';
+
+  // Auto-upload QR when wizard reaches step 1 and we have a clientId
+  useEffect(() => {
+    if (wizardStep !== 1 || !createdClientId || !qrValue || qrBlobUrl || qrUploading) return;
+    setQrUploading(true);
+    QRCode.toDataURL(qrValue, { width: 512, errorCorrectionLevel: 'H' })
+      .then(dataUrl => uploadClientQr(createdClientId, companyId, dataUrl))
+      .then(res => { setQrBlobUrl(res.qrBlobUrl); })
+      .catch(() => { /* non-fatal — QR still shows in UI */ })
+      .finally(() => setQrUploading(false));
+  }, [wizardStep, createdClientId, qrValue]);
+
   // ── Wizard renderers ───────────────────────────────────────────────────────
 
   const WizardStepBar = () => (
@@ -622,11 +659,6 @@ const ClientsPage: React.FC = () => {
     </div>
   );
 
-  // QR value encodes enough to identify the client at any POS terminal
-  const qrValue = createdClientId
-    ? buildClientQrValue(createdClientId, newClient.first_name ?? '', newClient.last_name ?? '')
-    : '';
-
   const renderStep1 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
@@ -648,6 +680,15 @@ const ClientsPage: React.FC = () => {
         <p><strong>Teléfono:</strong> {newClient.cellphone}</p>
         {newClient.email && <p><strong>Email:</strong> {newClient.email}</p>}
         <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>ID: {createdClientId}</p>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, fontSize: 12 }}>
+        {qrUploading && (
+          <><IonSpinner name="crescent" style={{ width: 14, height: 14 }} /><span style={{ color: '#6b7280' }}>Guardando QR...</span></>
+        )}
+        {!qrUploading && qrBlobUrl && (
+          <><IonIcon icon={checkmarkCircle} style={{ color: '#059669', fontSize: 16 }} /><span style={{ color: '#059669', fontWeight: 600 }}>QR guardado en Azure</span></>
+        )}
       </div>
 
       {qrValue && createdClientId && (
@@ -923,44 +964,74 @@ const ClientsPage: React.FC = () => {
         </div>
         <h2 className="wizard-step-title">Cuenta de Pagos</h2>
         <p className="wizard-step-desc">
-          El cliente necesita registrar su información bancaria para recibir o realizar pagos de préstamos.
+          El cliente registra su información bancaria para recibir y realizar pagos de forma segura.
         </p>
       </div>
 
-      <div className="wizard-summary-box">
-        <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
-        <p><strong>Email:</strong> {newClient.email}</p>
-        {stripeAccountId && <p><strong>Cuenta Stripe:</strong> {stripeAccountId}</p>}
-        <p><strong>Estado KYC:</strong> {stripeKycDone ? '✅ Completado' : '⏳ Pendiente'}</p>
+      {/* Client + KYC status summary */}
+      <div className="wizard-stripe-status-card">
+        <div className={`wizard-stripe-status-icon-wrap${stripeKycDone ? ' done' : ''}`}>
+          <IonIcon icon={stripeKycDone ? checkmarkCircle : walletOutline} />
+        </div>
+        <div className="wizard-stripe-status-body">
+          <span className="wizard-stripe-status-name">
+            {newClient.first_name} {newClient.last_name}
+          </span>
+          <span className="wizard-stripe-status-sub">
+            {stripeKycDone ? 'Cuenta bancaria verificada ✓' : 'Verificación pendiente'}
+          </span>
+          {stripeAccountId && (
+            <span className="wizard-stripe-account-id">{stripeAccountId}</span>
+          )}
+        </div>
+        <span className={`wizard-stripe-kyc-badge${stripeKycDone ? ' done' : ''}`}>
+          {stripeKycDone ? 'KYC ✓' : 'Pendiente'}
+        </span>
       </div>
 
       {stripeOnboardingUrl ? (
         <div className="wizard-stripe-section">
-          <p className="wizard-stripe-desc">
-            Comparte este enlace con el cliente para que registre su tarjeta o cuenta CLABE en Stripe.
-            El proceso es seguro y tarda menos de 5 minutos.
-          </p>
-          <IonButton
-            expand="block"
-            className="wizard-stripe-btn"
-            onClick={() => window.open(stripeOnboardingUrl, '_blank')}
-          >
-            <IonIcon icon={walletOutline} slot="start" />
-            Abrir registro bancario
-          </IonButton>
-          <IonButton
-            expand="block"
-            fill="outline"
-            className="wizard-stripe-btn"
-            onClick={() => {
-              navigator.clipboard.writeText(stripeOnboardingUrl);
-              toast('Enlace copiado al portapapeles');
-            }}
-          >
-            <IonIcon icon={copyOutline} slot="start" />
-            Copiar enlace
-          </IonButton>
-          <div className="wizard-stripe-confirm">
+          {/* URL preview box */}
+          <div className="wizard-stripe-url-box">
+            <IonIcon icon={shareOutline} className="wizard-stripe-url-icon" />
+            <span className="wizard-stripe-url-text">{stripeOnboardingUrl}</span>
+          </div>
+
+          {/* Action cards — same pattern as doc type buttons */}
+          <div className="wizard-stripe-actions">
+            <button
+              type="button"
+              className="wizard-stripe-action-btn primary"
+              onClick={() => window.open(stripeOnboardingUrl, '_blank')}
+            >
+              <div className="wizard-stripe-action-icon-wrap">
+                <IonIcon icon={walletOutline} />
+              </div>
+              <div className="wizard-stripe-action-text">
+                <span className="wizard-stripe-action-name">Abrir registro bancario</span>
+                <span className="wizard-stripe-action-desc">Se abre en el navegador del cliente</span>
+              </div>
+              <IonIcon icon={chevronForward} className="wizard-stripe-action-arrow" />
+            </button>
+
+            <button
+              type="button"
+              className="wizard-stripe-action-btn"
+              onClick={() => { navigator.clipboard.writeText(stripeOnboardingUrl); toast('Enlace copiado al portapapeles'); }}
+            >
+              <div className="wizard-stripe-action-icon-wrap">
+                <IonIcon icon={copyOutline} />
+              </div>
+              <div className="wizard-stripe-action-text">
+                <span className="wizard-stripe-action-name">Copiar enlace</span>
+                <span className="wizard-stripe-action-desc">Comparte por WhatsApp, SMS o email</span>
+              </div>
+              <IonIcon icon={chevronForward} className="wizard-stripe-action-arrow" />
+            </button>
+          </div>
+
+          {/* KYC confirmation checkbox — same as contract step */}
+          <div className="wizard-checkbox-list" style={{ marginTop: 8 }}>
             <button
               type="button"
               className={`wizard-checkbox-card${stripeKycDone ? ' checked' : ''}`}
@@ -974,10 +1045,16 @@ const ClientsPage: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="wizard-stripe-section">
-          <p className="wizard-stripe-desc" style={{ color: '#EF4444' }}>
-            No se pudo generar el enlace de registro. Puedes generarlo más tarde desde el perfil del cliente.
-          </p>
+        <div className="wizard-stripe-error-card">
+          <div className="wizard-stripe-error-icon-wrap">
+            <IonIcon icon={closeCircle} />
+          </div>
+          <div className="wizard-stripe-error-body">
+            <span className="wizard-stripe-error-title">Enlace no disponible</span>
+            <span className="wizard-stripe-error-desc">
+              Puedes generarlo desde el dashboard del cliente una vez guardado.
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -1212,7 +1289,7 @@ const ClientsPage: React.FC = () => {
             <IonCard key={client.clientId} className="client-card">
               <IonCardContent className="client-card-content">
                 <div className="client-card-row">
-                  <div className="client-left">
+                  <div className="client-left" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                     {clientSelfieMap[client.clientId] ? (
                       <img
                         src={clientSelfieMap[client.clientId]}
@@ -1222,6 +1299,11 @@ const ClientsPage: React.FC = () => {
                     ) : (
                       <IonIcon icon={personCircle} className="client-avatar" />
                     )}
+                    {(() => {
+                      const steps = getLoanCompletion(client);
+                      const pct = Math.round((steps.filter(s => s.done).length / steps.length) * 100);
+                      return <LoanCompletionRing percentage={pct} size={48} strokeWidth={4} />;
+                    })()}
                   </div>
                   <div className="client-main">
                     <div className="client-header">

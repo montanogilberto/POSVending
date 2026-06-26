@@ -59,6 +59,9 @@ import {
 import { useUser } from '../components/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../api/clientDashboardApi';
 import { Loan, getAllLoans, createLoan } from '../api/loanApi';
+import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../api/clientFaceRecognitionApi';
+import { Client, getOneClient } from '../api/clientsApi';
+import LoanCompletionRing, { LoanStep } from '../components/LoanCompletionRing';
 
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';
@@ -172,6 +175,10 @@ const ClientDashboardPage: React.FC = () => {
   });
 
 
+  // Face recognition / completion
+  const [faceRecord, setFaceRecord] = useState<ClientFaceRecognition | null>(null);
+  const [clientRecord, setClientRecord] = useState<Client | null>(null);
+
   // Stripe state
   const [stripeAccount, setStripeAccount] = useState<any>(null);
   const [stripeTransactions, setStripeTransactions] = useState<any[]>([]);
@@ -279,6 +286,17 @@ const ClientDashboardPage: React.FC = () => {
     fetchDashboard();
     fetchLoans();
     fetchStripe();
+    if (companyId && clientId) {
+      getAllClientFaceRecognitions(companyId)
+        .then(records => {
+          const r = records.find(x => x.clientId === Number(clientId));
+          setFaceRecord(r ?? null);
+        })
+        .catch(() => {});
+      getOneClient({ clients: [{ clientId: Number(clientId) }] })
+        .then(list => setClientRecord(list[0] ?? null))
+        .catch(() => {});
+    }
   }, [companyId, clientId]);
 
   // ── Derived values ────────────────────────────────────────────────────────
@@ -310,6 +328,16 @@ const ClientDashboardPage: React.FC = () => {
       })
       .catch(() => {});
   }, [companyId, clientId]);
+
+  const loanSteps: LoanStep[] = [
+    { label: 'Información general', done: true },
+    { label: 'Código QR',           done: !!clientRecord?.qrBlobUrl },
+    { label: 'Cuenta de pago',      done: !!(stripeAccount?.chargesEnabled && stripeAccount?.detailsSubmitted) },
+    { label: 'Biométrico',          done: !!faceRecord?.isVerified },
+    { label: 'Contrato',            done: !!faceRecord?.contractAccepted },
+    { label: 'Pagaré',              done: !!faceRecord?.pagareAccepted },
+  ];
+  const loanCompletionPct = Math.round((loanSteps.filter(s => s.done).length / loanSteps.length) * 100);
 
   const activeLoans = loans.filter(l => l.loanStatus === 'Active');
   const paymentActivities = recentActivities.filter(a =>
@@ -410,6 +438,29 @@ const ClientDashboardPage: React.FC = () => {
           <div className="utilization-track">
             <div className="utilization-fill" style={{ width: `${utilizationPct}%` }} />
           </div>
+        </IonCardContent>
+      </IonCard>
+
+      {/* Loan completion progress */}
+      <IonCard className="client-dashboard-card">
+        <IonCardHeader>
+          <IonCardTitle>Progreso para Préstamo</IonCardTitle>
+        </IonCardHeader>
+        <IonCardContent>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} />
+            <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
+          </div>
+          {loanCompletionPct < 100 && (
+            <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
+              Completa todos los pasos para acceder al crédito.
+            </p>
+          )}
+          {loanCompletionPct === 100 && (
+            <p style={{ fontSize: 12, color: '#059669', marginTop: 12, marginBottom: 0, fontWeight: 600 }}>
+              ✓ Perfil completo — elegible para solicitar préstamo.
+            </p>
+          )}
         </IonCardContent>
       </IonCard>
 

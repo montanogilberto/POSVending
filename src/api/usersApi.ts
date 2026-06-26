@@ -77,6 +77,50 @@ export const pickProfileImageUrl = (user: Partial<ApiUser> | null | undefined): 
   return `${PROFILE_IMAGE_BASE_URL}${filename}`;
 };
 
+export interface CreateUserPayload {
+  email: string;
+  username: string;
+  password: string;
+  appProfile?: string;
+  enabledModules?: string[];
+  roleCode?: string;
+  companyId?: number;
+  branchId?: number;
+}
+
+export interface UserSaveResponse {
+  userId?: number;
+  id?: number;
+  message?: string;
+  msg?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+/** POST /users  action=1 → create partial user, returns userId */
+export const createUser = async (payload: CreateUserPayload): Promise<UserSaveResponse> => {
+  const res = await fetch(`${API_BASE_URL}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ users: [{ id: 0, action: 1, ...payload }] }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || data.error || `Error ${res.status}`);
+  return data;
+};
+
+/** POST /users  action=2 → update existing user fields (partial, SP keeps nulls as-is) */
+export const updateUser = async (userId: number, payload: Partial<CreateUserPayload>): Promise<UserSaveResponse> => {
+  const res = await fetch(`${API_BASE_URL}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ users: [{ id: userId, action: 2, ...payload }] }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || data.error || `Error ${res.status}`);
+  return data;
+};
+
 /**
  * POST /login — returns userId on success (msg e.g. "User Valid").
  * Note: backend route is lowercase `/login` (not `/Login`).
