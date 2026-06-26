@@ -183,18 +183,23 @@ const ClientDashboardPage: React.FC = () => {
 
   // ── Fetch dashboard data ──────────────────────────────────────────────────
   const fetchDashboard = async () => {
-    if (!companyId || !clientId) return;
+    if (!companyId || !clientId) {
+      console.log('[ClientDashboard] fetchDashboard skipped — companyId:', companyId, 'clientId:', clientId);
+      return;
+    }
     setLoading(true);
+    console.log('[ClientDashboard] fetchDashboard → /all_clientDashboards', { companyId, clientId });
     try {
       const data = await getAllClientDashboards(companyId, clientId);
+      console.log('[ClientDashboard] fetchDashboard ✅ rows:', data.length);
       setFinancialSummary(data.length > 0 ? data[0] : null);
       const activities = data
         .filter(d => d.activityDate && d.activityType)
         .sort((a, b) => new Date(b.activityDate!).getTime() - new Date(a.activityDate!).getTime());
       setRecentActivities(activities);
       setDisplayedActivities(activities.slice(0, PAGE_SIZE));
-    } catch {
-      // silent — backend may not have this endpoint yet
+    } catch (err) {
+      console.error('[ClientDashboard] fetchDashboard ❌', err);
     } finally {
       setLoading(false);
     }
@@ -202,29 +207,41 @@ const ClientDashboardPage: React.FC = () => {
 
   // ── Fetch loans for this client ───────────────────────────────────────────
   const fetchLoans = async () => {
-    if (!companyId) return;
+    if (!companyId) {
+      console.log('[ClientDashboard] fetchLoans skipped — companyId:', companyId);
+      return;
+    }
     setLoansLoading(true);
+    console.log('[ClientDashboard] fetchLoans → /all_loans', { companyId, clientId });
     try {
       const all = await getAllLoans(companyId);
+      console.log('[ClientDashboard] fetchLoans ✅ total:', all.length, '→ filtered for clientId:', clientId, '→', all.filter(l => l.clientId === clientId).length);
       setLoans(all.filter(l => l.clientId === clientId));
-    } catch {
-      // silent — backend may not have this endpoint yet
+    } catch (err) {
+      console.error('[ClientDashboard] fetchLoans ❌', err);
     } finally {
       setLoansLoading(false);
     }
   };
 
   const fetchStripe = async () => {
-    if (!companyId || !clientId) return;
+    if (!companyId || !clientId) {
+      console.log('[ClientDashboard] fetchStripe skipped — companyId:', companyId, 'clientId:', clientId);
+      return;
+    }
     setStripeLoading(true);
+    console.log('[ClientDashboard] fetchStripe → /stripe/connected-accounts/status', { clientId, companyId });
     try {
       const [statusRes, txRes] = await Promise.all([
         stripeGetStatus(clientId, companyId),
         stripeGetTransactions(clientId, companyId),
       ]);
+      console.log('[ClientDashboard] fetchStripe ✅ status:', statusRes, 'txCount:', txRes.transactions?.length ?? 0);
       setStripeAccount(statusRes.account ?? null);
       setStripeTransactions(txRes.transactions ?? []);
-    } catch { /* silent */ } finally {
+    } catch (err) {
+      console.error('[ClientDashboard] fetchStripe ❌', err);
+    } finally {
       setStripeLoading(false);
     }
   };
