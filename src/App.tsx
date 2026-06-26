@@ -52,6 +52,8 @@ import {
   cogOutline,
   walletOutline,
   constructOutline,
+  starOutline,
+  chatbubblesOutline,
 }
   from 'ionicons/icons';
   
@@ -92,6 +94,8 @@ import P2PLendingPage from './pages/P2PLendingPage';
 import BorrowerOnboardingPage from './pages/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/LoanPaymentPage';
 import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
+import RewardsPage from './pages/RewardsPage';
+import LoanChatPage from './pages/LoanChatPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -389,6 +393,15 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'rewards') && (
+              <IonItem button routerLink="/rewards">
+                <IonIcon icon={starOutline} slot="start" />
+                <IonLabel>Recompensas</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
             <IonItemDivider>Finanzas P2P</IonItemDivider>
 
             <IonMenuToggle autoHide={false}>
@@ -405,6 +418,15 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/borrower-onboarding">
                 <IonIcon icon={constructOutline} slot="start" />
                 <IonLabel>Registro Prestatario</IonLabel>
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'loanChat') && (
+              <IonItem button routerLink="/loan-chat/new">
+                <IonIcon icon={chatbubblesOutline} slot="start" />
+                <IonLabel>Chat de Préstamo</IonLabel>
               </IonItem>
               )}
             </IonMenuToggle>
@@ -497,6 +519,8 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/borrower-onboarding" component={BorrowerOnboardingPage} />
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
             <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
+            <PrivateRoute exact path="/rewards" component={RewardsPage} />
+            <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
           </IonRouterOutlet>
 

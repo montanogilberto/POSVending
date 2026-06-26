@@ -1,0 +1,60 @@
+.rw-page { --background: #f8fafc; }
+
+.rw-kpi-grid { padding: 0; margin-bottom: 4px; }
+
+.rw-kpi-card {
+  margin: 4px;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+}
+.rw-kpi-card ion-card-content {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px;
+}
+.rw-kpi-label { font-size: 0.75rem; color: #6b7280; margin: 0; }
+.rw-kpi-value { font-size: 1.4rem; font-weight: 700; margin: 0; }
+
+.rw-card {
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+  margin: 8px 0;
+}
+.rw-card-header-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.rw-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 24px 0; color: #9ca3af; text-align: center;
+}
+.rw-empty ion-icon { font-size: 2.4rem; }
+
+/* Leaderboard */
+.rw-leaderboard-item { --border-radius: 12px; margin-bottom: 4px; }
+.rw-rank {
+  font-size: 1.1rem; font-weight: 800; color: #d97706;
+  min-width: 28px; text-align: center;
+}
+.rw-balance-badge {
+  --background: #fef3c7; --color: #92400e;
+  font-size: 0.78rem; padding: 4px 10px; border-radius: 99px;
+}
+
+/* Rules */
+.rw-rule-item { --border-radius: 12px; margin-bottom: 4px; }
+.rw-rule-actions { display: flex; }
+
+/* Transactions */
+.rw-tx-item { --border-radius: 12px; margin-bottom: 4px; }
+.rw-pts-earn  { color: #059669; font-weight: 700; margin-left: 6px; }
+.rw-pts-redeem { color: #dc2626; font-weight: 700; margin-left: 6px; }
+.rw-badge-earn   { --background: #d1fae5; --color: #065f46; font-size: 0.72rem; padding: 3px 8px; border-radius: 99px; }
+.rw-badge-redeem { --background: #fee2e2; --color: #991b1b; font-size: 0.72rem; padding: 3px 8px; border-radius: 99px; }
+
+/* Form */
+.rw-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 0 80px; }
+.rw-preview {
+  background: #f0fdf4; border: 1px solid #bbf7d0;
+  border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; color: #166534;
+}
+.rw-save-btn  { --background: #2563eb; --color: #fff; margin-top: 4px; }
+.rw-redeem-btn { --background: #dc2626; }
