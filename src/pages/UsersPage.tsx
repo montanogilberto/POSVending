@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import './UsersPage.css';
+import './shared-card-list.css';
 import {
   IonPage,
   IonContent,

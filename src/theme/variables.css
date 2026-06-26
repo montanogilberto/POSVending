@@ -116,6 +116,58 @@ http://ionicframework.com/docs/theming/ */
     color: rgba(255,255,255,0.85);
   }
 
+  /* ── Collapse toggle button ──────────────────────────────── */
+  .menu-collapse-btn {
+    --color: #666;
+    --padding-start: 8px;
+    --padding-end: 8px;
+  }
+
+  /* ── Collapsed rail mode ─────────────────────────────────── */
+  .menu-rail ion-item {
+    --padding-start: 0;
+    --padding-end: 0;
+    --inner-padding-start: 0;
+    --inner-padding-end: 0;
+  }
+  /* Center the entire native row */
+  .menu-rail ion-item::part(native) {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+  }
+  /* The start slot becomes the only content — push it to center */
+  .menu-rail ion-item::part(start) {
+    margin-inline-end: 0;
+    margin-inline-start: 0;
+  }
+  .menu-rail ion-item ion-icon {
+    font-size: 22px;
+    margin: 0 auto !important;
+    display: block;
+  }
+
+  /* Collapsed profile — avatar only, centred, no gradient text */
+  .profile-header-collapsed {
+    padding: 16px 8px;
+    flex-direction: column;
+    align-items: center;
+  }
+  .profile-header-collapsed ion-avatar.profile-avatar {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 0;
+  }
+
+  /* Smooth width transition on the split pane */
+  ion-split-pane {
+    transition: --side-width 0.25s ease;
+  }
+  ion-menu {
+    transition: width 0.25s ease, max-width 0.25s ease;
+  }
+
   /* Menu sections styling */
   ion-item-divider {
     font-weight: 500;

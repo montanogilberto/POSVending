@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import './shared-card-list.css';
 import { IonPage, IonContent, IonList, IonItem, IonLabel, IonText, IonLoading, IonToast, IonFab, IonFabButton, IonIcon, IonAlert, IonModal, IonInput, IonSelect, IonSelectOption, IonDatetime, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSearchbar, IonButton, IonInfiniteScroll, IonInfiniteScrollContent, DatetimeChangeEventDetail, InputInputEventDetail, SelectChangeEventDetail } from '@ionic/react';
-import { addOutline, notificationsOutline, createOutline, trashOutline, eyeOutline, closeOutline } from 'ionicons/icons';
+import { addOutline, notificationsOutline, createOutline, trashOutline, eyeOutline, closeOutline, informationCircleOutline, checkmarkCircleOutline, warningOutline, alertCircleOutline, cogOutline } from 'ionicons/icons';
 import { IonHeader, IonToolbar, IonTitle, IonButtons } from '@ionic/react';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
@@ -198,53 +199,88 @@ const PushNotificationPage: React.FC = () => {
           placeholder="Buscar notificaciones..."
         />
 
-        <IonList className="push-notifications-list">
-          {filteredNotifications.map((notification) => (
-            <IonCard key={notification.pushNotificationId} className="push-notifications-card">
-              <IonCardHeader className="push-notifications-card-header">
-                <IonCardTitle className="push-notifications-card-title">{notification.title}</IonCardTitle>
-                <IonLabel>
-                  <IonText color={notification.isRead ? 'medium' : 'primary'}>
-                    {notification.isRead ? 'Leída' : 'No Leída'}
-                  </IonText>
-                </IonLabel>
-              </IonCardHeader>
-              <IonCardContent className="push-notifications-card-content">
-                <p>{notification.message.substring(0, 100)}{notification.message.length > 100 ? '...' : ''}</p>
-                <IonLabel>
-                  Tipo: <IonText color="dark">{notification.notificationType}</IonText>
-                </IonLabel>
-                <IonLabel>
-                  Prioridad: <IonText color="dark">{notification.priority}</IonText>
-                </IonLabel>
-                {notification.scheduledAt && (
-                  <IonLabel>
-                    Programada: <IonText color="dark">{toHermosillo(notification.scheduledAt)}</IonText>
-                  </IonLabel>
-                )}
-                {notification.sentAt && (
-                  <IonLabel>
-                    Enviada: <IonText color="dark">{toHermosillo(notification.sentAt)}</IonText>
-                  </IonLabel>
-                )}
-                <div className="push-notifications-actions">
-                  <IonButton fill="clear" size="small" onClick={() => handleDetailsClick(notification)}>
-                    <IonIcon icon={eyeOutline} slot="start" />
-                    Detalles
-                  </IonButton>
-                  <IonButton fill="clear" size="small" color="primary" onClick={() => handleEditClick(notification)}>
-                    <IonIcon icon={createOutline} slot="start" />
-                    Editar
-                  </IonButton>
-                  <IonButton fill="clear" size="small" color="danger" onClick={() => handleDeleteClick(notification)}>
-                    <IonIcon icon={trashOutline} slot="start" />
-                    Eliminar
-                  </IonButton>
-                </div>
-              </IonCardContent>
-            </IonCard>
-          ))}
-        </IonList>
+        <div className="pn-list">
+          {filteredNotifications.length === 0 && !loading && (
+            <div className="empty-state">
+              <IonIcon icon={notificationsOutline} className="empty-icon" />
+              <IonText color="medium"><p>{searchText ? 'Sin resultados' : 'No hay notificaciones'}</p></IonText>
+            </div>
+          )}
+          {filteredNotifications.map((notification) => {
+            const typeIcon = {
+              Info: informationCircleOutline,
+              Success: checkmarkCircleOutline,
+              Warning: warningOutline,
+              Error: alertCircleOutline,
+              System: cogOutline,
+            }[notification.notificationType] ?? notificationsOutline;
+
+            const typeColor = {
+              Info: '#3b82f6',
+              Success: '#10b981',
+              Warning: '#f59e0b',
+              Error: '#ef4444',
+              System: '#6b7280',
+            }[notification.notificationType] ?? '#3b82f6';
+
+            const priorityColor = {
+              Low: '#6b7280',
+              Normal: '#3b82f6',
+              High: '#f59e0b',
+              Critical: '#ef4444',
+            }[notification.priority] ?? '#3b82f6';
+
+            return (
+              <IonCard key={notification.pushNotificationId} className="client-card">
+                <IonCardContent className="client-card-content">
+                  <div className="client-card-row">
+                    <div className="client-left">
+                      <div className="pn-type-icon" style={{ background: typeColor + '18', color: typeColor }}>
+                        <IonIcon icon={typeIcon} />
+                      </div>
+                    </div>
+                    <div className="client-main">
+                      <div className="client-header">
+                        <span className="client-name">{notification.title}</span>
+                        <span className={`pn-read-badge ${notification.isRead ? 'pn-read' : 'pn-unread'}`}>
+                          {notification.isRead ? 'Leída' : 'No leída'}
+                        </span>
+                      </div>
+                      <p className="client-subtitle">{notification.message.substring(0, 90)}{notification.message.length > 90 ? '…' : ''}</p>
+                      <div className="client-meta-row">
+                        <span className="client-meta-badge">
+                          <span className="meta-label">Tipo</span>
+                          <span className="meta-value" style={{ color: typeColor }}>{notification.notificationType}</span>
+                        </span>
+                        <span className="client-meta-badge">
+                          <span className="meta-label">Prioridad</span>
+                          <span className="meta-value" style={{ color: priorityColor }}>{notification.priority}</span>
+                        </span>
+                        {notification.sentAt && (
+                          <span className="client-meta-badge">
+                            <span className="meta-label">Enviada</span>
+                            <span className="meta-value">{toHermosillo(notification.sentAt)}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="client-actions">
+                      <IonButton fill="outline" size="small" color="medium" onClick={() => handleDetailsClick(notification)} className="action-button">
+                        <IonIcon icon={eyeOutline} slot="start" /> Detalles
+                      </IonButton>
+                      <IonButton fill="outline" size="small" color="primary" onClick={() => handleEditClick(notification)} className="action-button edit-button">
+                        <IonIcon icon={createOutline} slot="start" /> Editar
+                      </IonButton>
+                      <IonButton fill="outline" size="small" color="danger" onClick={() => handleDeleteClick(notification)} className="action-button delete-button">
+                        <IonIcon icon={trashOutline} slot="start" /> Eliminar
+                      </IonButton>
+                    </div>
+                  </div>
+                </IonCardContent>
+              </IonCard>
+            );
+          })}
+        </div>
 
         <IonInfiniteScroll onIonInfinite={loadMoreItems} threshold="100px" disabled={!canLoadMore || searchText !== ''}>
           <IonInfiniteScrollContent loadingText="Cargando más notificaciones..."></IonInfiniteScrollContent>

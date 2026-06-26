@@ -1,0 +1,203 @@
+/* ============================================================
+   Shared Card-List Design System
+   Used by: ClientsPage, PushNotificationPage, SupplierPage, UsersPage
+   Pattern: avatar | main (name + subtitle + meta badges) | actions
+   ============================================================ */
+
+/* ── List wrapper ──────────────────────────────────────────── */
+.pn-list,
+.clients-list,
+.supplier-list,
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+/* ── Card ──────────────────────────────────────────────────── */
+.client-card {
+  margin: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.05) !important;
+  border: 1px solid rgba(0,0,0,.04);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  overflow: hidden;
+}
+.client-card:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,.08), 0 8px 20px rgba(0,0,0,.07) !important;
+  transform: translateY(-1px);
+}
+
+/* ── Card inner ────────────────────────────────────────────── */
+.client-card-content { padding: 16px !important; }
+.client-card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.client-left { flex-shrink: 0; }
+.client-main { flex: 1; min-width: 0; }
+
+/* ── Avatars ───────────────────────────────────────────────── */
+.client-avatar {
+  font-size: 40px;
+  color: var(--ion-color-primary, #0056D2);
+  background: rgba(0,86,210,.12);
+  border-radius: 50%;
+  padding: 4px;
+}
+.client-avatar-photo {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(0,86,210,.2);
+  background: #f3f4f6;
+}
+
+/* Push notification type icon */
+.pn-type-icon {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+
+/* Supplier building icon */
+.supplier-avatar-icon {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: rgba(99,102,241,.12);
+  color: #6366f1;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+}
+
+/* User avatar fallback */
+.user-fallback-icon {
+  font-size: 40px;
+  color: var(--ion-color-primary, #0056D2);
+}
+
+/* ── Name row ──────────────────────────────────────────────── */
+.client-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.client-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  line-height: 1.35;
+  letter-spacing: -0.1px;
+}
+.client-subtitle {
+  font-size: 13px;
+  color: #6B7280;
+  margin: 0 0 10px 0;
+  line-height: 1.5;
+}
+
+/* ── Status badges inline with name ───────────────────────── */
+.pn-read-badge, .pn-unread-badge,
+.supplier-status-badge,
+.user-status-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.pn-read   { background: #f3f4f6; color: #9ca3af; }
+.pn-unread { background: #dbeafe; color: #1d4ed8; }
+.sup-active   { background: #d1fae5; color: #065f46; }
+.sup-inactive { background: #fee2e2; color: #991b1b; }
+.status-active   { color: #059669; font-weight: 700; }
+.status-inactive { color: #dc2626; font-weight: 700; }
+
+/* ── Meta badges ───────────────────────────────────────────── */
+.client-meta-row, .user-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.client-meta-badge, .user-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F4F6F9;
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.meta-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.meta-value {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 600;
+}
+
+/* ── Action column ─────────────────────────────────────────── */
+.client-actions, .user-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.action-button {
+  --border-radius: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: .2px;
+  min-height: 36px;
+  min-width: 90px;
+}
+.action-button ion-icon { margin-right: 4px; }
+.edit-button   { --border-color: var(--ion-color-primary, #0056D2); --color: var(--ion-color-primary, #0056D2); }
+.delete-button { --border-color: var(--ion-color-danger, #dc3545);  --color: var(--ion-color-danger, #dc3545); }
+
+/* ── Empty / loading state ─────────────────────────────────── */
+.empty-state, .loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+.empty-icon {
+  font-size: 64px;
+  color: var(--ion-color-medium, #6c757d);
+  margin-bottom: 16px;
+  opacity: .5;
+}
+.empty-state p, .loading-state p { font-size: 16px; margin: 0; }
+
+/* ── Search container ──────────────────────────────────────── */
+.search-container { padding: 8px 14px 0; }
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .client-card-row { flex-wrap: wrap; }
+  .client-actions, .user-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-left: 0;
+    margin-top: 10px;
+    width: 100%;
+  }
+  .action-button { flex: 1; min-width: 80px; }
+}

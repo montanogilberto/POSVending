@@ -24,6 +24,8 @@ import {
   IonSplitPane,
   IonPage,
   IonImg,
+  IonButton,
+  IonButtons,
   setupIonicReact,
 } from '@ionic/react';
 import { menuController } from '@ionic/core';
@@ -54,6 +56,8 @@ import {
   constructOutline,
   starOutline,
   chatbubblesOutline,
+  chevronBackOutline,
+  chevronForwardOutline,
 }
   from 'ionicons/icons';
   
@@ -149,6 +153,7 @@ const AppShell: React.FC = () => {
   const [profileImageSrc, setProfileImageSrc] = useState(() =>
     resolveAvatarUrl(avatarUrl)
   );
+  const [menuCollapsed, setMenuCollapsed] = useState(false);
 
   useEffect(() => {
     setProfileImageSrc(resolveAvatarUrl(avatarUrl));
@@ -239,17 +244,31 @@ const AppShell: React.FC = () => {
   };
 
   return (
-    <IonSplitPane contentId="main" when="(min-width: 792px)">
+    <IonSplitPane
+      contentId="main"
+      when="(min-width: 792px)"
+      style={{
+        '--side-width':     menuCollapsed ? '64px' : '280px',
+        '--side-max-width': menuCollapsed ? '64px' : '280px',
+        '--side-min-width': menuCollapsed ? '64px' : '280px',
+        transition: 'all 0.25s ease',
+      } as React.CSSProperties}
+    >
       {/* Side menu */}
-      <IonMenu menuId="main-menu" contentId="main" side="start">
+      <IonMenu menuId="main-menu" contentId="main" side="start" className={menuCollapsed ? 'menu-rail' : ''}>
         <IonHeader className="menu-header">
           <IonToolbar>
-            <IonTitle>POS GMO</IonTitle>
+            {!menuCollapsed && <IonTitle>POS GMO</IonTitle>}
+            <IonButtons slot="end">
+              <IonButton fill="clear" size="small" onClick={() => setMenuCollapsed(c => !c)} className="menu-collapse-btn">
+                <IonIcon icon={menuCollapsed ? chevronForwardOutline : chevronBackOutline} />
+              </IonButton>
+            </IonButtons>
           </IonToolbar>
         </IonHeader>
 
         <IonContent>
-          <div className="profile-header">
+          <div className={`profile-header ${menuCollapsed ? 'profile-header-collapsed' : ''}`}>
             <IonAvatar className="profile-avatar">
               <IonImg
                 src={profileImageSrc}
@@ -258,6 +277,7 @@ const AppShell: React.FC = () => {
               />
             </IonAvatar>
 
+            {!menuCollapsed && (
             <div className="profile-info">
               <h3 className="profile-name">{username || 'Usuario'}</h3>
               <p className="profile-role">
@@ -266,206 +286,206 @@ const AppShell: React.FC = () => {
                   : roleName || 'Usuario'}
               </p>
             </div>
+            )}
           </div>
 
           <IonList>
-            <IonItemDivider>Catálogo</IonItemDivider>
+            {!menuCollapsed && <IonItemDivider>Catálogo</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'clients') && (
-              <IonItem button routerLink="/clients">
+              <IonItem button routerLink="/clients" title="Clientes">
                 <IonIcon icon={people} slot="start" />
-                <IonLabel>Clientes</IonLabel>
+                {!menuCollapsed && <IonLabel>Clientes</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'clientFaceRecognitions') && (
-              <IonItem button routerLink="/clientFaceRecognitions">
+              <IonItem button routerLink="/clientFaceRecognitions" title="Cliente Reconocimiento Facial">
                 <IonIcon icon={personCircle} slot="start" />
-                <IonLabel>Cliente Reconocimiento Facial</IonLabel>
+                {!menuCollapsed && <IonLabel>Cliente Reconocimiento Facial</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'products') && (
-              <IonItem button routerLink="/products-management">
+              <IonItem button routerLink="/products-management" title="Productos">
                 <IonIcon icon={cube} slot="start" />
-                <IonLabel>Productos</IonLabel>
+                {!menuCollapsed && <IonLabel>Productos</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
-
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'pushNotifications') && (
-              <IonItem button routerLink="/pushNotifications">
+              <IonItem button routerLink="/pushNotifications" title="Notificaciones Push">
                 <IonIcon icon={shieldCheckmarkOutline} slot="start" />
-                <IonLabel>Notificaciones Push</IonLabel>
+                {!menuCollapsed && <IonLabel>Notificaciones Push</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'categories') && (
-              <IonItem button routerLink="/categories">
+              <IonItem button routerLink="/categories" title="Categorías">
                 <IonIcon icon={grid} slot="start" />
-                <IonLabel>Categorías</IonLabel>
+                {!menuCollapsed && <IonLabel>Categorías</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'suppliers') && (
-              <IonItem button routerLink="/suppliers">
+              <IonItem button routerLink="/suppliers" title="Proveedores">
                 <IonIcon icon={storefrontOutline} slot="start" />
-                <IonLabel>Proveedores</IonLabel>
+                {!menuCollapsed && <IonLabel>Proveedores</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
-            <IonItemDivider>Mensajes</IonItemDivider>
+            {!menuCollapsed && <IonItemDivider>Mensajes</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'alerts') && (
-              <IonItem button routerLink="/alerts">
+              <IonItem button routerLink="/alerts" title="Alertas">
                 <IonIcon icon={notifications} slot="start" />
-                <IonLabel>Alertas</IonLabel>
+                {!menuCollapsed && <IonLabel>Alertas</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'emails') && (
-              <IonItem button routerLink="/emails">
+              <IonItem button routerLink="/emails" title="Correos">
                 <IonIcon icon={mail} slot="start" />
-                <IonLabel>Correos</IonLabel>
+                {!menuCollapsed && <IonLabel>Correos</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
-            <IonItemDivider>Administración</IonItemDivider>
+            {!menuCollapsed && <IonItemDivider>Administración</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'users') && (
-              <IonItem button routerLink="/users">
+              <IonItem button routerLink="/users" title="Usuarios">
                 <IonIcon icon={person} slot="start" />
-                <IonLabel>Usuarios</IonLabel>
+                {!menuCollapsed && <IonLabel>Usuarios</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'ingresos') && (
-              <IonItem button routerLink="/ingresos">
+              <IonItem button routerLink="/ingresos" title="Ingresos">
                 <IonIcon icon={barChart} slot="start" />
-                <IonLabel>Ingresos</IonLabel>
+                {!menuCollapsed && <IonLabel>Ingresos</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'egresos') && (
-              <IonItem button routerLink="/egresos">
+              <IonItem button routerLink="/egresos" title="Egresos">
                 <IonIcon icon={barChart} slot="start" />
-                <IonLabel>Egresos</IonLabel>
+                {!menuCollapsed && <IonLabel>Egresos</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'loans') && (
-              <IonItem button routerLink="/loans">
+              <IonItem button routerLink="/loans" title="Préstamos">
                 <IonIcon icon={cashOutline} slot="start" />
-                <IonLabel>Préstamos</IonLabel>
+                {!menuCollapsed && <IonLabel>Préstamos</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'manufacturing') && (
-              <IonItem button routerLink="/manufacturing">
+              <IonItem button routerLink="/manufacturing" title="Manufactura">
                 <IonIcon icon={cogOutline} slot="start" />
-                <IonLabel>Manufactura</IonLabel>
+                {!menuCollapsed && <IonLabel>Manufactura</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'rewards') && (
-              <IonItem button routerLink="/rewards">
+              <IonItem button routerLink="/rewards" title="Recompensas">
                 <IonIcon icon={starOutline} slot="start" />
-                <IonLabel>Recompensas</IonLabel>
+                {!menuCollapsed && <IonLabel>Recompensas</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
-            <IonItemDivider>Finanzas P2P</IonItemDivider>
+            {!menuCollapsed && <IonItemDivider>Finanzas P2P</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'clients') && (
-              <IonItem button routerLink="/p2p-lending">
+              <IonItem button routerLink="/p2p-lending" title="Préstamos P2P">
                 <IonIcon icon={walletOutline} slot="start" />
-                <IonLabel>Préstamos P2P</IonLabel>
+                {!menuCollapsed && <IonLabel>Préstamos P2P</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'clients') && (
-              <IonItem button routerLink="/borrower-onboarding">
+              <IonItem button routerLink="/borrower-onboarding" title="Registro Prestatario">
                 <IonIcon icon={constructOutline} slot="start" />
-                <IonLabel>Registro Prestatario</IonLabel>
+                {!menuCollapsed && <IonLabel>Registro Prestatario</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'loanChat') && (
-              <IonItem button routerLink="/loan-chat/new">
+              <IonItem button routerLink="/loan-chat/new" title="Chat de Préstamo">
                 <IonIcon icon={chatbubblesOutline} slot="start" />
-                <IonLabel>Chat de Préstamo</IonLabel>
+                {!menuCollapsed && <IonLabel>Chat de Préstamo</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
-            <IonItemDivider>IOT</IonItemDivider>
+            {!menuCollapsed && <IonItemDivider>IOT</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'iot') && (
-              <IonItem button routerLink="/led-status">
+              <IonItem button routerLink="/led-status" title="LED Status">
                 <IonIcon icon={bulb} slot="start" />
-                <IonLabel>LED Status</IonLabel>
+                {!menuCollapsed && <IonLabel>LED Status</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'iot') && (
-              <IonItem button routerLink="/water-tanks">
+              <IonItem button routerLink="/water-tanks" title="Water Tanks">
                 <IonIcon icon={water} slot="start" />
-                <IonLabel>Water Tanks</IonLabel>
+                {!menuCollapsed && <IonLabel>Water Tanks</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
-            <IonItemDivider>Sistema</IonItemDivider>
+            {!menuCollapsed && <IonItemDivider>Sistema</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'settings') && (
-              <IonItem button routerLink="/setting">
+              <IonItem button routerLink="/setting" title="Configuración">
                 <IonIcon icon={settings} slot="start" />
-                <IonLabel>Configuración</IonLabel>
+                {!menuCollapsed && <IonLabel>Configuración</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              <IonItem button onClick={handleLogout}>
+              <IonItem button onClick={handleLogout} title="Cerrar sesión">
                 <IonIcon icon={logOutOutline} slot="start" color="danger" />
-                <IonLabel color="danger">Cerrar sesión</IonLabel>
+                {!menuCollapsed && <IonLabel color="danger">Cerrar sesión</IonLabel>}
               </IonItem>
             </IonMenuToggle>
           </IonList>

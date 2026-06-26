@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './SupplierPage.css';
+import './shared-card-list.css';
 import {
   IonPage, IonContent, IonList, IonLabel, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonFab, IonFabButton, IonIcon, IonModal,
@@ -7,7 +8,7 @@ import {
   IonInfiniteScroll, IonInfiniteScrollContent, IonTextarea, IonToggle,
   IonHeader, IonToolbar, IonButtons, IonTitle, IonText
 } from '@ionic/react';
-import { add, pencil, trash, peopleOutline, arrowBack, save } from 'ionicons/icons';
+import { add, pencil, trash, peopleOutline, arrowBack, save, businessOutline } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
@@ -202,81 +203,49 @@ const SupplierPage: React.FC = () => {
             </div>
           ) : (
             displayedSuppliers.map(supplier => (
-              <IonCard key={supplier.supplierId} className="supplier-card">
-                <IonCardContent className="supplier-card-content">
-                  <div className="supplier-card-row">
-                    <div className="supplier-main">
-                      <IonCardHeader className="supplier-header">
-                        <IonCardTitle className="supplier-name">{supplier.supplierName}</IonCardTitle>
-                        <IonLabel className="supplier-subtitle">ID: {supplier.supplierId}</IonLabel>
-                      </IonCardHeader>
-                      <div className="supplier-meta-row">
-                        {supplier.contactName && (
-                          <IonLabel className="supplier-meta-badge">
-                            <span className="meta-label">Contacto:</span>
-                            <span className="meta-value">{supplier.contactName}</span>
-                          </IonLabel>
-                        )}
-                        {supplier.phone && (
-                          <IonLabel className="supplier-meta-badge">
-                            <span className="meta-label">Teléfono:</span>
-                            <span className="meta-value">{supplier.phone}</span>
-                          </IonLabel>
-                        )}
-                        {supplier.email && (
-                          <IonLabel className="supplier-meta-badge">
-                            <span className="meta-label">Email:</span>
-                            <span className="meta-value">{supplier.email}</span>
-                          </IonLabel>
-                        )}
-                        {supplier.address && (
-                          <IonLabel className="supplier-meta-badge">
-                            <span className="meta-label">Dirección:</span>
-                            <span className="meta-value">{supplier.address}</span>
-                          </IonLabel>
-                        )}
-                        <IonLabel className="supplier-meta-badge">
-                          <span className="meta-label">Estado:</span>
-                          <span className="meta-value">{supplier.active === '1' ? 'Activo' : 'Inactivo'}</span>
-                        </IonLabel>
-                        <IonLabel className="supplier-meta-badge">
-                          <span className="meta-label">Creado:</span>
-                          <span className="meta-value">{toHermosillo(supplier.created_At)}</span>
-                        </IonLabel>
-                        {supplier.updated_at && (
-                          <IonLabel className="supplier-meta-badge">
-                            <span className="meta-label">Actualizado:</span>
-                            <span className="meta-value">{toHermosillo(supplier.updated_at)}</span>
-                          </IonLabel>
-                        )}
+              <IonCard key={supplier.supplierId} className="client-card">
+                <IonCardContent className="client-card-content">
+                  <div className="client-card-row">
+                    <div className="client-left">
+                      <div className="supplier-avatar-icon">
+                        <IonIcon icon={businessOutline} />
                       </div>
                     </div>
-                    <div className="supplier-actions">
-                      <IonButton
-                        fill="outline"
-                        color="primary"
-                        size="small"
-                        className="action-button edit-button"
-                        onClick={() => {
-                          setEditingSupplier(supplier);
-                          setShowEditModal(true);
-                        }}
-                      >
-                        <IonIcon icon={pencil} slot="start" />
-                        Editar
+                    <div className="client-main">
+                      <div className="client-header">
+                        <span className="client-name">{supplier.supplierName}</span>
+                        <span className={`supplier-status-badge ${supplier.active === '1' ? 'sup-active' : 'sup-inactive'}`}>
+                          {supplier.active === '1' ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
+                      <p className="client-subtitle">{supplier.email || supplier.contactName || 'Sin contacto registrado'}</p>
+                      <div className="client-meta-row">
+                        {supplier.contactName && (
+                          <span className="client-meta-badge">
+                            <span className="meta-label">Contacto</span>
+                            <span className="meta-value">{supplier.contactName}</span>
+                          </span>
+                        )}
+                        {supplier.phone && (
+                          <span className="client-meta-badge">
+                            <span className="meta-label">Teléfono</span>
+                            <span className="meta-value">{supplier.phone}</span>
+                          </span>
+                        )}
+                        <span className="client-meta-badge">
+                          <span className="meta-label">Creado</span>
+                          <span className="meta-value">{toHermosillo(supplier.created_At)}</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="client-actions">
+                      <IonButton fill="outline" size="small" color="primary" className="action-button edit-button"
+                        onClick={() => { setEditingSupplier(supplier); setShowEditModal(true); }}>
+                        <IonIcon icon={pencil} slot="start" /> Editar
                       </IonButton>
-                      <IonButton
-                        fill="outline"
-                        color="danger"
-                        size="small"
-                        className="action-button delete-button"
-                        onClick={() => {
-                          setSupplierToDelete(supplier);
-                          setShowDeleteAlert(true);
-                        }}
-                      >
-                        <IonIcon icon={trash} slot="start" />
-                        Eliminar
+                      <IonButton fill="outline" size="small" color="danger" className="action-button delete-button"
+                        onClick={() => { setSupplierToDelete(supplier); setShowDeleteAlert(true); }}>
+                        <IonIcon icon={trash} slot="start" /> Eliminar
                       </IonButton>
                     </div>
                   </div>
