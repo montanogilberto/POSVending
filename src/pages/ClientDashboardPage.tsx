@@ -63,6 +63,50 @@ import { Loan, getAllLoans, createLoan } from '../api/loanApi';
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';
 
+// ── Stripe helpers ────────────────────────────────────────────────────────────
+async function stripeGetStatus(clientId: number, companyId: number) {
+  const r = await fetch(`${API_BASE_URL}/stripe/connected-accounts/status`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId }),
+  });
+  return r.json();
+}
+
+async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
+  const r = await fetch(`${API_BASE_URL}/stripe/connected-accounts`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId, email }),
+  });
+  return r.json();
+}
+
+async function stripeOnboardingLink(clientId: number, companyId: number) {
+  const r = await fetch(`${API_BASE_URL}/stripe/onboarding-link`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId }),
+  });
+  return r.json();
+}
+
+async function stripeGetTransactions(clientId: number, companyId: number) {
+  const r = await fetch(`${API_BASE_URL}/stripe/transactions`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId }),
+  });
+  return r.json();
+}
+
+async function stripeCreatePaymentIntent(clientId: number, companyId: number, amount: number) {
+  const r = await fetch(`${API_BASE_URL}/stripe/payment-intents`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      companyId, fromClientId: clientId, toClientId: clientId,
+      amount, paymentType: 'loan_repayment', description: 'Pago de préstamo',
+    }),
+  });
+  return r.json();
+}
+
 type Tab = 'home' | 'loans' | 'payments' | 'activity' | 'profile';
 
 const toHermosillo = (utc: string | undefined): string => {
@@ -128,6 +172,15 @@ const ClientDashboardPage: React.FC = () => {
   });
 
 
+  // Stripe state
+  const [stripeAccount, setStripeAccount] = useState<any>(null);
+  const [stripeTransactions, setStripeTransactions] = useState<any[]>([]);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payIntentId, setPayIntentId] = useState('');
+  const [payClientSecret, setPayClientSecret] = useState('');
+
   // ── Fetch dashboard data ──────────────────────────────────────────────────
   const fetchDashboard = async () => {
     if (!companyId || !clientId) return;
@@ -161,9 +214,54 @@ const ClientDashboardPage: React.FC = () => {
     }
   };
 
+  const fetchStripe = async () => {
+    if (!companyId || !clientId) return;
+    setStripeLoading(true);
+    try {
+      const [statusRes, txRes] = await Promise.all([
+        stripeGetStatus(clientId, companyId),
+        stripeGetTransactions(clientId, companyId),
+      ]);
+      setStripeAccount(statusRes.account ?? null);
+      setStripeTransactions(txRes.transactions ?? []);
+    } catch { /* silent */ } finally {
+      setStripeLoading(false);
+    }
+  };
+
+  const handleStripeKyc = async () => {
+    if (!companyId || !clientId) return;
+    setStripeLoading(true);
+    try {
+      if (!stripeAccount) {
+        await stripeCreateAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
+      }
+      const linkRes = await stripeOnboardingLink(clientId, companyId);
+      if (linkRes.url) window.open(linkRes.url, '_blank');
+    } catch { setError('Error al iniciar registro bancario'); }
+    finally { setStripeLoading(false); fetchStripe(); }
+  };
+
+  const handleCreatePayment = async () => {
+    const cents = Math.round(parseFloat(payAmount) * 100);
+    if (!cents || cents < 100) { setError('Monto mínimo: $1.00'); return; }
+    setStripeLoading(true);
+    try {
+      const res = await stripeCreatePaymentIntent(clientId!, companyId!, cents);
+      if (res.error) { setError(res.error); return; }
+      setPayIntentId(res.paymentIntentId);
+      setPayClientSecret(res.clientSecret);
+      setSuccessMsg(`Pago iniciado: ${res.paymentIntentId}`);
+      setShowPayModal(false);
+      fetchStripe();
+    } catch { setError('Error al crear pago'); }
+    finally { setStripeLoading(false); }
+  };
+
   useEffect(() => {
     fetchDashboard();
     fetchLoans();
+    fetchStripe();
   }, [companyId, clientId]);
 
   // ── Derived values ────────────────────────────────────────────────────────
@@ -426,56 +524,151 @@ const ClientDashboardPage: React.FC = () => {
     </IonCard>
   );
 
-  const renderPayments = () => (
-    <>
-      {/* Next payment */}
-      {financialSummary?.nextPaymentAmount != null && (
-        <IonCard className="client-dashboard-card cd-next-payment-card">
+  const renderPayments = () => {
+    const kycDone = stripeAccount?.chargesEnabled && stripeAccount?.detailsSubmitted;
+    return (
+      <>
+        {/* Stripe account status */}
+        <IonCard className="client-dashboard-card cd-stripe-card">
+          <IonCardHeader>
+            <div className="cd-stripe-header">
+              <IonCardTitle>Cuenta Bancaria (Stripe)</IonCardTitle>
+              <IonButton fill="clear" size="small" onClick={fetchStripe}>
+                <IonIcon icon={refreshOutline} slot="icon-only" />
+              </IonButton>
+            </div>
+          </IonCardHeader>
           <IonCardContent>
-            <div className="cd-next-payment-top">
-              <IonIcon icon={cardOutline} className="cd-next-payment-icon" />
-              <div>
-                <p>Próximo pago</p>
-                <h2>${financialSummary.nextPaymentAmount.toFixed(2)}</h2>
-                {financialSummary.nextPaymentDate && (
-                  <IonNote>{toDate(financialSummary.nextPaymentDate)}</IonNote>
+            {stripeLoading && <p className="cd-stripe-loading">Verificando...</p>}
+            {!stripeLoading && !stripeAccount && (
+              <div className="cd-stripe-empty">
+                <IonIcon icon={cardOutline} className="cd-stripe-big-icon" />
+                <p>Sin cuenta bancaria registrada.</p>
+                <p className="cd-stripe-sub">Registra tu tarjeta o CLABE para recibir y enviar pagos.</p>
+                <IonButton shape="round" expand="block" className="cd-stripe-cta" onClick={handleStripeKyc}>
+                  <IonIcon icon={addCircleOutline} slot="start" /> Registrar cuenta
+                </IonButton>
+              </div>
+            )}
+            {!stripeLoading && stripeAccount && (
+              <div className="cd-stripe-status">
+                <div className="cd-stripe-row">
+                  <IonIcon icon={kycDone ? checkmarkCircleOutline : alertCircleOutline}
+                    className={kycDone ? 'cd-stripe-icon-ok' : 'cd-stripe-icon-warn'} />
+                  <div>
+                    <strong>{kycDone ? 'Cuenta verificada' : 'Verificación pendiente'}</strong>
+                    <p className="cd-stripe-acct-id">{stripeAccount.connectedAccountId}</p>
+                  </div>
+                </div>
+                <div className="cd-stripe-chips">
+                  <span className={`cd-chip ${stripeAccount.chargesEnabled ? 'cd-chip-ok' : 'cd-chip-off'}`}>
+                    Cobros {stripeAccount.chargesEnabled ? '✓' : '✗'}
+                  </span>
+                  <span className={`cd-chip ${stripeAccount.payoutsEnabled ? 'cd-chip-ok' : 'cd-chip-off'}`}>
+                    Retiros {stripeAccount.payoutsEnabled ? '✓' : '✗'}
+                  </span>
+                  <span className={`cd-chip ${stripeAccount.detailsSubmitted ? 'cd-chip-ok' : 'cd-chip-off'}`}>
+                    KYC {stripeAccount.detailsSubmitted ? '✓' : '✗'}
+                  </span>
+                </div>
+                {!kycDone && (
+                  <IonButton shape="round" expand="block" className="cd-stripe-cta" onClick={handleStripeKyc}>
+                    <IonIcon icon={documentTextOutline} slot="start" /> Completar verificación
+                  </IonButton>
                 )}
               </div>
-            </div>
-            <IonButton expand="block" shape="round" className="client-dashboard-action-button" style={{ marginTop: 14 }}>
-              <IonIcon icon={cardOutline} slot="start" /> Pagar ahora
-            </IonButton>
+            )}
           </IonCardContent>
         </IonCard>
-      )}
 
-      {/* Payment history */}
-      <IonCard className="client-dashboard-card">
-        <IonCardHeader><IonCardTitle>Historial de Pagos</IonCardTitle></IonCardHeader>
-        <IonCardContent>
-          {paymentActivities.length === 0 ? (
-            <div className="cd-empty-state">
-              <IonIcon icon={receiptOutline} />
-              <p>Sin historial de pagos.</p>
+        {/* Next payment */}
+        {financialSummary?.nextPaymentAmount != null && (
+          <IonCard className="client-dashboard-card cd-next-payment-card">
+            <IonCardContent>
+              <div className="cd-next-payment-top">
+                <IonIcon icon={cardOutline} className="cd-next-payment-icon" />
+                <div>
+                  <p>Próximo pago</p>
+                  <h2>${financialSummary.nextPaymentAmount.toFixed(2)}</h2>
+                  {financialSummary.nextPaymentDate && (
+                    <IonNote>{toDate(financialSummary.nextPaymentDate)}</IonNote>
+                  )}
+                </div>
+              </div>
+              <IonButton expand="block" shape="round" className="client-dashboard-action-button"
+                style={{ marginTop: 14 }} onClick={() => setShowPayModal(true)}>
+                <IonIcon icon={cardOutline} slot="start" /> Pagar ahora
+              </IonButton>
+            </IonCardContent>
+          </IonCard>
+        )}
+
+        {/* Stripe transactions */}
+        <IonCard className="client-dashboard-card">
+          <IonCardHeader>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <IonCardTitle>Transacciones</IonCardTitle>
+              <IonButton fill="clear" size="small" onClick={() => setShowPayModal(true)}>
+                <IonIcon icon={addCircleOutline} slot="start" /> Nuevo pago
+              </IonButton>
             </div>
-          ) : (
-            <IonList lines="none" className="client-dashboard-list">
-              {paymentActivities.map((a, i) => (
-                <IonItem key={i} className="client-dashboard-item activity-item">
-                  <IonIcon icon={checkmarkCircleOutline} slot="start" style={{ color: '#148742' }} />
-                  <IonLabel>
-                    <h3>${a.amount?.toFixed(2)}</h3>
-                    <p>{a.description}</p>
-                    <IonNote>{toHermosillo(a.activityDate)}</IonNote>
-                  </IonLabel>
-                </IonItem>
-              ))}
-            </IonList>
-          )}
-        </IonCardContent>
-      </IonCard>
-    </>
-  );
+          </IonCardHeader>
+          <IonCardContent>
+            {stripeTransactions.length === 0 ? (
+              <div className="cd-empty-state">
+                <IonIcon icon={receiptOutline} />
+                <p>Sin transacciones registradas.</p>
+              </div>
+            ) : (
+              <IonList lines="none" className="client-dashboard-list">
+                {stripeTransactions.map((tx: any, i: number) => (
+                  <IonItem key={i} className="client-dashboard-item activity-item cd-tx-item">
+                    <IonIcon
+                      icon={tx.status === 'succeeded' ? checkmarkCircleOutline : tx.status === 'pending' ? ellipseOutline : alertCircleOutline}
+                      slot="start"
+                      style={{ color: tx.status === 'succeeded' ? '#148742' : tx.status === 'pending' ? '#b45309' : '#dc2626' }}
+                    />
+                    <IonLabel>
+                      <h3>${(tx.amount / 100).toFixed(2)} <span className="cd-tx-currency">{(tx.currency ?? 'mxn').toUpperCase()}</span></h3>
+                      <p>{tx.paymentType?.replace(/_/g, ' ')}</p>
+                      <IonNote>{tx.created_At ? toHermosillo(tx.created_At) : ''}</IonNote>
+                    </IonLabel>
+                    <IonBadge
+                      slot="end"
+                      className={`cd-tx-badge ${tx.status === 'succeeded' ? 'cd-tx-ok' : tx.status === 'pending' ? 'cd-tx-pending' : 'cd-tx-fail'}`}
+                    >
+                      {tx.status}
+                    </IonBadge>
+                  </IonItem>
+                ))}
+              </IonList>
+            )}
+          </IonCardContent>
+        </IonCard>
+
+        {/* Payment history from dashboard */}
+        {paymentActivities.length > 0 && (
+          <IonCard className="client-dashboard-card">
+            <IonCardHeader><IonCardTitle>Historial de Pagos</IonCardTitle></IonCardHeader>
+            <IonCardContent>
+              <IonList lines="none" className="client-dashboard-list">
+                {paymentActivities.map((a, i) => (
+                  <IonItem key={i} className="client-dashboard-item activity-item">
+                    <IonIcon icon={checkmarkCircleOutline} slot="start" style={{ color: '#148742' }} />
+                    <IonLabel>
+                      <h3>${a.amount?.toFixed(2)}</h3>
+                      <p>{a.description}</p>
+                      <IonNote>{toHermosillo(a.activityDate)}</IonNote>
+                    </IonLabel>
+                  </IonItem>
+                ))}
+              </IonList>
+            </IonCardContent>
+          </IonCard>
+        )}
+      </>
+    );
+  };
 
   const renderActivity = () => (
     <IonCard className="client-dashboard-card recent-activity-card">
@@ -630,6 +823,64 @@ const ClientDashboardPage: React.FC = () => {
     </IonModal>
   );
 
+  // ── Payment modal ─────────────────────────────────────────────────────────
+  const renderPayModal = () => (
+    <IonModal isOpen={showPayModal} onDidDismiss={() => { setShowPayModal(false); setPayAmount(''); }}>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>Realizar Pago</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={() => setShowPayModal(false)}>
+              <IonIcon icon={closeOutline} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent className="ion-padding">
+        <div className="cd-loan-form">
+          {payIntentId ? (
+            <div className="cd-pay-success">
+              <IonIcon icon={checkmarkCircleOutline} className="cd-pay-success-icon" />
+              <p><strong>Pago creado exitosamente</strong></p>
+              <p className="cd-stripe-acct-id">{payIntentId}</p>
+              <p style={{ fontSize: '0.82rem', color: '#6b7280', marginTop: 8 }}>
+                Usa el <code>clientSecret</code> con Stripe.js en la app para confirmar el pago con tarjeta.
+              </p>
+              <IonButton expand="block" shape="round" onClick={() => { setPayIntentId(''); setPayClientSecret(''); setShowPayModal(false); }}
+                className="client-dashboard-action-button" style={{ marginTop: 20 }}>
+                Cerrar
+              </IonButton>
+            </div>
+          ) : (
+            <>
+              <div className="cd-form-group">
+                <label>Monto a pagar ($MXN)</label>
+                <IonInput
+                  type="number" value={payAmount} placeholder="Ej: 500.00"
+                  onIonInput={e => setPayAmount(e.detail.value!)}
+                  fill="outline" labelPlacement="floating" label="Monto"
+                />
+              </div>
+              {parseFloat(payAmount) > 0 && (
+                <div className="cd-loan-preview">
+                  <p><strong>Resumen</strong></p>
+                  <p>Monto: ${parseFloat(payAmount).toFixed(2)} MXN</p>
+                  <p>({Math.round(parseFloat(payAmount) * 100)} centavos Stripe)</p>
+                </div>
+              )}
+              <IonButton expand="block" shape="round" onClick={handleCreatePayment}
+                disabled={stripeLoading || !payAmount}
+                className="client-dashboard-action-button" style={{ marginTop: 20 }}>
+                <IonIcon icon={cardOutline} slot="start" />
+                {stripeLoading ? 'Procesando...' : 'Crear pago'}
+              </IonButton>
+            </>
+          )}
+        </div>
+      </IonContent>
+    </IonModal>
+  );
+
   // ── Main render ───────────────────────────────────────────────────────────
   return (
     <IonPage>
@@ -662,7 +913,10 @@ const ClientDashboardPage: React.FC = () => {
           {activeTab === 'profile'  && renderProfile()}
         </section>
 
+        <div style={{ height: 110 }} />
+
         {renderLoanModal()}
+        {renderPayModal()}
 
         <nav className="floating-bottom-nav">
           {([

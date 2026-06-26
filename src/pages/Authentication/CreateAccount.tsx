@@ -8,6 +8,7 @@ import { useHistory } from 'react-router-dom';
 import './CreateAccount.css';
 import { eye, eyeOff, chevronBack, chevronForward, checkmark } from 'ionicons/icons';
 import { getAllCompanies, getBranchesByCompany, Company, CompanyBranch } from '../../api/companiesApi';
+import { RoleCode, ROLE_GROUPS } from '../../config/rolePermissions';
 
 // ── Application profiles ────────────────────────────────────────────────────
 
@@ -24,18 +25,18 @@ const APP_PROFILES: AppProfile[] = [
   {
     id: 'pos',
     label: 'Punto de Venta',
-    description: 'Ventas, carrito, caja, inventario y recibos.',
+    description: 'Ventas, carrito, caja, inventario, recompensas.',
     emoji: '🏪',
-    modules: ['pos_cart', 'cash_register', 'inventory_products', 'receipts_printing', 'accounting_ledger'],
+    modules: ['pos_cart', 'cash_register', 'inventory_products', 'receipts_printing', 'accounting_ledger', 'rewards'],
     color: '#2563eb',
   },
   {
     id: 'loans',
-    label: 'Préstamos',
-    description: 'Créditos, clientes, validación facial y contratos.',
+    label: 'Préstamos P2P',
+    description: 'Créditos, chat, validación facial y pagos Stripe.',
     emoji: '💰',
-    modules: ['clients', 'clientFaceRecognition', 'pushNotifications', 'accounting_ledger'],
-    color: '#059669',
+    modules: ['clients', 'clientFaceRecognition', 'pushNotifications', 'loanChat', 'accounting_ledger'],
+    color: '#7c3aed',
   },
   {
     id: 'custom',
@@ -56,13 +57,14 @@ const ALL_MODULES = [
   { id: 'clients',               label: 'Gestión de Clientes' },
   { id: 'clientFaceRecognition', label: 'Reconocimiento Facial' },
   { id: 'pushNotifications',     label: 'Notificaciones Push' },
+  { id: 'rewards',               label: 'Puntos de Recompensa' },
+  { id: 'loanChat',              label: 'Chat de Préstamos' },
 ];
 
-const ROLES = [
-  { id: 'admin',    label: 'Administrador', emoji: '👑', color: '#dc2626', desc: 'Acceso total al sistema.' },
-  { id: 'manager',  label: 'Gerente',       emoji: '🧑‍💼', color: '#d97706', desc: 'Gestión y reportes.' },
-  { id: 'employee', label: 'Empleado',      emoji: '👷', color: '#2563eb', desc: 'Operaciones básicas.' },
-];
+const ROLE_COLOR: Record<string, string> = {
+  admin: '#dc2626', manager: '#d97706', employee: '#2563eb',
+  borrower: '#059669', lender: '#7c3aed', business: '#0369a1', viewer: '#6b7280',
+};
 
 const STEPS = ['Cuenta', 'Perfil', 'Acceso'];
 
@@ -89,7 +91,7 @@ const CreateAccount: React.FC = () => {
   const [enabledModules, setEnabledModules]     = useState<string[]>([]);
 
   // Step 2 — role + company + branch
-  const [userRole, setUserRole]             = useState<string>('employee');
+  const [userRole, setUserRole]             = useState<RoleCode>('employee');
   const [companies, setCompanies]           = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [branches, setBranches]             = useState<CompanyBranch[]>([]);
@@ -130,6 +132,9 @@ const CreateAccount: React.FC = () => {
   const selectProfile = (profile: AppProfile) => {
     setSelectedProfile(profile.id);
     setEnabledModules(profile.id === 'custom' ? [] : [...profile.modules]);
+    // Reset role to sensible default for the chosen profile
+    const defaults: Record<string, RoleCode> = { pos: 'employee', loans: 'borrower', custom: 'employee' };
+    setUserRole(defaults[profile.id] ?? 'employee');
   };
 
   const toggleModule = (id: string) => {
@@ -313,14 +318,14 @@ const CreateAccount: React.FC = () => {
       <h2 className="ca-step-title">Acceso y empresa</h2>
       <p className="ca-step-desc">Define el rol y vincula la empresa del usuario.</p>
 
-      {/* Role picker */}
+      {/* Role picker — options depend on chosen app profile */}
       <p className="ca-modules-title" style={{ marginBottom: 8 }}>Rol de acceso:</p>
       <div className="ca-profile-grid" style={{ marginBottom: 16 }}>
-        {ROLES.map(r => (
+        {(ROLE_GROUPS[(selectedProfile as keyof typeof ROLE_GROUPS) ?? 'pos'] ?? ROLE_GROUPS.pos).map(r => (
           <button
             key={r.id}
             className={`ca-profile-card ${userRole === r.id ? 'selected' : ''}`}
-            style={{ '--profile-color': r.color } as any}
+            style={{ '--profile-color': ROLE_COLOR[r.id] ?? '#6b7280' } as any}
             onClick={() => setUserRole(r.id)}
           >
             <span className="ca-profile-emoji">{r.emoji}</span>
@@ -381,7 +386,7 @@ const CreateAccount: React.FC = () => {
       <div className="ca-summary-box" style={{ marginTop: 16 }}>
         <p><strong>Perfil:</strong> {APP_PROFILES.find(p => p.id === selectedProfile)?.label}</p>
         <p><strong>Módulos activos:</strong> {enabledModules.length}</p>
-        <p><strong>Rol:</strong> {ROLES.find(r => r.id === userRole)?.label}</p>
+        <p><strong>Rol:</strong> {ROLE_GROUPS.custom.find(r => r.id === userRole)?.label}</p>
         <p><strong>Empresa:</strong> {selectedCompany?.name ?? 'Sin seleccionar'}</p>
         {selectedBranch && <p><strong>Sucursal:</strong> {selectedBranch.name}</p>}
       </div>

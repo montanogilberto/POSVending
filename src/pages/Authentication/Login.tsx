@@ -8,7 +8,6 @@ import { useHistory } from 'react-router-dom';
 import { eye, eyeOff } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
-import { getAllClients } from '../../api/clientsApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
 import { normalizeRoleCode } from '../../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
@@ -192,19 +191,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     navigateAfterLogin(pending);
   };
 
-  const navigateAfterLogin = async (pending: typeof pendingUserRef.current) => {
-    // If the user is linked to a client, check clientType and route accordingly
-    if (pending?.clientId) {
-      try {
-        const clients = await getAllClients();
-        const linked = clients.find(c => c.clientId === pending.clientId);
-        if (linked?.clientType === 'lender' || linked?.clientType === 'borrower' || linked?.clientType === 'both') {
-          history.push('/p2p-lending');
-          return;
-        }
-      } catch { /* fall through to dashboard */ }
+  const navigateAfterLogin = (pending: typeof pendingUserRef.current) => {
+    const role = pending?.roleCode;
+    if (role === 'borrower' || role === 'lender') {
+      history.push('/p2p-lending');
+    } else if (role === 'business' || role === 'employee') {
+      history.push('/pos');
+    } else {
+      history.push('/dashboard');
     }
-    history.push('/dashboard');
   };
 
   const handleSkipOpenCash = () => {
