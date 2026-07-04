@@ -9,9 +9,11 @@
     "preview": "vite preview",
     "test.e2e": "cypress run",
     "test.unit": "vitest",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node scripts/postinstall-face-assets.js"
   },
   "dependencies": {
+    "@azure/ai-vision-face-ui": "^1.4.5",
     "@capacitor/android": "7.4.2",
     "@capacitor/app": "7.0.1",
     "@capacitor/camera": "^7.0.5",

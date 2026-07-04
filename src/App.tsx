@@ -89,7 +89,11 @@ import ForgotPassword from './pages/Authentication/ForgotPassword';
 import CreateAccount from './pages/Authentication/CreateAccount';
 import SupplierPage from './pages/SupplierPage';
 import LoanPage from './pages/LoanPage';
-import ClientFaceRecognitionPage from './pages/ClientFaceRecognitionPage';
+// Lazy-loaded: pulls in the gated @azure/ai-vision-face-ui SDK, which isn't
+// installable without private-feed credentials. Keeping it out of the eager
+// bundle means environments without those credentials can still run the rest
+// of the app; only this route fails to load.
+const ClientFaceRecognitionPage = React.lazy(() => import('./pages/ClientFaceRecognitionPage'));
 import ClientDashboardPage from './pages/ClientDashboardPage';
 import LenderDashboardPage from './pages/LenderDashboardPage';
 import ClientFollowUpPage from './pages/ClientFollowUpPage';
@@ -531,7 +535,9 @@ const AppShell: React.FC = () => {
             </Route>
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
-            <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
+            <React.Suspense fallback={null}>
+              <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
+            </React.Suspense>
             <PrivateRoute exact path="/client-dashboard/:clientId" component={ClientDashboardPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />

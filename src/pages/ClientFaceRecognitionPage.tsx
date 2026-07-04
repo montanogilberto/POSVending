@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   IonPage,
   IonContent,
@@ -19,15 +19,16 @@ import {
   IonIcon,
   IonSpinner,
 } from '@ionic/react';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
 import ClientSelector from '../components/ClientSelector';
+import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 import { useUser } from '../components/UserContext';
 import { Client } from '../api/clientsApi';
 import {
+  createClientFaceRecognitionSession,
   verifyClientFaceRecognition,
   submitContractClientFaceRecognition,
   FaceVerificationResponse,
@@ -89,6 +90,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [azureSessionId, setAzureSessionId] = useState<string>('');
   const [azureAuthToken, setAzureAuthToken] = useState<string>('');
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
+  const livenessContainerRef = useRef<HTMLDivElement>(null);
 
   const STEPS = ['Cliente y documento', 'Captura', 'Verificación', 'Contrato'];
 
@@ -145,49 +147,59 @@ const ClientFaceRecognitionPage: React.FC = () => {
     }
   };
 
-  const takePicture = async (
-    setImageBase64: React.Dispatch<React.SetStateAction<string>>,
-    onSuccess?: () => void
-  ) => {
-    try {
-      const photo = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.Base64,
-        source: CameraSource.Camera,
-      });
-      if (photo.base64String) {
-        setImageBase64(`data:image/jpeg;base64,${photo.base64String}`);
-        onSuccess?.();
-      }
-    } catch (err) {
-      setError((err as Error).message ?? 'Error al capturar la imagen');
-      setShowToast(true);
-    }
+  const showCaptureHelp = () => {
+    setToastMessage('Coloca tu identificación dentro del marco, evita reflejos y mantenla firme.');
+    setShowToast(true);
   };
 
   const startLivenessSession = async () => {
+    setCaptureSubStep('liveness-active');
+    setLivenessStatus('in-progress');
+    setError('');
+
+    let detector: HTMLElementTagNameMap['azure-ai-vision-face-ui'] | null = null;
     try {
-      setCaptureSubStep('liveness-active');
-      setLivenessStatus('in-progress');
-      const { sessionId, authToken } = await (await import('../api/clientFaceRecognitionApi'))
-        .createClientFaceRecognitionSession(Number(companyId), Number(selectedClient?.clientId));
+      const { sessionId, authToken } = await createClientFaceRecognitionSession(
+        Number(companyId),
+        Number(selectedClient?.clientId)
+      );
       setAzureSessionId(sessionId);
       setAzureAuthToken(authToken);
+
+      // Registers the <azure-ai-vision-face-ui> custom element (side-effect import).
+      await import('@azure/ai-vision-face-ui/FaceLivenessDetector.js');
+
+      const container = livenessContainerRef.current;
+      if (!container) {
+        throw new Error('No se pudo inicializar la cámara de validación facial.');
+      }
+
+      detector = document.createElement('azure-ai-vision-face-ui');
+      container.appendChild(detector);
+
+      // The SDK owns the entire UI from here: face-centering guide, head-turn
+      // challenge, and "movimiento incorrecto" retry screens are all rendered
+      // internally. This promise only resolves once the user completes (or
+      // permanently fails) that flow.
+      await detector.start(authToken);
+
       setLivenessStatus('completed');
       setCaptureSubStep('processing');
-      // Simulate processing then advance
+      setToastMessage('Validación facial completada correctamente.');
+      setShowToast(true);
       setTimeout(() => {
-        setToastMessage('Validación facial completada correctamente.');
-        setShowToast(true);
         setStep(2);
         setCaptureSubStep('doc-intro');
-      }, 1800);
+      }, 1200);
     } catch (err) {
       setLivenessStatus('failed');
-      setError((err as Error).message ?? 'No se pudo iniciar la sesión de validación facial');
+      setError((err as Error).message ?? 'No se pudo completar la validación facial. Vuelve a intentarlo.');
       setShowToast(true);
       setCaptureSubStep('liveness-intro');
+    } finally {
+      if (detector?.parentElement) {
+        detector.parentElement.removeChild(detector);
+      }
     }
   };
 
@@ -342,13 +354,6 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <button className="wizard-footer-back" onClick={goBack}>
               <IonIcon icon={chevronForward} style={{ transform: 'rotate(180deg)' }} /> Cancelar
             </button>
-            <div className="wizard-footer-spacer" />
-            <button
-              className="wizard-footer-next"
-              onClick={() => takePicture(setIdFrontImageBase64, () => setCaptureSubStep('flip-instruction'))}
-            >
-              Capturar <IonIcon icon={cameraOutline} />
-            </button>
           </div>
         );
       }
@@ -372,13 +377,6 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <div className="wizard-footer">
             <button className="wizard-footer-back" onClick={goBack}>
               <IonIcon icon={chevronForward} style={{ transform: 'rotate(180deg)' }} /> Cancelar
-            </button>
-            <div className="wizard-footer-spacer" />
-            <button
-              className="wizard-footer-next"
-              onClick={() => takePicture(setIdBackImageBase64, () => setCaptureSubStep('back-review'))}
-            >
-              Capturar <IonIcon icon={cameraOutline} />
             </button>
           </div>
         );
@@ -469,21 +467,15 @@ const ClientFaceRecognitionPage: React.FC = () => {
 
     if (captureSubStep === 'front-capture') {
       return (
-        <IonCard className="client-face-recognition-step-card cfr-capture-card">
-          <IonCardContent>
-            <h2 className="cfr-capture-title">Parte delantera</h2>
-            <p className="cfr-capture-desc">Muestre la parte delantera del documento a cámara.</p>
-            <div className="cfr-camera-frame">
-              {idFrontImageBase64 ? (
-                <img src={idFrontImageBase64} alt="Frente" className="cfr-camera-preview" />
-              ) : (
-                <div className="cfr-camera-placeholder">
-                  <IonIcon icon={idCardOutline} className="cfr-camera-guide-icon" />
-                </div>
-              )}
-            </div>
-          </IonCardContent>
-        </IonCard>
+        <GuidedDocumentCapture
+          title="Parte delantera"
+          instructions="Muestre la parte delantera del documento a cámara."
+          onHelp={showCaptureHelp}
+          onCapture={(base64) => {
+            setIdFrontImageBase64(base64);
+            setCaptureSubStep('flip-instruction');
+          }}
+        />
       );
     }
 
@@ -505,22 +497,15 @@ const ClientFaceRecognitionPage: React.FC = () => {
 
     if (captureSubStep === 'back-capture') {
       return (
-        <IonCard className="client-face-recognition-step-card cfr-capture-card">
-          <IonCardContent>
-            <h2 className="cfr-capture-title">Parte trasera</h2>
-            <p className="cfr-capture-desc">Muestre la parte trasera del documento a cámara.</p>
-            <div className="cfr-camera-frame">
-              {idBackImageBase64 ? (
-                <img src={idBackImageBase64} alt="Reverso" className="cfr-camera-preview" />
-              ) : (
-                <div className="cfr-camera-placeholder">
-                  <IonIcon icon={idCardOutline} className="cfr-camera-guide-icon" />
-                  <span className="cfr-camera-hint">Aleja el documento</span>
-                </div>
-              )}
-            </div>
-          </IonCardContent>
-        </IonCard>
+        <GuidedDocumentCapture
+          title="Parte trasera"
+          instructions="Muestre la parte trasera del documento a cámara."
+          onHelp={showCaptureHelp}
+          onCapture={(base64) => {
+            setIdBackImageBase64(base64);
+            setCaptureSubStep('back-review');
+          }}
+        />
       );
     }
 
@@ -561,15 +546,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
         <IonCard className="client-face-recognition-step-card cfr-capture-card">
           <IonCardContent>
             <h2 className="cfr-capture-title">Movimientos de cabeza</h2>
-            <p className="cfr-capture-desc">Coloca tu cara al centro y mira a la cámara.</p>
-            <div className="cfr-camera-frame cfr-liveness-frame">
-              <div className="cfr-liveness-overlay">
-                <IonIcon icon={personOutline} className="cfr-liveness-face-icon" />
-              </div>
-              <div className="cfr-liveness-hint-badge">
-                → Mueve la cabeza hacia la derecha
-              </div>
-            </div>
+            <p className="cfr-capture-desc">Coloca tu cara al centro y sigue las indicaciones en pantalla.</p>
+            <div ref={livenessContainerRef} className="cfr-liveness-sdk-container" />
           </IonCardContent>
         </IonCard>
       );
