@@ -197,8 +197,15 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setShowToast(true);
       setCaptureSubStep('liveness-intro');
     } finally {
+      // React may have already unmounted the container (e.g. user navigated
+      // away mid-session), which detaches detector along with it — guard
+      // against removeChild throwing on a node that's no longer a child.
       if (detector?.parentElement) {
-        detector.parentElement.removeChild(detector);
+        try {
+          detector.parentElement.removeChild(detector);
+        } catch {
+          // Already removed; nothing to do.
+        }
       }
     }
   };
