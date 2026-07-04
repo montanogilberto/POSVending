@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { IonIcon } from '@ionic/react';
 import { helpCircleOutline, personOutline, warningOutline } from 'ionicons/icons';
+import { Capacitor } from '@capacitor/core';
+import { Camera } from '@capacitor/camera';
 import { analyzeFrame, OverlayRect } from '../utils/documentCaptureAnalysis';
 import './GuidedDocumentCapture.css';
 
@@ -165,6 +167,17 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
 
     async function start() {
       try {
+        // On native Android, a WebView only auto-grants a getUserMedia prompt
+        // if the OS-level CAMERA permission is already granted — it won't
+        // surface the runtime dialog itself. Request it through Capacitor
+        // first so that dialog actually appears.
+        if (Capacitor.isNativePlatform()) {
+          const status = await Camera.requestPermissions({ permissions: ['camera'] });
+          if (status.camera !== 'granted' && status.camera !== 'limited') {
+            throw new DOMException('Camera permission was not granted.', 'NotAllowedError');
+          }
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
