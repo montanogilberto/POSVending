@@ -21,27 +21,28 @@ const HEIGHT = 160;
 const RECT: OverlayRect = { x: 10, y: 20, width: 100, height: 120 };
 
 describe('analyzeFrame', () => {
-  it('scores a flat mid-gray frame as blurry with no visible border', () => {
+  it('scores a flat mid-gray frame as blurry (no document detail)', () => {
     const frame = makeImageData(WIDTH, HEIGHT, () => [140, 140, 140]);
     const { metrics } = analyzeFrame(frame, RECT, null);
     expect(metrics.blurScore).toBeLessThan(10);
-    expect(metrics.borderScore).toBeLessThan(10);
-    expect(metrics.overallScore).toBeLessThan(40);
+    // Below GuidedDocumentCapture's "aligning" threshold (55) — good lighting
+    // alone must not be enough to pass without actual document detail.
+    expect(metrics.overallScore).toBeLessThan(55);
   });
 
-  it('scores a frame with a strong rectangular edge at the overlay border higher', () => {
+  it('scores a detailed document filling the guide interior as sharp, even without touching the guide outline', () => {
+    // Checkerboard texture drawn well inside the rect (margin on every side),
+    // simulating a real photo where the card doesn't reach the drawn guide's
+    // exact edges — this used to keep the score capped indefinitely.
+    const margin = 15;
     const frame = makeImageData(WIDTH, HEIGHT, (x, y) => {
-      const onBorder =
-        x === RECT.x || x === RECT.x + RECT.width - 1 || y === RECT.y || y === RECT.y + RECT.height - 1;
-      // High-frequency checkerboard inside the card to simulate document texture/sharpness.
       const inside =
-        x >= RECT.x && x < RECT.x + RECT.width && y >= RECT.y && y < RECT.y + RECT.height;
-      if (onBorder) return [0, 0, 0];
+        x >= RECT.x + margin && x < RECT.x + RECT.width - margin &&
+        y >= RECT.y + margin && y < RECT.y + RECT.height - margin;
       if (inside) return (x + y) % 2 === 0 ? [230, 230, 230] : [30, 30, 30];
       return [140, 140, 140];
     });
     const { metrics } = analyzeFrame(frame, RECT, null);
-    expect(metrics.borderScore).toBeGreaterThan(50);
     expect(metrics.blurScore).toBeGreaterThan(50);
   });
 

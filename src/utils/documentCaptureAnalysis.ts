@@ -8,7 +8,6 @@ export interface FrameQualityMetrics {
   brightnessScore: number;
   glareScore: number;
   motionScore: number;
-  borderScore: number;
   overallScore: number;
 }
 
@@ -20,11 +19,10 @@ export interface OverlayRect {
 }
 
 const WEIGHTS = {
-  border: 0.35,
-  blur: 0.25,
-  brightness: 0.2,
-  glare: 0.1,
-  motion: 0.1,
+  blur: 0.45,
+  brightness: 0.25,
+  glare: 0.15,
+  motion: 0.15,
 };
 
 function toGrayscale(data: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
@@ -53,30 +51,67 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
-function computeBlurScore(laplacian: Float32Array): number {
+// Variance of the Laplacian *inside the guide only*. A sharp, detailed
+// document (text, photo, microprint) filling the guide has high variance;
+// a blurry frame — or a plain background behind a too-small/misaligned
+// document — has low variance. Deliberately scoped to the interior rather
+// than the guide's drawn outline: requiring the physical document edge to
+// land exactly on the outline is unrealistic for a handheld phone and was
+// capping the score before any frame could ever qualify as "good".
+function computeBlurScore(laplacian: Float32Array, rect: OverlayRect, width: number, height: number): number {
+  const x0 = Math.max(1, rect.x);
+  const y0 = Math.max(1, rect.y);
+  const x1 = Math.min(width - 1, rect.x + rect.width);
+  const y1 = Math.min(height - 1, rect.y + rect.height);
+
   let sum = 0;
-  for (let i = 0; i < laplacian.length; i++) sum += laplacian[i];
-  const mean = sum / laplacian.length;
-  let variance = 0;
-  for (let i = 0; i < laplacian.length; i++) {
-    const d = laplacian[i] - mean;
-    variance += d * d;
+  let count = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      sum += laplacian[y * width + x];
+      count++;
+    }
   }
-  variance /= laplacian.length;
+  if (count === 0) return 0;
+  const mean = sum / count;
+
+  let variance = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const d = laplacian[y * width + x] - mean;
+      variance += d * d;
+    }
+  }
+  variance /= count;
+
   // Empirically, sharp document photos land well above ~150 variance on a
-  // downsampled grayscale frame; blurry ones stay under ~40.
+  // downsampled grayscale frame; blurry ones, or plain backgrounds, stay
+  // under ~40.
   return clampScore((variance / 150) * 100);
 }
 
-function computeBrightnessScore(gray: Uint8ClampedArray): number {
+// Scoped to the guide interior — a dark background around a well-lit
+// document (or vice versa) shouldn't drag this down.
+function computeBrightnessScore(gray: Uint8ClampedArray, rect: OverlayRect, width: number, height: number): number {
+  const x0 = Math.max(0, rect.x);
+  const y0 = Math.max(0, rect.y);
+  const x1 = Math.min(width, rect.x + rect.width);
+  const y1 = Math.min(height, rect.y + rect.height);
+
   let sum = 0;
   let clipped = 0;
-  for (let i = 0; i < gray.length; i++) {
-    sum += gray[i];
-    if (gray[i] < 12 || gray[i] > 244) clipped++;
+  let count = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const value = gray[y * width + x];
+      sum += value;
+      if (value < 12 || value > 244) clipped++;
+      count++;
+    }
   }
-  const mean = sum / gray.length;
-  const clippedRatio = clipped / gray.length;
+  if (count === 0) return 0;
+  const mean = sum / count;
+  const clippedRatio = clipped / count;
   // Ideal band ~90-190; penalize distance from the band center (140).
   const distance = Math.abs(mean - 140);
   const exposureScore = clampScore(100 - distance * 1.1);
@@ -113,47 +148,6 @@ function computeMotionScore(
   return clampScore(100 - meanDiff * 4);
 }
 
-// Proxy for "the document's physical edges line up with our overlay guide":
-// sums edge strength in a thin band around the overlay rectangle's perimeter.
-function computeBorderScore(
-  laplacian: Float32Array,
-  rect: OverlayRect,
-  width: number,
-  height: number
-): number {
-  const band = 6;
-  let sum = 0;
-  let count = 0;
-
-  const addRow = (y: number) => {
-    if (y < 1 || y >= height - 1) return;
-    for (let x = Math.max(1, rect.x); x < Math.min(width - 1, rect.x + rect.width); x++) {
-      sum += Math.abs(laplacian[y * width + x]);
-      count++;
-    }
-  };
-  const addCol = (x: number) => {
-    if (x < 1 || x >= width - 1) return;
-    for (let y = Math.max(1, rect.y); y < Math.min(height - 1, rect.y + rect.height); y++) {
-      sum += Math.abs(laplacian[y * width + x]);
-      count++;
-    }
-  };
-
-  for (let b = 0; b < band; b++) {
-    addRow(rect.y + b);
-    addRow(rect.y + rect.height - 1 - b);
-    addCol(rect.x + b);
-    addCol(rect.x + rect.width - 1 - b);
-  }
-
-  if (count === 0) return 0;
-  const meanEdge = sum / count;
-  // A visible physical border produces a much stronger mean edge response
-  // than an empty/plain background behind the overlay.
-  return clampScore((meanEdge / 35) * 100);
-}
-
 export function analyzeFrame(
   imageData: ImageData,
   rect: OverlayRect,
@@ -163,22 +157,20 @@ export function analyzeFrame(
   const gray = toGrayscale(data, width, height);
   const laplacian = laplacianMap(gray, width, height);
 
-  const blurScore = computeBlurScore(laplacian);
-  const brightnessScore = computeBrightnessScore(gray);
+  const blurScore = computeBlurScore(laplacian, rect, width, height);
+  const brightnessScore = computeBrightnessScore(gray, rect, width, height);
   const glareScore = computeGlareScore(data, rect, width);
   const motionScore = computeMotionScore(gray, previousGray);
-  const borderScore = computeBorderScore(laplacian, rect, width, height);
 
   const overallScore = clampScore(
-    borderScore * WEIGHTS.border +
-      blurScore * WEIGHTS.blur +
+    blurScore * WEIGHTS.blur +
       brightnessScore * WEIGHTS.brightness +
       glareScore * WEIGHTS.glare +
       motionScore * WEIGHTS.motion
   );
 
   return {
-    metrics: { blurScore, brightnessScore, glareScore, motionScore, borderScore, overallScore },
+    metrics: { blurScore, brightnessScore, glareScore, motionScore, overallScore },
     gray,
   };
 }
