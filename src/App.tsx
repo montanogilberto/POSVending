@@ -289,6 +289,7 @@ const AppShell: React.FC = () => {
   };
 
   const handleLogout = () => {
+    setIsLocked(false);
     logout();
     history.push('/login');
   };
