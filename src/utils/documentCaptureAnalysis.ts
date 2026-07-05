@@ -3,12 +3,15 @@
 // good enough to gate when auto-capture should fire, not a replacement for
 // server-side OCR-quality validation.
 
+export type PositionHint = 'move-closer' | 'move-back' | 'hold-steady';
+
 export interface FrameQualityMetrics {
   blurScore: number;
   brightnessScore: number;
   glareScore: number;
   motionScore: number;
   overallScore: number;
+  positionHint: PositionHint;
 }
 
 export interface OverlayRect {
@@ -148,6 +151,70 @@ function computeMotionScore(
   return clampScore(100 - meanDiff * 4);
 }
 
+function meanAbsEdge(laplacian: Float32Array, x0: number, y0: number, x1: number, y1: number, width: number): number {
+  let sum = 0;
+  let count = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      sum += Math.abs(laplacian[y * width + x]);
+      count++;
+    }
+  }
+  return count === 0 ? 0 : sum / count;
+}
+
+// Distinguishes "no/too-small document" from "document cropped by the guide"
+// so the UI can tell the user which way to move. Neither state requires the
+// document's edges to land exactly on the drawn outline (see computeBlurScore
+// above) — this only looks at *how much detail reaches near the outline*:
+//   - Center of the guide has little detail  -> nothing there yet, or too
+//     far away to resolve texture -> move closer.
+//   - Detail extends all the way to the guide's outer edge -> the document
+//     likely doesn't fit within the guide -> move back.
+//   - Otherwise the document is centered with some margin -> hold steady.
+function computePositionHint(
+  laplacian: Float32Array,
+  rect: OverlayRect,
+  width: number,
+  height: number
+): PositionHint {
+  const marginX = rect.width * 0.15;
+  const marginY = rect.height * 0.15;
+  const innerX0 = Math.max(1, Math.round(rect.x + marginX));
+  const innerY0 = Math.max(1, Math.round(rect.y + marginY));
+  const innerX1 = Math.min(width - 1, Math.round(rect.x + rect.width - marginX));
+  const innerY1 = Math.min(height - 1, Math.round(rect.y + rect.height - marginY));
+  const centerDensity = meanAbsEdge(laplacian, innerX0, innerY0, innerX1, innerY1, width);
+
+  const band = 3;
+  const outerX0 = Math.max(1, rect.x);
+  const outerY0 = Math.max(1, rect.y);
+  const outerX1 = Math.min(width - 1, rect.x + rect.width);
+  const outerY1 = Math.min(height - 1, rect.y + rect.height);
+  let boundarySum = 0;
+  let boundaryCount = 0;
+  for (let b = 0; b < band; b++) {
+    for (let x = outerX0; x < outerX1; x++) {
+      boundarySum += Math.abs(laplacian[(outerY0 + b) * width + x]);
+      boundarySum += Math.abs(laplacian[(outerY1 - 1 - b) * width + x]);
+      boundaryCount += 2;
+    }
+    for (let y = outerY0; y < outerY1; y++) {
+      boundarySum += Math.abs(laplacian[y * width + (outerX0 + b)]);
+      boundarySum += Math.abs(laplacian[y * width + (outerX1 - 1 - b)]);
+      boundaryCount += 2;
+    }
+  }
+  const boundaryDensity = boundaryCount === 0 ? 0 : boundarySum / boundaryCount;
+
+  const CROPPED_THRESHOLD = 40;
+  const NO_DOCUMENT_THRESHOLD = 6;
+
+  if (boundaryDensity > CROPPED_THRESHOLD) return 'move-back';
+  if (centerDensity < NO_DOCUMENT_THRESHOLD) return 'move-closer';
+  return 'hold-steady';
+}
+
 export function analyzeFrame(
   imageData: ImageData,
   rect: OverlayRect,
@@ -161,6 +228,7 @@ export function analyzeFrame(
   const brightnessScore = computeBrightnessScore(gray, rect, width, height);
   const glareScore = computeGlareScore(data, rect, width);
   const motionScore = computeMotionScore(gray, previousGray);
+  const positionHint = computePositionHint(laplacian, rect, width, height);
 
   const overallScore = clampScore(
     blurScore * WEIGHTS.blur +
@@ -170,7 +238,7 @@ export function analyzeFrame(
   );
 
   return {
-    metrics: { blurScore, brightnessScore, glareScore, motionScore, overallScore },
+    metrics: { blurScore, brightnessScore, glareScore, motionScore, overallScore, positionHint },
     gray,
   };
 }

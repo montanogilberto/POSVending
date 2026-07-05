@@ -72,12 +72,44 @@ describe('analyzeFrame', () => {
     expect(second.metrics.motionScore).toBeGreaterThan(90);
   });
 
-  it('keeps all scores within 0-100 bounds', () => {
+  it('keeps all numeric scores within 0-100 bounds', () => {
     const frame = makeImageData(WIDTH, HEIGHT, (x, y) => [(x * 7) % 256, (y * 13) % 256, (x + y) % 256]);
     const { metrics } = analyzeFrame(frame, RECT, null);
-    for (const value of Object.values(metrics)) {
+    for (const [key, value] of Object.entries(metrics)) {
+      if (key === 'positionHint') continue;
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThanOrEqual(100);
     }
+  });
+
+  it('hints to move closer when nothing is inside the guide', () => {
+    const frame = makeImageData(WIDTH, HEIGHT, () => [140, 140, 140]);
+    const { metrics } = analyzeFrame(frame, RECT, null);
+    expect(metrics.positionHint).toBe('move-closer');
+  });
+
+  it('hints to hold steady when a document sits centered with margin inside the guide', () => {
+    const margin = 15;
+    const frame = makeImageData(WIDTH, HEIGHT, (x, y) => {
+      const inside =
+        x >= RECT.x + margin && x < RECT.x + RECT.width - margin &&
+        y >= RECT.y + margin && y < RECT.y + RECT.height - margin;
+      if (inside) return (x + y) % 2 === 0 ? [230, 230, 230] : [30, 30, 30];
+      return [140, 140, 140];
+    });
+    const { metrics } = analyzeFrame(frame, RECT, null);
+    expect(metrics.positionHint).toBe('hold-steady');
+  });
+
+  it('hints to move back when document detail is cropped by the guide edge', () => {
+    // High-frequency texture reaching all the way to (and past) the rect's
+    // outer boundary, simulating a document too close/zoomed-in to fit.
+    const frame = makeImageData(WIDTH, HEIGHT, (x, y) => {
+      const inside = x >= RECT.x && x < RECT.x + RECT.width && y >= RECT.y && y < RECT.y + RECT.height;
+      if (inside) return (x + y) % 2 === 0 ? [230, 230, 230] : [30, 30, 30];
+      return [140, 140, 140];
+    });
+    const { metrics } = analyzeFrame(frame, RECT, null);
+    expect(metrics.positionHint).toBe('move-back');
   });
 });

@@ -102,6 +102,21 @@
   width: 55%;
 }
 
+.gdc-position-hint {
+  position: absolute;
+  left: 50%;
+  bottom: -18px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(17, 17, 17, 0.85);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 20px;
+  z-index: 2;
+}
+
 .gdc-error {
   position: absolute;
   inset: 0;

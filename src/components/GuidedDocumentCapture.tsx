@@ -3,10 +3,16 @@ import { IonIcon } from '@ionic/react';
 import { helpCircleOutline, personOutline, warningOutline } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { Camera } from '@capacitor/camera';
-import { analyzeFrame, OverlayRect } from '../utils/documentCaptureAnalysis';
+import { analyzeFrame, OverlayRect, PositionHint } from '../utils/documentCaptureAnalysis';
 import './GuidedDocumentCapture.css';
 
 type CaptureState = 'initializing' | 'searching' | 'aligning' | 'stable' | 'captured' | 'error';
+
+const POSITION_HINT_LABEL: Record<PositionHint, string> = {
+  'move-closer': 'Acércate un poco',
+  'move-back': 'Aléjate un poco',
+  'hold-steady': 'Mantente quieto',
+};
 
 interface GuidedDocumentCaptureProps {
   title: string;
@@ -52,6 +58,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const [state, setState] = useState<CaptureState>('initializing');
   const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [positionHint, setPositionHint] = useState<PositionHint>('move-closer');
 
   const stopStream = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -140,6 +147,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       const imageData = ctx.getImageData(0, 0, analysisWidth, analysisHeight);
       const { metrics, gray } = analyzeFrame(imageData, analysisRect, previousGrayRef.current);
       previousGrayRef.current = gray;
+      setPositionHint(metrics.positionHint);
 
       if (metrics.overallScore >= GOOD_SCORE_THRESHOLD) {
         consecutiveGoodRef.current += 1;
@@ -247,6 +255,10 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
               <span className="gdc-id-line gdc-id-line--short" />
             </div>
           </div>
+
+          {(state === 'searching' || state === 'aligning') && (
+            <div className="gdc-position-hint">{POSITION_HINT_LABEL[positionHint]}</div>
+          )}
         </div>
       )}
 
