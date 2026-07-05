@@ -453,7 +453,9 @@ const ClientsPage: React.FC = () => {
       setAzureSessionId(sessionId);
 
       // Registers the <azure-ai-vision-face-ui> custom element (side-effect import).
-      await import('@azure/ai-vision-face-ui/FaceLivenessDetector.js');
+      // Use a runtime-constructed URL so TS/Vite don't statically resolve a private SDK path.
+      const sdkUrl = '/azure-face-sdk/FaceLivenessDetector.js';
+      await import(/* @vite-ignore */ (sdkUrl as string));
 
       const container = livenessContainerRef.current;
       if (!container) {
