@@ -249,6 +249,12 @@ const AppShell: React.FC = () => {
   }, [userId]);
 
   // Biometric app-lock: gate on cold start and whenever the app resumes from background.
+  // isAuthenticatingRef guards against a self-triggering loop: the native biometric
+  // prompt runs in its own Activity, so showing/dismissing it pauses/resumes the host
+  // app just like backgrounding it would — without this guard, a successful unlock
+  // immediately re-triggers the resume listener and re-locks the app.
+  const isAuthenticatingRef = React.useRef(false);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -260,7 +266,7 @@ const AppShell: React.FC = () => {
       if (!cancelled && enabled) setIsLocked(true);
 
       stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
-        if (!isActive) return;
+        if (!isActive || isAuthenticatingRef.current) return;
         const stillEnabled = await isBiometricLockEnabled();
         if (stillEnabled) setIsLocked(true);
       });
@@ -273,8 +279,13 @@ const AppShell: React.FC = () => {
   }, []);
 
   const handleBiometricUnlock = async () => {
-    const ok = await authenticateBiometric('Desbloquea la app para continuar');
-    if (ok) setIsLocked(false);
+    isAuthenticatingRef.current = true;
+    try {
+      const ok = await authenticateBiometric('Desbloquea la app para continuar');
+      if (ok) setIsLocked(false);
+    } finally {
+      isAuthenticatingRef.current = false;
+    }
   };
 
   const handleLogout = () => {
