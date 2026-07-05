@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { Redirect, Route, useHistory } from 'react-router-dom';
 import {
   IonApp,
@@ -189,14 +189,18 @@ const AppShell: React.FC = () => {
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
+    let registrationHandle: PluginListenerHandle | undefined;
+    let receivedHandle: PluginListenerHandle | undefined;
+    let cancelled = false;
+
     const registerPush = async () => {
       let permission = await PushNotifications.checkPermissions();
       if (permission.receive === 'prompt') {
         permission = await PushNotifications.requestPermissions();
       }
-      if (permission.receive !== 'granted') return;
+      if (permission.receive !== 'granted' || cancelled) return;
 
-      PushNotifications.addListener('registration', async (token) => {
+      registrationHandle = await PushNotifications.addListener('registration', async (token) => {
         const platform = Capacitor.getPlatform();
         try {
           await fetch(`${import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net'}/registerDevice`, {
@@ -216,7 +220,7 @@ const AppShell: React.FC = () => {
         }
       });
 
-      PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+      receivedHandle = await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
         await LocalNotifications.schedule({
           notifications: [{
             id: Date.now(),
@@ -234,7 +238,9 @@ const AppShell: React.FC = () => {
     registerPush();
 
     return () => {
-      PushNotifications.removeAllListeners();
+      cancelled = true;
+      registrationHandle?.remove();
+      receivedHandle?.remove();
     };
   }, [userId]);
 

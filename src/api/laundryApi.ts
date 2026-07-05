@@ -20,6 +20,26 @@ interface CartItem {
   selectedOptions: { [optionId: number]: number };
 }
 
+const normalizeError = (error: unknown) => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    try {
+      return JSON.parse(JSON.stringify(error));
+    } catch {
+      return { raw: String(error) };
+    }
+  }
+
+  return { raw: String(error) };
+};
+
 // ✅ FIXED: Proper options object instead of raw signal
 export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> => {
   try {
@@ -29,7 +49,13 @@ export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> =
     );
 
     if (!response.ok) {
-      throw new Error(`Error ${response.status}`);
+      const responseText = await response.text().catch(() => '');
+      console.error('all_income non-OK response', {
+        status: response.status,
+        statusText: response.statusText,
+        body: responseText,
+      });
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.json();
@@ -44,13 +70,13 @@ export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> =
         new Date(a.paymentDate).getTime()
     );
 
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
+  } catch (error: unknown) {
+    if ((error as any)?.name === 'AbortError') {
       console.log('Fetch aborted');
       return [];
     }
 
-    console.error('Error loading incomes:', error);
+    console.error('Error loading incomes (api detailed):', normalizeError(error));
     return [];
   }
 };
