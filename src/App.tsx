@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -155,14 +155,13 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 };
 
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName, avatarUrl, userId, roleCode, roleName, setAvatarUrl, isAuthenticated } =
+  const { logout, username, companyName, branchName, avatarUrl, userId, roleCode, roleName, setAvatarUrl } =
     useUser();
   const history = useHistory();
   const [profileImageSrc, setProfileImageSrc] = useState(() =>
     resolveAvatarUrl(avatarUrl)
   );
   const [menuCollapsed, setMenuCollapsed] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
     setProfileImageSrc(resolveAvatarUrl(avatarUrl));
@@ -248,71 +247,14 @@ const AppShell: React.FC = () => {
     };
   }, [userId]);
 
-  // Biometric app-lock: gate on cold start and whenever the app resumes from background.
-  // isAuthenticatingRef guards against a self-triggering loop: the native biometric
-  // prompt runs in its own Activity, so showing/dismissing it pauses/resumes the host
-  // app just like backgrounding it would — without this guard, a successful unlock
-  // immediately re-triggers the resume listener and re-locks the app.
-  const isAuthenticatingRef = React.useRef(false);
-
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-
-    let cancelled = false;
-    let stateChangeHandle: PluginListenerHandle | undefined;
-
-    (async () => {
-      const enabled = await isBiometricLockEnabled();
-      if (!cancelled && enabled) setIsLocked(true);
-
-      stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
-        if (!isActive || isAuthenticatingRef.current) return;
-        const stillEnabled = await isBiometricLockEnabled();
-        if (stillEnabled) setIsLocked(true);
-      });
-    })();
-
-    return () => {
-      cancelled = true;
-      stateChangeHandle?.remove();
-    };
-  }, []);
-
-  const handleBiometricUnlock = async () => {
-    isAuthenticatingRef.current = true;
-    try {
-      const ok = await authenticateBiometric('Desbloquea la app para continuar');
-      if (ok) setIsLocked(false);
-    } finally {
-      isAuthenticatingRef.current = false;
-    }
-  };
-
   const handleLogout = () => {
-    setIsLocked(false);
     logout();
     history.push('/login');
-  };
-
-  const handleBiometricLockClose = () => {
-    setIsLocked(false);
-    history.push(isAuthenticated ? '/dashboard' : '/login');
   };
 
   const openMainMenu = async () => {
     await menuController.open('main-menu');
   };
-
-  if (isLocked) {
-    return (
-      <BiometricLockScreen
-        username={username}
-        onUnlock={handleBiometricUnlock}
-        onLogout={handleLogout}
-        onClose={handleBiometricLockClose}
-      />
-    );
-  }
 
   return (
     <IonSplitPane
@@ -647,23 +589,105 @@ const AppShell: React.FC = () => {
   );
 };
 
+// Biometric app-lock, rendered ONCE at the app root — not tied to any route,
+// so it survives back/forward navigation and route remounts. It renders as an
+// overlay on top of whatever page is currently showing.
+//
+// isAuthenticatingRef guards against a self-triggering loop: the native
+// biometric prompt runs in its own Activity, so showing/dismissing it
+// pauses/resumes the host app just like backgrounding it would — without this
+// guard, a successful unlock immediately re-triggers the resume listener and
+// re-locks the app.
+const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, username, logout } = useUser();
+  const history = useHistory();
+  const [isLocked, setIsLocked] = useState(false);
+  const isAuthenticatingRef = useRef(false);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !isAuthenticated) {
+      setIsLocked(false);
+      return;
+    }
+
+    let cancelled = false;
+    let stateChangeHandle: PluginListenerHandle | undefined;
+
+    (async () => {
+      const enabled = await isBiometricLockEnabled();
+      if (!cancelled && enabled) setIsLocked(true);
+
+      stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
+        if (!isActive || isAuthenticatingRef.current) return;
+        const stillEnabled = await isBiometricLockEnabled();
+        if (stillEnabled) setIsLocked(true);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      stateChangeHandle?.remove();
+    };
+  }, [isAuthenticated]);
+
+  const handleUnlock = async () => {
+    isAuthenticatingRef.current = true;
+    try {
+      const ok = await authenticateBiometric('Desbloquea la app para continuar');
+      if (ok) {
+        setIsLocked(false);
+        history.push('/dashboard');
+      }
+    } finally {
+      isAuthenticatingRef.current = false;
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLocked(false);
+    logout();
+    history.push('/login');
+  };
+
+  const handleClose = () => {
+    setIsLocked(false);
+    history.push('/dashboard');
+  };
+
+  return (
+    <>
+      {children}
+      {isLocked && (
+        <BiometricLockScreen
+          username={username}
+          onUnlock={handleUnlock}
+          onLogout={handleLogout}
+          onClose={handleClose}
+        />
+      )}
+    </>
+  );
+};
+
 const App: React.FC = () => {
   return (
     <IncomeProvider>
       <ProductProvider>
         <IonApp>
           <IonReactRouter>
-            <IonRouterOutlet id="root-outlet">
-              <Route exact path="/login" component={Login} />
-              <Route exact path="/forgot-password" component={ForgotPassword} />
-              <Route exact path="/create-account" component={CreateAccount} />
+            <BiometricLockGate>
+              <IonRouterOutlet id="root-outlet">
+                <Route exact path="/login" component={Login} />
+                <Route exact path="/forgot-password" component={ForgotPassword} />
+                <Route exact path="/create-account" component={CreateAccount} />
 
-              <Route exact path="/">
-                <Redirect to="/login" />
-              </Route>
+                <Route exact path="/">
+                  <Redirect to="/login" />
+                </Route>
 
-              <Route component={AppShell} />
-            </IonRouterOutlet>
+                <Route component={AppShell} />
+              </IonRouterOutlet>
+            </BiometricLockGate>
           </IonReactRouter>
         </IonApp>
       </ProductProvider>
