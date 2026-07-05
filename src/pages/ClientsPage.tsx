@@ -395,7 +395,7 @@ const ClientsPage: React.FC = () => {
           clients: [{ clientId: createdClientId, first_name: newClient.first_name!, last_name: newClient.last_name!, cellphone: newClient.cellphone!, email: newClient.email!, companyId, clientType: newClient.clientType, action: '2' }],
         };
         await createOrUpdateClient(req);
-        loadClients();
+        await loadClients();
       } else if (!createdClientId) {
         const clientId = Date.now();
         const req: CreateClientRequest = {
@@ -403,7 +403,7 @@ const ClientsPage: React.FC = () => {
         };
         await createOrUpdateClient(req);
         setCreatedClientId(clientId);
-        loadClients();
+        await loadClients();
       }
       setWizardStep(1);
     } catch { toast(wizardMode === 'edit' ? 'Error al actualizar el cliente' : 'Error al crear el cliente'); }
