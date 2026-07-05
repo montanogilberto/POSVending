@@ -1,6 +1,6 @@
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
-export type ClientType = 'borrower' | 'lender' | 'both';
+export type ClientType = 'borrower' | 'lender' | 'both' | 'lawyer';
 
 export interface Client {
   clientId: number;
@@ -53,9 +53,7 @@ export interface GetOneClientRequest {
 }
 
 export interface GetOneClientResponse {
-  result: Array<{
-    clients: Client[];
-  }>;
+  clients: Client[];
 }
 
 export const createOrUpdateClient = async (data: CreateClientRequest): Promise<CreateClientResponse> => {
@@ -136,5 +134,5 @@ export const getOneClient = async (data: GetOneClientRequest): Promise<Client[]>
   }
 
   const responseData: GetOneClientResponse = await response.json();
-  return responseData.result[0]?.clients || [];
+  return responseData.clients || [];
 };

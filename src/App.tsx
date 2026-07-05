@@ -95,6 +95,7 @@ import LoanPage from './pages/LoanPage';
 // of the app; only this route fails to load.
 const ClientFaceRecognitionPage = React.lazy(() => import('./pages/ClientFaceRecognitionPage'));
 import ClientDashboardPage from './pages/ClientDashboardPage';
+import ExpedienteDigitalPage from './pages/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/LenderDashboardPage';
 import ClientFollowUpPage from './pages/ClientFollowUpPage';
 import PushNotificationPage from './pages/PushNotificationPage';
@@ -539,6 +540,7 @@ const AppShell: React.FC = () => {
               <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
             </React.Suspense>
             <PrivateRoute exact path="/client-dashboard/:clientId" component={ClientDashboardPage} />
+            <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
             <PrivateRoute exact path="/p2p-lending" component={P2PLendingPage} />

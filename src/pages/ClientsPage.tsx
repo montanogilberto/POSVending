@@ -336,6 +336,10 @@ const ClientsPage: React.FC = () => {
     setWizardMode('edit');
     setNewClient({ first_name: client.first_name, last_name: client.last_name, email: client.email, cellphone: client.cellphone, clientType: client.clientType ?? 'borrower' });
     setCreatedClientId(client.clientId);
+    // Preload the client's existing QR (if any) so the auto-upload effect sees
+    // it's already done and doesn't generate + upload a brand new blob every
+    // time this client is reopened for editing.
+    setQrBlobUrl(client.qrBlobUrl ?? '');
     setShowWizard(true);
   };
 
@@ -655,6 +659,7 @@ const ClientsPage: React.FC = () => {
             { id: 'borrower', label: '📋 Acreditado', desc: 'Solicita préstamo', color: '#2563eb' },
             { id: 'lender',   label: '💼 Prestamista', desc: 'Financia préstamos', color: '#15803d' },
             { id: 'both',     label: '🔄 Ambos', desc: 'Acreditado y prestamista', color: '#7c3aed' },
+            { id: 'lawyer',   label: '⚖️ Licenciado en derecho', desc: 'Asesoría legal', color: '#b45309' },
           ] as { id: ClientType; label: string; desc: string; color: string }[]).map(t => (
             <button
               key={t.id}
@@ -1337,6 +1342,9 @@ const ClientsPage: React.FC = () => {
                     <IonButton fill="outline" size="small" color="warning" onClick={() => history.push(`/client-followup/${client.clientId}`)} className="action-button">
                       <IonIcon icon={calendarOutline} slot="start" /> Seguimiento
                     </IonButton>
+                    <IonButton fill="outline" size="small" style={{ '--color': '#b45309', '--border-color': '#b45309' }} onClick={() => history.push(`/client-expediente/${client.clientId}`)} className="action-button">
+                      <IonIcon icon={documentTextOutline} slot="start" /> Expediente
+                    </IonButton>
                     <IonButton fill="outline" size="small" color="primary" onClick={() => handleEdit(client)} className="action-button edit-button">
                       <IonIcon icon={pencil} slot="start" /> Editar
                     </IonButton>
@@ -1450,8 +1458,16 @@ const ClientsPage: React.FC = () => {
                 <div>
                   <p style={{ margin: 0, fontWeight: 700, color: '#111827' }}>{shareClient.first_name} {shareClient.last_name}</p>
                   <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>{shareClient.cellphone}</p>
-                  <span style={{ fontSize: 11, background: shareClient.clientType === 'lender' ? '#dcfce7' : '#eff6ff', color: shareClient.clientType === 'lender' ? '#15803d' : '#2563eb', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
-                    {shareClient.clientType === 'lender' ? '💼 Prestamista' : shareClient.clientType === 'both' ? '🔄 Ambos' : '📋 Acreditado'}
+                  <span style={{
+                    fontSize: 11,
+                    background: shareClient.clientType === 'lender' ? '#dcfce7' : shareClient.clientType === 'lawyer' ? '#fef3c7' : '#eff6ff',
+                    color: shareClient.clientType === 'lender' ? '#15803d' : shareClient.clientType === 'lawyer' ? '#b45309' : '#2563eb',
+                    padding: '2px 8px', borderRadius: 99, fontWeight: 700,
+                  }}>
+                    {shareClient.clientType === 'lender' ? '💼 Prestamista'
+                      : shareClient.clientType === 'both' ? '🔄 Ambos'
+                      : shareClient.clientType === 'lawyer' ? '⚖️ Licenciado en derecho'
+                      : '📋 Acreditado'}
                   </span>
                 </div>
               </div>
