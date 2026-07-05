@@ -630,13 +630,18 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
     };
   }, [isAuthenticated]);
 
+  // Hard navigation (not history.push) is deliberate here: /dashboard is a tab
+  // route owned by AppShell's own nested IonTabs/IonRouterOutlet. This gate
+  // lives above that tree, so a plain history.push updates the URL and tab-bar
+  // highlight but doesn't reliably remount the tab's outlet content, leaving a
+  // blank screen. A full reload guarantees AppShell mounts cleanly.
   const handleUnlock = async () => {
     isAuthenticatingRef.current = true;
     try {
       const ok = await authenticateBiometric('Desbloquea la app para continuar');
       if (ok) {
         setIsLocked(false);
-        history.push('/dashboard');
+        window.location.href = '/dashboard';
       }
     } finally {
       isAuthenticatingRef.current = false;
@@ -651,7 +656,7 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const handleClose = () => {
     setIsLocked(false);
-    history.push('/dashboard');
+    window.location.href = '/dashboard';
   };
 
   return (
