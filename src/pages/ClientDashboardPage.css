@@ -1,6 +1,5 @@
 .client-dashboard-page.fintech-surface {
   --background: radial-gradient(circle at top left, #f9fbff 0%, #f3f6ff 40%, #eef2fb 100%);
-  padding-bottom: 120px;
 }
 
 .dashboard-shell {
@@ -519,3 +518,43 @@
 
 .cd-loan-preview p { margin: 3px 0; }
 .cd-loan-preview strong { display: block; margin-bottom: 6px; font-size: 14px; }
+
+/* ── Stripe payment section ─────────────────────────────────── */
+.cd-stripe-header { display: flex; align-items: center; justify-content: space-between; }
+.cd-stripe-loading { color: #74839f; text-align: center; font-size: 0.9rem; }
+
+.cd-stripe-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 16px 0; text-align: center; color: #74839f;
+}
+.cd-stripe-big-icon { font-size: 2.4rem; color: #c7d2e8; }
+.cd-stripe-sub { font-size: 0.82rem; color: #9aa5bc; max-width: 240px; }
+.cd-stripe-cta { margin-top: 12px; --background: #635bff; --color: #fff; }
+
+.cd-stripe-status { display: flex; flex-direction: column; gap: 12px; }
+.cd-stripe-row { display: flex; align-items: flex-start; gap: 12px; }
+.cd-stripe-icon-ok { font-size: 1.6rem; color: #148742; flex-shrink: 0; }
+.cd-stripe-icon-warn { font-size: 1.6rem; color: #b45309; flex-shrink: 0; }
+.cd-stripe-acct-id { font-size: 0.72rem; color: #9aa5bc; margin: 2px 0 0; font-family: monospace; }
+
+.cd-stripe-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.cd-chip {
+  padding: 4px 10px; border-radius: 99px; font-size: 0.74rem; font-weight: 600;
+}
+.cd-chip-ok { background: #d1fae5; color: #065f46; }
+.cd-chip-off { background: #fee2e2; color: #991b1b; }
+
+/* Transaction list */
+.cd-tx-item { --border-radius: 12px; margin-bottom: 4px; }
+.cd-tx-currency { font-size: 0.72rem; color: #9aa5bc; margin-left: 4px; }
+.cd-tx-badge { font-size: 0.68rem; padding: 3px 8px; border-radius: 99px; }
+.cd-tx-ok { --background: #d1fae5; --color: #065f46; }
+.cd-tx-pending { --background: #fef3c7; --color: #92400e; }
+.cd-tx-fail { --background: #fee2e2; --color: #991b1b; }
+
+/* Pay modal */
+.cd-pay-success {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 32px 16px; text-align: center;
+}
+.cd-pay-success-icon { font-size: 3.5rem; color: #148742; }

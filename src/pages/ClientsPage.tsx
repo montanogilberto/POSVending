@@ -31,12 +31,12 @@ import {
   IonCheckbox,
   IonSpinner,
   IonLoading,
+  IonFooter,
 } from '@ionic/react';
 import {
   add,
   trash,
   pencil,
-  arrowBack,
   person,
   mail,
   checkmarkCircle,
@@ -63,15 +63,17 @@ import {
   chatbubbleOutline,
   copyOutline,
   closeOutline,
+  close,
 } from 'ionicons/icons';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useHistory } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
 import { useUser } from '../components/UserContext';
-import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest } from '../api/clientsApi';
+import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr } from '../api/clientsApi';
+import QRCode from 'qrcode';
+import { buildClientQrValue, downloadClientQrPdf } from '../utils/clientQrPdf';
 import {
   verifyClientFaceRecognition,
   submitContractClientFaceRecognition,
@@ -81,6 +83,8 @@ import {
   ContractSubmissionRequest,
   ClientFaceRecognition,
 } from '../api/clientFaceRecognitionApi';
+import LoanCompletionRing from '../components/LoanCompletionRing';
+import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 
 type CaptureSubStep =
   | 'doc-intro'
@@ -92,7 +96,29 @@ type CaptureSubStep =
   | 'liveness-active'
   | 'processing';
 
-const WIZARD_STEPS = ['Cliente', 'Código QR', 'Documento', 'Captura', 'Verificación', 'Contrato'];
+const WIZARD_STEPS = ['Cliente', 'Código QR', 'Documento', 'Captura', 'Verificación', 'Contrato', 'Cuenta'];
+
+const API_BASE = 'https://smartloansbackend.azurewebsites.net';
+
+async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
+  const res = await fetch(`${API_BASE}/stripe/connected-accounts`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId, email }),
+  });
+  return res.json();
+}
+
+async function stripeGetOnboardingLink(clientId: number, companyId: number) {
+  const res = await fetch(`${API_BASE}/stripe/onboarding-link`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      clientId, companyId,
+      returnUrl: 'http://localhost:8100/clients',
+      refreshUrl: 'http://localhost:8100/clients',
+    }),
+  });
+  return res.json();
+}
 
 const emptyErrors = {
   first_name: '',
@@ -108,6 +134,7 @@ const ClientsPage: React.FC = () => {
   // ── List state ─────────────────────────────────────────────────────────────
   const [clients, setClients] = useState<Client[]>([]);
   const [clientSelfieMap, setClientSelfieMap] = useState<Record<number, string>>({});
+  const [faceRecordMap, setFaceRecordMap] = useState<Record<number, ClientFaceRecognition>>({});
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -132,12 +159,20 @@ const ClientsPage: React.FC = () => {
   const [createErrors, setCreateErrors] = useState(emptyErrors);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
-  // Step 1 — QR (derived from createdClientId + newClient name, no extra state needed)
+  // Step 1 — QR
+  const [qrBlobUrl, setQrBlobUrl] = useState('');
+  const [qrUploading, setQrUploading] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrModalClient, setQrModalClient] = useState<Client | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareClient, setShareClient] = useState<Client | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [qrDownloading, setQrDownloading] = useState(false);
+
+  // Step 6 — Stripe
+  const [stripeAccountId, setStripeAccountId] = useState('');
+  const [stripeOnboardingUrl, setStripeOnboardingUrl] = useState('');
+  const [stripeKycDone, setStripeKycDone] = useState(false);
 
   // Step 2 — document
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
@@ -147,6 +182,7 @@ const ClientsPage: React.FC = () => {
   const [idBackImageBase64, setIdBackImageBase64] = useState('');
   const [azureSessionId, setAzureSessionId] = useState('');
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'in-progress' | 'completed' | 'failed'>('idle');
+  const livenessContainerRef = useRef<HTMLDivElement>(null);
 
   // Step 3 — verification result
   const [confidenceScore, setConfidenceScore] = useState(0);
@@ -167,6 +203,24 @@ const ClientsPage: React.FC = () => {
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
   const toast = (msg: string) => { setToastMessage(msg); setShowToast(true); };
+
+  const handleDownloadQrPdf = async (client: Pick<Client, 'clientId' | 'first_name' | 'last_name' | 'cellphone' | 'email'>) => {
+    setQrDownloading(true);
+    try {
+      await downloadClientQrPdf({
+        clientId: client.clientId,
+        firstName: client.first_name,
+        lastName: client.last_name,
+        cellphone: client.cellphone,
+        email: client.email,
+      });
+      toast('PDF descargado correctamente');
+    } catch {
+      toast('Error al generar el PDF del QR');
+    } finally {
+      setQrDownloading(false);
+    }
+  };
 
   const validateEmail = (email: string) => {
     if (!email.trim()) return { isValid: true, message: '' };
@@ -197,14 +251,28 @@ const ClientsPage: React.FC = () => {
         getAllClientFaceRecognitions(Number(companyId)).catch(() => [] as ClientFaceRecognition[]),
       ]);
       setClients(fetchedClients);
-      // Build clientId → most recent selfie URL map
       const selfieMap: Record<number, string> = {};
+      const faceMap: Record<number, ClientFaceRecognition> = {};
       faceRecords.forEach((r) => {
         if (r.clientSelfieBlobUrl) selfieMap[r.clientId] = r.clientSelfieBlobUrl;
+        faceMap[r.clientId] = r;
       });
       setClientSelfieMap(selfieMap);
+      setFaceRecordMap(faceMap);
     } catch { toast('Error al cargar los clientes'); }
     finally { setLoading(false); }
+  };
+
+  const getLoanCompletion = (client: Client) => {
+    const face = faceRecordMap[client.clientId];
+    return [
+      { label: 'Información general', done: true },
+      { label: 'Código QR',           done: !!client.qrBlobUrl },
+      { label: 'Cuenta de pago',      done: false }, // requires Stripe check — shown in dashboard
+      { label: 'Biométrico',          done: !!face?.isVerified },
+      { label: 'Contrato',            done: !!face?.contractAccepted },
+      { label: 'Pagaré',              done: !!face?.pagareAccepted },
+    ];
   };
 
   const filteredClients = useMemo(() => {
@@ -268,6 +336,10 @@ const ClientsPage: React.FC = () => {
     setWizardMode('edit');
     setNewClient({ first_name: client.first_name, last_name: client.last_name, email: client.email, cellphone: client.cellphone, clientType: client.clientType ?? 'borrower' });
     setCreatedClientId(client.clientId);
+    // Preload the client's existing QR (if any) so the auto-upload effect sees
+    // it's already done and doesn't generate + upload a brand new blob every
+    // time this client is reopened for editing.
+    setQrBlobUrl(client.qrBlobUrl ?? '');
     setShowWizard(true);
   };
 
@@ -292,6 +364,11 @@ const ClientsPage: React.FC = () => {
     setPagareAccepted(false);
     setHasPhysicalPagare(false);
     setContractAcceptedAt('');
+    setStripeAccountId('');
+    setStripeOnboardingUrl('');
+    setStripeKycDone(false);
+    setQrBlobUrl('');
+    setQrUploading(false);
   };
 
   const createIsValid = useMemo(() => {
@@ -318,7 +395,7 @@ const ClientsPage: React.FC = () => {
           clients: [{ clientId: createdClientId, first_name: newClient.first_name!, last_name: newClient.last_name!, cellphone: newClient.cellphone!, email: newClient.email!, companyId, clientType: newClient.clientType, action: '2' }],
         };
         await createOrUpdateClient(req);
-        loadClients();
+        await loadClients();
       } else if (!createdClientId) {
         const clientId = Date.now();
         const req: CreateClientRequest = {
@@ -326,42 +403,58 @@ const ClientsPage: React.FC = () => {
         };
         await createOrUpdateClient(req);
         setCreatedClientId(clientId);
-        loadClients();
+        await loadClients();
       }
       setWizardStep(1);
     } catch { toast(wizardMode === 'edit' ? 'Error al actualizar el cliente' : 'Error al crear el cliente'); }
     finally { setWizardLoading(false); }
   };
 
-  const takePicture = async (setter: React.Dispatch<React.SetStateAction<string>>, onSuccess?: () => void) => {
-    try {
-      const photo = await Camera.getPhoto({ quality: 90, allowEditing: false, resultType: CameraResultType.Base64, source: CameraSource.Camera });
-      if (photo.base64String) {
-        setter(`data:image/jpeg;base64,${photo.base64String}`);
-        onSuccess?.();
-      }
-    } catch (err) {
-      toast((err as Error).message ?? 'Error al capturar la imagen');
-    }
-  };
-
   const startLivenessSession = async () => {
     setCaptureSubStep('liveness-active');
     setLivenessStatus('in-progress');
+
+    let detector: HTMLElementTagNameMap['azure-ai-vision-face-ui'] | null = null;
     try {
-      const { sessionId } = await createClientFaceRecognitionSession(Number(companyId), Number(createdClientId));
+      const { sessionId, authToken } = await createClientFaceRecognitionSession(Number(companyId), Number(createdClientId));
       setAzureSessionId(sessionId);
+
+      // Registers the <azure-ai-vision-face-ui> custom element (side-effect import).
+      await import('@azure/ai-vision-face-ui/FaceLivenessDetector.js');
+
+      const container = livenessContainerRef.current;
+      if (!container) {
+        throw new Error('No se pudo inicializar la cámara de validación facial.');
+      }
+
+      detector = document.createElement('azure-ai-vision-face-ui');
+      container.appendChild(detector);
+
+      // The SDK owns the entire UI from here: face-centering guide, head-turn
+      // challenge, and "movimiento incorrecto" retry screens are all rendered
+      // internally. This promise only resolves once the user completes (or
+      // permanently fails) that flow.
+      await detector.start(authToken);
+
       setLivenessStatus('completed');
       setCaptureSubStep('processing');
       setTimeout(() => {
         toast('Validación facial completada correctamente.');
         setWizardStep(4);
         setCaptureSubStep('doc-intro');
-      }, 1800);
+      }, 1200);
     } catch (err) {
       setLivenessStatus('failed');
-      toast((err as Error).message ?? 'No se pudo iniciar la sesión de validación facial');
+      toast((err as Error).message ?? 'No se pudo completar la validación facial. Vuelve a intentarlo.');
       setCaptureSubStep('liveness-intro');
+    } finally {
+      if (detector?.parentElement) {
+        try {
+          detector.parentElement.removeChild(detector);
+        } catch {
+          // Already removed; nothing to do.
+        }
+      }
     }
   };
 
@@ -412,9 +505,23 @@ const ClientsPage: React.FC = () => {
       const res = await submitContractClientFaceRecognition(payload);
       if (res.error) { toast(`Error: ${res.msg || res.error}`); }
       else {
-        toast('¡Cliente registrado con contrato enviado exitosamente!');
-        setShowWizard(false);
-        resetWizard();
+        toast('¡Contrato enviado! Configurando cuenta de pagos...');
+        // Create Stripe Connected Account for this client
+        try {
+          const acct = await stripeCreateAccount(
+            Number(createdClientId),
+            Number(companyId),
+            newClient.email ?? `client${createdClientId}@posgmo.mx`,
+          );
+          if (acct?.account?.connectedAccountId) {
+            setStripeAccountId(acct.account.connectedAccountId);
+          }
+          const link = await stripeGetOnboardingLink(Number(createdClientId), Number(companyId));
+          if (link?.url) setStripeOnboardingUrl(link.url);
+        } catch {
+          toast('Contrato guardado. No se pudo crear cuenta Stripe.');
+        }
+        setWizardStep(6);
       }
     } catch (err) {
       toast((err as Error).message ?? 'Error al enviar el contrato');
@@ -444,6 +551,22 @@ const ClientsPage: React.FC = () => {
     if (target < wizardStep) { setWizardStep(target); setCaptureSubStep('doc-intro'); }
   };
 
+  // QR value encodes enough to identify the client at any POS terminal
+  const qrValue = createdClientId
+    ? buildClientQrValue(createdClientId, newClient.first_name ?? '', newClient.last_name ?? '')
+    : '';
+
+  // Auto-upload QR when wizard reaches step 1 and we have a clientId
+  useEffect(() => {
+    if (wizardStep !== 1 || !createdClientId || !qrValue || qrBlobUrl || qrUploading) return;
+    setQrUploading(true);
+    QRCode.toDataURL(qrValue, { width: 512, errorCorrectionLevel: 'H' })
+      .then(dataUrl => uploadClientQr(createdClientId, companyId, dataUrl))
+      .then(res => { setQrBlobUrl(res.qrBlobUrl); })
+      .catch(() => { /* non-fatal — QR still shows in UI */ })
+      .finally(() => setQrUploading(false));
+  }, [wizardStep, createdClientId, qrValue]);
+
   // ── Wizard renderers ───────────────────────────────────────────────────────
 
   const WizardStepBar = () => (
@@ -469,69 +592,88 @@ const ClientsPage: React.FC = () => {
   const renderStep0 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
-        <div className="wizard-step-icon-wrap" style={{ background: '#e0f2fe' }}>
-          <IonIcon icon={personCircle} style={{ fontSize: 40, color: 'var(--ion-color-primary)' }} />
-        </div>
-        <h2 className="wizard-step-title">Datos del Cliente</h2>
         <p className="wizard-step-desc">Ingresa la información personal del nuevo cliente.</p>
       </div>
 
-      <IonItem className="form-item outline">
-        <IonIcon icon={person} slot="start" color="primary" />
-        <IonLabel position="floating">Nombre *</IonLabel>
-        <IonInput value={newClient.first_name} onIonInput={(e) => setNewClient(p => ({ ...p, first_name: e.detail.value! }))} />
-        {createErrors.first_name && <IonNote slot="helper" color="danger">{createErrors.first_name}</IonNote>}
-      </IonItem>
+      <div className="wizard-form-fields">
+        <div className="wizard-field-group">
+          <IonInput
+            fill="outline"
+            label="Nombre *"
+            labelPlacement="floating"
+            value={newClient.first_name}
+            onIonInput={(e) => setNewClient(p => ({ ...p, first_name: e.detail.value! }))}
+            className={createErrors.first_name ? 'ion-invalid ion-touched' : ''}
+            errorText={createErrors.first_name}
+          />
+        </div>
 
-      <IonItem className="form-item outline">
-        <IonIcon icon={person} slot="start" color="primary" />
-        <IonLabel position="floating">Apellido *</IonLabel>
-        <IonInput value={newClient.last_name} onIonInput={(e) => setNewClient(p => ({ ...p, last_name: e.detail.value! }))} />
-        {createErrors.last_name && <IonNote slot="helper" color="danger">{createErrors.last_name}</IonNote>}
-      </IonItem>
+        <div className="wizard-field-group">
+          <IonInput
+            fill="outline"
+            label="Apellido *"
+            labelPlacement="floating"
+            value={newClient.last_name}
+            onIonInput={(e) => setNewClient(p => ({ ...p, last_name: e.detail.value! }))}
+            className={createErrors.last_name ? 'ion-invalid ion-touched' : ''}
+            errorText={createErrors.last_name}
+          />
+        </div>
 
-      <IonItem className="form-item outline">
-        <IonIcon icon={call} slot="start" color="primary" />
-        <IonLabel position="floating">Teléfono *</IonLabel>
-        <IonInput type="tel" value={newClient.cellphone} onIonInput={(e) => setNewClient(p => ({ ...p, cellphone: e.detail.value! }))} />
-        {createErrors.cellphone && <IonNote slot="helper" color="danger">{createErrors.cellphone}</IonNote>}
-      </IonItem>
+        <div className="wizard-field-group">
+          <IonInput
+            fill="outline"
+            label="Teléfono *"
+            labelPlacement="floating"
+            type="tel"
+            value={newClient.cellphone}
+            onIonInput={(e) => setNewClient(p => ({ ...p, cellphone: e.detail.value! }))}
+            className={createErrors.cellphone ? 'ion-invalid ion-touched' : ''}
+            errorText={createErrors.cellphone}
+          />
+        </div>
 
-      <IonItem className="form-item outline">
-        <IonIcon icon={mail} slot="start" color="primary" />
-        <IonLabel position="floating">Email</IonLabel>
-        <IonInput type="email" value={newClient.email} onIonInput={(e) => setNewClient(p => ({ ...p, email: e.detail.value! }))} />
-        {newClient.email && !createErrors.email.isValid && (
-          <>
-            <IonIcon icon={closeCircle} slot="end" color="danger" />
-            <IonNote slot="helper" color="danger">{createErrors.email.message}</IonNote>
-          </>
-        )}
-        {newClient.email && createErrors.email.isValid && (
-          <IonIcon icon={checkmarkCircle} slot="end" color="success" />
-        )}
-      </IonItem>
+        <div className="wizard-field-group">
+          <IonInput
+            fill="outline"
+            label="Email"
+            labelPlacement="floating"
+            type="email"
+            value={newClient.email}
+            onIonInput={(e) => setNewClient(p => ({ ...p, email: e.detail.value! }))}
+            className={newClient.email && !createErrors.email.isValid ? 'ion-invalid ion-touched' : ''}
+            errorText={newClient.email && !createErrors.email.isValid ? createErrors.email.message : undefined}
+          >
+            {newClient.email && createErrors.email.isValid && (
+              <IonIcon icon={checkmarkCircle} slot="end" color="success" aria-hidden="true" />
+            )}
+          </IonInput>
+        </div>
+      </div>
 
       {/* Client type selector */}
-      <div style={{ margin: '14px 4px 0' }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: '#374151', margin: '0 0 8px' }}>Tipo de cliente:</p>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div className="wizard-client-type-section">
+        <p className="wizard-client-type-label">Tipo de cliente:</p>
+        <div className="wizard-client-type-grid">
           {([
             { id: 'borrower', label: '📋 Acreditado', desc: 'Solicita préstamo', color: '#2563eb' },
             { id: 'lender',   label: '💼 Prestamista', desc: 'Financia préstamos', color: '#15803d' },
             { id: 'both',     label: '🔄 Ambos', desc: 'Acreditado y prestamista', color: '#7c3aed' },
+            { id: 'lawyer',   label: '⚖️ Licenciado en derecho', desc: 'Asesoría legal', color: '#b45309' },
           ] as { id: ClientType; label: string; desc: string; color: string }[]).map(t => (
             <button
               key={t.id}
               type="button"
+              className={`wizard-client-type-btn${newClient.clientType === t.id ? ' selected' : ''}`}
+              style={newClient.clientType === t.id
+                ? { borderColor: t.color, background: `${t.color}14` }
+                : undefined}
               onClick={() => setNewClient(p => ({ ...p, clientType: t.id }))}
-              style={{
-                flex: 1, padding: '10px 6px', borderRadius: 12, border: `2px solid ${newClient.clientType === t.id ? t.color : '#e5e7eb'}`,
-                background: newClient.clientType === t.id ? `${t.color}14` : '#fff',
-                cursor: 'pointer', textAlign: 'center',
-              }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: newClient.clientType === t.id ? t.color : '#374151' }}>{t.label}</div>
-              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{t.desc}</div>
+            >
+              <span className="wizard-client-type-btn-name" style={newClient.clientType === t.id ? { color: t.color } : undefined}>
+                {t.label}
+              </span>
+              <span className="wizard-client-type-btn-desc">{t.desc}</span>
             </button>
           ))}
         </div>
@@ -539,18 +681,9 @@ const ClientsPage: React.FC = () => {
     </div>
   );
 
-  // QR value encodes enough to identify the client at any POS terminal
-  const qrValue = createdClientId
-    ? `CLIENT:${createdClientId}:${newClient.first_name} ${newClient.last_name}`
-    : '';
-
   const renderStep1 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
-        <div className="wizard-step-icon-wrap" style={{ background: '#f0fdf4' }}>
-          <IonIcon icon={qrCodeOutline} style={{ fontSize: 40, color: '#16a34a' }} />
-        </div>
-        <h2 className="wizard-step-title">Código QR del Cliente</h2>
         <p className="wizard-step-desc">
           Este código QR identifica al cliente en todos los puntos de venta. Imprímelo o guárdalo.
         </p>
@@ -570,6 +703,39 @@ const ClientsPage: React.FC = () => {
         {newClient.email && <p><strong>Email:</strong> {newClient.email}</p>}
         <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>ID: {createdClientId}</p>
       </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, fontSize: 12 }}>
+        {qrUploading && (
+          <><IonSpinner name="crescent" style={{ width: 14, height: 14 }} /><span style={{ color: '#6b7280' }}>Guardando QR...</span></>
+        )}
+        {!qrUploading && qrBlobUrl && (
+          <><IonIcon icon={checkmarkCircle} style={{ color: '#059669', fontSize: 16 }} /><span style={{ color: '#059669', fontWeight: 600 }}>QR guardado en Azure</span></>
+        )}
+      </div>
+
+      {qrValue && createdClientId && (
+        <IonButton
+          expand="block"
+          className="client-qr-download-btn"
+          onClick={() => handleDownloadQrPdf({
+            clientId: createdClientId,
+            first_name: newClient.first_name ?? '',
+            last_name: newClient.last_name ?? '',
+            cellphone: newClient.cellphone ?? '',
+            email: newClient.email ?? '',
+          })}
+          disabled={qrDownloading}
+        >
+          {qrDownloading ? (
+            <IonSpinner name="crescent" style={{ width: 18, height: 18 }} />
+          ) : (
+            <>
+              <IonIcon icon={downloadOutline} slot="start" />
+              Descargar QR como PDF
+            </>
+          )}
+        </IonButton>
+      )}
     </div>
   );
 
@@ -583,32 +749,32 @@ const ClientsPage: React.FC = () => {
         <p className="wizard-step-desc">Selecciona el documento de identificación oficial del cliente.</p>
       </div>
 
-      <IonList className="client-face-recognition-radio-list ion-margin-top">
-        <IonListHeader><IonLabel>Identificación oficial</IonLabel></IonListHeader>
-        <IonRadioGroup value={documentType} onIonChange={(e) => setDocumentType(e.detail.value)}>
-          <IonItem>
-            <IonLabel>
-              <strong>INE</strong>
-              <p style={{ fontSize: 12, color: '#6b7280' }}>Credencial para votar</p>
-            </IonLabel>
-            <IonRadio value="INE" slot="end" />
-          </IonItem>
-          <IonItem>
-            <IonLabel>
-              <strong>Pasaporte</strong>
-              <p style={{ fontSize: 12, color: '#6b7280' }}>Pasaporte vigente</p>
-            </IonLabel>
-            <IonRadio value="Passport" slot="end" />
-          </IonItem>
-          <IonItem>
-            <IonLabel>
-              <strong>Licencia de Conducir</strong>
-              <p style={{ fontSize: 12, color: '#6b7280' }}>Licencia vigente</p>
-            </IonLabel>
-            <IonRadio value="Driver License" slot="end" />
-          </IonItem>
-        </IonRadioGroup>
-      </IonList>
+      <div className="wizard-doc-type-list">
+        {([
+          { value: 'INE',            label: 'INE',                  desc: 'Credencial para votar',  icon: idCardOutline },
+          { value: 'Passport',       label: 'Pasaporte',            desc: 'Pasaporte vigente',      icon: documentTextOutline },
+          { value: 'Driver License', label: 'Licencia de Conducir', desc: 'Licencia vigente',       icon: idCardOutline },
+        ] as { value: typeof documentType; label: string; desc: string; icon: string }[]).map(opt => {
+          const selected = documentType === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              className={`wizard-doc-type-btn${selected ? ' selected' : ''}`}
+              onClick={() => setDocumentType(opt.value)}
+            >
+              <div className="wizard-doc-type-btn-icon">
+                <IonIcon icon={opt.icon} />
+              </div>
+              <div className="wizard-doc-type-btn-text">
+                <span className="wizard-doc-type-btn-name">{opt.label}</span>
+                <span className="wizard-doc-type-btn-desc">{opt.desc}</span>
+              </div>
+              <div className={`wizard-doc-type-btn-radio${selected ? ' selected' : ''}`} />
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -631,17 +797,15 @@ const ClientsPage: React.FC = () => {
     );
 
     if (captureSubStep === 'front-capture') return (
-      <IonCard className="client-face-recognition-step-card cfr-capture-card">
-        <IonCardContent>
-          <h2 className="cfr-capture-title">Parte delantera</h2>
-          <p className="cfr-capture-desc">Muestre la parte delantera del documento a cámara.</p>
-          <div className="cfr-camera-frame">
-            {idFrontImageBase64
-              ? <img src={idFrontImageBase64} alt="Frente" className="cfr-camera-preview" />
-              : <div className="cfr-camera-placeholder"><IonIcon icon={idCardOutline} className="cfr-camera-guide-icon" /></div>}
-          </div>
-        </IonCardContent>
-      </IonCard>
+      <GuidedDocumentCapture
+        title="Parte delantera"
+        instructions="Muestre la parte delantera del documento a cámara."
+        onHelp={() => toast('Coloca la identificación dentro del marco, evita reflejos y mantenla firme.')}
+        onCapture={(base64) => {
+          setIdFrontImageBase64(base64);
+          setCaptureSubStep('flip-instruction');
+        }}
+      />
     );
 
     if (captureSubStep === 'flip-instruction') return (
@@ -659,20 +823,15 @@ const ClientsPage: React.FC = () => {
     );
 
     if (captureSubStep === 'back-capture') return (
-      <IonCard className="client-face-recognition-step-card cfr-capture-card">
-        <IonCardContent>
-          <h2 className="cfr-capture-title">Parte trasera</h2>
-          <p className="cfr-capture-desc">Muestre la parte trasera del documento a cámara.</p>
-          <div className="cfr-camera-frame">
-            {idBackImageBase64
-              ? <img src={idBackImageBase64} alt="Reverso" className="cfr-camera-preview" />
-              : <div className="cfr-camera-placeholder">
-                  <IonIcon icon={idCardOutline} className="cfr-camera-guide-icon" />
-                  <span className="cfr-camera-hint">Aleja el documento</span>
-                </div>}
-          </div>
-        </IonCardContent>
-      </IonCard>
+      <GuidedDocumentCapture
+        title="Parte trasera"
+        instructions="Muestre la parte trasera del documento a cámara."
+        onHelp={() => toast('Coloca la identificación dentro del marco, evita reflejos y mantenla firme.')}
+        onCapture={(base64) => {
+          setIdBackImageBase64(base64);
+          setCaptureSubStep('back-review');
+        }}
+      />
     );
 
     if (captureSubStep === 'back-review') return (
@@ -705,13 +864,8 @@ const ClientsPage: React.FC = () => {
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
           <h2 className="cfr-capture-title">Movimientos de cabeza</h2>
-          <p className="cfr-capture-desc">Coloca la cara al centro y mira a la cámara.</p>
-          <div className="cfr-camera-frame cfr-liveness-frame">
-            <div className="cfr-liveness-overlay">
-              <IonIcon icon={personOutline} className="cfr-liveness-face-icon" />
-            </div>
-            <div className="cfr-liveness-hint-badge">→ Mueve la cabeza hacia la derecha</div>
-          </div>
+          <p className="cfr-capture-desc">Coloca la cara al centro y sigue las indicaciones en pantalla.</p>
+          <div ref={livenessContainerRef} className="cfr-liveness-sdk-container" />
         </IonCardContent>
       </IonCard>
     );
@@ -787,125 +941,315 @@ const ClientsPage: React.FC = () => {
         </p>
       </div>
 
-      <IonItem lines="none" className="wizard-checkbox-item">
-        <IonCheckbox checked={contractAccepted} onIonChange={(e) => setContractAccepted(e.detail.checked)} slot="start" />
-        <IonLabel className="ion-text-wrap">Acepto los términos del contrato de crédito</IonLabel>
-      </IonItem>
-
-      <IonItem lines="none" className="wizard-checkbox-item">
-        <IonCheckbox checked={pagareAccepted} onIonChange={(e) => setPagareAccepted(e.detail.checked)} slot="start" />
-        <IonLabel className="ion-text-wrap">Acepto y firmo electrónicamente el pagaré</IonLabel>
-      </IonItem>
-
-      <IonItem lines="none" className="wizard-checkbox-item">
-        <IonCheckbox checked={hasPhysicalPagare} onIonChange={(e) => setHasPhysicalPagare(e.detail.checked)} slot="start" />
-        <IonLabel className="ion-text-wrap">El pagaré físico está en resguardo</IonLabel>
-      </IonItem>
+      <div className="wizard-checkbox-list">
+        {([
+          { checked: contractAccepted,  onChange: setContractAccepted,  label: 'Acepto los términos del contrato de crédito',     required: true },
+          { checked: pagareAccepted,    onChange: setPagareAccepted,    label: 'Acepto y firmo electrónicamente el pagaré',        required: true },
+          { checked: hasPhysicalPagare, onChange: setHasPhysicalPagare, label: 'El pagaré físico está en resguardo',              required: false },
+        ]).map((item, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`wizard-checkbox-card${item.checked ? ' checked' : ''}`}
+            onClick={() => item.onChange(!item.checked)}
+          >
+            <div className={`wizard-checkbox-box${item.checked ? ' checked' : ''}`}>
+              {item.checked && <IonIcon icon={checkmark} />}
+            </div>
+            <span className="wizard-checkbox-card-label">
+              {item.label}
+              {item.required && <span className="wizard-checkbox-required"> *</span>}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
+  );
+
+  const renderStep6 = () => (
+    <div className="wizard-step-body">
+      <div className="wizard-step-header">
+        <div className="wizard-step-icon-wrap" style={{ background: '#F0FDF4' }}>
+          <IonIcon icon={walletOutline} style={{ fontSize: 40, color: '#059669' }} />
+        </div>
+        <h2 className="wizard-step-title">Cuenta de Pagos</h2>
+        <p className="wizard-step-desc">
+          El cliente registra su información bancaria para recibir y realizar pagos de forma segura.
+        </p>
+      </div>
+
+      {/* Client + KYC status summary */}
+      <div className="wizard-stripe-status-card">
+        <div className={`wizard-stripe-status-icon-wrap${stripeKycDone ? ' done' : ''}`}>
+          <IonIcon icon={stripeKycDone ? checkmarkCircle : walletOutline} />
+        </div>
+        <div className="wizard-stripe-status-body">
+          <span className="wizard-stripe-status-name">
+            {newClient.first_name} {newClient.last_name}
+          </span>
+          <span className="wizard-stripe-status-sub">
+            {stripeKycDone ? 'Cuenta bancaria verificada ✓' : 'Verificación pendiente'}
+          </span>
+          {stripeAccountId && (
+            <span className="wizard-stripe-account-id">{stripeAccountId}</span>
+          )}
+        </div>
+        <span className={`wizard-stripe-kyc-badge${stripeKycDone ? ' done' : ''}`}>
+          {stripeKycDone ? 'KYC ✓' : 'Pendiente'}
+        </span>
+      </div>
+
+      {stripeOnboardingUrl ? (
+        <div className="wizard-stripe-section">
+          {/* URL preview box */}
+          <div className="wizard-stripe-url-box">
+            <IonIcon icon={shareOutline} className="wizard-stripe-url-icon" />
+            <span className="wizard-stripe-url-text">{stripeOnboardingUrl}</span>
+          </div>
+
+          {/* Action cards — same pattern as doc type buttons */}
+          <div className="wizard-stripe-actions">
+            <button
+              type="button"
+              className="wizard-stripe-action-btn primary"
+              onClick={() => window.open(stripeOnboardingUrl, '_blank')}
+            >
+              <div className="wizard-stripe-action-icon-wrap">
+                <IonIcon icon={walletOutline} />
+              </div>
+              <div className="wizard-stripe-action-text">
+                <span className="wizard-stripe-action-name">Abrir registro bancario</span>
+                <span className="wizard-stripe-action-desc">Se abre en el navegador del cliente</span>
+              </div>
+              <IonIcon icon={chevronForward} className="wizard-stripe-action-arrow" />
+            </button>
+
+            <button
+              type="button"
+              className="wizard-stripe-action-btn"
+              onClick={() => { navigator.clipboard.writeText(stripeOnboardingUrl); toast('Enlace copiado al portapapeles'); }}
+            >
+              <div className="wizard-stripe-action-icon-wrap">
+                <IonIcon icon={copyOutline} />
+              </div>
+              <div className="wizard-stripe-action-text">
+                <span className="wizard-stripe-action-name">Copiar enlace</span>
+                <span className="wizard-stripe-action-desc">Comparte por WhatsApp, SMS o email</span>
+              </div>
+              <IonIcon icon={chevronForward} className="wizard-stripe-action-arrow" />
+            </button>
+          </div>
+
+          {/* KYC confirmation checkbox — same as contract step */}
+          <div className="wizard-checkbox-list" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className={`wizard-checkbox-card${stripeKycDone ? ' checked' : ''}`}
+              onClick={() => setStripeKycDone(!stripeKycDone)}
+            >
+              <div className={`wizard-checkbox-box${stripeKycDone ? ' checked' : ''}`}>
+                {stripeKycDone && <IonIcon icon={checkmark} />}
+              </div>
+              <span className="wizard-checkbox-card-label">El cliente completó su registro bancario</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="wizard-stripe-error-card">
+          <div className="wizard-stripe-error-icon-wrap">
+            <IonIcon icon={closeCircle} />
+          </div>
+          <div className="wizard-stripe-error-body">
+            <span className="wizard-stripe-error-title">Enlace no disponible</span>
+            <span className="wizard-stripe-error-desc">
+              Puedes generarlo desde el dashboard del cliente una vez guardado.
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const ClientWizardFooterBar: React.FC<{
+    showBack?: boolean;
+    onBack?: () => void;
+    backLabel?: string;
+    backIcon?: string;
+    primary?: React.ReactNode;
+    onPrimary?: () => void;
+    primaryDisabled?: boolean;
+    variant?: 'next' | 'submit';
+  }> = ({
+    showBack = true,
+    onBack,
+    backLabel = 'Atrás',
+    backIcon = chevronBack,
+    primary,
+    onPrimary,
+    primaryDisabled,
+    variant = 'next',
+  }) => (
+    <IonFooter className="client-wizard-footer">
+      <div className={`client-wizard-footer-inner${showBack ? '' : ' client-wizard-footer-inner--single'}`}>
+        {showBack && onBack && (
+          <button type="button" className="client-wizard-btn-back" onClick={onBack}>
+            <IonIcon icon={backIcon} />
+            <span>{backLabel}</span>
+          </button>
+        )}
+        {primary && onPrimary && (
+          <button
+            type="button"
+            className={variant === 'submit' ? 'client-wizard-btn-submit' : 'client-wizard-btn-next'}
+            onClick={onPrimary}
+            disabled={primaryDisabled}
+          >
+            {primary}
+          </button>
+        )}
+      </div>
+    </IonFooter>
   );
 
   const WizardFooter = () => {
     if (wizardStep === 3) {
       if (captureSubStep === 'processing' || captureSubStep === 'liveness-active') return null;
 
-      if (captureSubStep === 'doc-intro') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('front-capture')}>
-            Capturar <IonIcon icon={cameraOutline} />
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'doc-intro') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={() => setCaptureSubStep('front-capture')}
+            primary={<>Capturar <IonIcon icon={cameraOutline} /></>}
+          />
+        );
+      }
 
-      if (captureSubStep === 'front-capture') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => takePicture(setIdFrontImageBase64, () => setCaptureSubStep('flip-instruction'))}>
-            <IonIcon icon={cameraOutline} /> Capturar frente
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'front-capture') {
+        return <ClientWizardFooterBar onBack={goBackWizard} backLabel="Cancelar" />;
+      }
 
-      if (captureSubStep === 'flip-instruction') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('back-capture')}>
-            Continuar <IonIcon icon={chevronForward} />
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'flip-instruction') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={() => setCaptureSubStep('back-capture')}
+            primary={<>Continuar <IonIcon icon={chevronForward} /></>}
+          />
+        );
+      }
 
-      if (captureSubStep === 'back-capture') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => takePicture(setIdBackImageBase64, () => setCaptureSubStep('back-review'))}>
-            <IonIcon icon={cameraOutline} /> Capturar reverso
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'back-capture') {
+        return <ClientWizardFooterBar onBack={goBackWizard} backLabel="Cancelar" />;
+      }
 
-      if (captureSubStep === 'back-review') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={() => { setIdBackImageBase64(''); setCaptureSubStep('back-capture'); }}>
-            <IonIcon icon={refreshOutline} /> Repetir
-          </button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={() => setCaptureSubStep('liveness-intro')}>
-            Continuar <IonIcon icon={chevronForward} />
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'back-review') {
+        return (
+          <ClientWizardFooterBar
+            onBack={() => { setIdBackImageBase64(''); setCaptureSubStep('back-capture'); }}
+            backLabel="Repetir"
+            backIcon={refreshOutline}
+            onPrimary={() => setCaptureSubStep('liveness-intro')}
+            primary={<>Continuar <IonIcon icon={chevronForward} /></>}
+          />
+        );
+      }
 
-      if (captureSubStep === 'liveness-intro') return (
-        <div className="wizard-footer">
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-          <div className="wizard-footer-spacer" />
-          <button className="wizard-footer-next" onClick={startLivenessSession}>
-            Iniciar validación <IonIcon icon={chevronForward} />
-          </button>
-        </div>
-      );
+      if (captureSubStep === 'liveness-intro') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={startLivenessSession}
+            primary={<>Iniciar validación <IonIcon icon={chevronForward} /></>}
+          />
+        );
+      }
 
       return null;
     }
 
-    return (
-      <div className="wizard-footer">
-        {wizardStep > 0 && (
-          <button className="wizard-footer-back" onClick={goBackWizard}><IonIcon icon={chevronBack} /> Atrás</button>
-        )}
-        <div className="wizard-footer-spacer" />
-        {wizardStep === 0 && (
-          <button className="wizard-footer-next" onClick={handleWizardNext0} disabled={!createIsValid || wizardLoading}>
-            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : <>Siguiente <IonIcon icon={chevronForward} /></>}
-          </button>
-        )}
-        {wizardStep === 1 && (
-          <button className="wizard-footer-next" onClick={() => setWizardStep(2)}>
-            Siguiente <IonIcon icon={chevronForward} />
-          </button>
-        )}
-        {wizardStep === 2 && (
-          <button className="wizard-footer-next" onClick={() => { if (!documentType) { toast('Selecciona un tipo de documento'); return; } setWizardStep(3); }}>
-            Siguiente <IonIcon icon={chevronForward} />
-          </button>
-        )}
-        {wizardStep === 4 && (
-          <button className="wizard-footer-submit" onClick={handleVerify} disabled={wizardLoading}>
-            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : 'Verificar biometría'}
-          </button>
-        )}
-        {wizardStep === 5 && (
-          <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || !pagareAccepted || wizardLoading}>
-            {wizardLoading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : 'Enviar contrato ✓'}
-          </button>
-        )}
-      </div>
-    );
+    if (wizardStep === 0) {
+      return (
+        <ClientWizardFooterBar
+          showBack={false}
+          onPrimary={handleWizardNext0}
+          primaryDisabled={!createIsValid || wizardLoading}
+          primary={
+            wizardLoading
+              ? <IonSpinner name="crescent" className="client-wizard-btn-spinner" />
+              : <>Siguiente <IonIcon icon={chevronForward} /></>
+          }
+        />
+      );
+    }
+
+    if (wizardStep === 1) {
+      return (
+        <ClientWizardFooterBar
+          onBack={goBackWizard}
+          onPrimary={() => setWizardStep(2)}
+          primary={<>Siguiente <IonIcon icon={chevronForward} /></>}
+        />
+      );
+    }
+
+    if (wizardStep === 2) {
+      return (
+        <ClientWizardFooterBar
+          onBack={goBackWizard}
+          onPrimary={() => {
+            if (!documentType) { toast('Selecciona un tipo de documento'); return; }
+            setWizardStep(3);
+          }}
+          primary={<>Siguiente <IonIcon icon={chevronForward} /></>}
+        />
+      );
+    }
+
+    if (wizardStep === 4) {
+      return (
+        <ClientWizardFooterBar
+          onBack={goBackWizard}
+          onPrimary={handleVerify}
+          primaryDisabled={wizardLoading}
+          variant="submit"
+          primary={
+            wizardLoading
+              ? <IonSpinner name="crescent" className="client-wizard-btn-spinner" />
+              : 'Verificar biometría'
+          }
+        />
+      );
+    }
+
+    if (wizardStep === 5) {
+      return (
+        <ClientWizardFooterBar
+          onBack={goBackWizard}
+          onPrimary={handleSubmitContract}
+          primaryDisabled={!contractAccepted || !pagareAccepted || wizardLoading}
+          variant="submit"
+          primary={
+            wizardLoading
+              ? <IonSpinner name="crescent" className="client-wizard-btn-spinner" />
+              : <>Enviar contrato <IonIcon icon={checkmark} /></>
+          }
+        />
+      );
+    }
+
+    if (wizardStep === 6) {
+      return (
+        <ClientWizardFooterBar
+          showBack={false}
+          onPrimary={() => { setShowWizard(false); resetWizard(); loadClients(); }}
+          variant="submit"
+          primary={<>Finalizar <IonIcon icon={checkmark} /></>}
+        />
+      );
+    }
+
+    return null;
   };
 
   const renderWizardStep = () => {
@@ -914,7 +1258,8 @@ const ClientsPage: React.FC = () => {
     if (wizardStep === 2) return renderStep2();
     if (wizardStep === 3) return renderCaptureSubStep();
     if (wizardStep === 4) return renderStep4();
-    return renderStep5();
+    if (wizardStep === 5) return renderStep5();
+    return renderStep6();
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -944,7 +1289,7 @@ const ClientsPage: React.FC = () => {
             <IonCard key={client.clientId} className="client-card">
               <IonCardContent className="client-card-content">
                 <div className="client-card-row">
-                  <div className="client-left">
+                  <div className="client-left" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                     {clientSelfieMap[client.clientId] ? (
                       <img
                         src={clientSelfieMap[client.clientId]}
@@ -954,6 +1299,11 @@ const ClientsPage: React.FC = () => {
                     ) : (
                       <IonIcon icon={personCircle} className="client-avatar" />
                     )}
+                    {(() => {
+                      const steps = getLoanCompletion(client);
+                      const pct = Math.round((steps.filter(s => s.done).length / steps.length) * 100);
+                      return <LoanCompletionRing percentage={pct} size={48} strokeWidth={4} />;
+                    })()}
                   </div>
                   <div className="client-main">
                     <div className="client-header">
@@ -991,6 +1341,9 @@ const ClientsPage: React.FC = () => {
                     )}
                     <IonButton fill="outline" size="small" color="warning" onClick={() => history.push(`/client-followup/${client.clientId}`)} className="action-button">
                       <IonIcon icon={calendarOutline} slot="start" /> Seguimiento
+                    </IonButton>
+                    <IonButton fill="outline" size="small" style={{ '--color': '#b45309', '--border-color': '#b45309' }} onClick={() => history.push(`/client-expediente/${client.clientId}`)} className="action-button">
+                      <IonIcon icon={documentTextOutline} slot="start" /> Expediente
                     </IonButton>
                     <IonButton fill="outline" size="small" color="primary" onClick={() => handleEdit(client)} className="action-button edit-button">
                       <IonIcon icon={pencil} slot="start" /> Editar
@@ -1050,9 +1403,9 @@ const ClientsPage: React.FC = () => {
         </IonHeader>
         <IonContent className="ion-padding">
           {qrModalClient && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingTop: 8 }}>
+            <div className="client-qr-modal-content">
               <QRCodeSVG
-                value={`CLIENT:${qrModalClient.clientId}:${qrModalClient.first_name} ${qrModalClient.last_name}`}
+                value={buildClientQrValue(qrModalClient.clientId, qrModalClient.first_name, qrModalClient.last_name)}
                 size={220}
                 level="H"
                 includeMargin
@@ -1062,6 +1415,21 @@ const ClientsPage: React.FC = () => {
                 <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>{qrModalClient.cellphone}</p>
                 <p style={{ margin: '2px 0 0', color: '#9ca3af', fontSize: 12 }}>ID: {qrModalClient.clientId}</p>
               </div>
+              <IonButton
+                expand="block"
+                className="client-qr-download-btn"
+                onClick={() => handleDownloadQrPdf(qrModalClient)}
+                disabled={qrDownloading}
+              >
+                {qrDownloading ? (
+                  <IonSpinner name="crescent" style={{ width: 18, height: 18 }} />
+                ) : (
+                  <>
+                    <IonIcon icon={downloadOutline} slot="start" />
+                    Descargar QR como PDF
+                  </>
+                )}
+              </IonButton>
             </div>
           )}
         </IonContent>
@@ -1090,8 +1458,16 @@ const ClientsPage: React.FC = () => {
                 <div>
                   <p style={{ margin: 0, fontWeight: 700, color: '#111827' }}>{shareClient.first_name} {shareClient.last_name}</p>
                   <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>{shareClient.cellphone}</p>
-                  <span style={{ fontSize: 11, background: shareClient.clientType === 'lender' ? '#dcfce7' : '#eff6ff', color: shareClient.clientType === 'lender' ? '#15803d' : '#2563eb', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
-                    {shareClient.clientType === 'lender' ? '💼 Prestamista' : shareClient.clientType === 'both' ? '🔄 Ambos' : '📋 Acreditado'}
+                  <span style={{
+                    fontSize: 11,
+                    background: shareClient.clientType === 'lender' ? '#dcfce7' : shareClient.clientType === 'lawyer' ? '#fef3c7' : '#eff6ff',
+                    color: shareClient.clientType === 'lender' ? '#15803d' : shareClient.clientType === 'lawyer' ? '#b45309' : '#2563eb',
+                    padding: '2px 8px', borderRadius: 99, fontWeight: 700,
+                  }}>
+                    {shareClient.clientType === 'lender' ? '💼 Prestamista'
+                      : shareClient.clientType === 'both' ? '🔄 Ambos'
+                      : shareClient.clientType === 'lawyer' ? '⚖️ Licenciado en derecho'
+                      : '📋 Acreditado'}
                   </span>
                 </div>
               </div>
@@ -1131,25 +1507,25 @@ const ClientsPage: React.FC = () => {
         </IonContent>
       </IonModal>
 
-      {/* ── Create Wizard Modal ─────────────────────────────────────────────── */}
+      {/* ── Client Wizard Modal ──────────────────────────────────────────────── */}
       <IonModal isOpen={showWizard} onDidDismiss={() => { setShowWizard(false); resetWizard(); }} className="client-wizard-modal">
-        <IonHeader className="ion-no-border">
-          <IonToolbar className="modal-toolbar">
-            <IonButtons slot="start">
-              <IonButton fill="clear" onClick={() => { setShowWizard(false); resetWizard(); }}>
-                <IonIcon icon={arrowBack} style={{ color: 'white' }} />
-              </IonButton>
-            </IonButtons>
-            <IonTitle className="modal-title">{wizardMode === 'edit' ? 'Editar Cliente' : 'Nuevo Cliente'}</IonTitle>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle className="client-wizard-modal-title">
+              {wizardMode === 'edit' ? 'Editar Cliente' : 'Nuevo Cliente'}
+            </IonTitle>
             <IonButtons slot="end">
-              <span className="wizard-step-badge">{wizardStep + 1} / {WIZARD_STEPS.length}</span>
+              <IonButton onClick={() => { setShowWizard(false); resetWizard(); }} fill="clear">
+                <IonIcon icon={close} />
+              </IonButton>
             </IonButtons>
           </IonToolbar>
         </IonHeader>
 
-        <IonContent className="modal-content client-face-recognition-page">
-          <WizardStepBar />
-          {renderWizardStep()}
+        <WizardStepBar />
+
+        <IonContent className="client-wizard-content client-face-recognition-page">
+          <div className="client-wizard-scroll-content">{renderWizardStep()}</div>
         </IonContent>
 
         <WizardFooter />

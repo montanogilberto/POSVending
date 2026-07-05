@@ -1,6 +1,6 @@
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
-export type ClientType = 'borrower' | 'lender' | 'both';
+export type ClientType = 'borrower' | 'lender' | 'both' | 'lawyer';
 
 export interface Client {
   clientId: number;
@@ -10,6 +10,7 @@ export interface Client {
   cellphone: string;
   email: string;
   clientType?: ClientType;
+  qrBlobUrl?: string;
   created_At?: string;
   updated_at?: string;
 }
@@ -52,9 +53,7 @@ export interface GetOneClientRequest {
 }
 
 export interface GetOneClientResponse {
-  result: Array<{
-    clients: Client[];
-  }>;
+  clients: Client[];
 }
 
 export const createOrUpdateClient = async (data: CreateClientRequest): Promise<CreateClientResponse> => {
@@ -107,6 +106,20 @@ export const getAllClients = async (): Promise<Client[]> => {
   }
 };
 
+export const uploadClientQr = async (
+  clientId: number,
+  companyId: number | undefined,
+  qrBase64: string
+): Promise<{ qrBlobUrl: string }> => {
+  const res = await fetch(`${API_BASE_URL}/clients/upload-qr`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clients: [{ clientId, companyId, qrBase64 }] }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 export const getOneClient = async (data: GetOneClientRequest): Promise<Client[]> => {
   const response = await fetch(`${API_BASE_URL}/one_clients`, {
     method: 'POST',
@@ -121,5 +134,5 @@ export const getOneClient = async (data: GetOneClientRequest): Promise<Client[]>
   }
 
   const responseData: GetOneClientResponse = await response.json();
-  return responseData.result[0]?.clients || [];
+  return responseData.clients || [];
 };

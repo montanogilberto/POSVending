@@ -1,0 +1,24 @@
+.product-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 16px 24px;
+}
+
+.product-form-fields ion-input,
+.product-form-fields ion-textarea {
+  --border-radius: 12px;
+}
+
+.product-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.product-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6B7280;
+  margin: 0 2px;
+}

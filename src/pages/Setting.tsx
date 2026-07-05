@@ -106,12 +106,20 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   admin:    'Administrador',
   manager:  'Gerente',
   employee: 'Empleado',
+  borrower: 'Prestatario',
+  lender:   'Prestamista',
+  business: 'Negocio',
+  viewer:   'Lector',
 };
 
 const ROLE_COLORS: Record<RoleCode, string> = {
   admin:    'danger',
   manager:  'warning',
   employee: 'primary',
+  borrower: 'success',
+  lender:   'tertiary',
+  business: 'secondary',
+  viewer:   'medium',
 };
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -123,6 +131,10 @@ function buildInitialPermissions(): PermissionMap {
     admin:    new Set(ROLE_UI.admin    as UiFeature[]),
     manager:  new Set(ROLE_UI.manager  as UiFeature[]),
     employee: new Set(ROLE_UI.employee as UiFeature[]),
+    borrower: new Set(ROLE_UI.borrower as UiFeature[]),
+    lender:   new Set(ROLE_UI.lender   as UiFeature[]),
+    business: new Set(ROLE_UI.business as UiFeature[]),
+    viewer:   new Set(ROLE_UI.viewer   as UiFeature[]),
   };
 }
 

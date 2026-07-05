@@ -77,6 +77,121 @@ export const pickProfileImageUrl = (user: Partial<ApiUser> | null | undefined): 
   return `${PROFILE_IMAGE_BASE_URL}${filename}`;
 };
 
+export interface CreateUserPayload {
+  email?: string;
+  cellphone?: string; // stored in dbo.users.cellphone — used to link to clients table
+  name: string;       // SP column is `name` (display name / username)
+  password: string;
+  appProfile?: string;
+  enabledModules?: string[];
+  roleCode?: string;
+  companyId?: number;
+  branchId?: number;
+}
+
+export interface UserSaveResponse {
+  userId?: number | string;
+  id?: number | string;
+  message?: string;
+  msg?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+/** POST /users  action=1 → create user, returns { userId } */
+export const createUser = async (payload: CreateUserPayload): Promise<UserSaveResponse> => {
+  const body = { users: [{ user_id: 0, action: 1, ...payload }] };
+  console.log('[createUser] REQUEST →', body);
+  const res = await fetch(`${API_BASE_URL}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  console.log('[createUser] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.msg || data.error || `Error ${res.status}`);
+  return data;
+};
+
+/** POST /users  action=2 → update existing user fields */
+export const updateUser = async (userId: number, payload: Partial<CreateUserPayload>): Promise<UserSaveResponse> => {
+  const body = { users: [{ user_id: userId, action: 2, ...payload }] };
+  console.log('[updateUser] REQUEST userId=%d →', userId, body);
+  const res = await fetch(`${API_BASE_URL}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  console.log('[updateUser] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.msg || data.error || `Error ${res.status}`);
+  return data;
+};
+
+export interface ContactCheckResult {
+  found: boolean;
+  clientId?: number;
+  firstName?: string;
+  lastName?: string;
+  cellphone?: string;
+  email?: string;
+  companyId?: number;
+  userId?: number;
+  userName?: string;
+  hasAccount?: number;        // 1 or 0 (integer from SQL — check with === 1)
+  completionPct?: number;     // 0–100
+  stepsCompleted?: number;    // 0–6
+  stepGeneralInfo?: number;
+  stepQr?: number;
+  stepBiometric?: number;
+  stepContract?: number;
+  stepPagare?: number;
+}
+
+/** POST /check_contact — looks up a phone or email in clients + users tables */
+export const checkContact = async (contact: string): Promise<ContactCheckResult> => {
+  console.log('[checkContact] contact=', contact);
+  const res = await fetch(`${API_BASE_URL}/check_contact`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contact }),
+  });
+  const data = await res.json();
+  console.log('[checkContact] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+};
+
+/** POST /send_verification_code — sends 6-digit OTP via email, sms, or whatsapp */
+export const sendVerificationCode = async (
+  target: string,
+  method: 'email' | 'sms' | 'whatsapp' = 'email',
+): Promise<void> => {
+  console.log('[sendVerificationCode] method=%s target=%s', method, target);
+  const res = await fetch(`${API_BASE_URL}/send_verification_code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target, method }),
+  });
+  const data = await res.json();
+  console.log('[sendVerificationCode] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+};
+
+/** POST /verify_code — validates OTP, returns { valid: boolean } */
+export const verifyCode = async (target: string, code: string): Promise<boolean> => {
+  console.log('[verifyCode] target=%s code=%s', target, code);
+  const res = await fetch(`${API_BASE_URL}/verify_code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target, code }),
+  });
+  const data = await res.json();
+  console.log('[verifyCode] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data.valid === true;
+};
+
 /**
  * POST /login — returns userId on success (msg e.g. "User Valid").
  * Note: backend route is lowercase `/login` (not `/Login`).

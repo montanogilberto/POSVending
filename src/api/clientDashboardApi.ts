@@ -26,16 +26,24 @@ export interface ClientDashboardListResponse {
 }
 
 export async function getAllClientDashboards(companyId: number, clientId: number): Promise<ClientDashboard[]> {
+  const body = { clientDashboards: [{ companyId, clientId }] };
+  console.log('[clientDashboardApi] getAllClientDashboards →', `${BASE_URL}/all_clientDashboards`, body);
   try {
     const res = await fetch(BASE_URL + "/all_clientDashboards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientDashboards: [{ companyId, clientId }] }),
+      body: JSON.stringify(body),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('[clientDashboardApi] getAllClientDashboards ❌', res.status, text);
+      return [];
+    }
     const data: ClientDashboardListResponse = await res.json();
+    console.log('[clientDashboardApi] getAllClientDashboards ✅', data);
     return data.clientDashboards ?? [];
-  } catch {
+  } catch (err) {
+    console.error('[clientDashboardApi] getAllClientDashboards ❌ fetch error:', err);
     return [];
   }
 }

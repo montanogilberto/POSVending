@@ -265,51 +265,6 @@
   color: var(--ion-color-primary);
 }
 
-/* Camera frame */
-.cfr-camera-frame {
-  width: 100%;
-  aspect-ratio: 4/3;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 3px solid white;
-  box-shadow: 0 0 0 3px var(--ion-color-primary);
-  background: #111;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cfr-camera-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-  height: 100%;
-}
-
-.cfr-camera-guide-icon {
-  font-size: 72px;
-  color: rgba(255,255,255,0.8);
-}
-
-.cfr-camera-hint {
-  background: rgba(255,255,255,0.9);
-  color: #111;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 16px;
-  border-radius: 20px;
-}
-
-.cfr-camera-preview {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 /* Review image */
 .cfr-review-image {
   width: 100%;
@@ -336,38 +291,21 @@
   color: var(--ion-color-primary);
 }
 
-.cfr-liveness-frame {
-  box-shadow: 0 0 0 3px #10b981;
+/* Hosts the <azure-ai-vision-face-ui> element, which renders its own camera,
+   face-centering guide, head-turn challenge, and error/retry UI internally. */
+.cfr-liveness-sdk-container {
+  width: 100%;
+  aspect-ratio: 3/4;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #111;
+  position: relative;
 }
 
-.cfr-liveness-overlay {
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  border: 3px solid white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.3);
-}
-
-.cfr-liveness-face-icon {
-  font-size: 80px;
-  color: white;
-}
-
-.cfr-liveness-hint-badge {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255,255,255,0.92);
-  color: #111;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 18px;
-  border-radius: 20px;
-  white-space: nowrap;
+.cfr-liveness-sdk-container azure-ai-vision-face-ui {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 /* Processing screen */
