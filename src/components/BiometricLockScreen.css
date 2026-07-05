@@ -10,6 +10,23 @@
   box-sizing: border-box;
 }
 
+.biometric-lock-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--ion-color-light, #f4f4f4);
+  color: var(--ion-color-medium, #777);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
 .biometric-lock-content {
   flex: 1;
   display: flex;

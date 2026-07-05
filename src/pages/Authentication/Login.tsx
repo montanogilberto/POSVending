@@ -1,17 +1,23 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   IonContent, IonPage, IonInput, IonGrid, IonRow, IonCol,
   IonLabel, IonToast, IonRouterLink, IonButton, IonIcon, IonLoading,
-  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons,
+  IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonToggle,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { eye, eyeOff } from 'ionicons/icons';
+import { eye, eyeOff, fingerPrintOutline } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
 import { normalizeRoleCode } from '../../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/CompanySelector/CompanySelector';
+import {
+  isBiometricAvailable,
+  isBiometricLockEnabled,
+  setBiometricLockEnabled,
+  authenticateBiometric,
+} from '../../utils/biometricAuth';
 import './Login.css';
 
 interface LoginProps {
@@ -28,6 +34,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading]                       = useState(false);
   const [message, setMessage]                       = useState<string | null>(null);
   const [showPassword, setShowPassword]             = useState(false);
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [showCompanySelector, setShowCompanySelector] = useState(false);
   const [showOpenCashPrompt, setShowOpenCashPrompt] = useState(false);
   const [openCashAmount, setOpenCashAmount] = useState<string>('0');
@@ -48,6 +56,26 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     roleCode: ReturnType<typeof normalizeRoleCode>;
     roleName: string;
   } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const [available, enabled] = await Promise.all([
+        isBiometricAvailable(),
+        isBiometricLockEnabled(),
+      ]);
+      setBiometricSupported(available);
+      setBiometricEnabledState(available && enabled);
+    })();
+  }, []);
+
+  const handleBiometricToggle = async (nextValue: boolean) => {
+    if (nextValue) {
+      const confirmed = await authenticateBiometric('Confirma tu identidad para activar el bloqueo biométrico');
+      if (!confirmed) return;
+    }
+    await setBiometricLockEnabled(nextValue);
+    setBiometricEnabledState(nextValue);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -306,6 +334,18 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       </button>
                     </div>
                   </div>
+
+                  {biometricSupported && (
+                    <div className="login-biometric-toggle">
+                      <IonIcon icon={fingerPrintOutline} />
+                      <IonLabel>Usar bloqueo biométrico</IonLabel>
+                      <IonToggle
+                        checked={biometricEnabled}
+                        onIonChange={e => handleBiometricToggle(e.detail.checked)}
+                        color="primary"
+                      />
+                    </div>
+                  )}
 
                   <IonButton
                     type="submit"

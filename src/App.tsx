@@ -155,7 +155,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 };
 
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName, avatarUrl, userId, roleCode, roleName, setAvatarUrl } =
+  const { logout, username, companyName, branchName, avatarUrl, userId, roleCode, roleName, setAvatarUrl, isAuthenticated } =
     useUser();
   const history = useHistory();
   const [profileImageSrc, setProfileImageSrc] = useState(() =>
@@ -294,6 +294,11 @@ const AppShell: React.FC = () => {
     history.push('/login');
   };
 
+  const handleBiometricLockClose = () => {
+    setIsLocked(false);
+    history.push(isAuthenticated ? '/dashboard' : '/login');
+  };
+
   const openMainMenu = async () => {
     await menuController.open('main-menu');
   };
@@ -304,6 +309,7 @@ const AppShell: React.FC = () => {
         username={username}
         onUnlock={handleBiometricUnlock}
         onLogout={handleLogout}
+        onClose={handleBiometricLockClose}
       />
     );
   }

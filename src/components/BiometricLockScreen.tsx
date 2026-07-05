@@ -1,17 +1,22 @@
 import React from 'react';
 import { IonIcon, IonButton } from '@ionic/react';
-import { fingerPrintOutline } from 'ionicons/icons';
+import { fingerPrintOutline, closeOutline } from 'ionicons/icons';
 import './BiometricLockScreen.css';
 
 interface BiometricLockScreenProps {
   username: string;
   onUnlock: () => void;
   onLogout: () => void;
+  onClose: () => void;
 }
 
-const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({ username, onUnlock, onLogout }) => {
+const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({ username, onUnlock, onLogout, onClose }) => {
   return (
     <div className="biometric-lock-screen">
+      <button type="button" className="biometric-lock-close" aria-label="Cerrar" onClick={onClose}>
+        <IonIcon icon={closeOutline} />
+      </button>
+
       <div className="biometric-lock-content">
         <IonIcon icon={fingerPrintOutline} className="biometric-lock-icon" />
         <h2 className="biometric-lock-title">Usa tu huella digital para desbloquear la app</h2>
