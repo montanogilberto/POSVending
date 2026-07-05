@@ -26,7 +26,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const history = useHistory();
-  const { login, setUserData } = useUser();
+  const { login, setUserData, isAuthenticated, roleCode } = useUser();
 
   const usernameRef = useRef<string>('');
   const passwordRef = useRef<string>('');
@@ -75,6 +75,19 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
     await setBiometricLockEnabled(nextValue);
     setBiometricEnabledState(nextValue);
+
+    // Already has a valid session (e.g. landed on /login while still logged in) —
+    // confirming the toggle just proved their identity, so continue straight in
+    // instead of asking them to type credentials again.
+    if (nextValue && isAuthenticated) {
+      if (roleCode === 'borrower' || roleCode === 'lender') {
+        history.push('/p2p-lending');
+      } else if (roleCode === 'business' || roleCode === 'employee') {
+        history.push('/pos');
+      } else {
+        history.push('/dashboard');
+      }
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
