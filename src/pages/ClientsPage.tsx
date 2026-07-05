@@ -79,6 +79,8 @@ import {
   submitContractClientFaceRecognition,
   createClientFaceRecognitionSession,
   getAllClientFaceRecognitions,
+  uploadClientFaceRecognitionImage,
+  upsertClientFaceRecognition,
   FaceVerificationResponse,
   ContractSubmissionRequest,
   ClientFaceRecognition,
@@ -183,6 +185,9 @@ const ClientsPage: React.FC = () => {
   const [azureSessionId, setAzureSessionId] = useState('');
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'in-progress' | 'completed' | 'failed'>('idle');
   const livenessContainerRef = useRef<HTMLDivElement>(null);
+  // Tracks the ClientFaceRecognition row created on first capture, so later
+  // captures/scores update that same row instead of creating duplicates.
+  const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
 
   // Step 3 — verification result
   const [confidenceScore, setConfidenceScore] = useState(0);
@@ -369,6 +374,34 @@ const ClientsPage: React.FC = () => {
     setStripeKycDone(false);
     setQrBlobUrl('');
     setQrUploading(false);
+    clientFaceRecognitionIdRef.current = undefined;
+  };
+
+  // Persists a capture to blob storage as soon as it's taken, instead of only
+  // at the final "Verificar biometría" step — so the image survives even if
+  // the user closes the wizard before finishing. Failures here are non-fatal:
+  // the local base64 still lets the user continue, and the final verify step
+  // remains a fallback.
+  const uploadCapturedImage = async (side: 'front' | 'back', base64: string) => {
+    if (!createdClientId) return;
+    try {
+      const { blobUrl } = await uploadClientFaceRecognitionImage({
+        companyId: Number(companyId),
+        clientId: createdClientId,
+        side,
+        imageBase64: base64.split(',')[1],
+      });
+      const record = await upsertClientFaceRecognition(
+        Number(companyId),
+        createdClientId,
+        documentType,
+        side === 'front' ? { idFrontImageBlobUrl: blobUrl } : { idBackImageBlobUrl: blobUrl },
+        clientFaceRecognitionIdRef.current
+      );
+      clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
+    } catch (err) {
+      console.error(`[Expediente] Failed to upload ${side} ID image early:`, err);
+    }
   };
 
   const createIsValid = useMemo(() => {
@@ -474,7 +507,29 @@ const ClientsPage: React.FC = () => {
       setIdFrontBlobUrl(res.idFrontImageBlobUrl);
       setSelfieBlobUrl(res.clientSelfieBlobUrl);
       if (res.error) { toast(res.error); }
-      else { toast('¡Verificación completada!'); setWizardStep(5); }
+      else {
+        // Persist the score/selfie onto the same row the captures already
+        // created, rather than leaving it only in local component state.
+        try {
+          const record = await upsertClientFaceRecognition(
+            Number(companyId),
+            Number(createdClientId),
+            documentType,
+            {
+              confidenceScore: res.confidenceScore,
+              isVerified: res.isVerified,
+              idFrontImageBlobUrl: res.idFrontImageBlobUrl,
+              clientSelfieBlobUrl: res.clientSelfieBlobUrl,
+            },
+            clientFaceRecognitionIdRef.current
+          );
+          clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
+        } catch (persistErr) {
+          console.error('[Expediente] Failed to persist verification score:', persistErr);
+        }
+        toast('¡Verificación completada!');
+        setWizardStep(5);
+      }
     } catch (err) {
       toast((err as Error).message ?? 'Error durante la verificación biométrica');
     } finally { setWizardLoading(false); }
@@ -804,6 +859,7 @@ const ClientsPage: React.FC = () => {
         onCapture={(base64) => {
           setIdFrontImageBase64(base64);
           setCaptureSubStep('flip-instruction');
+          uploadCapturedImage('front', base64);
         }}
       />
     );
@@ -830,6 +886,7 @@ const ClientsPage: React.FC = () => {
         onCapture={(base64) => {
           setIdBackImageBase64(base64);
           setCaptureSubStep('back-review');
+          uploadCapturedImage('back', base64);
         }}
       />
     );

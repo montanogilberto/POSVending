@@ -87,6 +87,17 @@ export interface ContractSubmissionResponse {
   error?: string;
 }
 
+export interface UploadDocumentImageRequest {
+  companyId: number;
+  clientId: number;
+  side: "front" | "back" | "selfie";
+  imageBase64: string; // raw base64, no "data:image/...;base64," prefix
+}
+
+export interface UploadDocumentImageResponse {
+  blobUrl: string;
+}
+
 // GET ALL -- POST /all_clientFaceRecognitions
 export async function getAllClientFaceRecognitions(companyId: number): Promise<ClientFaceRecognition[]> {
   const res = await fetch(BASE_URL + "/all_clientFaceRecognitions", {
@@ -129,6 +140,55 @@ export async function deleteClientFaceRecognition(id: number, companyId: number)
     body: JSON.stringify({ clientFaceRecognitions: [{ action: 3, clientFaceRecognitionId: id, companyId }] }),
   });
   if (!res.ok) throw new Error(await res.text());
+}
+
+// UPLOAD A SINGLE DOCUMENT/SELFIE IMAGE -- POST /api/clientFaceRecognition/upload-image
+// Mirrors uploadClientQr's pattern: just persists one image to blob storage and
+// hands back its URL, decoupled from the full verify+liveness call, so a capture
+// can be saved immediately instead of only at the very end of the wizard.
+export async function uploadClientFaceRecognitionImage(
+  payload: UploadDocumentImageRequest
+): Promise<UploadDocumentImageResponse> {
+  const res = await fetch(BASE_URL + "/api/clientFaceRecognition/upload-image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return await res.json();
+}
+
+// Finds the client's existing record (if any) and updates it, or creates a new
+// one otherwise — so incremental captures/scores land on a single row instead
+// of accumulating duplicates the way QR blobs did before that fix.
+export async function upsertClientFaceRecognition(
+  companyId: number,
+  clientId: number,
+  documentType: string,
+  patch: Partial<ClientFaceRecognition>,
+  existingId?: number
+): Promise<ClientFaceRecognition> {
+  const recordId =
+    existingId ??
+    (await getAllClientFaceRecognitions(companyId)).find((r) => r.clientId === clientId)?.clientFaceRecognitionId;
+
+  if (recordId) {
+    return updateClientFaceRecognition(recordId, patch);
+  }
+
+  return createClientFaceRecognition({
+    companyId,
+    clientId,
+    documentType,
+    idFrontImageBlobUrl: "",
+    clientSelfieBlobUrl: "",
+    confidenceScore: 0,
+    isVerified: false,
+    contractAccepted: false,
+    pagareAccepted: false,
+    hasPhysicalPagare: false,
+    ...patch,
+  });
 }
 
 // CREATE SESSION -- POST /api/clientFaceRecognition/create-session
