@@ -36,6 +36,7 @@ import {
   FaceVerificationResponse,
   ContractSubmissionRequest,
 } from '../api/clientFaceRecognitionApi';
+import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -185,6 +186,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const startLivenessSession = async () => {
+    if (await isBiometricLockEnabled()) {
+      const confirmed = await authenticateBiometric('Confirma tu identidad para iniciar la verificación');
+      if (!confirmed) return;
+    }
+
     setCaptureSubStep('liveness-active');
     setLivenessStatus('in-progress');
     setError('');

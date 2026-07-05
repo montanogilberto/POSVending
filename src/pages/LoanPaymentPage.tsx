@@ -107,6 +107,7 @@ function createRepaymentIntent(payload: { companyId: number; loanId: number; bor
   return _createPaymentIntent({ companyId: payload.companyId, fromClientId: payload.borrowerId, toClientId: payload.lenderId, amount: Math.round(payload.amountMXN * 100), paymentType: 'loan_repayment', loanId: payload.loanId, description: `Pago préstamo ${payload.loanId} — cuota ${payload.installmentNumber ?? ''}`, metadata: { installmentNumber: String(payload.installmentNumber ?? 1) } });
 }
 import { createPushNotification } from '../api/pushNotificationsApi';
+import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
 import './LoanPaymentPage.css';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────
@@ -263,6 +264,12 @@ const LoanPaymentPage: React.FC = () => {
   // ── Confirm payment ────────────────────────────────────────────────────
   const handleConfirmPayment = async () => {
     if (!stripeRef.current || !elementsRef.current) return;
+
+    if (await isBiometricLockEnabled()) {
+      const confirmed = await authenticateBiometric('Confirma tu identidad para autorizar el pago');
+      if (!confirmed) return;
+    }
+
     setStep('processing');
 
     const { error } = await stripeRef.current.confirmPayment({

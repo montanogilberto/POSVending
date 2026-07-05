@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { Redirect, Route, useHistory } from 'react-router-dom';
 import {
@@ -126,6 +127,8 @@ import { useUser } from './components/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
+import BiometricLockScreen from './components/BiometricLockScreen';
+import { isBiometricLockEnabled, authenticateBiometric } from './utils/biometricAuth';
 
 setupIonicReact();
 
@@ -159,6 +162,7 @@ const AppShell: React.FC = () => {
     resolveAvatarUrl(avatarUrl)
   );
   const [menuCollapsed, setMenuCollapsed] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
     setProfileImageSrc(resolveAvatarUrl(avatarUrl));
@@ -244,6 +248,34 @@ const AppShell: React.FC = () => {
     };
   }, [userId]);
 
+  // Biometric app-lock: gate on cold start and whenever the app resumes from background.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let cancelled = false;
+    let stateChangeHandle: PluginListenerHandle | undefined;
+
+    (async () => {
+      const enabled = await isBiometricLockEnabled();
+      if (!cancelled && enabled) setIsLocked(true);
+
+      stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
+        if (!isActive) return;
+        const stillEnabled = await isBiometricLockEnabled();
+        if (stillEnabled) setIsLocked(true);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      stateChangeHandle?.remove();
+    };
+  }, []);
+
+  const handleBiometricUnlock = async () => {
+    const ok = await authenticateBiometric('Desbloquea la app para continuar');
+    if (ok) setIsLocked(false);
+  };
 
   const handleLogout = () => {
     logout();
@@ -253,6 +285,16 @@ const AppShell: React.FC = () => {
   const openMainMenu = async () => {
     await menuController.open('main-menu');
   };
+
+  if (isLocked) {
+    return (
+      <BiometricLockScreen
+        username={username}
+        onUnlock={handleBiometricUnlock}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
   return (
     <IonSplitPane

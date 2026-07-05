@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IonPage,
   IonContent,
@@ -34,11 +34,18 @@ import {
   cartOutline,
   shieldCheckmarkOutline,
   cogOutline,
+  fingerPrintOutline,
 } from 'ionicons/icons';
 import Header from '../components/Header';
 import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
 import { RoleCode, UiFeature, ROLE_UI } from '../config/rolePermissions';
+import {
+  isBiometricAvailable,
+  isBiometricLockEnabled,
+  setBiometricLockEnabled,
+  authenticateBiometric,
+} from '../utils/biometricAuth';
 import './Setting.css';
 
 // ── Module definitions ──────────────────────────────────────────────────────
@@ -147,6 +154,31 @@ const Setting: React.FC = () => {
   const [showToast, setShowToast]       = useState(false);
   const [toastMsg, setToastMsg]         = useState('');
 
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const [available, enabled] = await Promise.all([
+        isBiometricAvailable(),
+        isBiometricLockEnabled(),
+      ]);
+      setBiometricSupported(available);
+      setBiometricEnabledState(available && enabled);
+    })();
+  }, []);
+
+  const handleBiometricToggle = async (nextValue: boolean) => {
+    if (nextValue) {
+      const confirmed = await authenticateBiometric('Confirma tu identidad para activar el bloqueo biométrico');
+      if (!confirmed) return;
+    }
+    await setBiometricLockEnabled(nextValue);
+    setBiometricEnabledState(nextValue);
+    setToastMsg(nextValue ? 'Bloqueo biométrico activado' : 'Bloqueo biométrico desactivado');
+    setShowToast(true);
+  };
+
   const [popoverState, setPopoverState] = useState<{
     showAlertPopover: boolean;
     showMailPopover: boolean;
@@ -224,6 +256,33 @@ const Setting: React.FC = () => {
       />
 
       <IonContent className="setting-content">
+
+        {/* ── Security ── */}
+        <IonCard className="setting-module-card">
+          <IonCardHeader className="setting-module-header">
+            <IonCardTitle className="setting-module-title">Seguridad</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent className="setting-module-content">
+            <IonItem lines="none" className="setting-feature-item">
+              <IonIcon icon={fingerPrintOutline} slot="start" className={`setting-feature-icon ${biometricEnabled ? 'icon-active' : 'icon-inactive'}`} />
+              <IonLabel className="setting-feature-label">
+                Bloqueo biométrico
+                <p className="setting-feature-code">
+                  {biometricSupported
+                    ? 'Solicita huella digital o Face ID al abrir la app'
+                    : 'No disponible en este dispositivo'}
+                </p>
+              </IonLabel>
+              <IonToggle
+                slot="end"
+                checked={biometricEnabled}
+                disabled={!biometricSupported}
+                onIonChange={e => handleBiometricToggle(e.detail.checked)}
+                color="primary"
+              />
+            </IonItem>
+          </IonCardContent>
+        </IonCard>
 
         {/* ── Header ── */}
         <div className="setting-role-header">

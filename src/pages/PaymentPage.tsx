@@ -21,6 +21,7 @@ import {
   import { useOrder } from '../context/OrderContext';
   import { useState } from 'react';
   import { useHistory } from 'react-router-dom';
+  import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
   //import { products } from '../data/products';
   
   const PaymentPage: React.FC = () => {
@@ -45,12 +46,17 @@ import {
       //return `${option.name}: ${labels.join(', ')}`;
     //});
   
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
       if (!paymentMethod) {
         setShowToast(true);
         return;
       }
-  
+
+      if (await isBiometricLockEnabled()) {
+        const confirmed = await authenticateBiometric('Confirma tu identidad para autorizar el pedido');
+        if (!confirmed) return;
+      }
+
       setOrder({
         ...order,
         paymentMethod,
