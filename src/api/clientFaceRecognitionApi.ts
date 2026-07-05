@@ -192,10 +192,18 @@ export async function upsertClientFaceRecognition(
 }
 
 // CREATE SESSION -- POST /api/clientFaceRecognition/create-session
-export async function createClientFaceRecognitionSession(companyId?: number, clientId?: number): Promise<CreateLivenessSessionResponse> {
+// Azure's "Liveness With Verify" session requires the reference (ID) image to
+// be attached at creation time — it can't be added afterward — so the front
+// ID capture must already exist before calling this.
+export async function createClientFaceRecognitionSession(
+  companyId?: number,
+  clientId?: number,
+  idFrontImageBase64?: string
+): Promise<CreateLivenessSessionResponse> {
   const payload = {
     companyId: companyId ?? null,
     clientId: clientId ?? null,
+    idFrontImageBase64: (idFrontImageBase64 ?? "").split(",").pop() ?? "",
     source: "web",
     createdAt: new Date().toISOString(),
   };

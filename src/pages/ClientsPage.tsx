@@ -449,7 +449,7 @@ const ClientsPage: React.FC = () => {
 
     let detector: HTMLElementTagNameMap['azure-ai-vision-face-ui'] | null = null;
     try {
-      const { sessionId, authToken } = await createClientFaceRecognitionSession(Number(companyId), Number(createdClientId));
+      const { sessionId, authToken } = await createClientFaceRecognitionSession(Number(companyId), Number(createdClientId), idFrontImageBase64);
       setAzureSessionId(sessionId);
 
       // Registers the <azure-ai-vision-face-ui> custom element (side-effect import).

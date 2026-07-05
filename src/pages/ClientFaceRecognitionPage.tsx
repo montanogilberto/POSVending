@@ -193,7 +193,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
     try {
       const { sessionId, authToken } = await createClientFaceRecognitionSession(
         Number(companyId),
-        Number(selectedClient?.clientId)
+        Number(selectedClient?.clientId),
+        idFrontImageBase64
       );
       setAzureSessionId(sessionId);
       setAzureAuthToken(authToken);
