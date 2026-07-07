@@ -667,8 +667,16 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
         console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
       }
     } finally {
-      isAuthenticatingRef.current = false;
-      console.log('[BiometricLockGate] handleUnlock: finally, isAuthenticatingRef = false');
+      // The native biometric sheet fires its own "app resumed" event AFTER
+      // its dismiss animation finishes — this lags behind the JS promise
+      // resolving here. Clearing the guard immediately left a gap where that
+      // trailing event slipped through and re-locked the app right after a
+      // successful unlock (confirmed via device logs). Delaying the reset
+      // covers that gap.
+      setTimeout(() => {
+        isAuthenticatingRef.current = false;
+        console.log('[BiometricLockGate] handleUnlock: delayed reset, isAuthenticatingRef = false');
+      }, 1000);
     }
   };
 
