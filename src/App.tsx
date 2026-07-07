@@ -605,7 +605,10 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
   const isAuthenticatingRef = useRef(false);
 
   useEffect(() => {
+    console.log('[BiometricLockGate] effect running. isNative =', Capacitor.isNativePlatform(), 'isAuthenticated =', isAuthenticated);
+
     if (!Capacitor.isNativePlatform() || !isAuthenticated) {
+      console.log('[BiometricLockGate] bailing out early (native/auth check failed), setIsLocked(false)');
       setIsLocked(false);
       return;
     }
@@ -615,16 +618,30 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
     (async () => {
       const enabled = await isBiometricLockEnabled();
-      if (!cancelled && enabled) setIsLocked(true);
+      console.log('[BiometricLockGate] cold-start check: enabled =', enabled, 'cancelled =', cancelled);
+      if (!cancelled && enabled) {
+        console.log('[BiometricLockGate] cold-start: setIsLocked(true)');
+        setIsLocked(true);
+      }
 
       stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
-        if (!isActive || isAuthenticatingRef.current) return;
+        console.log('[BiometricLockGate] appStateChange fired. isActive =', isActive, 'isAuthenticatingRef =', isAuthenticatingRef.current);
+        if (!isActive || isAuthenticatingRef.current) {
+          console.log('[BiometricLockGate] appStateChange: ignoring (inactive or mid-authenticate)');
+          return;
+        }
         const stillEnabled = await isBiometricLockEnabled();
-        if (stillEnabled) setIsLocked(true);
+        console.log('[BiometricLockGate] appStateChange: stillEnabled =', stillEnabled);
+        if (stillEnabled) {
+          console.log('[BiometricLockGate] appStateChange: setIsLocked(true)');
+          setIsLocked(true);
+        }
       });
+      console.log('[BiometricLockGate] appStateChange listener attached');
     })();
 
     return () => {
+      console.log('[BiometricLockGate] effect cleanup, removing listener');
       cancelled = true;
       stateChangeHandle?.remove();
     };
@@ -636,28 +653,38 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // highlight but doesn't reliably remount the tab's outlet content, leaving a
   // blank screen. A full reload guarantees AppShell mounts cleanly.
   const handleUnlock = async () => {
+    console.log('[BiometricLockGate] handleUnlock: called, setting isAuthenticatingRef = true');
     isAuthenticatingRef.current = true;
     try {
       const ok = await authenticateBiometric('Desbloquea la app para continuar');
+      console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
       if (ok) {
+        console.log('[BiometricLockGate] handleUnlock: SUCCESS, setIsLocked(false) + navigating to /dashboard');
         setIsLocked(false);
         window.location.href = '/dashboard';
+      } else {
+        console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
       }
     } finally {
       isAuthenticatingRef.current = false;
+      console.log('[BiometricLockGate] handleUnlock: finally, isAuthenticatingRef = false');
     }
   };
 
   const handleLogout = () => {
+    console.log('[BiometricLockGate] handleLogout: called');
     setIsLocked(false);
     logout();
     history.push('/login');
   };
 
   const handleClose = () => {
+    console.log('[BiometricLockGate] handleClose: called, setIsLocked(false) + navigating to /dashboard');
     setIsLocked(false);
     window.location.href = '/dashboard';
   };
+
+  console.log('[BiometricLockGate] render. isLocked =', isLocked, 'isAuthenticated =', isAuthenticated);
 
   return (
     <>

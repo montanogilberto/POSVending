@@ -63,14 +63,17 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         isBiometricAvailable(),
         isBiometricLockEnabled(),
       ]);
+      console.log('[Login] mount check: available =', available, 'enabled =', enabled, 'isAuthenticated =', isAuthenticated);
       setBiometricSupported(available);
       setBiometricEnabledState(available && enabled);
     })();
   }, []);
 
   const handleBiometricToggle = async (nextValue: boolean) => {
+    console.log('[Login] handleBiometricToggle: nextValue =', nextValue, 'isAuthenticated =', isAuthenticated);
     if (nextValue) {
       const confirmed = await authenticateBiometric('Confirma tu identidad para activar el bloqueo biométrico');
+      console.log('[Login] handleBiometricToggle: authenticateBiometric confirmed =', confirmed);
       if (!confirmed) return;
     }
     await setBiometricLockEnabled(nextValue);
@@ -80,6 +83,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     // confirming the toggle just proved their identity, so continue straight in
     // instead of asking them to type credentials again.
     if (nextValue && isAuthenticated) {
+      console.log('[Login] handleBiometricToggle: already authenticated, redirecting by role =', roleCode);
       if (roleCode === 'borrower' || roleCode === 'lender') {
         history.push('/p2p-lending');
       } else if (roleCode === 'business' || roleCode === 'employee') {
@@ -87,6 +91,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       } else {
         history.push('/dashboard');
       }
+    } else {
+      console.log('[Login] handleBiometricToggle: not redirecting (nextValue/isAuthenticated false)');
     }
   };
 
