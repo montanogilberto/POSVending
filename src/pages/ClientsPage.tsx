@@ -379,7 +379,11 @@ const ClientsPage: React.FC = () => {
   // the local base64 still lets the user continue, and the final verify step
   // remains a fallback.
   const uploadCapturedImage = async (side: 'front' | 'back' | 'selfie', base64: string) => {
-    if (!createdClientId) return '';
+    console.log(`[Expediente] uploadCapturedImage(${side}): starting, createdClientId =`, createdClientId);
+    if (!createdClientId) {
+      console.log(`[Expediente] uploadCapturedImage(${side}): ABORT — no createdClientId`);
+      return '';
+    }
     try {
       const { blobUrl } = await uploadClientFaceRecognitionImage({
         companyId: Number(companyId),
@@ -387,6 +391,7 @@ const ClientsPage: React.FC = () => {
         side,
         imageBase64: base64.split(',')[1],
       });
+      console.log(`[Expediente] uploadCapturedImage(${side}): uploaded to blob →`, blobUrl);
       if (side === 'front') setIdFrontBlobUrl(blobUrl);
       const record = await upsertClientFaceRecognition(
         Number(companyId),
@@ -399,6 +404,7 @@ const ClientsPage: React.FC = () => {
           : { clientSelfieBlobUrl: blobUrl },
         clientFaceRecognitionIdRef.current
       );
+      console.log(`[Expediente] uploadCapturedImage(${side}): persisted, clientFaceRecognitionId =`, record.clientFaceRecognitionId);
       clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
       return blobUrl;
     } catch (err) {
@@ -447,6 +453,7 @@ const ClientsPage: React.FC = () => {
   };
 
   const startLivenessSession = async () => {
+    console.log('[Expediente] startLivenessSession: user tapped "Iniciar validación"');
     setCaptureSubStep('liveness-active');
     setLivenessStatus('in-progress');
   };
@@ -455,15 +462,18 @@ const ClientsPage: React.FC = () => {
   // from the live selfie challenge against one computed from the captured ID
   // photo, instead of round-tripping through Azure's liveness-with-verify API.
   const handleLivenessComplete = async (result: FaceLivenessResult) => {
+    console.log('[Expediente] handleLivenessComplete: liveness challenge finished, computing ID descriptor + match');
     setCaptureSubStep('processing');
     try {
       const idDescriptor = await getFaceDescriptorFromImage(idFrontImageBase64);
       if (!idDescriptor) {
+        console.log('[Expediente] handleLivenessComplete: no face found in ID image, aborting');
         throw new Error('No se detectó un rostro en la identificación capturada. Vuelve a capturar el documento.');
       }
 
       const { distance, isMatch } = compareFaceDescriptors(idDescriptor, result.descriptor);
       const confidence = distanceToConfidence(distance);
+      console.log('[Expediente] handleLivenessComplete: match result — distance =', distance.toFixed(4), 'confidence =', confidence.toFixed(4), 'isMatch =', isMatch);
 
       const selfieUrl = await uploadCapturedImage('selfie', result.selfieBase64);
 
@@ -473,6 +483,7 @@ const ClientsPage: React.FC = () => {
       setLivenessStatus(isMatch ? 'completed' : 'failed');
 
       if (clientFaceRecognitionIdRef.current) {
+        console.log('[Expediente] handleLivenessComplete: persisting confidenceScore/isVerified onto record', clientFaceRecognitionIdRef.current);
         await upsertClientFaceRecognition(
           Number(companyId),
           Number(createdClientId),
@@ -480,12 +491,16 @@ const ClientsPage: React.FC = () => {
           { confidenceScore: confidence, isVerified: isMatch },
           clientFaceRecognitionIdRef.current
         );
+        console.log('[Expediente] handleLivenessComplete: persisted successfully');
+      } else {
+        console.log('[Expediente] handleLivenessComplete: WARNING — no clientFaceRecognitionId yet, score not persisted');
       }
 
       toast(isMatch ? 'Validación facial completada correctamente.' : 'El rostro no coincide con la identificación. Vuelve a intentarlo.');
       setWizardStep(4);
       setCaptureSubStep('doc-intro');
     } catch (err) {
+      console.log('[Expediente] handleLivenessComplete: FAILED', err);
       setLivenessStatus('failed');
       toast((err as Error).message ?? 'No se pudo completar la validación facial. Vuelve a intentarlo.');
       setCaptureSubStep('liveness-intro');
@@ -493,6 +508,7 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleContinueToContract = () => {
+    console.log('[Expediente] handleContinueToContract: isVerified =', isVerified);
     if (!isVerified) {
       toast('La verificación facial no fue exitosa. Vuelve a capturar la validación facial.');
       return;
@@ -501,6 +517,7 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleSubmitContract = async () => {
+    console.log('[Expediente] handleSubmitContract: starting, contractAccepted =', contractAccepted, 'pagareAccepted =', pagareAccepted, 'isVerified =', isVerified, 'confidenceScore =', confidenceScore);
     if (!contractAccepted || !pagareAccepted) { toast('Por favor acepta los términos del contrato y el pagaré.'); return; }
     setWizardLoading(true);
     try {
@@ -522,9 +539,21 @@ const ClientsPage: React.FC = () => {
         hasPhysicalPagare,
         userId: 0,
       };
+      console.log('[Expediente] handleSubmitContract: submitting payload', {
+        clientId: payload.clientId,
+        documentType: payload.documentType,
+        idFrontImageBlobUrl: payload.idFrontImageBlobUrl,
+        clientSelfieBlobUrl: payload.clientSelfieBlobUrl,
+        confidenceScore: payload.confidenceScore,
+        isVerified: payload.isVerified,
+      });
       const res = await submitContractClientFaceRecognition(payload);
-      if (res.error) { toast(`Error: ${res.msg || res.error}`); }
-      else {
+      console.log('[Expediente] handleSubmitContract: response =', res);
+      if (res.error) {
+        console.log('[Expediente] handleSubmitContract: backend returned an error', res.error, res.msg);
+        toast(`Error: ${res.msg || res.error}`);
+      } else {
+        console.log('[Expediente] handleSubmitContract: SUCCESS — record persisted, creating Stripe account');
         toast('¡Contrato enviado! Configurando cuenta de pagos...');
         // Create Stripe Connected Account for this client
         try {
@@ -533,17 +562,20 @@ const ClientsPage: React.FC = () => {
             Number(companyId),
             newClient.email ?? `client${createdClientId}@posgmo.mx`,
           );
+          console.log('[Expediente] handleSubmitContract: Stripe account created =', acct?.account?.connectedAccountId);
           if (acct?.account?.connectedAccountId) {
             setStripeAccountId(acct.account.connectedAccountId);
           }
           const link = await stripeGetOnboardingLink(Number(createdClientId), Number(companyId));
           if (link?.url) setStripeOnboardingUrl(link.url);
-        } catch {
+        } catch (stripeErr) {
+          console.log('[Expediente] handleSubmitContract: Stripe account creation FAILED', stripeErr);
           toast('Contrato guardado. No se pudo crear cuenta Stripe.');
         }
         setWizardStep(6);
       }
     } catch (err) {
+      console.log('[Expediente] handleSubmitContract: FAILED', err);
       toast((err as Error).message ?? 'Error al enviar el contrato');
     } finally { setWizardLoading(false); }
   };

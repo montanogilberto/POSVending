@@ -51,10 +51,18 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   }, []);
 
   const finish = useCallback(() => {
+    console.log('[FaceLivenessCapture] finish: challenge completed, capturing selfie frame');
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     const detection = lastDetectionRef.current;
-    if (!video || !canvas || !detection) return;
+    if (!video || !canvas || !detection) {
+      console.log('[FaceLivenessCapture] finish: ABORT — missing video/canvas/detection', {
+        hasVideo: !!video,
+        hasCanvas: !!canvas,
+        hasDetection: !!detection,
+      });
+      return;
+    }
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -62,10 +70,14 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const selfieBase64 = canvas.toDataURL('image/jpeg', 0.92);
+    console.log('[FaceLivenessCapture] finish: selfie captured, base64 length =', selfieBase64.length);
 
     stopStream();
     setState('captured');
-    setTimeout(() => onComplete({ selfieBase64, descriptor: detection.descriptor }), 500);
+    setTimeout(() => {
+      console.log('[FaceLivenessCapture] finish: calling onComplete()');
+      onComplete({ selfieBase64, descriptor: detection.descriptor });
+    }, 500);
   }, [onComplete, stopStream]);
 
   const tick = useCallback(
@@ -95,10 +107,17 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       }
 
       lastDetectionRef.current = detection;
-      setState((prev) => (prev === 'loading-models' || prev === 'starting-camera' || prev === 'searching' ? 'challenge' : prev));
+      setState((prev) => {
+        if (prev === 'loading-models' || prev === 'starting-camera' || prev === 'searching') {
+          console.log(`[FaceLivenessCapture] tick: face acquired, presenting challenge "${challenge}"`);
+          return 'challenge';
+        }
+        return prev;
+      });
 
       const completed = evaluateChallengeFrame(challenge, detection, challengeStateRef.current);
       if (completed && !doneRef.current) {
+        console.log(`[FaceLivenessCapture] tick: challenge "${challenge}" satisfied → finishing`);
         doneRef.current = true;
         finish();
         return;
@@ -111,6 +130,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
   const startCameraAndLoop = useCallback(
     async (skipModelLoad: boolean) => {
+      console.log('[FaceLivenessCapture] startCameraAndLoop: starting, skipModelLoad =', skipModelLoad);
       try {
         if (!skipModelLoad) {
           setState('loading-models');
@@ -119,17 +139,21 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
         setState('starting-camera');
         if (Capacitor.isNativePlatform()) {
+          console.log('[FaceLivenessCapture] startCameraAndLoop: native platform, requesting camera permission');
           const status = await Camera.requestPermissions({ permissions: ['camera'] });
+          console.log('[FaceLivenessCapture] startCameraAndLoop: camera permission status =', status.camera);
           if (status.camera !== 'granted' && status.camera !== 'limited') {
             throw new DOMException('Camera permission was not granted.', 'NotAllowedError');
           }
         }
 
+        console.log('[FaceLivenessCapture] startCameraAndLoop: calling getUserMedia (front camera)');
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
         });
         if (doneRef.current) {
+          console.log('[FaceLivenessCapture] startCameraAndLoop: already done by the time stream resolved, stopping tracks');
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
@@ -139,9 +163,11 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
           video.srcObject = stream;
           await video.play();
         }
+        console.log('[FaceLivenessCapture] startCameraAndLoop: camera stream started, entering detection loop');
         setState('searching');
         rafRef.current = requestAnimationFrame(tick);
       } catch (err) {
+        console.log('[FaceLivenessCapture] startCameraAndLoop: FAILED', err);
         setState('error');
         setErrorMessage(
           (err as Error).name === 'NotAllowedError'
@@ -154,9 +180,11 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   );
 
   useEffect(() => {
+    console.log('[FaceLivenessCapture] mount: initial challenge =', challenge);
     startCameraAndLoop(false);
 
     return () => {
+      console.log('[FaceLivenessCapture] unmount: stopping stream');
       doneRef.current = true;
       stopStream();
     };
@@ -164,6 +192,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   }, []);
 
   const retry = () => {
+    console.log('[FaceLivenessCapture] retry: user requested retry after error');
     challengeStateRef.current = newChallengeState();
     lastDetectionRef.current = null;
     doneRef.current = false;

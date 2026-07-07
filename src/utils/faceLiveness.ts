@@ -15,12 +15,24 @@ let modelsLoadedPromise: Promise<void> | null = null;
 
 export function loadFaceApiModels(): Promise<void> {
   if (!modelsLoadedPromise) {
+    console.log('[FaceLiveness] loadFaceApiModels: starting model download from', MODEL_URL);
+    const startedAt = Date.now();
     modelsLoadedPromise = Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
       faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-    ]).then(() => undefined);
+    ])
+      .then(() => {
+        console.log(`[FaceLiveness] loadFaceApiModels: all models loaded in ${Date.now() - startedAt}ms`);
+      })
+      .catch((err) => {
+        console.log('[FaceLiveness] loadFaceApiModels: FAILED', err);
+        modelsLoadedPromise = null; // allow a retry instead of caching a rejected promise forever
+        throw err;
+      });
+  } else {
+    console.log('[FaceLiveness] loadFaceApiModels: already loaded/loading, reusing cached promise');
   }
   return modelsLoadedPromise;
 }
@@ -45,13 +57,16 @@ async function detectFace(input: faceapi.TNetInput): Promise<FaceDetectionResult
 
 export async function detectFaceFromVideo(video: HTMLVideoElement): Promise<FaceDetectionResult | null> {
   await loadFaceApiModels();
-  return detectFace(video);
+  const result = await detectFace(video);
+  console.log('[FaceLiveness] detectFaceFromVideo: face', result ? 'DETECTED' : 'not detected this frame');
+  return result;
 }
 
 // Loads a base64/data-URL image (e.g. the captured ID front photo) into an
 // HTMLImageElement and runs the same detection pipeline, so the ID descriptor
 // and the live-selfie descriptor are computed the exact same way.
 export async function getFaceDescriptorFromImage(base64OrDataUrl: string): Promise<Float32Array | null> {
+  console.log('[FaceLiveness] getFaceDescriptorFromImage: starting, input length =', base64OrDataUrl.length);
   await loadFaceApiModels();
   const dataUrl = base64OrDataUrl.startsWith('data:')
     ? base64OrDataUrl
@@ -64,14 +79,18 @@ export async function getFaceDescriptorFromImage(base64OrDataUrl: string): Promi
   });
   img.src = dataUrl;
   await loaded;
+  console.log('[FaceLiveness] getFaceDescriptorFromImage: image decoded', img.naturalWidth, 'x', img.naturalHeight);
 
   const result = await detectFace(img);
+  console.log('[FaceLiveness] getFaceDescriptorFromImage: result =', result ? 'face found, descriptor computed' : 'NO FACE FOUND in ID image');
   return result?.descriptor ?? null;
 }
 
 export function compareFaceDescriptors(a: Float32Array, b: Float32Array): { distance: number; isMatch: boolean } {
   const distance = faceapi.euclideanDistance(a, b);
-  return { distance, isMatch: distance <= MATCH_DISTANCE_THRESHOLD };
+  const isMatch = distance <= MATCH_DISTANCE_THRESHOLD;
+  console.log('[FaceLiveness] compareFaceDescriptors: distance =', distance.toFixed(4), '| threshold =', MATCH_DISTANCE_THRESHOLD, '| isMatch =', isMatch);
+  return { distance, isMatch };
 }
 
 // Converts a face-match distance (0 = identical, ~1.5 = very different) into
@@ -95,7 +114,9 @@ export const CHALLENGE_LABEL: Record<LivenessChallenge, string> = {
 };
 
 export function pickRandomChallenge(): LivenessChallenge {
-  return LIVENESS_CHALLENGES[Math.floor(Math.random() * LIVENESS_CHALLENGES.length)];
+  const challenge = LIVENESS_CHALLENGES[Math.floor(Math.random() * LIVENESS_CHALLENGES.length)];
+  console.log('[FaceLiveness] pickRandomChallenge:', challenge);
+  return challenge;
 }
 
 function eyeAspectRatio(eye: faceapi.Point[]): number {
@@ -135,8 +156,10 @@ export function evaluateChallengeFrame(
   if (challenge === 'blink') {
     const ear = (eyeAspectRatio(detection.landmarks.getLeftEye()) + eyeAspectRatio(detection.landmarks.getRightEye())) / 2;
     if (ear < EAR_CLOSED_THRESHOLD) {
+      if (!state.earWasClosed) console.log('[FaceLiveness] evaluateChallengeFrame[blink]: eyes closed detected, EAR =', ear.toFixed(3));
       state.earWasClosed = true;
     } else if (state.earWasClosed) {
+      console.log('[FaceLiveness] evaluateChallengeFrame[blink]: eyes reopened, EAR =', ear.toFixed(3), '→ challenge COMPLETE');
       state.triggered = true;
     }
     return state.triggered;
@@ -144,6 +167,7 @@ export function evaluateChallengeFrame(
 
   if (challenge === 'smile') {
     if (detection.expressions.happy >= SMILE_HAPPY_THRESHOLD) {
+      if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[smile]: happy =', detection.expressions.happy.toFixed(3), '→ challenge COMPLETE');
       state.triggered = true;
     }
     return state.triggered;
@@ -162,7 +186,13 @@ export function evaluateChallengeFrame(
 
   // Note: video is mirrored (selfie view), so a user turning their head to
   // their own left moves the nose to the right of the mirrored frame.
-  if (challenge === 'turn-left' && offsetRatio > TURN_OFFSET_RATIO) state.triggered = true;
-  if (challenge === 'turn-right' && offsetRatio < -TURN_OFFSET_RATIO) state.triggered = true;
+  if (challenge === 'turn-left' && offsetRatio > TURN_OFFSET_RATIO) {
+    if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[turn-left]: offsetRatio =', offsetRatio.toFixed(3), '→ challenge COMPLETE');
+    state.triggered = true;
+  }
+  if (challenge === 'turn-right' && offsetRatio < -TURN_OFFSET_RATIO) {
+    if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[turn-right]: offsetRatio =', offsetRatio.toFixed(3), '→ challenge COMPLETE');
+    state.triggered = true;
+  }
   return state.triggered;
 }

@@ -160,7 +160,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // the local base64 still lets the user continue, and the final verify step
   // remains a fallback.
   const uploadCapturedImage = async (side: 'front' | 'back' | 'selfie', base64: string) => {
-    if (!selectedClient) return '';
+    console.log(`[Expediente] uploadCapturedImage(${side}): starting, clientId =`, selectedClient?.clientId);
+    if (!selectedClient) {
+      console.log(`[Expediente] uploadCapturedImage(${side}): ABORT — no selectedClient`);
+      return '';
+    }
     try {
       const { blobUrl } = await uploadClientFaceRecognitionImage({
         companyId: Number(companyId),
@@ -168,6 +172,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         side,
         imageBase64: base64.split(',')[1],
       });
+      console.log(`[Expediente] uploadCapturedImage(${side}): uploaded to blob →`, blobUrl);
       if (side === 'front') setIdFrontImageBlobUrl(blobUrl);
       const record = await upsertClientFaceRecognition(
         Number(companyId),
@@ -180,6 +185,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           : { clientSelfieBlobUrl: blobUrl },
         clientFaceRecognitionIdRef.current
       );
+      console.log(`[Expediente] uploadCapturedImage(${side}): persisted, clientFaceRecognitionId =`, record.clientFaceRecognitionId);
       clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
       return blobUrl;
     } catch (err) {
@@ -189,8 +195,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const startLivenessSession = async () => {
+    console.log('[Expediente] startLivenessSession: user tapped "Iniciar proceso"');
     if (await isBiometricLockEnabled()) {
+      console.log('[Expediente] startLivenessSession: biometric lock enabled, requesting device confirmation first');
       const confirmed = await authenticateBiometric('Confirma tu identidad para iniciar la verificación');
+      console.log('[Expediente] startLivenessSession: biometric confirmation result =', confirmed);
       if (!confirmed) return;
     }
     setError('');
@@ -202,15 +211,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // from the live selfie challenge against one computed from the captured ID
   // photo, instead of round-tripping through Azure's liveness-with-verify API.
   const handleLivenessComplete = async (result: FaceLivenessResult) => {
+    console.log('[Expediente] handleLivenessComplete: liveness challenge finished, computing ID descriptor + match');
     setCaptureSubStep('processing');
     try {
       const idDescriptor = await getFaceDescriptorFromImage(idFrontImageBase64);
       if (!idDescriptor) {
+        console.log('[Expediente] handleLivenessComplete: no face found in ID image, aborting');
         throw new Error('No se detectó un rostro en la identificación capturada. Vuelve a capturar el documento.');
       }
 
       const { distance, isMatch } = compareFaceDescriptors(idDescriptor, result.descriptor);
       const confidence = distanceToConfidence(distance);
+      console.log('[Expediente] handleLivenessComplete: match result — distance =', distance.toFixed(4), 'confidence =', confidence.toFixed(4), 'isMatch =', isMatch);
 
       const selfieBlobUrl = await uploadCapturedImage('selfie', result.selfieBase64);
 
@@ -220,6 +232,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setLivenessStatus(isMatch ? 'completed' : 'failed');
 
       if (clientFaceRecognitionIdRef.current) {
+        console.log('[Expediente] handleLivenessComplete: persisting confidenceScore/isVerified onto record', clientFaceRecognitionIdRef.current);
         await upsertClientFaceRecognition(
           Number(companyId),
           Number(selectedClient?.clientId),
@@ -227,6 +240,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
           { confidenceScore: confidence, isVerified: isMatch },
           clientFaceRecognitionIdRef.current
         );
+        console.log('[Expediente] handleLivenessComplete: persisted successfully');
+      } else {
+        console.log('[Expediente] handleLivenessComplete: WARNING — no clientFaceRecognitionId yet, score not persisted');
       }
 
       setToastMessage(
@@ -236,6 +252,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setStep(2);
       setCaptureSubStep('doc-intro');
     } catch (err) {
+      console.log('[Expediente] handleLivenessComplete: FAILED', err);
       setLivenessStatus('failed');
       setError((err as Error).message ?? 'No se pudo completar la validación facial. Vuelve a intentarlo.');
       setShowToast(true);
@@ -244,6 +261,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const handleContinueToContract = () => {
+    console.log('[Expediente] handleContinueToContract: isVerified =', isVerified);
     if (!isVerified) {
       setError('La verificación facial no fue exitosa. Vuelve a capturar la validación facial.');
       setShowToast(true);
@@ -272,6 +290,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const handleSubmitContract = async () => {
+    console.log('[Expediente] handleSubmitContract: starting, contractAccepted =', contractAccepted, 'isVerified =', isVerified, 'confidenceScore =', confidenceScore);
     if (!contractAccepted) {
       setError('Por favor acepta los términos del contrato para continuar.');
       setShowToast(true);
@@ -301,19 +320,31 @@ const ClientFaceRecognitionPage: React.FC = () => {
         hasPhysicalPagare,
         userId: 0,
       };
+      console.log('[Expediente] handleSubmitContract: submitting payload', {
+        clientId: payload.clientId,
+        documentType: payload.documentType,
+        idFrontImageBlobUrl: payload.idFrontImageBlobUrl,
+        clientSelfieBlobUrl: payload.clientSelfieBlobUrl,
+        confidenceScore: payload.confidenceScore,
+        isVerified: payload.isVerified,
+      });
 
       const response = await submitContractClientFaceRecognition(payload);
+      console.log('[Expediente] handleSubmitContract: response =', response);
 
       if (response.error) {
+        console.log('[Expediente] handleSubmitContract: backend returned an error', response.error, response.msg);
         setError(response.error);
         setToastMessage(`Error al enviar el contrato: ${response.msg || ''}`);
         setShowToast(true);
       } else {
+        console.log('[Expediente] handleSubmitContract: SUCCESS — record persisted, resetting wizard');
         setToastMessage('¡Contrato aceptado y enviado exitosamente!');
         setShowToast(true);
         resetWizard();
       }
     } catch (err) {
+      console.log('[Expediente] handleSubmitContract: FAILED', err);
       setError((err as Error).message ?? 'Error al enviar el contrato');
       setShowToast(true);
     } finally {
