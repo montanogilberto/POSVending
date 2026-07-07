@@ -10,7 +10,8 @@
     "test.e2e": "cypress run",
     "test.unit": "vitest",
     "lint": "eslint",
-    "postinstall": "node scripts/postinstall-face-assets.js"
+    "postinstall": "node scripts/postinstall-face-assets.js",
+    "capacitor:sync:after": "node scripts/ensure-ios-permissions.js"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^9.1.2",
