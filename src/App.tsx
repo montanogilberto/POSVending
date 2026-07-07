@@ -647,11 +647,12 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
     };
   }, [isAuthenticated]);
 
-  // Hard navigation (not history.push) is deliberate here: /dashboard is a tab
-  // route owned by AppShell's own nested IonTabs/IonRouterOutlet. This gate
-  // lives above that tree, so a plain history.push updates the URL and tab-bar
-  // highlight but doesn't reliably remount the tab's outlet content, leaving a
-  // blank screen. A full reload guarantees AppShell mounts cleanly.
+  // IMPORTANT: use history.push here, NOT window.location.href. A hard
+  // navigation reloads the entire page — which remounts BiometricLockGate
+  // itself from scratch, re-running the cold-start check and immediately
+  // re-locking the app in an infinite loop (confirmed via device logs: close
+  // → reload → re-lock → close → reload → re-lock...). history.push is a
+  // normal in-SPA navigation and does not remount this component.
   const handleUnlock = async () => {
     console.log('[BiometricLockGate] handleUnlock: called, setting isAuthenticatingRef = true');
     isAuthenticatingRef.current = true;
@@ -661,7 +662,7 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
       if (ok) {
         console.log('[BiometricLockGate] handleUnlock: SUCCESS, setIsLocked(false) + navigating to /dashboard');
         setIsLocked(false);
-        window.location.href = '/dashboard';
+        history.push('/dashboard');
       } else {
         console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
       }
@@ -681,7 +682,7 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
   const handleClose = () => {
     console.log('[BiometricLockGate] handleClose: called, setIsLocked(false) + navigating to /dashboard');
     setIsLocked(false);
-    window.location.href = '/dashboard';
+    history.push('/dashboard');
   };
 
   console.log('[BiometricLockGate] render. isLocked =', isLocked, 'isAuthenticated =', isAuthenticated);
