@@ -291,23 +291,6 @@
   color: var(--ion-color-primary);
 }
 
-/* Hosts the <azure-ai-vision-face-ui> element, which renders its own camera,
-   face-centering guide, head-turn challenge, and error/retry UI internally. */
-.cfr-liveness-sdk-container {
-  width: 100%;
-  aspect-ratio: 3/4;
-  border-radius: 14px;
-  overflow: hidden;
-  background: #111;
-  position: relative;
-}
-
-.cfr-liveness-sdk-container azure-ai-vision-face-ui {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
 /* Processing screen */
 .cfr-processing-screen {
   display: flex;

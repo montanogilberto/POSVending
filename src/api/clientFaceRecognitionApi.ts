@@ -36,28 +36,6 @@ export interface ClientFaceRecognitionListResponse {
   clientFaceRecognitions: ClientFaceRecognition[];
 }
 
-export interface CreateLivenessSessionResponse {
-  sessionId: string;
-  authToken: string;
-}
-
-export interface FaceVerificationRequest {
-  companyId: number;
-  clientId: number;
-  documentType: string;
-  idFrontImageBase64: string;
-  idBackImageBase64: string;
-  azureSessionId: string;
-}
-
-export interface FaceVerificationResponse {
-  isVerified: boolean;
-  confidenceScore: number;
-  idFrontImageBlobUrl: string;
-  clientSelfieBlobUrl: string;
-  error?: string;
-}
-
 export interface ContractSubmissionRequest {
   companyId: number;
   clientId: number;
@@ -189,51 +167,6 @@ export async function upsertClientFaceRecognition(
     hasPhysicalPagare: false,
     ...patch,
   });
-}
-
-// CREATE SESSION -- POST /api/clientFaceRecognition/create-session
-// Azure's "Liveness With Verify" session requires the reference (ID) image to
-// be attached at creation time — it can't be added afterward — so the front
-// ID capture must already exist before calling this.
-export async function createClientFaceRecognitionSession(
-  companyId?: number,
-  clientId?: number,
-  idFrontImageBase64?: string
-): Promise<CreateLivenessSessionResponse> {
-  const payload = {
-    companyId: companyId ?? null,
-    clientId: clientId ?? null,
-    idFrontImageBase64: (idFrontImageBase64 ?? "").split(",").pop() ?? "",
-    source: "web",
-    createdAt: new Date().toISOString(),
-  };
-
-  console.log("[FaceRecognition][create-session] Request URL:", BASE_URL + "/api/clientFaceRecognition/create-session");
-  console.log("[FaceRecognition][create-session] Request payload:", payload);
-
-  const res = await fetch(BASE_URL + "/api/clientFaceRecognition/create-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const raw = await res.text();
-  console.log("[FaceRecognition][create-session] Response status:", res.status);
-  console.log("[FaceRecognition][create-session] Response body:", raw);
-
-  if (!res.ok) throw new Error(raw || `create-session failed with status ${res.status}`);
-  return JSON.parse(raw);
-}
-
-// VERIFY -- POST /api/clientFaceRecognition/verify
-export async function verifyClientFaceRecognition(payload: FaceVerificationRequest): Promise<FaceVerificationResponse> {
-  const res = await fetch(BASE_URL + "/api/clientFaceRecognition/verify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return await res.json();
 }
 
 // CONTRACT -- POST /api/clientFaceRecognition/contract

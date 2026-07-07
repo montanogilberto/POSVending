@@ -25,18 +25,17 @@ import AlertPopover from '../components/PopOver/AlertPopover';
 import MailPopover from '../components/PopOver/MailPopover';
 import ClientSelector from '../components/ClientSelector';
 import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
+import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
 import { useUser } from '../components/UserContext';
 import { Client } from '../api/clientsApi';
 import {
-  createClientFaceRecognitionSession,
-  verifyClientFaceRecognition,
   submitContractClientFaceRecognition,
   uploadClientFaceRecognitionImage,
   upsertClientFaceRecognition,
-  FaceVerificationResponse,
   ContractSubmissionRequest,
 } from '../api/clientFaceRecognitionApi';
 import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
+import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../utils/faceLiveness';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -90,10 +89,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [pagareAccepted, setPagareAccepted] = useState<boolean>(false);
   const [hasPhysicalPagare, setHasPhysicalPagare] = useState<boolean>(false);
   const [contractAcceptedAt, setContractAcceptedAt] = useState<string>('');
-  const [azureSessionId, setAzureSessionId] = useState<string>('');
-  const [azureAuthToken, setAzureAuthToken] = useState<string>('');
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
-  const livenessContainerRef = useRef<HTMLDivElement>(null);
   // Tracks the ClientFaceRecognition row created on first capture, so later
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
@@ -113,7 +109,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         return false;
       }
     }
-    if (step === 1 && (!idFrontImageBase64 || !idBackImageBase64 || !azureSessionId)) {
+    if (step === 1 && (!idFrontImageBase64 || !idBackImageBase64 || livenessStatus !== 'completed')) {
       setError('Por favor completa la captura del documento y la validación facial.');
       setShowToast(true);
       return false;
@@ -163,8 +159,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // the user closes the wizard before finishing. Failures here are non-fatal:
   // the local base64 still lets the user continue, and the final verify step
   // remains a fallback.
-  const uploadCapturedImage = async (side: 'front' | 'back', base64: string) => {
-    if (!selectedClient) return;
+  const uploadCapturedImage = async (side: 'front' | 'back' | 'selfie', base64: string) => {
+    if (!selectedClient) return '';
     try {
       const { blobUrl } = await uploadClientFaceRecognitionImage({
         companyId: Number(companyId),
@@ -172,16 +168,23 @@ const ClientFaceRecognitionPage: React.FC = () => {
         side,
         imageBase64: base64.split(',')[1],
       });
+      if (side === 'front') setIdFrontImageBlobUrl(blobUrl);
       const record = await upsertClientFaceRecognition(
         Number(companyId),
         selectedClient.clientId,
         documentType,
-        side === 'front' ? { idFrontImageBlobUrl: blobUrl } : { idBackImageBlobUrl: blobUrl },
+        side === 'front'
+          ? { idFrontImageBlobUrl: blobUrl }
+          : side === 'back'
+          ? { idBackImageBlobUrl: blobUrl }
+          : { clientSelfieBlobUrl: blobUrl },
         clientFaceRecognitionIdRef.current
       );
       clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
+      return blobUrl;
     } catch (err) {
       console.error(`[Expediente] Failed to upload ${side} ID image early:`, err);
+      return '';
     }
   };
 
@@ -190,119 +193,63 @@ const ClientFaceRecognitionPage: React.FC = () => {
       const confirmed = await authenticateBiometric('Confirma tu identidad para iniciar la verificación');
       if (!confirmed) return;
     }
-
-    setCaptureSubStep('liveness-active');
-    setLivenessStatus('in-progress');
     setError('');
+    setLivenessStatus('in-progress');
+    setCaptureSubStep('liveness-active');
+  };
 
-    let detector: HTMLElementTagNameMap['azure-ai-vision-face-ui'] | null = null;
+  // Runs entirely client-side via face-api.js: compares the descriptor computed
+  // from the live selfie challenge against one computed from the captured ID
+  // photo, instead of round-tripping through Azure's liveness-with-verify API.
+  const handleLivenessComplete = async (result: FaceLivenessResult) => {
+    setCaptureSubStep('processing');
     try {
-      const { sessionId, authToken } = await createClientFaceRecognitionSession(
-        Number(companyId),
-        Number(selectedClient?.clientId),
-        idFrontImageBase64
-      );
-      setAzureSessionId(sessionId);
-      setAzureAuthToken(authToken);
-
-      // Registers the <azure-ai-vision-face-ui> custom element (side-effect import).
-      await import('@azure/ai-vision-face-ui/FaceLivenessDetector.js');
-
-      const container = livenessContainerRef.current;
-      if (!container) {
-        throw new Error('No se pudo inicializar la cámara de validación facial.');
+      const idDescriptor = await getFaceDescriptorFromImage(idFrontImageBase64);
+      if (!idDescriptor) {
+        throw new Error('No se detectó un rostro en la identificación capturada. Vuelve a capturar el documento.');
       }
 
-      detector = document.createElement('azure-ai-vision-face-ui');
-      container.appendChild(detector);
+      const { distance, isMatch } = compareFaceDescriptors(idDescriptor, result.descriptor);
+      const confidence = distanceToConfidence(distance);
 
-      // The SDK owns the entire UI from here: face-centering guide, head-turn
-      // challenge, and "movimiento incorrecto" retry screens are all rendered
-      // internally. This promise only resolves once the user completes (or
-      // permanently fails) that flow.
-      await detector.start(authToken);
+      const selfieBlobUrl = await uploadCapturedImage('selfie', result.selfieBase64);
 
-      setLivenessStatus('completed');
-      setCaptureSubStep('processing');
-      setToastMessage('Validación facial completada correctamente.');
+      setConfidenceScore(confidence);
+      setIsVerified(isMatch);
+      setClientSelfieBlobUrl(selfieBlobUrl);
+      setLivenessStatus(isMatch ? 'completed' : 'failed');
+
+      if (clientFaceRecognitionIdRef.current) {
+        await upsertClientFaceRecognition(
+          Number(companyId),
+          Number(selectedClient?.clientId),
+          documentType,
+          { confidenceScore: confidence, isVerified: isMatch },
+          clientFaceRecognitionIdRef.current
+        );
+      }
+
+      setToastMessage(
+        isMatch ? 'Validación facial completada correctamente.' : 'El rostro no coincide con la identificación. Vuelve a intentarlo.'
+      );
       setShowToast(true);
-      setTimeout(() => {
-        setStep(2);
-        setCaptureSubStep('doc-intro');
-      }, 1200);
+      setStep(2);
+      setCaptureSubStep('doc-intro');
     } catch (err) {
       setLivenessStatus('failed');
       setError((err as Error).message ?? 'No se pudo completar la validación facial. Vuelve a intentarlo.');
       setShowToast(true);
       setCaptureSubStep('liveness-intro');
-    } finally {
-      // React may have already unmounted the container (e.g. user navigated
-      // away mid-session), which detaches detector along with it — guard
-      // against removeChild throwing on a node that's no longer a child.
-      if (detector?.parentElement) {
-        try {
-          detector.parentElement.removeChild(detector);
-        } catch {
-          // Already removed; nothing to do.
-        }
-      }
     }
   };
 
-  const handleVerify = async () => {
-    if (!validateStep()) return;
-
-    setLoading(true);
-    setError('');
-    try {
-      const response: FaceVerificationResponse = await verifyClientFaceRecognition({
-        companyId: Number(companyId),
-        clientId: Number(selectedClient?.clientId),
-        documentType,
-        idFrontImageBase64: idFrontImageBase64.split(',')[1],
-        idBackImageBase64: idBackImageBase64.split(',')[1],
-        azureSessionId,
-      });
-
-      setConfidenceScore(response.confidenceScore);
-      setIsVerified(response.isVerified);
-      setIdFrontImageBlobUrl(response.idFrontImageBlobUrl);
-      setClientSelfieBlobUrl(response.clientSelfieBlobUrl);
-
-      if (response.error) {
-        setError(response.error);
-        setShowToast(true);
-      } else {
-        // Persist the score/selfie onto the same row the captures already
-        // created, rather than leaving it only in local component state.
-        try {
-          const record = await upsertClientFaceRecognition(
-            Number(companyId),
-            Number(selectedClient?.clientId),
-            documentType,
-            {
-              confidenceScore: response.confidenceScore,
-              isVerified: response.isVerified,
-              idFrontImageBlobUrl: response.idFrontImageBlobUrl,
-              clientSelfieBlobUrl: response.clientSelfieBlobUrl,
-            },
-            clientFaceRecognitionIdRef.current
-          );
-          clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
-        } catch (persistErr) {
-          console.error('[Expediente] Failed to persist verification score:', persistErr);
-        }
-
-        setToastMessage('¡Verificación completada!');
-        setShowToast(true);
-        setStep(3);
-      }
-    } catch (err) {
-      setError((err as Error).message ?? 'Error durante la verificación biométrica');
+  const handleContinueToContract = () => {
+    if (!isVerified) {
+      setError('La verificación facial no fue exitosa. Vuelve a capturar la validación facial.');
       setShowToast(true);
-    } finally {
-      setLoading(false);
+      return;
     }
+    setStep(3);
   };
 
   const resetWizard = () => {
@@ -320,8 +267,6 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setPagareAccepted(false);
     setHasPhysicalPagare(false);
     setContractAcceptedAt('');
-    setAzureSessionId('');
-    setAzureAuthToken('');
     setLivenessStatus('idle');
     clientFaceRecognitionIdRef.current = undefined;
   };
@@ -497,8 +442,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
           </button>
         )}
         {step === 2 && (
-          <button className="wizard-footer-submit" onClick={handleVerify} disabled={loading}>
-            Verificar biometría
+          <button className="wizard-footer-submit" onClick={handleContinueToContract} disabled={loading}>
+            Continuar
           </button>
         )}
         {step === 3 && (
@@ -614,9 +559,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
       return (
         <IonCard className="client-face-recognition-step-card cfr-capture-card">
           <IonCardContent>
-            <h2 className="cfr-capture-title">Movimientos de cabeza</h2>
+            <h2 className="cfr-capture-title">Validación de vida</h2>
             <p className="cfr-capture-desc">Coloca tu cara al centro y sigue las indicaciones en pantalla.</p>
-            <div ref={livenessContainerRef} className="cfr-liveness-sdk-container" />
+            <FaceLivenessCapture
+              onComplete={handleLivenessComplete}
+              onCancel={() => setCaptureSubStep('liveness-intro')}
+            />
           </IonCardContent>
         </IonCard>
       );
@@ -709,7 +657,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <div className="ion-margin-top">
               <p><strong>Cliente:</strong> {selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}` : '—'}</p>
               <p><strong>Documento:</strong> {documentType || '—'}</p>
-              <p><strong>Sesión Azure:</strong> {azureSessionId ? 'Iniciada ✓' : 'Pendiente'}</p>
+              <p><strong>Coincidencia facial:</strong> {isVerified ? `Verificada ✓ (${(confidenceScore * 100).toFixed(1)}%)` : 'No verificada'}</p>
               <p><strong>Liveness:</strong> {livenessStatus}</p>
             </div>
           </IonCardContent>
