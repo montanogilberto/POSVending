@@ -19,6 +19,7 @@ export function loadFaceApiModels(): Promise<void> {
     const startedAt = Date.now();
     modelsLoadedPromise = Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
       faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
@@ -37,7 +38,16 @@ export function loadFaceApiModels(): Promise<void> {
   return modelsLoadedPromise;
 }
 
-const DETECTOR_OPTIONS = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+// Tuned for the live selfie challenge: a face filling most of the frame,
+// needs to run every ~150ms, so speed matters more than sensitivity.
+const VIDEO_DETECTOR_OPTIONS = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+
+// Tuned for a captured ID card photo: the face is a small photo within a much
+// larger document image, so TinyFaceDetector (built for a face filling the
+// frame) misses it entirely. SsdMobilenetv1 is slower but far more accurate
+// for small/varied face sizes — acceptable here since this only runs once on
+// a static image, not in a real-time loop.
+const ID_IMAGE_DETECTOR_OPTIONS = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
 
 export type FaceDetectionResult = {
   descriptor: Float32Array;
@@ -45,9 +55,12 @@ export type FaceDetectionResult = {
   expressions: faceapi.FaceExpressions;
 };
 
-async function detectFace(input: faceapi.TNetInput): Promise<FaceDetectionResult | null> {
+async function detectFace(
+  input: faceapi.TNetInput,
+  options: faceapi.TinyFaceDetectorOptions | faceapi.SsdMobilenetv1Options
+): Promise<FaceDetectionResult | null> {
   const result = await faceapi
-    .detectSingleFace(input, DETECTOR_OPTIONS)
+    .detectSingleFace(input, options)
     .withFaceLandmarks()
     .withFaceExpressions()
     .withFaceDescriptor();
@@ -57,7 +70,7 @@ async function detectFace(input: faceapi.TNetInput): Promise<FaceDetectionResult
 
 export async function detectFaceFromVideo(video: HTMLVideoElement): Promise<FaceDetectionResult | null> {
   await loadFaceApiModels();
-  const result = await detectFace(video);
+  const result = await detectFace(video, VIDEO_DETECTOR_OPTIONS);
   console.log('[FaceLiveness] detectFaceFromVideo: face', result ? 'DETECTED' : 'not detected this frame');
   return result;
 }
@@ -81,7 +94,7 @@ export async function getFaceDescriptorFromImage(base64OrDataUrl: string): Promi
   await loaded;
   console.log('[FaceLiveness] getFaceDescriptorFromImage: image decoded', img.naturalWidth, 'x', img.naturalHeight);
 
-  const result = await detectFace(img);
+  const result = await detectFace(img, ID_IMAGE_DETECTOR_OPTIONS);
   console.log('[FaceLiveness] getFaceDescriptorFromImage: result =', result ? 'face found, descriptor computed' : 'NO FACE FOUND in ID image');
   return result?.descriptor ?? null;
 }
