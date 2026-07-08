@@ -43,9 +43,10 @@ import './ClientFaceRecognitionPage.css';
 type CaptureSubStep =
   | 'doc-intro'       // "Verifica tu documento"
   | 'front-capture'   // live camera front
+  | 'front-review'    // "Asegúrate de que sea legible" (front)
   | 'flip-instruction'// "Ahora voltea tu identificación"
   | 'back-capture'    // live camera back
-  | 'back-review'     // "Asegúrate de que sea legible"
+  | 'back-review'     // "Asegúrate de que sea legible" (back)
   | 'liveness-intro'  // "Mueve la cabeza..."
   | 'liveness-active' // liveness in progress
   | 'processing';     // "Cargando..."
@@ -129,7 +130,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
       const prev: Record<CaptureSubStep, CaptureSubStep> = {
         'doc-intro': 'doc-intro',
         'front-capture': 'doc-intro',
-        'flip-instruction': 'front-capture',
+        'front-review': 'front-capture',
+        'flip-instruction': 'front-review',
         'back-capture': 'flip-instruction',
         'back-review': 'back-capture',
         'liveness-intro': 'back-review',
@@ -272,6 +274,16 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setStep(3);
   };
 
+  // Going back from the verification summary previously reset captureSubStep
+  // to 'doc-intro', forcing a full front+back ID re-capture just to retry a
+  // failed face match. Front/back images are still valid here, so only send
+  // the user back into the liveness challenge.
+  const handleBackFromVerification = () => {
+    console.log('[Expediente] handleBackFromVerification: returning to liveness-intro, keeping ID captures');
+    setStep(1);
+    setCaptureSubStep('liveness-intro');
+  };
+
   const resetWizard = () => {
     setStep(0);
     setCaptureSubStep('doc-intro');
@@ -406,6 +418,23 @@ const ClientFaceRecognitionPage: React.FC = () => {
         );
       }
 
+      if (captureSubStep === 'front-review') {
+        return (
+          <div className="wizard-footer">
+            <button className="wizard-footer-back" onClick={() => {
+              setIdFrontImageBase64('');
+              setCaptureSubStep('front-capture');
+            }}>
+              <IonIcon icon={refreshOutline} /> Volver a capturar
+            </button>
+            <div className="wizard-footer-spacer" />
+            <button className="wizard-footer-next" onClick={() => setCaptureSubStep('flip-instruction')}>
+              Continuar <IonIcon icon={chevronForward} />
+            </button>
+          </div>
+        );
+      }
+
       if (captureSubStep === 'flip-instruction') {
         return (
           <div className="wizard-footer">
@@ -467,7 +496,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
     return (
       <div className="wizard-footer">
         {step > 0 && (
-          <button className="wizard-footer-back" onClick={goBack}>
+          <button
+            className="wizard-footer-back"
+            onClick={step === 2 ? handleBackFromVerification : goBack}
+          >
             <IonIcon icon={chevronForward} style={{ transform: 'rotate(180deg)' }} /> Atrás
           </button>
         )}
@@ -521,10 +553,23 @@ const ClientFaceRecognitionPage: React.FC = () => {
           onHelp={showCaptureHelp}
           onCapture={(base64) => {
             setIdFrontImageBase64(base64);
-            setCaptureSubStep('flip-instruction');
+            setCaptureSubStep('front-review');
             uploadCapturedImage('front', base64);
           }}
         />
+      );
+    }
+
+    if (captureSubStep === 'front-review') {
+      return (
+        <IonCard className="client-face-recognition-step-card cfr-capture-card">
+          <IonCardContent>
+            <h2 className="cfr-capture-title">Asegúrate de que tu identificación sea legible</h2>
+            {idFrontImageBase64 && (
+              <img src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />
+            )}
+          </IonCardContent>
+        </IonCard>
       );
     }
 

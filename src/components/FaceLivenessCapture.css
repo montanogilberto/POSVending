@@ -18,6 +18,40 @@
   display: none;
 }
 
+.flc-ring {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  width: 78%;
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+
+.flc-ring-segment {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke 0.25s ease;
+}
+
+.flc-ring-segment--pending {
+  stroke: rgba(255, 255, 255, 0.35);
+}
+
+.flc-ring-segment--active {
+  stroke: var(--ion-color-primary, #3880ff);
+}
+
+.flc-ring-segment--done {
+  stroke: #10b981;
+}
+
+.flc-banner-step {
+  opacity: 0.8;
+  margin-right: 4px;
+}
+
 .flc-overlay {
   position: absolute;
   inset: 0;
