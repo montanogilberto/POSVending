@@ -6,7 +6,7 @@ import { Camera } from '@capacitor/camera';
 import {
   loadFaceApiModels,
   detectFaceFromVideo,
-  pickRandomChallenge,
+  pickChallengeSequence,
   newChallengeState,
   evaluateChallengeFrame,
   CHALLENGE_LABEL,
@@ -30,6 +30,44 @@ interface FaceLivenessCaptureProps {
 
 const ANALYSIS_INTERVAL_MS = 150;
 
+// Fixed compass position per direction (SVG angle: 0deg = 3 o'clock, clockwise).
+const RING_TARGET_DEG: Record<LivenessChallenge, number> = {
+  right: 0,
+  down: 90,
+  left: 180,
+  up: 270,
+};
+const RING_RADIUS = 46;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const RING_GAP_DEG = 8;
+const RING_SEGMENT_DEG = 90 - RING_GAP_DEG;
+const RING_SEGMENT_LEN = RING_CIRCUMFERENCE * (RING_SEGMENT_DEG / 360);
+
+const LivenessRing: React.FC<{ sequence: LivenessChallenge[]; completedCount: number }> = ({ sequence, completedCount }) => {
+  const completed = new Set(sequence.slice(0, completedCount));
+  const active = sequence[completedCount];
+
+  return (
+    <svg className="flc-ring" viewBox="0 0 100 100">
+      {(Object.keys(RING_TARGET_DEG) as LivenessChallenge[]).map((direction) => {
+        const status = completed.has(direction) ? 'done' : direction === active ? 'active' : 'pending';
+        const rotate = RING_TARGET_DEG[direction] - RING_SEGMENT_DEG / 2;
+        return (
+          <circle
+            key={direction}
+            className={`flc-ring-segment flc-ring-segment--${status}`}
+            cx="50"
+            cy="50"
+            r={RING_RADIUS}
+            strokeDasharray={`${RING_SEGMENT_LEN} ${RING_CIRCUMFERENCE}`}
+            transform={`rotate(${rotate} 50 50)`}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
 const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, onCancel }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,12 +75,16 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   const rafRef = useRef<number>(0);
   const lastTickRef = useRef(0);
   const doneRef = useRef(false);
-  const challengeStateRef = useRef<ChallengeFrameState & { earWasClosed?: boolean }>(newChallengeState());
+  const challengeStateRef = useRef<ChallengeFrameState>(newChallengeState());
   const lastDetectionRef = useRef<FaceDetectionResult | null>(null);
+  const challengeIndexRef = useRef(0);
 
   const [state, setState] = useState<CaptureState>('loading-models');
-  const [challenge, setChallenge] = useState<LivenessChallenge>(() => pickRandomChallenge());
+  const [sequence, setSequence] = useState<LivenessChallenge[]>(() => pickChallengeSequence());
+  const [challengeIndex, setChallengeIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const currentChallenge = sequence[challengeIndex];
 
   const stopStream = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -51,7 +93,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   }, []);
 
   const finish = useCallback(() => {
-    console.log('[FaceLivenessCapture] finish: challenge completed, capturing selfie frame');
+    console.log('[FaceLivenessCapture] finish: all 4 moves completed, capturing selfie frame');
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     const detection = lastDetectionRef.current;
@@ -109,23 +151,30 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       lastDetectionRef.current = detection;
       setState((prev) => {
         if (prev === 'loading-models' || prev === 'starting-camera' || prev === 'searching') {
-          console.log(`[FaceLivenessCapture] tick: face acquired, presenting challenge "${challenge}"`);
+          console.log(`[FaceLivenessCapture] tick: face acquired, presenting move ${challengeIndexRef.current + 1}/4 "${sequence[challengeIndexRef.current]}"`);
           return 'challenge';
         }
         return prev;
       });
 
+      const challenge = sequence[challengeIndexRef.current];
       const completed = evaluateChallengeFrame(challenge, detection, challengeStateRef.current);
       if (completed && !doneRef.current) {
-        console.log(`[FaceLivenessCapture] tick: challenge "${challenge}" satisfied → finishing`);
-        doneRef.current = true;
-        finish();
-        return;
+        const nextIndex = challengeIndexRef.current + 1;
+        console.log(`[FaceLivenessCapture] tick: move "${challenge}" satisfied (${nextIndex}/4)`);
+        if (nextIndex >= sequence.length) {
+          doneRef.current = true;
+          finish();
+          return;
+        }
+        challengeIndexRef.current = nextIndex;
+        challengeStateRef.current = newChallengeState();
+        setChallengeIndex(nextIndex);
       }
 
       rafRef.current = requestAnimationFrame(tick);
     },
-    [challenge, finish]
+    [sequence, finish]
   );
 
   const startCameraAndLoop = useCallback(
@@ -180,7 +229,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   );
 
   useEffect(() => {
-    console.log('[FaceLivenessCapture] mount: initial challenge =', challenge);
+    console.log('[FaceLivenessCapture] mount: sequence =', sequence);
     startCameraAndLoop(false);
 
     return () => {
@@ -193,10 +242,13 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
   const retry = () => {
     console.log('[FaceLivenessCapture] retry: user requested retry after error');
+    const newSequence = pickChallengeSequence();
+    challengeIndexRef.current = 0;
     challengeStateRef.current = newChallengeState();
     lastDetectionRef.current = null;
     doneRef.current = false;
-    setChallenge(pickRandomChallenge());
+    setSequence(newSequence);
+    setChallengeIndex(0);
     setErrorMessage('');
     stopStream();
     startCameraAndLoop(true);
@@ -206,6 +258,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     <div className="flc-root">
       <video ref={videoRef} className="flc-video" autoPlay playsInline muted />
       <canvas ref={captureCanvasRef} className="flc-hidden-canvas" />
+
+      {(state === 'challenge' || state === 'searching') && (
+        <LivenessRing sequence={sequence} completedCount={challengeIndex} />
+      )}
 
       {(state === 'loading-models' || state === 'starting-camera') && (
         <div className="flc-overlay">
@@ -219,7 +275,9 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       )}
 
       {state === 'challenge' && (
-        <div className="flc-banner flc-banner--challenge">{CHALLENGE_LABEL[challenge]}</div>
+        <div className="flc-banner flc-banner--challenge">
+          <span className="flc-banner-step">{challengeIndex + 1}/{sequence.length}</span> {CHALLENGE_LABEL[currentChallenge]}
+        </div>
       )}
 
       {state === 'captured' && (

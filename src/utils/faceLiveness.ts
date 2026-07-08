@@ -3,9 +3,9 @@
 // entirely client-side: no vendor approval, no per-check cost, no session API.
 //
 // Trade-off vs. a dedicated liveness SDK: weaker anti-spoofing guarantees (a
-// static high-res photo or video replay could in theory defeat a single
-// blink/turn/smile challenge). Acceptable here because the ID-photo face
-// match is still enforced and the challenge is randomized per attempt.
+// static high-res photo or video replay could in theory defeat the 4-move
+// head-turn challenge). Acceptable here because the ID-photo face match is
+// still enforced and the challenge order is randomized per attempt.
 import * as faceapi from '@vladmandic/face-api';
 
 const MODEL_URL = '/models/face-api';
@@ -22,7 +22,6 @@ export function loadFaceApiModels(): Promise<void> {
       faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-      faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
     ])
       .then(() => {
         console.log(`[FaceLiveness] loadFaceApiModels: all models loaded in ${Date.now() - startedAt}ms`);
@@ -52,7 +51,6 @@ const ID_IMAGE_DETECTOR_OPTIONS = new faceapi.SsdMobilenetv1Options({ minConfide
 export type FaceDetectionResult = {
   descriptor: Float32Array;
   landmarks: faceapi.FaceLandmarks68;
-  expressions: faceapi.FaceExpressions;
 };
 
 async function detectFace(
@@ -62,10 +60,9 @@ async function detectFace(
   const result = await faceapi
     .detectSingleFace(input, options)
     .withFaceLandmarks()
-    .withFaceExpressions()
     .withFaceDescriptor();
   if (!result) return null;
-  return { descriptor: result.descriptor, landmarks: result.landmarks, expressions: result.expressions };
+  return { descriptor: result.descriptor, landmarks: result.landmarks };
 }
 
 export async function detectFaceFromVideo(video: HTMLVideoElement): Promise<FaceDetectionResult | null> {
@@ -114,42 +111,36 @@ export function distanceToConfidence(distance: number): number {
 }
 
 // ── Liveness challenges ──────────────────────────────────────────────────────
+// Sequential 4-direction head-movement challenge (left/right/up/down), shown
+// one at a time with a 4-segment progress ring in FaceLivenessCapture. All
+// four must complete before a selfie frame + descriptor are captured.
 
-export type LivenessChallenge = 'blink' | 'turn-left' | 'turn-right' | 'smile';
-
-export const LIVENESS_CHALLENGES: LivenessChallenge[] = ['blink', 'turn-left', 'turn-right', 'smile'];
+export type LivenessChallenge = 'left' | 'right' | 'up' | 'down';
 
 export const CHALLENGE_LABEL: Record<LivenessChallenge, string> = {
-  blink: 'Parpadea dos veces',
-  'turn-left': 'Gira la cabeza a tu izquierda',
-  'turn-right': 'Gira la cabeza a tu derecha',
-  smile: 'Sonríe',
+  left: 'Gira la cabeza a tu izquierda',
+  right: 'Gira la cabeza a tu derecha',
+  up: 'Levanta la mirada hacia arriba',
+  down: 'Baja la mirada hacia abajo',
 };
 
-export function pickRandomChallenge(): LivenessChallenge {
-  const challenge = LIVENESS_CHALLENGES[Math.floor(Math.random() * LIVENESS_CHALLENGES.length)];
-  console.log('[FaceLiveness] pickRandomChallenge:', challenge);
-  return challenge;
+// Randomized order each attempt so a static video/photo replay can't be
+// pre-recorded to match a fixed sequence.
+export function pickChallengeSequence(): LivenessChallenge[] {
+  const sequence: LivenessChallenge[] = ['left', 'right', 'up', 'down'];
+  for (let i = sequence.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [sequence[i], sequence[j]] = [sequence[j], sequence[i]];
+  }
+  console.log('[FaceLiveness] pickChallengeSequence:', sequence);
+  return sequence;
 }
 
-function eyeAspectRatio(eye: faceapi.Point[]): number {
-  // Standard 6-point EAR formula (Soukupová & Čech). eye[0..5] are the 6
-  // landmark points face-api.js returns per eye, in the same fixed order
-  // dlib's 68-point model uses.
-  const dist = (p1: faceapi.Point, p2: faceapi.Point) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
-  const vertical1 = dist(eye[1], eye[5]);
-  const vertical2 = dist(eye[2], eye[4]);
-  const horizontal = dist(eye[0], eye[3]);
-  if (horizontal === 0) return 0;
-  return (vertical1 + vertical2) / (2 * horizontal);
-}
-
-const EAR_CLOSED_THRESHOLD = 0.21;
-const SMILE_HAPPY_THRESHOLD = 0.7;
-const TURN_OFFSET_RATIO = 0.18;
+const YAW_OFFSET_RATIO = 0.18; // left/right — confirmed against real device logs (0.34 / -0.187 observed)
+const PITCH_OFFSET_RATIO = 0.15; // up/down — heuristic, may need on-device threshold tuning
 
 export interface ChallengeFrameState {
-  /** true once the challenge's motion/expression was actually observed this attempt */
+  /** true once the challenge's motion was actually observed this attempt */
   triggered: boolean;
 }
 
@@ -158,53 +149,52 @@ export function newChallengeState(): ChallengeFrameState {
 }
 
 // Called once per analyzed video frame. Mutates `state` and returns whether
-// the challenge just completed on this frame. Each challenge type needs the
-// user to move away from neutral and (for blink) back again, so a single
-// borderline frame can't accidentally satisfy it.
+// the given challenge just completed on this frame.
 export function evaluateChallengeFrame(
   challenge: LivenessChallenge,
   detection: FaceDetectionResult,
-  state: ChallengeFrameState & { earWasClosed?: boolean }
+  state: ChallengeFrameState
 ): boolean {
-  if (challenge === 'blink') {
-    const ear = (eyeAspectRatio(detection.landmarks.getLeftEye()) + eyeAspectRatio(detection.landmarks.getRightEye())) / 2;
-    if (ear < EAR_CLOSED_THRESHOLD) {
-      if (!state.earWasClosed) console.log('[FaceLiveness] evaluateChallengeFrame[blink]: eyes closed detected, EAR =', ear.toFixed(3));
-      state.earWasClosed = true;
-    } else if (state.earWasClosed) {
-      console.log('[FaceLiveness] evaluateChallengeFrame[blink]: eyes reopened, EAR =', ear.toFixed(3), '→ challenge COMPLETE');
-      state.triggered = true;
-    }
-    return state.triggered;
-  }
-
-  if (challenge === 'smile') {
-    if (detection.expressions.happy >= SMILE_HAPPY_THRESHOLD) {
-      if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[smile]: happy =', detection.expressions.happy.toFixed(3), '→ challenge COMPLETE');
-      state.triggered = true;
-    }
-    return state.triggered;
-  }
-
-  // Head turn: compare nose-tip x position against the midpoint between the
-  // outer eye corners, normalized by face width — sign/magnitude indicates
-  // which way the head is turned regardless of frame resolution.
   const nose = detection.landmarks.getNose();
   const leftEye = detection.landmarks.getLeftEye();
   const rightEye = detection.landmarks.getRightEye();
   const noseTip = nose[Math.floor(nose.length / 2)];
-  const eyeMidX = (leftEye[0].x + rightEye[3].x) / 2;
-  const faceWidth = Math.abs(rightEye[3].x - leftEye[0].x) || 1;
-  const offsetRatio = (noseTip.x - eyeMidX) / faceWidth;
 
-  // Note: video is mirrored (selfie view), so a user turning their head to
-  // their own left moves the nose to the right of the mirrored frame.
-  if (challenge === 'turn-left' && offsetRatio > TURN_OFFSET_RATIO) {
-    if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[turn-left]: offsetRatio =', offsetRatio.toFixed(3), '→ challenge COMPLETE');
+  if (challenge === 'left' || challenge === 'right') {
+    // Compare nose-tip x position against the midpoint between the outer
+    // eye corners, normalized by face width — sign/magnitude indicates
+    // which way the head is turned regardless of frame resolution.
+    const eyeMidX = (leftEye[0].x + rightEye[3].x) / 2;
+    const faceWidth = Math.abs(rightEye[3].x - leftEye[0].x) || 1;
+    const offsetRatio = (noseTip.x - eyeMidX) / faceWidth;
+
+    // Note: video is mirrored (selfie view), so a user turning their head to
+    // their own left moves the nose to the right of the mirrored frame.
+    if (challenge === 'left' && offsetRatio > YAW_OFFSET_RATIO) {
+      if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[left]: offsetRatio =', offsetRatio.toFixed(3), '→ challenge COMPLETE');
+      state.triggered = true;
+    }
+    if (challenge === 'right' && offsetRatio < -YAW_OFFSET_RATIO) {
+      if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[right]: offsetRatio =', offsetRatio.toFixed(3), '→ challenge COMPLETE');
+      state.triggered = true;
+    }
+    return state.triggered;
+  }
+
+  // Head pitch: compare nose-tip y position against the vertical midpoint
+  // between the eye line and the chin, normalized by face height.
+  const jaw = detection.landmarks.getJawOutline();
+  const chin = jaw[Math.floor(jaw.length / 2)];
+  const eyeMidY = (leftEye[0].y + rightEye[3].y) / 2;
+  const faceHeight = Math.abs(chin.y - eyeMidY) || 1;
+  const offsetYRatio = (noseTip.y - (eyeMidY + chin.y) / 2) / faceHeight;
+
+  if (challenge === 'down' && offsetYRatio > PITCH_OFFSET_RATIO) {
+    if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[down]: offsetYRatio =', offsetYRatio.toFixed(3), '→ challenge COMPLETE');
     state.triggered = true;
   }
-  if (challenge === 'turn-right' && offsetRatio < -TURN_OFFSET_RATIO) {
-    if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[turn-right]: offsetRatio =', offsetRatio.toFixed(3), '→ challenge COMPLETE');
+  if (challenge === 'up' && offsetYRatio < -PITCH_OFFSET_RATIO) {
+    if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[up]: offsetYRatio =', offsetYRatio.toFixed(3), '→ challenge COMPLETE');
     state.triggered = true;
   }
   return state.triggered;

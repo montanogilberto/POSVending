@@ -190,6 +190,7 @@ const ClientsPage: React.FC = () => {
   const [confidenceScore, setConfidenceScore] = useState(0);
   const [isVerified, setIsVerified] = useState(false);
   const [idFrontBlobUrl, setIdFrontBlobUrl] = useState('');
+  const [idBackBlobUrl, setIdBackBlobUrl] = useState('');
   const [selfieBlobUrl, setSelfieBlobUrl] = useState('');
 
   // Step 4 — contract
@@ -360,6 +361,7 @@ const ClientsPage: React.FC = () => {
     setConfidenceScore(0);
     setIsVerified(false);
     setIdFrontBlobUrl('');
+    setIdBackBlobUrl('');
     setSelfieBlobUrl('');
     setContractAccepted(false);
     setPagareAccepted(false);
@@ -393,6 +395,7 @@ const ClientsPage: React.FC = () => {
       });
       console.log(`[Expediente] uploadCapturedImage(${side}): uploaded to blob →`, blobUrl);
       if (side === 'front') setIdFrontBlobUrl(blobUrl);
+      if (side === 'back') setIdBackBlobUrl(blobUrl);
       const record = await upsertClientFaceRecognition(
         Number(companyId),
         createdClientId,
@@ -524,10 +527,12 @@ const ClientsPage: React.FC = () => {
       const now = new Date().toISOString();
       setContractAcceptedAt(now);
       const payload: ContractSubmissionRequest = {
+        clientFaceRecognitionId: clientFaceRecognitionIdRef.current,
         companyId: Number(companyId),
         clientId: Number(createdClientId),
         documentType,
         idFrontImageBlobUrl: idFrontBlobUrl,
+        idBackImageBlobUrl: idBackBlobUrl,
         clientSelfieBlobUrl: selfieBlobUrl,
         confidenceScore,
         isVerified,

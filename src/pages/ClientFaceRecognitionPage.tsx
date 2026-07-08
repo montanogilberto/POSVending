@@ -82,6 +82,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [idFrontImageBase64, setIdFrontImageBase64] = useState<string>('');
   const [idBackImageBase64, setIdBackImageBase64] = useState<string>('');
   const [idFrontImageBlobUrl, setIdFrontImageBlobUrl] = useState<string>('');
+  const [idBackImageBlobUrl, setIdBackImageBlobUrl] = useState<string>('');
   const [clientSelfieBlobUrl, setClientSelfieBlobUrl] = useState<string>('');
   const [confidenceScore, setConfidenceScore] = useState<number>(0);
   const [isVerified, setIsVerified] = useState<boolean>(false);
@@ -174,6 +175,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       });
       console.log(`[Expediente] uploadCapturedImage(${side}): uploaded to blob →`, blobUrl);
       if (side === 'front') setIdFrontImageBlobUrl(blobUrl);
+      if (side === 'back') setIdBackImageBlobUrl(blobUrl);
       const record = await upsertClientFaceRecognition(
         Number(companyId),
         selectedClient.clientId,
@@ -278,6 +280,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setIdFrontImageBase64('');
     setIdBackImageBase64('');
     setIdFrontImageBlobUrl('');
+    setIdBackImageBlobUrl('');
     setClientSelfieBlobUrl('');
     setConfidenceScore(0);
     setIsVerified(false);
@@ -305,10 +308,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setContractAcceptedAt(now);
 
       const payload: ContractSubmissionRequest = {
+        clientFaceRecognitionId: clientFaceRecognitionIdRef.current,
         companyId: Number(companyId),
         clientId: Number(selectedClient?.clientId),
         documentType,
         idFrontImageBlobUrl,
+        idBackImageBlobUrl,
         clientSelfieBlobUrl,
         confidenceScore,
         isVerified,

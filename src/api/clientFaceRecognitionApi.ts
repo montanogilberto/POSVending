@@ -37,10 +37,15 @@ export interface ClientFaceRecognitionListResponse {
 }
 
 export interface ContractSubmissionRequest {
+  // When set, the connector updates this existing row instead of inserting
+  // a new one — without it, every contract submission creates an orphaned
+  // duplicate row that never gets the front/back images already uploaded.
+  clientFaceRecognitionId?: number;
   companyId: number;
   clientId: number;
   documentType: string;
   idFrontImageBlobUrl: string;
+  idBackImageBlobUrl?: string;
   clientSelfieBlobUrl: string;
   confidenceScore: number;
   isVerified: boolean;
