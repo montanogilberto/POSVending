@@ -47,6 +47,7 @@ type CaptureSubStep =
   | 'flip-instruction'// "Ahora voltea tu identificación"
   | 'back-capture'    // live camera back
   | 'back-review'     // "Asegúrate de que sea legible" (back)
+  | 'id-summary'      // "Confirma que la información sea correcta"
   | 'liveness-intro'  // "Mueve la cabeza..."
   | 'liveness-active' // liveness in progress
   | 'processing';     // "Cargando..."
@@ -92,6 +93,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [hasPhysicalPagare, setHasPhysicalPagare] = useState<boolean>(false);
   const [contractAcceptedAt, setContractAcceptedAt] = useState<string>('');
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
+  const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
   // Tracks the ClientFaceRecognition row created on first capture, so later
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
@@ -134,7 +136,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
         'flip-instruction': 'front-review',
         'back-capture': 'flip-instruction',
         'back-review': 'back-capture',
-        'liveness-intro': 'back-review',
+        'id-summary': 'back-review',
+        'liveness-intro': 'id-summary',
         'liveness-active': 'liveness-intro',
         'processing': 'liveness-active',
       };
@@ -301,6 +304,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setHasPhysicalPagare(false);
     setContractAcceptedAt('');
     setLivenessStatus('idle');
+    setIdInfoConfirmed(false);
     clientFaceRecognitionIdRef.current = undefined;
   };
 
@@ -423,6 +427,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <div className="wizard-footer">
             <button className="wizard-footer-back" onClick={() => {
               setIdFrontImageBase64('');
+              setIdInfoConfirmed(false);
               setCaptureSubStep('front-capture');
             }}>
               <IonIcon icon={refreshOutline} /> Volver a capturar
@@ -464,13 +469,32 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <div className="wizard-footer">
             <button className="wizard-footer-back" onClick={() => {
               setIdBackImageBase64('');
+              setIdInfoConfirmed(false);
               setCaptureSubStep('back-capture');
             }}>
               <IonIcon icon={refreshOutline} /> Volver a capturar
             </button>
             <div className="wizard-footer-spacer" />
-            <button className="wizard-footer-next" onClick={() => setCaptureSubStep('liveness-intro')}>
+            <button className="wizard-footer-next" onClick={() => setCaptureSubStep('id-summary')}>
               Continuar <IonIcon icon={chevronForward} />
+            </button>
+          </div>
+        );
+      }
+
+      if (captureSubStep === 'id-summary') {
+        return (
+          <div className="wizard-footer">
+            <button className="wizard-footer-back" onClick={goBack}>
+              <IonIcon icon={chevronForward} style={{ transform: 'rotate(180deg)' }} /> Atrás
+            </button>
+            <div className="wizard-footer-spacer" />
+            <button
+              className="wizard-footer-submit"
+              disabled={!idInfoConfirmed}
+              onClick={() => setCaptureSubStep('liveness-intro')}
+            >
+              Confirmar y continuar
             </button>
           </div>
         );
@@ -612,6 +636,45 @@ const ClientFaceRecognitionPage: React.FC = () => {
             {idBackImageBase64 && (
               <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />
             )}
+          </IonCardContent>
+        </IonCard>
+      );
+    }
+
+    if (captureSubStep === 'id-summary') {
+      return (
+        <IonCard className="client-face-recognition-step-card cfr-capture-card">
+          <IonCardContent>
+            <h2 className="cfr-capture-title">Confirma que la información sea correcta</h2>
+            <p className="cfr-capture-desc">
+              Revisa los datos y las capturas de la identificación antes de continuar con la validación facial.
+            </p>
+
+            <div className="ion-margin-top">
+              <p><strong>Cliente:</strong> {selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}` : '—'}</p>
+              <p><strong>Teléfono:</strong> {selectedClient?.cellphone || '—'}</p>
+              <p><strong>Email:</strong> {selectedClient?.email || '—'}</p>
+              <p><strong>Documento:</strong> {documentType || '—'}</p>
+            </div>
+
+            <div className="id-summary-images">
+              <div className="id-summary-image-card">
+                <span className="id-preview-title">Frente</span>
+                {idFrontImageBase64 && <img src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
+              </div>
+              <div className="id-summary-image-card">
+                <span className="id-preview-title">Reverso</span>
+                {idBackImageBase64 && <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
+              </div>
+            </div>
+
+            <IonItem className="ion-margin-top" lines="none">
+              <IonLabel className="ion-text-wrap">Confirmo que la información y las capturas de la identificación son correctas</IonLabel>
+              <IonCheckbox
+                checked={idInfoConfirmed}
+                onIonChange={(e: CustomEvent<{ checked: boolean }>) => setIdInfoConfirmed(e.detail.checked)}
+              />
+            </IonItem>
           </IonCardContent>
         </IonCard>
       );

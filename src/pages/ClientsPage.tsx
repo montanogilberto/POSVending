@@ -94,6 +94,7 @@ type CaptureSubStep =
   | 'flip-instruction'
   | 'back-capture'
   | 'back-review'
+  | 'id-summary'
   | 'liveness-intro'
   | 'liveness-active'
   | 'processing';
@@ -193,6 +194,7 @@ const ClientsPage: React.FC = () => {
   const [idFrontBlobUrl, setIdFrontBlobUrl] = useState('');
   const [idBackBlobUrl, setIdBackBlobUrl] = useState('');
   const [selfieBlobUrl, setSelfieBlobUrl] = useState('');
+  const [idInfoConfirmed, setIdInfoConfirmed] = useState(false);
 
   // Step 4 — contract
   const [contractAccepted, setContractAccepted] = useState(false);
@@ -364,6 +366,7 @@ const ClientsPage: React.FC = () => {
     setIdFrontBlobUrl('');
     setIdBackBlobUrl('');
     setSelfieBlobUrl('');
+    setIdInfoConfirmed(false);
     setContractAccepted(false);
     setPagareAccepted(false);
     setHasPhysicalPagare(false);
@@ -605,7 +608,8 @@ const ClientsPage: React.FC = () => {
         'flip-instruction': 'front-review',
         'back-capture': 'flip-instruction',
         'back-review': 'back-capture',
-        'liveness-intro': 'back-review',
+        'id-summary': 'back-review',
+        'liveness-intro': 'id-summary',
         'liveness-active': 'liveness-intro',
         'processing': 'liveness-active',
       };
@@ -923,6 +927,50 @@ const ClientsPage: React.FC = () => {
       </IonCard>
     );
 
+    if (captureSubStep === 'id-summary') return (
+      <IonCard className="client-face-recognition-step-card cfr-capture-card">
+        <IonCardContent>
+          <h2 className="cfr-capture-title">Confirma que la información sea correcta</h2>
+          <p className="cfr-capture-desc">
+            Revisa los datos y las capturas de la identificación antes de continuar con la validación facial.
+          </p>
+
+          <div className="ion-margin-top">
+            <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
+            <p><strong>Teléfono:</strong> {newClient.cellphone || '—'}</p>
+            <p><strong>Email:</strong> {newClient.email || '—'}</p>
+            <p><strong>Documento:</strong> {documentType || '—'}</p>
+          </div>
+
+          <div className="id-summary-images">
+            <div className="id-summary-image-card">
+              <span className="id-preview-title">Frente</span>
+              {idFrontImageBase64 && <img src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
+            </div>
+            <div className="id-summary-image-card">
+              <span className="id-preview-title">Reverso</span>
+              {idBackImageBase64 && <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
+            </div>
+          </div>
+
+          <div className="wizard-checkbox-list ion-margin-top">
+            <button
+              type="button"
+              className={`wizard-checkbox-card${idInfoConfirmed ? ' checked' : ''}`}
+              onClick={() => setIdInfoConfirmed(!idInfoConfirmed)}
+            >
+              <div className={`wizard-checkbox-box${idInfoConfirmed ? ' checked' : ''}`}>
+                {idInfoConfirmed && <IonIcon icon={checkmark} />}
+              </div>
+              <span className="wizard-checkbox-card-label">
+                Confirmo que la información y las capturas de la identificación son correctas
+              </span>
+            </button>
+          </div>
+        </IonCardContent>
+      </IonCard>
+    );
+
     if (captureSubStep === 'liveness-intro') return (
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
@@ -1215,7 +1263,7 @@ const ClientsPage: React.FC = () => {
       if (captureSubStep === 'front-review') {
         return (
           <ClientWizardFooterBar
-            onBack={() => { setIdFrontImageBase64(''); setCaptureSubStep('front-capture'); }}
+            onBack={() => { setIdFrontImageBase64(''); setIdInfoConfirmed(false); setCaptureSubStep('front-capture'); }}
             backLabel="Repetir"
             backIcon={refreshOutline}
             onPrimary={() => setCaptureSubStep('flip-instruction')}
@@ -1241,11 +1289,23 @@ const ClientsPage: React.FC = () => {
       if (captureSubStep === 'back-review') {
         return (
           <ClientWizardFooterBar
-            onBack={() => { setIdBackImageBase64(''); setCaptureSubStep('back-capture'); }}
+            onBack={() => { setIdBackImageBase64(''); setIdInfoConfirmed(false); setCaptureSubStep('back-capture'); }}
             backLabel="Repetir"
             backIcon={refreshOutline}
-            onPrimary={() => setCaptureSubStep('liveness-intro')}
+            onPrimary={() => setCaptureSubStep('id-summary')}
             primary={<>Continuar <IonIcon icon={chevronForward} /></>}
+          />
+        );
+      }
+
+      if (captureSubStep === 'id-summary') {
+        return (
+          <ClientWizardFooterBar
+            onBack={goBackWizard}
+            onPrimary={() => setCaptureSubStep('liveness-intro')}
+            primaryDisabled={!idInfoConfirmed}
+            variant="submit"
+            primary={<>Confirmar y continuar <IonIcon icon={chevronForward} /></>}
           />
         );
       }
