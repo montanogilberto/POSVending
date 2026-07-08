@@ -199,3 +199,71 @@ export function evaluateChallengeFrame(
   }
   return state.triggered;
 }
+
+// ── Anti-spoofing checks ─────────────────────────────────────────────────────
+// The 4-direction challenge above only checks 2D landmark geometry, which
+// can't distinguish a real head turning from a photo/video on another screen
+// being physically tilted the same way. These two checks close the cheapest,
+// most common attacks (a static printed/displayed photo, or swapping what's
+// in front of the camera partway through) without needing a depth sensor or
+// a paid liveness SDK. A video replay of the real person performing the
+// moves is a residual risk this can't fully close — that's the accepted
+// trade-off of a free, self-hosted liveness check (see module header).
+
+function eyeAspectRatio(eye: faceapi.Point[]): number {
+  // Standard 6-point EAR formula (Soukupová & Čech). eye[0..5] are the 6
+  // landmark points face-api.js returns per eye, in the same fixed order
+  // dlib's 68-point model uses.
+  const dist = (p1: faceapi.Point, p2: faceapi.Point) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+  const vertical1 = dist(eye[1], eye[5]);
+  const vertical2 = dist(eye[2], eye[4]);
+  const horizontal = dist(eye[0], eye[3]);
+  if (horizontal === 0) return 0;
+  return (vertical1 + vertical2) / (2 * horizontal);
+}
+
+const EAR_CLOSED_THRESHOLD = 0.21;
+
+export interface BlinkTrackerState {
+  earWasClosed: boolean;
+  blinkDetected: boolean;
+}
+
+export function newBlinkTrackerState(): BlinkTrackerState {
+  return { earWasClosed: false, blinkDetected: false };
+}
+
+// Called every frame regardless of which directional challenge is active.
+// A static photo can never close and reopen its eyes, so requiring one
+// blink at some point during the session — independent of the 4 visible
+// moves — kills the simplest, most common spoofing attempt.
+export function trackBlink(detection: FaceDetectionResult, state: BlinkTrackerState): boolean {
+  const ear = (eyeAspectRatio(detection.landmarks.getLeftEye()) + eyeAspectRatio(detection.landmarks.getRightEye())) / 2;
+  if (ear < EAR_CLOSED_THRESHOLD) {
+    state.earWasClosed = true;
+  } else if (state.earWasClosed && !state.blinkDetected) {
+    console.log('[FaceLiveness] trackBlink: blink detected, EAR =', ear.toFixed(3));
+    state.blinkDetected = true;
+  }
+  return state.blinkDetected;
+}
+
+const CONSISTENCY_DISTANCE_THRESHOLD = 0.5; // looser than the 0.6 ID-match cutoff — same live face across a session should be closer than that
+
+// Compares the face descriptors captured at each of the 4 challenge
+// completions against each other. If someone swaps what's in front of the
+// camera mid-session (e.g. switches to a held-up photo partway through),
+// the descriptors diverge well past what lighting/angle changes alone
+// would cause for one continuously-tracked live face.
+export function checkDescriptorConsistency(descriptors: Float32Array[]): { consistent: boolean; maxDistance: number } {
+  let maxDistance = 0;
+  for (let i = 0; i < descriptors.length; i++) {
+    for (let j = i + 1; j < descriptors.length; j++) {
+      const distance = faceapi.euclideanDistance(descriptors[i], descriptors[j]);
+      if (distance > maxDistance) maxDistance = distance;
+    }
+  }
+  const consistent = maxDistance <= CONSISTENCY_DISTANCE_THRESHOLD;
+  console.log('[FaceLiveness] checkDescriptorConsistency: maxDistance =', maxDistance.toFixed(4), '| threshold =', CONSISTENCY_DISTANCE_THRESHOLD, '| consistent =', consistent);
+  return { consistent, maxDistance };
+}

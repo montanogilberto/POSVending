@@ -1,0 +1,21 @@
+.stripe-onboarding-embed {
+  width: 100%;
+  min-height: 480px;
+}
+
+.stripe-onboarding-loading,
+.stripe-onboarding-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 240px;
+  color: #6b7280;
+  text-align: center;
+  padding: 24px;
+}
+
+.stripe-onboarding-error {
+  color: #b91c1c;
+}

@@ -85,7 +85,18 @@ import {
 import LoanCompletionRing from '../components/LoanCompletionRing';
 import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
+import StripeAccountOnboarding from '../components/StripeAccountOnboarding';
+import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../utils/faceLiveness';
+import { ExtractedIdFields } from '../utils/idOcr';
+
+const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
+  nombre: '',
+  domicilio: '',
+  curp: '',
+  claveElector: '',
+  fechaNacimiento: '',
+};
 
 type CaptureSubStep =
   | 'doc-intro'
@@ -111,14 +122,10 @@ async function stripeCreateAccount(clientId: number, companyId: number, email: s
   return res.json();
 }
 
-async function stripeGetOnboardingLink(clientId: number, companyId: number) {
-  const res = await fetch(`${API_BASE}/stripe/onboarding-link`, {
+async function stripeGetAccountStatus(clientId: number, companyId: number) {
+  const res = await fetch(`${API_BASE}/stripe/connected-accounts/status`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      clientId, companyId,
-      returnUrl: 'http://localhost:8100/clients',
-      refreshUrl: 'http://localhost:8100/clients',
-    }),
+    body: JSON.stringify({ clientId, companyId }),
   });
   return res.json();
 }
@@ -174,7 +181,6 @@ const ClientsPage: React.FC = () => {
 
   // Step 6 — Stripe
   const [stripeAccountId, setStripeAccountId] = useState('');
-  const [stripeOnboardingUrl, setStripeOnboardingUrl] = useState('');
   const [stripeKycDone, setStripeKycDone] = useState(false);
 
   // Step 2 — document
@@ -195,6 +201,7 @@ const ClientsPage: React.FC = () => {
   const [idBackBlobUrl, setIdBackBlobUrl] = useState('');
   const [selfieBlobUrl, setSelfieBlobUrl] = useState('');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState(false);
+  const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
 
   // Step 4 — contract
   const [contractAccepted, setContractAccepted] = useState(false);
@@ -367,12 +374,12 @@ const ClientsPage: React.FC = () => {
     setIdBackBlobUrl('');
     setSelfieBlobUrl('');
     setIdInfoConfirmed(false);
+    setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS);
     setContractAccepted(false);
     setPagareAccepted(false);
     setHasPhysicalPagare(false);
     setContractAcceptedAt('');
     setStripeAccountId('');
-    setStripeOnboardingUrl('');
     setStripeKycDone(false);
     setQrBlobUrl('');
     setQrUploading(false);
@@ -585,8 +592,6 @@ const ClientsPage: React.FC = () => {
           if (acct?.account?.connectedAccountId) {
             setStripeAccountId(acct.account.connectedAccountId);
           }
-          const link = await stripeGetOnboardingLink(Number(createdClientId), Number(companyId));
-          if (link?.url) setStripeOnboardingUrl(link.url);
         } catch (stripeErr) {
           console.log('[Expediente] handleSubmitContract: Stripe account creation FAILED', stripeErr);
           toast('Contrato guardado. No se pudo crear cuenta Stripe.');
@@ -953,6 +958,13 @@ const ClientsPage: React.FC = () => {
             </div>
           </div>
 
+          <IdExtractedFieldsSummary
+            idFrontImageBase64={idFrontImageBase64}
+            idBackImageBase64={idBackImageBase64}
+            fields={extractedIdFields}
+            onFieldsChange={setExtractedIdFields}
+          />
+
           <div className="wizard-checkbox-list ion-margin-top">
             <button
               type="button"
@@ -1097,6 +1109,23 @@ const ClientsPage: React.FC = () => {
     </div>
   );
 
+  // Fires when the client finishes (or manually exits) the embedded Stripe
+  // onboarding form. Re-checks the real account status server-side rather
+  // than trusting onExit alone, since a user can exit before completing.
+  const handleStripeOnboardingExit = async () => {
+    console.log('[Expediente] handleStripeOnboardingExit: refreshing Stripe account status');
+    if (!createdClientId) return;
+    try {
+      const status = await stripeGetAccountStatus(Number(createdClientId), Number(companyId));
+      const done = !!status?.account?.detailsSubmitted;
+      console.log('[Expediente] handleStripeOnboardingExit: detailsSubmitted =', done);
+      setStripeKycDone(done);
+      toast(done ? 'Registro bancario completado ✓' : 'El registro bancario quedó incompleto.');
+    } catch (err) {
+      console.log('[Expediente] handleStripeOnboardingExit: FAILED to refresh status', err);
+    }
+  };
+
   const renderStep6 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
@@ -1130,60 +1159,13 @@ const ClientsPage: React.FC = () => {
         </span>
       </div>
 
-      {stripeOnboardingUrl ? (
+      {stripeAccountId ? (
         <div className="wizard-stripe-section">
-          {/* URL preview box */}
-          <div className="wizard-stripe-url-box">
-            <IonIcon icon={shareOutline} className="wizard-stripe-url-icon" />
-            <span className="wizard-stripe-url-text">{stripeOnboardingUrl}</span>
-          </div>
-
-          {/* Action cards — same pattern as doc type buttons */}
-          <div className="wizard-stripe-actions">
-            <button
-              type="button"
-              className="wizard-stripe-action-btn primary"
-              onClick={() => window.open(stripeOnboardingUrl, '_blank')}
-            >
-              <div className="wizard-stripe-action-icon-wrap">
-                <IonIcon icon={walletOutline} />
-              </div>
-              <div className="wizard-stripe-action-text">
-                <span className="wizard-stripe-action-name">Abrir registro bancario</span>
-                <span className="wizard-stripe-action-desc">Se abre en el navegador del cliente</span>
-              </div>
-              <IonIcon icon={chevronForward} className="wizard-stripe-action-arrow" />
-            </button>
-
-            <button
-              type="button"
-              className="wizard-stripe-action-btn"
-              onClick={() => { navigator.clipboard.writeText(stripeOnboardingUrl); toast('Enlace copiado al portapapeles'); }}
-            >
-              <div className="wizard-stripe-action-icon-wrap">
-                <IonIcon icon={copyOutline} />
-              </div>
-              <div className="wizard-stripe-action-text">
-                <span className="wizard-stripe-action-name">Copiar enlace</span>
-                <span className="wizard-stripe-action-desc">Comparte por WhatsApp, SMS o email</span>
-              </div>
-              <IonIcon icon={chevronForward} className="wizard-stripe-action-arrow" />
-            </button>
-          </div>
-
-          {/* KYC confirmation checkbox — same as contract step */}
-          <div className="wizard-checkbox-list" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className={`wizard-checkbox-card${stripeKycDone ? ' checked' : ''}`}
-              onClick={() => setStripeKycDone(!stripeKycDone)}
-            >
-              <div className={`wizard-checkbox-box${stripeKycDone ? ' checked' : ''}`}>
-                {stripeKycDone && <IonIcon icon={checkmark} />}
-              </div>
-              <span className="wizard-checkbox-card-label">El cliente completó su registro bancario</span>
-            </button>
-          </div>
+          <StripeAccountOnboarding
+            clientId={Number(createdClientId)}
+            companyId={Number(companyId)}
+            onExit={handleStripeOnboardingExit}
+          />
         </div>
       ) : (
         <div className="wizard-stripe-error-card">
@@ -1191,9 +1173,9 @@ const ClientsPage: React.FC = () => {
             <IonIcon icon={closeCircle} />
           </div>
           <div className="wizard-stripe-error-body">
-            <span className="wizard-stripe-error-title">Enlace no disponible</span>
+            <span className="wizard-stripe-error-title">Cuenta no disponible</span>
             <span className="wizard-stripe-error-desc">
-              Puedes generarlo desde el dashboard del cliente una vez guardado.
+              Puedes generarla desde el dashboard del cliente una vez guardado.
             </span>
           </div>
         </div>
@@ -1263,7 +1245,7 @@ const ClientsPage: React.FC = () => {
       if (captureSubStep === 'front-review') {
         return (
           <ClientWizardFooterBar
-            onBack={() => { setIdFrontImageBase64(''); setIdInfoConfirmed(false); setCaptureSubStep('front-capture'); }}
+            onBack={() => { setIdFrontImageBase64(''); setIdInfoConfirmed(false); setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS); setCaptureSubStep('front-capture'); }}
             backLabel="Repetir"
             backIcon={refreshOutline}
             onPrimary={() => setCaptureSubStep('flip-instruction')}
@@ -1289,7 +1271,7 @@ const ClientsPage: React.FC = () => {
       if (captureSubStep === 'back-review') {
         return (
           <ClientWizardFooterBar
-            onBack={() => { setIdBackImageBase64(''); setIdInfoConfirmed(false); setCaptureSubStep('back-capture'); }}
+            onBack={() => { setIdBackImageBase64(''); setIdInfoConfirmed(false); setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS); setCaptureSubStep('back-capture'); }}
             backLabel="Repetir"
             backIcon={refreshOutline}
             onPrimary={() => setCaptureSubStep('id-summary')}

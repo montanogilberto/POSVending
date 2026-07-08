@@ -26,6 +26,7 @@ import MailPopover from '../components/PopOver/MailPopover';
 import ClientSelector from '../components/ClientSelector';
 import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
+import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
 import { useUser } from '../components/UserContext';
 import { Client } from '../api/clientsApi';
 import {
@@ -36,8 +37,17 @@ import {
 } from '../api/clientFaceRecognitionApi';
 import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../utils/faceLiveness';
+import { ExtractedIdFields } from '../utils/idOcr';
 
 import './ClientFaceRecognitionPage.css';
+
+const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
+  nombre: '',
+  domicilio: '',
+  curp: '',
+  claveElector: '',
+  fechaNacimiento: '',
+};
 
 // Sub-steps inside the capture wizard step
 type CaptureSubStep =
@@ -94,6 +104,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [contractAcceptedAt, setContractAcceptedAt] = useState<string>('');
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
+  const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
   // Tracks the ClientFaceRecognition row created on first capture, so later
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
@@ -305,6 +316,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setContractAcceptedAt('');
     setLivenessStatus('idle');
     setIdInfoConfirmed(false);
+    setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS);
     clientFaceRecognitionIdRef.current = undefined;
   };
 
@@ -428,6 +440,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <button className="wizard-footer-back" onClick={() => {
               setIdFrontImageBase64('');
               setIdInfoConfirmed(false);
+              setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS);
               setCaptureSubStep('front-capture');
             }}>
               <IonIcon icon={refreshOutline} /> Volver a capturar
@@ -470,6 +483,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <button className="wizard-footer-back" onClick={() => {
               setIdBackImageBase64('');
               setIdInfoConfirmed(false);
+              setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS);
               setCaptureSubStep('back-capture');
             }}>
               <IonIcon icon={refreshOutline} /> Volver a capturar
@@ -667,6 +681,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
                 {idBackImageBase64 && <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
               </div>
             </div>
+
+            <IdExtractedFieldsSummary
+              idFrontImageBase64={idFrontImageBase64}
+              idBackImageBase64={idBackImageBase64}
+              fields={extractedIdFields}
+              onFieldsChange={setExtractedIdFields}
+            />
 
             <IonItem className="ion-margin-top" lines="none">
               <IonLabel className="ion-text-wrap">Confirmo que la información y las capturas de la identificación son correctas</IonLabel>

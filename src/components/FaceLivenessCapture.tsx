@@ -9,14 +9,18 @@ import {
   pickChallengeSequence,
   newChallengeState,
   evaluateChallengeFrame,
+  newBlinkTrackerState,
+  trackBlink,
+  checkDescriptorConsistency,
   CHALLENGE_LABEL,
   LivenessChallenge,
   ChallengeFrameState,
+  BlinkTrackerState,
   FaceDetectionResult,
 } from '../utils/faceLiveness';
 import './FaceLivenessCapture.css';
 
-type CaptureState = 'loading-models' | 'starting-camera' | 'searching' | 'challenge' | 'captured' | 'error';
+type CaptureState = 'loading-models' | 'starting-camera' | 'searching' | 'challenge' | 'awaiting-blink' | 'captured' | 'error';
 
 export interface FaceLivenessResult {
   selfieBase64: string;
@@ -78,6 +82,8 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   const challengeStateRef = useRef<ChallengeFrameState>(newChallengeState());
   const lastDetectionRef = useRef<FaceDetectionResult | null>(null);
   const challengeIndexRef = useRef(0);
+  const blinkStateRef = useRef<BlinkTrackerState>(newBlinkTrackerState());
+  const challengeDescriptorsRef = useRef<Float32Array[]>([]);
 
   const [state, setState] = useState<CaptureState>('loading-models');
   const [sequence, setSequence] = useState<LivenessChallenge[]>(() => pickChallengeSequence());
@@ -92,35 +98,33 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     streamRef.current = null;
   }, []);
 
-  const finish = useCallback(() => {
-    console.log('[FaceLivenessCapture] finish: all 4 moves completed, capturing selfie frame');
-    const video = videoRef.current;
-    const canvas = captureCanvasRef.current;
-    const detection = lastDetectionRef.current;
-    if (!video || !canvas || !detection) {
-      console.log('[FaceLivenessCapture] finish: ABORT — missing video/canvas/detection', {
-        hasVideo: !!video,
-        hasCanvas: !!canvas,
-        hasDetection: !!detection,
-      });
-      return;
-    }
+  const finish = useCallback(
+    (descriptor: Float32Array) => {
+      console.log('[FaceLivenessCapture] finish: all checks passed, capturing selfie frame');
+      const video = videoRef.current;
+      const canvas = captureCanvasRef.current;
+      if (!video || !canvas) {
+        console.log('[FaceLivenessCapture] finish: ABORT — missing video/canvas', { hasVideo: !!video, hasCanvas: !!canvas });
+        return;
+      }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const selfieBase64 = canvas.toDataURL('image/jpeg', 0.92);
-    console.log('[FaceLivenessCapture] finish: selfie captured, base64 length =', selfieBase64.length);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const selfieBase64 = canvas.toDataURL('image/jpeg', 0.92);
+      console.log('[FaceLivenessCapture] finish: selfie captured, base64 length =', selfieBase64.length);
 
-    stopStream();
-    setState('captured');
-    setTimeout(() => {
-      console.log('[FaceLivenessCapture] finish: calling onComplete()');
-      onComplete({ selfieBase64, descriptor: detection.descriptor });
-    }, 500);
-  }, [onComplete, stopStream]);
+      stopStream();
+      setState('captured');
+      setTimeout(() => {
+        console.log('[FaceLivenessCapture] finish: calling onComplete()');
+        onComplete({ selfieBase64, descriptor });
+      }, 500);
+    },
+    [onComplete, stopStream]
+  );
 
   const tick = useCallback(
     async (timestamp: number) => {
@@ -157,16 +161,45 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
         return prev;
       });
 
+      // Tracked every frame regardless of phase — a static photo can never
+      // close and reopen its eyes, so this catches the simplest spoofing
+      // attempt independent of the 4 visible directional moves.
+      const blinked = trackBlink(detection, blinkStateRef.current);
+
+      if (challengeIndexRef.current >= sequence.length) {
+        // All 4 directions satisfied — now waiting on the passive blink
+        // check before accepting the session.
+        if (!blinked) {
+          setState('awaiting-blink');
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+
+        const { consistent } = checkDescriptorConsistency(challengeDescriptorsRef.current);
+        if (!consistent) {
+          console.log('[FaceLivenessCapture] tick: descriptor consistency check FAILED — face changed mid-session');
+          doneRef.current = true;
+          stopStream();
+          setState('error');
+          setErrorMessage('No se pudo verificar que la misma persona completó la validación. Vuelve a intentarlo.');
+          return;
+        }
+
+        doneRef.current = true;
+        // Use the descriptor from the last completed directional challenge
+        // (eyes open, mid-motion) rather than this frame — a blink-detection
+        // frame can land with eyes still closing, a worse source for the
+        // ID-match comparison.
+        finish(challengeDescriptorsRef.current[challengeDescriptorsRef.current.length - 1]);
+        return;
+      }
+
       const challenge = sequence[challengeIndexRef.current];
       const completed = evaluateChallengeFrame(challenge, detection, challengeStateRef.current);
       if (completed && !doneRef.current) {
         const nextIndex = challengeIndexRef.current + 1;
         console.log(`[FaceLivenessCapture] tick: move "${challenge}" satisfied (${nextIndex}/4)`);
-        if (nextIndex >= sequence.length) {
-          doneRef.current = true;
-          finish();
-          return;
-        }
+        challengeDescriptorsRef.current.push(detection.descriptor);
         challengeIndexRef.current = nextIndex;
         challengeStateRef.current = newChallengeState();
         setChallengeIndex(nextIndex);
@@ -174,7 +207,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
       rafRef.current = requestAnimationFrame(tick);
     },
-    [sequence, finish]
+    [sequence, finish, stopStream]
   );
 
   const startCameraAndLoop = useCallback(
@@ -245,6 +278,8 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     const newSequence = pickChallengeSequence();
     challengeIndexRef.current = 0;
     challengeStateRef.current = newChallengeState();
+    blinkStateRef.current = newBlinkTrackerState();
+    challengeDescriptorsRef.current = [];
     lastDetectionRef.current = null;
     doneRef.current = false;
     setSequence(newSequence);
@@ -259,7 +294,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       <video ref={videoRef} className="flc-video" autoPlay playsInline muted />
       <canvas ref={captureCanvasRef} className="flc-hidden-canvas" />
 
-      {(state === 'challenge' || state === 'searching') && (
+      {(state === 'challenge' || state === 'searching' || state === 'awaiting-blink') && (
         <LivenessRing sequence={sequence} completedCount={challengeIndex} />
       )}
 
@@ -272,6 +307,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
       {state === 'searching' && (
         <div className="flc-banner flc-banner--info">Coloca tu rostro dentro del encuadre</div>
+      )}
+
+      {state === 'awaiting-blink' && (
+        <div className="flc-banner flc-banner--challenge">Parpadea para finalizar</div>
       )}
 
       {state === 'challenge' && (

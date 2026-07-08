@@ -10,7 +10,7 @@
     "test.e2e": "cypress run",
     "test.unit": "vitest",
     "lint": "eslint",
-    "postinstall": "node scripts/postinstall-face-assets.js",
+    "postinstall": "node scripts/postinstall-face-assets.js && node scripts/postinstall-tesseract-assets.js",
     "capacitor:sync:after": "node scripts/ensure-ios-permissions.js"
   },
   "dependencies": {
@@ -29,6 +29,8 @@
     "@ionic/pwa-elements": "^3.4.0",
     "@ionic/react": "^8.5.0",
     "@ionic/react-router": "^8.7.8",
+    "@stripe/connect-js": "^3.4.6",
+    "@stripe/react-connect-js": "^3.4.4",
     "@stripe/react-stripe-js": "^6.6.0",
     "@stripe/stripe-js": "^9.8.0",
     "@vladmandic/face-api": "^1.7.15",
@@ -45,7 +47,8 @@
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.1.1",
     "react-native": "0.82.1",
-    "react-router-dom": "^5.3.4"
+    "react-router-dom": "^5.3.4",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
