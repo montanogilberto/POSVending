@@ -37,6 +37,31 @@ function computeOverlayRect(containerWidth: number, containerHeight: number): Ov
   return { x, y, width, height };
 }
 
+// The <video> element renders with object-fit: cover, so the visible frame is
+// a center-cropped region of the native video resolution. Both the analysis
+// tick and the final capture need to map container/CSS coordinates into that
+// same native-pixel region — shared here so they can't drift apart.
+function computeVideoCoverRect(
+  video: HTMLVideoElement,
+  containerWidth: number,
+  containerHeight: number
+): { sx: number; sy: number; sw: number; sh: number } {
+  const containerAspect = containerWidth / containerHeight;
+  const videoAspect = video.videoWidth / video.videoHeight;
+  let sx = 0;
+  let sy = 0;
+  let sw = video.videoWidth;
+  let sh = video.videoHeight;
+  if (videoAspect > containerAspect) {
+    sw = video.videoHeight * containerAspect;
+    sx = (video.videoWidth - sw) / 2;
+  } else {
+    sh = video.videoWidth / containerAspect;
+    sy = (video.videoHeight - sh) / 2;
+  }
+  return { sx, sy, sw, sh };
+}
+
 const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   title,
   instructions,
@@ -69,12 +94,30 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const captureFrame = useCallback(() => {
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
-    if (!video || !canvas) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const container = containerRef.current;
+    if (!video || !canvas || !container) return;
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const rect = computeOverlayRect(containerWidth, containerHeight);
+    const { sx, sy, sw } = computeVideoCoverRect(video, containerWidth, containerHeight);
+
+    // Crop to the guide rectangle only — previously this drew the entire
+    // video frame, so the saved photo was mostly background with the ID
+    // card occupying a small corner, making it look illegible regardless of
+    // how well the lens focused.
+    const scale = sw / containerWidth; // video-pixels per container-pixel
+    const cropX = sx + rect.x * scale;
+    const cropY = sy + rect.y * scale;
+    const cropW = rect.width * scale;
+    const cropH = rect.height * scale;
+
+    canvas.width = cropW;
+    canvas.height = cropH;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
     const base64 = canvas.toDataURL('image/jpeg', 0.92);
     stopStream();
     setState('captured');
@@ -111,20 +154,9 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
 
       // Replicate the same "object-fit: cover" crop the <video> element uses,
       // so the analyzed frame lines up with what the user actually sees.
-      const containerAspect = containerWidth / containerHeight;
-      const videoAspect = video.videoWidth / video.videoHeight;
-      let sx = 0;
-      let sy = 0;
-      let sw = video.videoWidth;
-      let sh = video.videoHeight;
-      if (videoAspect > containerAspect) {
-        sw = video.videoHeight * containerAspect;
-        sx = (video.videoWidth - sw) / 2;
-      } else {
-        sh = video.videoWidth / containerAspect;
-        sy = (video.videoHeight - sh) / 2;
-      }
+      const { sx, sy, sw, sh } = computeVideoCoverRect(video, containerWidth, containerHeight);
 
+      const containerAspect = containerWidth / containerHeight;
       const analysisWidth = ANALYSIS_CANVAS_WIDTH;
       const analysisHeight = Math.round(analysisWidth / containerAspect);
       analysisCanvas.width = analysisWidth;
@@ -187,7 +219,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: false,
         });
         if (cancelled) {
