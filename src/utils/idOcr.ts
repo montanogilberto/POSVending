@@ -44,7 +44,20 @@ function getWorker(): Promise<Worker> {
         // structure) it can mis-segment badly enough to return pure
         // noise. SPARSE_TEXT looks for text anywhere in the image without
         // assuming page layout, which fits this content much better.
-        await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+        //
+        // Live photos carry no DPI metadata, so without this Tesseract
+        // auto-estimates DPI from character size and logs e.g.
+        // "Estimating resolution as 214" — measured ~20% off the true
+        // value here, which throws off its font-size/segmentation
+        // heuristics enough to return pure noise. The capture pipeline
+        // crops to an ID-1 card (85.6mm wide) at native camera
+        // resolution, which on typical devices requesting 1920x1080
+        // works out to roughly 270 DPI — passing that explicitly skips
+        // the unreliable auto-estimate.
+        await worker.setParameters({
+          tessedit_pageseg_mode: PSM.SPARSE_TEXT,
+          user_defined_dpi: '270',
+        });
         return worker;
       })
       .catch((err) => {
