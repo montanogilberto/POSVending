@@ -10,7 +10,7 @@
 // extracted field here is meant to pre-fill an EDITABLE form field for the
 // office staff/client to visually confirm or correct — never persisted
 // without review.
-import { createWorker, Worker } from 'tesseract.js';
+import { createWorker, Worker, PSM } from 'tesseract.js';
 
 const TESSERACT_ASSET_PATH = '/tesseract';
 
@@ -36,11 +36,22 @@ function getWorker(): Promise<Worker> {
       // tesseract-core-simd-lstm.wasm"). Forcing a same-origin Worker keeps
       // self.location correct so the relative wasm lookup works.
       workerBlobURL: false,
-    }).catch((err) => {
-      console.log('[IdOcr] getWorker: FAILED to create worker', String(err));
-      workerPromise = null; // allow retry instead of caching a rejected promise forever
-      throw err;
-    });
+    })
+      .then(async (worker) => {
+        // Default page-segmentation mode (AUTO) assumes a scanned
+        // document page and tries to detect column/block layout — on an
+        // ID card (photo + hologram + scattered text fields, no page
+        // structure) it can mis-segment badly enough to return pure
+        // noise. SPARSE_TEXT looks for text anywhere in the image without
+        // assuming page layout, which fits this content much better.
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+        return worker;
+      })
+      .catch((err) => {
+        console.log('[IdOcr] getWorker: FAILED to create worker', String(err));
+        workerPromise = null; // allow retry instead of caching a rejected promise forever
+        throw err;
+      });
   }
   return workerPromise;
 }

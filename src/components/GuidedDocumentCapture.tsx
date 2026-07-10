@@ -114,6 +114,12 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
 
     canvas.width = cropW;
     canvas.height = cropH;
+    console.log(
+      '[GuidedDocumentCapture] captureFrame: video =',
+      video.videoWidth, 'x', video.videoHeight,
+      'container =', containerWidth, 'x', containerHeight,
+      'crop =', Math.round(cropW), 'x', Math.round(cropH)
+    );
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
