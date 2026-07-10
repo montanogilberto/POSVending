@@ -25,6 +25,13 @@ interface GuidedDocumentCaptureProps {
 const CARD_ASPECT = 85.6 / 54;
 const GOOD_SCORE_THRESHOLD = 82;
 const ALIGNING_SCORE_THRESHOLD = 55;
+// overallScore is a weighted average (blur 45%, brightness 25%, glare 15%,
+// motion 15%), so a frame can clear GOOD_SCORE_THRESHOLD with mediocre blur
+// if lighting/stillness are otherwise perfect — confirmed on-device: a
+// visibly blurry capture (unreadable by OCR) still passed the composite
+// gate. Requiring blurScore to independently clear its own floor closes
+// that gap without loosening the other checks.
+const MIN_BLUR_SCORE = 70;
 const STABILITY_FRAMES_REQUIRED = 6;
 const ANALYSIS_INTERVAL_MS = 100; // ~10 fps
 const ANALYSIS_CANVAS_WIDTH = 240;
@@ -187,7 +194,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       previousGrayRef.current = gray;
       setPositionHint(metrics.positionHint);
 
-      if (metrics.overallScore >= GOOD_SCORE_THRESHOLD) {
+      if (metrics.overallScore >= GOOD_SCORE_THRESHOLD && metrics.blurScore >= MIN_BLUR_SCORE) {
         consecutiveGoodRef.current += 1;
         setState(
           consecutiveGoodRef.current >= STABILITY_FRAMES_REQUIRED ? 'stable' : 'aligning'
@@ -199,6 +206,10 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
 
       if (consecutiveGoodRef.current >= STABILITY_FRAMES_REQUIRED && !capturedRef.current) {
         capturedRef.current = true;
+        console.log(
+          '[GuidedDocumentCapture] triggering capture, metrics =',
+          JSON.stringify(metrics)
+        );
         captureFrame();
         return;
       }
