@@ -55,11 +55,11 @@ const IdExtractedFieldsSummary: React.FC<IdExtractedFieldsSummaryProps> = ({
           claveElector: front.claveElector || back.claveElector,
           fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento,
         };
-        console.log('[IdExtractedFieldsSummary] OCR merged result', merged);
+        console.log('[IdExtractedFieldsSummary] OCR merged result', JSON.stringify(merged));
         onFieldsChange(merged);
       })
       .catch((err) => {
-        console.log('[IdExtractedFieldsSummary] OCR FAILED', err);
+        console.log('[IdExtractedFieldsSummary] OCR FAILED', String(err));
         if (!cancelled) {
           setOcrError('No se pudo leer la identificación automáticamente. Completa los datos manualmente.');
         }

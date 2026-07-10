@@ -37,7 +37,7 @@ function getWorker(): Promise<Worker> {
       // self.location correct so the relative wasm lookup works.
       workerBlobURL: false,
     }).catch((err) => {
-      console.log('[IdOcr] getWorker: FAILED to create worker', err);
+      console.log('[IdOcr] getWorker: FAILED to create worker', String(err));
       workerPromise = null; // allow retry instead of caching a rejected promise forever
       throw err;
     });
@@ -56,6 +56,10 @@ export async function extractRawText(imageBase64OrDataUrl: string): Promise<stri
   const startedAt = Date.now();
   const { data } = await worker.recognize(dataUrl);
   console.log(`[IdOcr] extractRawText: done in ${Date.now() - startedAt}ms, text length =`, data.text.length);
+  // JSON.stringify so the actual content survives Capacitor's Android
+  // console bridge, which otherwise flattens object/multi-line args to
+  // "[object Object]" — length alone isn't enough to diagnose bad OCR.
+  console.log('[IdOcr] extractRawText: raw text =', JSON.stringify(data.text));
   return data.text;
 }
 
@@ -134,7 +138,7 @@ export function parseIneFields(rawText: string): ExtractedIdFields {
     fechaNacimiento: dateMatch?.[0] ?? '',
   };
 
-  console.log('[IdOcr] parseIneFields: result =', result);
+  console.log('[IdOcr] parseIneFields: result =', JSON.stringify(result));
   return result;
 }
 
