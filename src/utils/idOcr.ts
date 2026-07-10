@@ -23,6 +23,19 @@ function getWorker(): Promise<Worker> {
       workerPath: `${TESSERACT_ASSET_PATH}/worker.min.js`,
       corePath: `${TESSERACT_ASSET_PATH}/tesseract-core-simd-lstm.js`,
       langPath: TESSERACT_ASSET_PATH,
+      // The self-hosted trained-data file is named without a .gz suffix
+      // (Capacitor's Android asset server 404s on .gz-suffixed assets) even
+      // though its bytes are still gzip-compressed — the worker detects the
+      // gzip magic header and decompresses regardless of this flag, which
+      // only controls whether ".gz" is appended to the fetch URL.
+      gzip: false,
+      // Default (true) spawns the worker from a Blob URL, which makes the
+      // worker thread's self.location a blob: URL instead of our real
+      // /tesseract/ path. The WASM core then can't resolve its .wasm
+      // binary relative to that blob URL ("Failed to parse URL from
+      // tesseract-core-simd-lstm.wasm"). Forcing a same-origin Worker keeps
+      // self.location correct so the relative wasm lookup works.
+      workerBlobURL: false,
     }).catch((err) => {
       console.log('[IdOcr] getWorker: FAILED to create worker', err);
       workerPromise = null; // allow retry instead of caching a rejected promise forever

@@ -32,10 +32,18 @@ for (const file of coreFiles) {
 }
 
 const LANG_DATA_URL = 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/spa/4.0.0_best_int/spa.traineddata.gz';
-const langDataDest = resolve(destDir, 'spa.traineddata.gz');
+// Saved WITHOUT the .gz extension even though the bytes are still gzip
+// data: Capacitor's Android asset server fails to serve .gz-suffixed
+// assets from the local WebView ("Unable to open asset URL" -> 404), a
+// known issue tied specifically to that extension. Tesseract.js's worker
+// auto-detects the gzip magic header and decompresses regardless of
+// filename, so dropping the extension (paired with gzip: false in
+// idOcr.ts, which controls the *fetch* filename, not decompression)
+// sidesteps the bug for free — same bytes, just a different name.
+const langDataDest = resolve(destDir, 'spa.traineddata');
 
 if (existsSync(langDataDest)) {
-  console.log('[ocr] spa.traineddata.gz already present — skipping download.');
+  console.log('[ocr] spa.traineddata already present — skipping download.');
 } else {
   console.log('[ocr] Downloading Spanish trained-data file (~2MB) from', LANG_DATA_URL);
   try {
@@ -44,7 +52,7 @@ if (existsSync(langDataDest)) {
     const buffer = Buffer.from(await res.arrayBuffer());
     const { writeFileSync } = await import('node:fs');
     writeFileSync(langDataDest, buffer);
-    console.log('[ocr] Downloaded spa.traineddata.gz into public/tesseract/.');
+    console.log('[ocr] Downloaded spa.traineddata (gzip content, .gz-free filename) into public/tesseract/.');
   } catch (err) {
     console.warn('[ocr] Failed to download Spanish trained-data file — OCR will fall back to Tesseract\'s CDN at runtime.', err.message);
   }
