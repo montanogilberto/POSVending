@@ -10,7 +10,7 @@
 // extracted field here is meant to pre-fill an EDITABLE form field for the
 // office staff/client to visually confirm or correct — never persisted
 // without review.
-import { createWorker, Worker, PSM } from 'tesseract.js';
+import { createWorker, Worker } from 'tesseract.js';
 
 const TESSERACT_ASSET_PATH = '/tesseract';
 
@@ -38,24 +38,24 @@ function getWorker(): Promise<Worker> {
       workerBlobURL: false,
     })
       .then(async (worker) => {
-        // Default page-segmentation mode (AUTO) assumes a scanned
-        // document page and tries to detect column/block layout — on an
-        // ID card (photo + hologram + scattered text fields, no page
-        // structure) it can mis-segment badly enough to return pure
-        // noise. SPARSE_TEXT looks for text anywhere in the image without
-        // assuming page layout, which fits this content much better.
+        // Tried PSM.SPARSE_TEXT here on the theory that AUTO's page-layout
+        // detection would mis-segment a card (photo + hologram + scattered
+        // fields, no page structure). Reverted: on-device testing showed
+        // even a clearly legible MRZ line came back as pure symbol noise
+        // under SPARSE_TEXT, and that mode is documented to have LSTM-only
+        // engine compatibility problems — a config bug, not evidence the
+        // image was unreadable. Falling back to Tesseract's own default
+        // (AUTO) rather than guessing another non-default mode blind.
         //
         // Live photos carry no DPI metadata, so without this Tesseract
         // auto-estimates DPI from character size and logs e.g.
         // "Estimating resolution as 214" — measured ~20% off the true
         // value here, which throws off its font-size/segmentation
-        // heuristics enough to return pure noise. The capture pipeline
-        // crops to an ID-1 card (85.6mm wide) at native camera
-        // resolution, which on typical devices requesting 1920x1080
-        // works out to roughly 270 DPI — passing that explicitly skips
-        // the unreliable auto-estimate.
+        // heuristics. The capture pipeline crops to an ID-1 card (85.6mm
+        // wide) at native camera resolution, which on typical devices
+        // requesting 1920x1080 works out to roughly 270 DPI — passing
+        // that explicitly skips the unreliable auto-estimate.
         await worker.setParameters({
-          tessedit_pageseg_mode: PSM.SPARSE_TEXT,
           user_defined_dpi: '270',
         });
         return worker;
