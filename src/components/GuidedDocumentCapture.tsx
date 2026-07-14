@@ -31,8 +31,23 @@ const ALIGNING_SCORE_THRESHOLD = 55;
 // visibly blurry capture (unreadable by OCR) still passed the composite
 // gate. Requiring blurScore to independently clear its own floor closes
 // that gap without loosening the other checks.
+//
+// NOTE: raising this further is a dead end. On-device logs showed
+// blurScore hitting its 100/100 ceiling on captures that measured only
+// ~11-17 full-resolution Laplacian variance (see computeFullResBlurVariance)
+// and were still too blurry for OCR — the metric is computed on a 240px
+// downsampled analysis canvas, which smooths away blur that survives at the
+// captured 918px resolution. No value of MIN_BLUR_SCORE can fix that; it's
+// saturated. See STABILITY_FRAMES_REQUIRED below for the actual mitigation.
 const MIN_BLUR_SCORE = 70;
-const STABILITY_FRAMES_REQUIRED = 6;
+// Bumped from 6 (600ms) to 14 (1.4s). The 240px blur gate can't reliably
+// tell a genuinely sharp frame from a blurry one (see MIN_BLUR_SCORE note),
+// and the likely real cause is the phone's autofocus not having settled by
+// the old, shorter dwell time — handheld macro-distance AF often takes
+// longer than 600ms to lock. There's no reliable JS API to query AF-lock
+// state from getUserMedia, so a longer required steady streak is the
+// practical proxy.
+const STABILITY_FRAMES_REQUIRED = 14;
 const ANALYSIS_INTERVAL_MS = 100; // ~10 fps
 const ANALYSIS_CANVAS_WIDTH = 240;
 
