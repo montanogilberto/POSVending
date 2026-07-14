@@ -47,17 +47,15 @@ function getWorker(): Promise<Worker> {
         // image was unreadable. Falling back to Tesseract's own default
         // (AUTO) rather than guessing another non-default mode blind.
         //
-        // Live photos carry no DPI metadata, so without this Tesseract
-        // auto-estimates DPI from character size and logs e.g.
-        // "Estimating resolution as 214" — measured ~20% off the true
-        // value here, which throws off its font-size/segmentation
-        // heuristics. The capture pipeline crops to an ID-1 card (85.6mm
-        // wide) at native camera resolution, which on typical devices
-        // requesting 1920x1080 works out to roughly 270 DPI — passing
-        // that explicitly skips the unreliable auto-estimate.
-        await worker.setParameters({
-          user_defined_dpi: '270',
-        });
+        // user_defined_dpi is set per-image in extractRawText, not here —
+        // see the comment there. A single fixed value at worker-creation
+        // time doesn't work: it was hardcoded to '270' (correct for the
+        // ~918px-wide crops the capture pipeline produced at the time), but
+        // once ImageCapture.takePhoto() started returning full sensor-
+        // resolution stills, the same physical card produced a ~2934px
+        // crop — true DPI ~870 — and the stale '270' figure made Tesseract
+        // badly mis-segment an otherwise sharp image (confirmed on-device:
+        // OCR got slower AND worse after that change).
         return worker;
       })
       .catch((err) => {
@@ -69,6 +67,22 @@ function getWorker(): Promise<Worker> {
   return workerPromise;
 }
 
+const ID_CARD_WIDTH_INCHES = 85.6 / 25.4; // ID-1 card width (85.6mm)
+
+// The capture pipeline (GuidedDocumentCapture) always crops to fill the
+// ID-1 card guide, so a captured image's own pixel width directly
+// corresponds to that physical 85.6mm width — computing DPI from it stays
+// correct regardless of which camera/device/capture path produced the
+// image, unlike a hardcoded figure (which broke once the capture
+// resolution changed — see the comment in getWorker above).
+async function computeDpiFromImage(dataUrl: string): Promise<number> {
+  const blob = await (await fetch(dataUrl)).blob();
+  const bitmap = await createImageBitmap(blob);
+  const width = bitmap.width;
+  bitmap.close();
+  return Math.round(width / ID_CARD_WIDTH_INCHES);
+}
+
 // Runs OCR on a captured ID photo (base64/data-URL) and returns the raw
 // recognized text, newline-separated as Tesseract reports it.
 export async function extractRawText(imageBase64OrDataUrl: string): Promise<string> {
@@ -77,6 +91,11 @@ export async function extractRawText(imageBase64OrDataUrl: string): Promise<stri
   const dataUrl = imageBase64OrDataUrl.startsWith('data:')
     ? imageBase64OrDataUrl
     : `data:image/jpeg;base64,${imageBase64OrDataUrl}`;
+
+  const dpi = await computeDpiFromImage(dataUrl);
+  console.log('[IdOcr] extractRawText: computed dpi =', dpi);
+  await worker.setParameters({ user_defined_dpi: String(dpi) });
+
   const startedAt = Date.now();
   const { data } = await worker.recognize(dataUrl);
   console.log(

@@ -87,6 +87,7 @@ import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
 import StripeAccountOnboarding from '../components/StripeAccountOnboarding';
 import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
+import ZoomableImage from '../components/ZoomableImage';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../utils/faceLiveness';
 import { ExtractedIdFields } from '../utils/idOcr';
 
@@ -891,7 +892,7 @@ const ClientsPage: React.FC = () => {
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
           <h2 className="cfr-capture-title">Asegúrate de que la identificación sea legible</h2>
-          {idFrontImageBase64 && <img src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
+          {idFrontImageBase64 && <ZoomableImage src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
         </IonCardContent>
       </IonCard>
     );
@@ -927,7 +928,7 @@ const ClientsPage: React.FC = () => {
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
           <h2 className="cfr-capture-title">Asegúrate de que la identificación sea legible</h2>
-          {idBackImageBase64 && <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
+          {idBackImageBase64 && <ZoomableImage src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
         </IonCardContent>
       </IonCard>
     );
@@ -950,11 +951,11 @@ const ClientsPage: React.FC = () => {
           <div className="id-summary-images">
             <div className="id-summary-image-card">
               <span className="id-preview-title">Frente</span>
-              {idFrontImageBase64 && <img src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
+              {idFrontImageBase64 && <ZoomableImage src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
             </div>
             <div className="id-summary-image-card">
               <span className="id-preview-title">Reverso</span>
-              {idBackImageBase64 && <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
+              {idBackImageBase64 && <ZoomableImage src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
             </div>
           </div>
 
@@ -1038,13 +1039,13 @@ const ClientsPage: React.FC = () => {
         <div className="id-preview-card">
           <span className="id-preview-title">Frente</span>
           {idFrontImageBase64
-            ? <img src={idFrontImageBase64} alt="Frente" className="captured-image captured-image-small" />
+            ? <ZoomableImage src={idFrontImageBase64} alt="Frente" className="captured-image captured-image-small" />
             : <div className="id-preview-placeholder">Sin captura</div>}
         </div>
         <div className="id-preview-card">
           <span className="id-preview-title">Reverso</span>
           {idBackImageBase64
-            ? <img src={idBackImageBase64} alt="Reverso" className="captured-image captured-image-small" />
+            ? <ZoomableImage src={idBackImageBase64} alt="Reverso" className="captured-image captured-image-small" />
             : <div className="id-preview-placeholder">Sin captura</div>}
         </div>
       </div>

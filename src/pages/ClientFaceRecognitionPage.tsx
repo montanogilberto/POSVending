@@ -27,6 +27,7 @@ import ClientSelector from '../components/ClientSelector';
 import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
 import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
+import ZoomableImage from '../components/ZoomableImage';
 import { useUser } from '../components/UserContext';
 import { Client } from '../api/clientsApi';
 import {
@@ -604,7 +605,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <IonCardContent>
             <h2 className="cfr-capture-title">Asegúrate de que tu identificación sea legible</h2>
             {idFrontImageBase64 && (
-              <img src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />
+              <ZoomableImage src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />
             )}
           </IonCardContent>
         </IonCard>
@@ -648,7 +649,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <IonCardContent>
             <h2 className="cfr-capture-title">Asegúrate de que tu identificación sea legible</h2>
             {idBackImageBase64 && (
-              <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />
+              <ZoomableImage src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />
             )}
           </IonCardContent>
         </IonCard>
@@ -674,11 +675,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <div className="id-summary-images">
               <div className="id-summary-image-card">
                 <span className="id-preview-title">Frente</span>
-                {idFrontImageBase64 && <img src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
+                {idFrontImageBase64 && <ZoomableImage src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
               </div>
               <div className="id-summary-image-card">
                 <span className="id-preview-title">Reverso</span>
-                {idBackImageBase64 && <img src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
+                {idBackImageBase64 && <ZoomableImage src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
               </div>
             </div>
 
@@ -808,13 +809,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
               <div className="id-preview-card">
                 <span className="id-preview-title">Frente</span>
                 {idFrontImageBase64
-                  ? <img src={idFrontImageBase64} alt="ID Front" className="captured-image captured-image-small" />
+                  ? <ZoomableImage src={idFrontImageBase64} alt="ID Front" className="captured-image captured-image-small" />
                   : <div className="id-preview-placeholder">Sin captura</div>}
               </div>
               <div className="id-preview-card">
                 <span className="id-preview-title">Reverso</span>
                 {idBackImageBase64
-                  ? <img src={idBackImageBase64} alt="ID Back" className="captured-image captured-image-small" />
+                  ? <ZoomableImage src={idBackImageBase64} alt="ID Back" className="captured-image captured-image-small" />
                   : <div className="id-preview-placeholder">Sin captura</div>}
               </div>
             </div>
