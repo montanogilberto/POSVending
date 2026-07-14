@@ -3,7 +3,7 @@ import { IonIcon } from '@ionic/react';
 import { helpCircleOutline, personOutline, warningOutline } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { Camera } from '@capacitor/camera';
-import { analyzeFrame, OverlayRect, PositionHint } from '../utils/documentCaptureAnalysis';
+import { analyzeFrame, computeFullResBlurVariance, OverlayRect, PositionHint } from '../utils/documentCaptureAnalysis';
 import './GuidedDocumentCapture.css';
 
 type CaptureState = 'initializing' | 'searching' | 'aligning' | 'stable' | 'captured' | 'error';
@@ -130,6 +130,13 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    // Logged (not gated on yet) to calibrate a real full-resolution
+    // sharpness threshold — the live-gating blurScore is measured on a
+    // heavily downsampled 240px analysis canvas, which smooths away blur
+    // that's still present at this capture's native resolution.
+    const fullResVariance = computeFullResBlurVariance(ctx.getImageData(0, 0, cropW, cropH));
+    console.log('[GuidedDocumentCapture] captureFrame: fullResBlurVariance =', fullResVariance);
 
     const base64 = canvas.toDataURL('image/jpeg', 0.92);
     stopStream();

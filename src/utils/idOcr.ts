@@ -79,7 +79,10 @@ export async function extractRawText(imageBase64OrDataUrl: string): Promise<stri
     : `data:image/jpeg;base64,${imageBase64OrDataUrl}`;
   const startedAt = Date.now();
   const { data } = await worker.recognize(dataUrl);
-  console.log(`[IdOcr] extractRawText: done in ${Date.now() - startedAt}ms, text length =`, data.text.length);
+  console.log(
+    `[IdOcr] extractRawText: done in ${Date.now() - startedAt}ms, text length =`, data.text.length,
+    'tesseract confidence =', data.confidence
+  );
   // JSON.stringify so the actual content survives Capacitor's Android
   // console bridge, which otherwise flattens object/multi-line args to
   // "[object Object]" — length alone isn't enough to diagnose bad OCR.

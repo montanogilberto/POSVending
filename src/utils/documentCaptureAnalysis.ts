@@ -93,6 +93,41 @@ function computeBlurScore(laplacian: Float32Array, rect: OverlayRect, width: num
   return clampScore((variance / 150) * 100);
 }
 
+// Same Laplacian-variance measure as computeBlurScore, but run over the
+// WHOLE image at its native resolution instead of the live-gating pipeline's
+// heavily downsampled (240px-wide) analysis canvas. Downsampling smooths
+// away real blur — confirmed on-device: computeBlurScore reported its
+// maximum 100/100 on a capture that was still too blurry for OCR to read.
+// This has no calibrated 0-100 scale yet (variance scales with resolution,
+// so the 150/40 reference above doesn't transfer) — it returns the raw
+// variance for logging until a real full-resolution threshold is derived
+// from actual device data.
+export function computeFullResBlurVariance(imageData: ImageData): number {
+  const { data, width, height } = imageData;
+  const gray = toGrayscale(data, width, height);
+  const laplacian = laplacianMap(gray, width, height);
+
+  let sum = 0;
+  let count = 0;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      sum += laplacian[y * width + x];
+      count++;
+    }
+  }
+  if (count === 0) return 0;
+  const mean = sum / count;
+
+  let variance = 0;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const d = laplacian[y * width + x] - mean;
+      variance += d * d;
+    }
+  }
+  return variance / count;
+}
+
 // Scoped to the guide interior — a dark background around a well-lit
 // document (or vice versa) shouldn't drag this down.
 function computeBrightnessScore(gray: Uint8ClampedArray, rect: OverlayRect, width: number, height: number): number {
