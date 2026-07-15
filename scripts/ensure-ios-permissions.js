@@ -22,6 +22,10 @@ const REQUIRED_KEYS = [
     key: 'NSCameraUsageDescription',
     value: 'Usamos la cámara para capturar la identificación y verificar tu identidad.',
   },
+  {
+    key: 'NSLocationWhenInUseUsageDescription',
+    value: 'Usamos tu ubicación para verificar tu presencia física al momento del registro.',
+  },
 ];
 
 let plist = readFileSync(plistPath, 'utf8');

@@ -24,6 +24,20 @@ export interface ClientFaceRecognition {
   hasPhysicalPagare: boolean;
   physicalPagareVerifiedAt?: string;
 
+  // Presence evidence (video + GPS, captured in lieu of OCR'd address)
+  presenceVideoBlobUrl?: string;
+  presenceLatitude?: number | null;
+  presenceLongitude?: number | null;
+  presenceLocationAccuracyMeters?: number | null;
+  presenceCapturedAt?: string;
+
+  // Signature match (ID-card signature crop vs. contract-signing signature)
+  idSignatureCropBlobUrl?: string;
+  contractSignatureBlobUrl?: string;
+  signatureMatchScore?: number | null;
+  signatureMatchPassed?: boolean | null;
+  signatureMatchedAt?: string;
+
   // Audit Fields
   isActive?: boolean;
   createdBy?: number;
@@ -60,8 +74,26 @@ export interface ContractSubmissionRequest {
   pagarePdfBase64: string;
   hasPhysicalPagare: boolean;
 
+  // Signature match — either side may be omitted (e.g. non-INE documents
+  // skip the ID-crop side); the backend only attempts a comparison when
+  // both are present.
+  idSignatureCropBlobUrl?: string;
+  idSignatureCropBase64?: string;
+  contractSignatureBlobUrl?: string;
+  contractSignatureBase64?: string;
+
   // Audit/User context
   userId: number;
+}
+
+export interface UploadPresenceCaptureRequest {
+  companyId: number;
+  clientId: number;
+  videoBase64: string; // raw base64, no "data:video/...;base64," prefix
+}
+
+export interface UploadPresenceCaptureResponse {
+  blobUrl: string;
 }
 
 export interface ContractSubmissionResponse {
@@ -172,6 +204,22 @@ export async function upsertClientFaceRecognition(
     hasPhysicalPagare: false,
     ...patch,
   });
+}
+
+// UPLOAD A PRESENCE (VIDEO) CAPTURE -- POST /api/clientFaceRecognition/upload-presence
+// Same two-step pattern as uploadClientFaceRecognitionImage: uploads the video and
+// hands back its blob URL only. The GPS fields never touch this endpoint — the
+// caller persists them (plus the returned blobUrl) via updateClientFaceRecognition.
+export async function uploadPresenceCapture(
+  payload: UploadPresenceCaptureRequest
+): Promise<UploadPresenceCaptureResponse> {
+  const res = await fetch(BASE_URL + "/api/clientFaceRecognition/upload-presence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return await res.json();
 }
 
 // CONTRACT -- POST /api/clientFaceRecognition/contract

@@ -28,17 +28,21 @@ import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
 import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
 import ZoomableImage from '../components/ZoomableImage';
+import PresenceCapture, { PresenceCaptureResult } from '../components/PresenceCapture';
+import SignaturePad from '../components/SignaturePad';
 import { useUser } from '../components/UserContext';
 import { Client } from '../api/clientsApi';
 import {
   submitContractClientFaceRecognition,
   uploadClientFaceRecognitionImage,
   upsertClientFaceRecognition,
+  uploadPresenceCapture as uploadPresenceCaptureApi,
   ContractSubmissionRequest,
 } from '../api/clientFaceRecognitionApi';
 import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../utils/faceLiveness';
 import { ExtractedIdFields } from '../utils/idOcr';
+import { cropIneSignatureRegion } from '../utils/signatureCrop';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -59,6 +63,8 @@ type CaptureSubStep =
   | 'back-capture'    // live camera back
   | 'back-review'     // "Asegúrate de que sea legible" (back)
   | 'id-summary'      // "Confirma que la información sea correcta"
+  | 'presence-intro'  // "Verificación de presencia" explanation
+  | 'presence-capture'// video + GPS capture
   | 'liveness-intro'  // "Mueve la cabeza..."
   | 'liveness-active' // liveness in progress
   | 'processing';     // "Cargando..."
@@ -106,6 +112,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
+  const [presenceResult, setPresenceResult] = useState<PresenceCaptureResult | null>(null);
+  const [contractSignatureBase64, setContractSignatureBase64] = useState<string>('');
   // Tracks the ClientFaceRecognition row created on first capture, so later
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
@@ -149,7 +157,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
         'back-capture': 'flip-instruction',
         'back-review': 'back-capture',
         'id-summary': 'back-review',
-        'liveness-intro': 'id-summary',
+        'presence-intro': 'id-summary',
+        'presence-capture': 'presence-intro',
+        'liveness-intro': 'presence-capture',
         'liveness-active': 'liveness-intro',
         'processing': 'liveness-active',
       };
@@ -210,6 +220,45 @@ const ClientFaceRecognitionPage: React.FC = () => {
     } catch (err) {
       console.error(`[Expediente] Failed to upload ${side} ID image early:`, err);
       return '';
+    }
+  };
+
+  // Persists the presence (video + GPS) capture the same way uploadCapturedImage
+  // does for ID photos: upload the blob, then upsert it onto the client's
+  // ClientFaceRecognitions row so it survives even if the wizard is abandoned
+  // before the final contract submission.
+  const handlePresenceCapture = async (result: PresenceCaptureResult) => {
+    console.log('[Expediente] handlePresenceCapture: captured, hasPosition =', result.latitude !== null);
+    setPresenceResult(result);
+    setCaptureSubStep('liveness-intro');
+    if (!selectedClient) {
+      console.log('[Expediente] handlePresenceCapture: ABORT — no selectedClient');
+      return;
+    }
+    try {
+      const { blobUrl } = await uploadPresenceCaptureApi({
+        companyId: Number(companyId),
+        clientId: selectedClient.clientId,
+        videoBase64: result.videoBase64.split(',')[1],
+      });
+      console.log('[Expediente] handlePresenceCapture: uploaded to blob →', blobUrl);
+      const record = await upsertClientFaceRecognition(
+        Number(companyId),
+        selectedClient.clientId,
+        documentType,
+        {
+          presenceVideoBlobUrl: blobUrl,
+          presenceLatitude: result.latitude,
+          presenceLongitude: result.longitude,
+          presenceLocationAccuracyMeters: result.accuracyMeters,
+          presenceCapturedAt: result.capturedAt,
+        },
+        clientFaceRecognitionIdRef.current
+      );
+      clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
+      console.log('[Expediente] handlePresenceCapture: persisted, clientFaceRecognitionId =', record.clientFaceRecognitionId);
+    } catch (err) {
+      console.error('[Expediente] Failed to upload presence capture:', err);
     }
   };
 
@@ -318,6 +367,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setLivenessStatus('idle');
     setIdInfoConfirmed(false);
     setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS);
+    setPresenceResult(null);
+    setContractSignatureBase64('');
     clientFaceRecognitionIdRef.current = undefined;
   };
 
@@ -328,6 +379,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setShowToast(true);
       return;
     }
+    if (!contractSignatureBase64) {
+      setError('Por favor firma para validar tu identidad.');
+      setShowToast(true);
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -335,6 +391,19 @@ const ClientFaceRecognitionPage: React.FC = () => {
     try {
       const now = new Date().toISOString();
       setContractAcceptedAt(now);
+
+      // Best-effort crop of the printed signature off the ID front photo, for
+      // automated comparison against the signature just drawn above — only
+      // meaningful for INE (see signatureCrop.ts); failures here shouldn't
+      // block submission, they just mean no automated match is attempted.
+      let idSignatureCropBase64 = '';
+      if (documentType === 'INE' && idFrontImageBase64) {
+        try {
+          idSignatureCropBase64 = await cropIneSignatureRegion(idFrontImageBase64);
+        } catch (cropErr) {
+          console.log('[Expediente] handleSubmitContract: signature crop FAILED', cropErr);
+        }
+      }
 
       const payload: ContractSubmissionRequest = {
         clientFaceRecognitionId: clientFaceRecognitionIdRef.current,
@@ -352,6 +421,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
         pagareAccepted: true,
         pagarePdfBase64: btoa('Pagaré aceptado electrónicamente'),
         hasPhysicalPagare,
+        idSignatureCropBase64: idSignatureCropBase64 ? idSignatureCropBase64.split(',')[1] : undefined,
+        contractSignatureBase64: contractSignatureBase64.split(',')[1],
         userId: 0,
       };
       console.log('[Expediente] handleSubmitContract: submitting payload', {
@@ -409,7 +480,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const Footer = () => {
     if (step === 1) {
       // Capture sub-step footers
-      if (captureSubStep === 'processing' || captureSubStep === 'liveness-active') return null;
+      if (captureSubStep === 'processing' || captureSubStep === 'liveness-active' || captureSubStep === 'presence-capture') return null;
 
       if (captureSubStep === 'doc-intro') {
         return (
@@ -507,9 +578,23 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <button
               className="wizard-footer-submit"
               disabled={!idInfoConfirmed}
-              onClick={() => setCaptureSubStep('liveness-intro')}
+              onClick={() => setCaptureSubStep('presence-intro')}
             >
               Confirmar y continuar
+            </button>
+          </div>
+        );
+      }
+
+      if (captureSubStep === 'presence-intro') {
+        return (
+          <div className="wizard-footer">
+            <button className="wizard-footer-back" onClick={goBack}>
+              <IonIcon icon={chevronForward} style={{ transform: 'rotate(180deg)' }} /> Atrás
+            </button>
+            <div className="wizard-footer-spacer" />
+            <button className="wizard-footer-next" onClick={() => setCaptureSubStep('presence-capture')}>
+              Continuar <IonIcon icon={chevronForward} />
             </button>
           </div>
         );
@@ -554,7 +639,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           </button>
         )}
         {step === 3 && (
-          <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || !pagareAccepted || loading}>
+          <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || !pagareAccepted || !contractSignatureBase64 || loading}>
             Enviar contrato
           </button>
         )}
@@ -702,6 +787,32 @@ const ClientFaceRecognitionPage: React.FC = () => {
       );
     }
 
+    if (captureSubStep === 'presence-intro') {
+      return (
+        <IonCard className="client-face-recognition-step-card cfr-capture-card">
+          <IonCardContent>
+            <h2 className="cfr-capture-title">Verificación de presencia</h2>
+            <p className="cfr-capture-desc">
+              Vamos a grabar un video breve y registrar tu ubicación exacta como evidencia de que
+              completaste este registro en persona. Esto ayuda a verificar tu domicilio cuando la
+              identificación no es legible por OCR.
+            </p>
+          </IonCardContent>
+        </IonCard>
+      );
+    }
+
+    if (captureSubStep === 'presence-capture') {
+      return (
+        <IonCard className="client-face-recognition-step-card cfr-capture-card">
+          <IonCardContent>
+            <h2 className="cfr-capture-title">Verificación de presencia</h2>
+            <PresenceCapture onCapture={handlePresenceCapture} />
+          </IonCardContent>
+        </IonCard>
+      );
+    }
+
     if (captureSubStep === 'liveness-intro') {
       return (
         <IonCard className="client-face-recognition-step-card cfr-capture-card">
@@ -844,6 +955,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <p><strong>Documento:</strong> {documentType || '—'}</p>
             <p><strong>Puntaje de confianza:</strong> {confidenceScore > 0 ? confidenceScore.toFixed(4) : '—'}</p>
             <p><strong>Estado:</strong> {isVerified ? 'Verificado ✓' : 'No verificado'}</p>
+            <p><strong>Presencia registrada:</strong> {presenceResult ? 'Sí ✓' : 'No'}</p>
             <p><strong>Contrato aceptado en:</strong> {contractAcceptedAt || 'Pendiente de envío'}</p>
           </div>
 
@@ -875,6 +987,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
               onIonChange={(e: CustomEvent<{ checked: boolean }>) => setHasPhysicalPagare(e.detail.checked)}
             />
           </IonItem>
+
+          {contractAccepted && pagareAccepted && (
+            <div className="ion-margin-top">
+              <p><strong>Firma electrónica:</strong></p>
+              <SignaturePad
+                label="Firma aquí para validar tu identidad"
+                onSave={(dataUrl) => setContractSignatureBase64(dataUrl)}
+                onClear={() => setContractSignatureBase64('')}
+              />
+              {contractSignatureBase64 && <p style={{ color: '#059669', fontSize: 13 }}>Firma guardada ✓</p>}
+            </div>
+          )}
         </IonCardContent>
       </IonCard>
     );

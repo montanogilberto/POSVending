@@ -10,7 +10,7 @@
     "test.e2e": "cypress run",
     "test.unit": "vitest",
     "lint": "eslint",
-    "postinstall": "node scripts/postinstall-face-assets.js && node scripts/postinstall-tesseract-assets.js",
+    "postinstall": "node scripts/postinstall-face-assets.js",
     "capacitor:sync:after": "node scripts/ensure-ios-permissions.js"
   },
   "dependencies": {
@@ -19,6 +19,7 @@
     "@capacitor/app": "7.1.2",
     "@capacitor/camera": "^7.0.5",
     "@capacitor/core": "7.4.5",
+    "@capacitor/geolocation": "^7.1.8",
     "@capacitor/haptics": "7.0.1",
     "@capacitor/ios": "7.4.5",
     "@capacitor/keyboard": "^7.0.6",
@@ -47,8 +48,7 @@
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.1.1",
     "react-native": "0.82.1",
-    "react-router-dom": "^5.3.4",
-    "tesseract.js": "^7.0.0"
+    "react-router-dom": "^5.3.4"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

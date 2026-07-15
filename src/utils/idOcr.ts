@@ -1,113 +1,22 @@
-// Self-hosted OCR for extracting name/address/CURP/etc. from a captured INE
-// (Mexican voter ID) photo. Uses Tesseract.js — free, runs entirely
-// client-side, no vendor approval or per-call cost — consistent with
-// replacing Azure Face API for liveness. Assets (worker script, WASM core,
-// Spanish trained data) are self-hosted in public/tesseract/ via
-// scripts/postinstall-tesseract-assets.js instead of Tesseract's default
-// runtime CDN fetch.
+// ID document field extraction — calls the backend's Azure AI Document
+// Intelligence endpoint (POST /ocr/extract-id-fields) instead of running
+// OCR client-side. Previously self-hosted via Tesseract.js; replaced after
+// extensive on-device testing this session proved Tesseract's general
+// "spa" model was never trained on ID-card layouts or the OCR-B MRZ font
+// and produced unusable text regardless of image sharpness/resolution/DPI
+// tuning.
 //
-// OCR accuracy on a handheld phone photo is inherently imperfect, so every
-// extracted field here is meant to pre-fill an EDITABLE form field for the
-// office staff/client to visually confirm or correct — never persisted
-// without review.
-import { createWorker, Worker } from 'tesseract.js';
-
-const TESSERACT_ASSET_PATH = '/tesseract';
-
-let workerPromise: Promise<Worker> | null = null;
-
-function getWorker(): Promise<Worker> {
-  if (!workerPromise) {
-    console.log('[IdOcr] getWorker: creating Tesseract worker (lang=spa)');
-    workerPromise = createWorker('spa', 1, {
-      workerPath: `${TESSERACT_ASSET_PATH}/worker.min.js`,
-      corePath: `${TESSERACT_ASSET_PATH}/tesseract-core-simd-lstm.js`,
-      langPath: TESSERACT_ASSET_PATH,
-      // The self-hosted trained-data file is named without a .gz suffix
-      // (Capacitor's Android asset server 404s on .gz-suffixed assets) even
-      // though its bytes are still gzip-compressed — the worker detects the
-      // gzip magic header and decompresses regardless of this flag, which
-      // only controls whether ".gz" is appended to the fetch URL.
-      gzip: false,
-      // Default (true) spawns the worker from a Blob URL, which makes the
-      // worker thread's self.location a blob: URL instead of our real
-      // /tesseract/ path. The WASM core then can't resolve its .wasm
-      // binary relative to that blob URL ("Failed to parse URL from
-      // tesseract-core-simd-lstm.wasm"). Forcing a same-origin Worker keeps
-      // self.location correct so the relative wasm lookup works.
-      workerBlobURL: false,
-    })
-      .then(async (worker) => {
-        // Tried PSM.SPARSE_TEXT here on the theory that AUTO's page-layout
-        // detection would mis-segment a card (photo + hologram + scattered
-        // fields, no page structure). Reverted: on-device testing showed
-        // even a clearly legible MRZ line came back as pure symbol noise
-        // under SPARSE_TEXT, and that mode is documented to have LSTM-only
-        // engine compatibility problems — a config bug, not evidence the
-        // image was unreadable. Falling back to Tesseract's own default
-        // (AUTO) rather than guessing another non-default mode blind.
-        //
-        // user_defined_dpi is set per-image in extractRawText, not here —
-        // see the comment there. A single fixed value at worker-creation
-        // time doesn't work: it was hardcoded to '270' (correct for the
-        // ~918px-wide crops the capture pipeline produced at the time), but
-        // once ImageCapture.takePhoto() started returning full sensor-
-        // resolution stills, the same physical card produced a ~2934px
-        // crop — true DPI ~870 — and the stale '270' figure made Tesseract
-        // badly mis-segment an otherwise sharp image (confirmed on-device:
-        // OCR got slower AND worse after that change).
-        return worker;
-      })
-      .catch((err) => {
-        console.log('[IdOcr] getWorker: FAILED to create worker', String(err));
-        workerPromise = null; // allow retry instead of caching a rejected promise forever
-        throw err;
-      });
-  }
-  return workerPromise;
-}
-
-const ID_CARD_WIDTH_INCHES = 85.6 / 25.4; // ID-1 card width (85.6mm)
-
-// The capture pipeline (GuidedDocumentCapture) always crops to fill the
-// ID-1 card guide, so a captured image's own pixel width directly
-// corresponds to that physical 85.6mm width — computing DPI from it stays
-// correct regardless of which camera/device/capture path produced the
-// image, unlike a hardcoded figure (which broke once the capture
-// resolution changed — see the comment in getWorker above).
-async function computeDpiFromImage(dataUrl: string): Promise<number> {
-  const blob = await (await fetch(dataUrl)).blob();
-  const bitmap = await createImageBitmap(blob);
-  const width = bitmap.width;
-  bitmap.close();
-  return Math.round(width / ID_CARD_WIDTH_INCHES);
-}
-
-// Runs OCR on a captured ID photo (base64/data-URL) and returns the raw
-// recognized text, newline-separated as Tesseract reports it.
-export async function extractRawText(imageBase64OrDataUrl: string): Promise<string> {
-  console.log('[IdOcr] extractRawText: starting, input length =', imageBase64OrDataUrl.length);
-  const worker = await getWorker();
-  const dataUrl = imageBase64OrDataUrl.startsWith('data:')
-    ? imageBase64OrDataUrl
-    : `data:image/jpeg;base64,${imageBase64OrDataUrl}`;
-
-  const dpi = await computeDpiFromImage(dataUrl);
-  console.log('[IdOcr] extractRawText: computed dpi =', dpi);
-  await worker.setParameters({ user_defined_dpi: String(dpi) });
-
-  const startedAt = Date.now();
-  const { data } = await worker.recognize(dataUrl);
-  console.log(
-    `[IdOcr] extractRawText: done in ${Date.now() - startedAt}ms, text length =`, data.text.length,
-    'tesseract confidence =', data.confidence
-  );
-  // JSON.stringify so the actual content survives Capacitor's Android
-  // console bridge, which otherwise flattens object/multi-line args to
-  // "[object Object]" — length alone isn't enough to diagnose bad OCR.
-  console.log('[IdOcr] extractRawText: raw text =', JSON.stringify(data.text));
-  return data.text;
-}
+// Also confirmed by testing Azure directly (both its general OCR and its
+// ID-document model, at multiple resolutions): the FRONT of an INE
+// consistently fails to OCR beyond the large header text on every engine
+// tried — the printed fields (Nombre, Domicilio, Clave de Elector, CURP)
+// sit on an anti-copy watermark pattern that gets treated as background
+// noise. The back's MRZ (designed to be machine-readable per ICAO 9303)
+// reads reliably, so the backend decodes name + fecha de nacimiento from
+// there; domicilio/curp/claveElector come back empty and stay editable
+// manual-entry fields — this is a real limitation of the document itself,
+// not something more image/OCR tuning can fix.
+const API_BASE = 'https://smartloansbackend.azurewebsites.net';
 
 export interface ExtractedIdFields {
   nombre: string;
@@ -117,79 +26,35 @@ export interface ExtractedIdFields {
   fechaNacimiento: string;
 }
 
-const LABEL_ALIASES: Record<string, string[]> = {
-  nombre: ['NOMBRE'],
-  domicilio: ['DOMICILIO'],
-  claveElector: ['CLAVE DE ELECTOR', 'CLAVE ELECTOR'],
-  fechaNacimiento: ['FECHA DE NACIMIENTO', 'NACIMIENTO'],
+const EMPTY_FIELDS: ExtractedIdFields = {
+  nombre: '',
+  domicilio: '',
+  curp: '',
+  claveElector: '',
+  fechaNacimiento: '',
 };
 
-const ALL_LABELS = Object.values(LABEL_ALIASES).flat();
-
-// CURP has a fixed, distinctive 18-character format, so it can be found
-// directly by pattern regardless of OCR noise around its label — the most
-// reliable field to extract.
-const CURP_REGEX = /[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/;
-
-// Clave de elector: 18 alphanumeric characters, typically 6 letters followed
-// by 12 digits — looser than CURP's format since it varies more in practice.
-const CLAVE_ELECTOR_REGEX = /[A-Z]{6}\d{9,12}/;
-
-const DATE_REGEX = /\d{2}\/\d{2}\/\d{4}/;
-
-function findLabelLineIndex(lines: string[], aliases: string[]): number {
-  const upperLines = lines.map((l) => l.toUpperCase());
-  for (const alias of aliases) {
-    const idx = upperLines.findIndex((l) => l.includes(alias));
-    if (idx !== -1) return idx;
+// Runs OCR + MRZ decoding on a captured ID photo (base64/data-URL) via the
+// backend. Called once per side (front, back) — the caller merges the two
+// results. Falls back to all-empty fields on any failure so the UI never
+// blocks on this; fields are always shown as editable inputs regardless.
+export async function extractIneFields(imageBase64: string): Promise<ExtractedIdFields> {
+  console.log('[IdOcr] extractIneFields: calling backend, input length =', imageBase64.length);
+  try {
+    const res = await fetch(`${API_BASE}/ocr/extract-id-fields`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64 }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      console.log('[IdOcr] extractIneFields: backend error —', data.error || res.status);
+      return EMPTY_FIELDS;
+    }
+    console.log('[IdOcr] extractIneFields: result =', JSON.stringify(data.fields));
+    return (data.fields as ExtractedIdFields) ?? EMPTY_FIELDS;
+  } catch (err) {
+    console.log('[IdOcr] extractIneFields: request FAILED', String(err));
+    return EMPTY_FIELDS;
   }
-  return -1;
-}
-
-// Takes the 1-2 non-empty lines following a label line, stopping early if
-// another known label is hit — a practical heuristic for multi-line fields
-// (name, address) whose exact line breaks vary between INE card layouts.
-function valueAfterLabel(lines: string[], labelIndex: number, maxLines = 2): string {
-  const collected: string[] = [];
-  for (let i = labelIndex + 1; i < lines.length && collected.length < maxLines; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const upper = line.toUpperCase();
-    if (ALL_LABELS.some((label) => upper.includes(label))) break;
-    collected.push(line);
-  }
-  return collected.join(' ').trim();
-}
-
-// Parses INE-specific fields out of raw OCR text. Every field falls back to
-// an empty string when not confidently found — the caller shows these as
-// editable inputs, not authoritative data.
-export function parseIneFields(rawText: string): ExtractedIdFields {
-  console.log('[IdOcr] parseIneFields: parsing', rawText.length, 'chars of raw text');
-  const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
-  const upperText = rawText.toUpperCase();
-
-  const curpMatch = upperText.match(CURP_REGEX);
-  const claveMatch = upperText.match(CLAVE_ELECTOR_REGEX);
-  const dateMatch = rawText.match(DATE_REGEX);
-
-  const nombreIdx = findLabelLineIndex(lines, LABEL_ALIASES.nombre);
-  const domicilioIdx = findLabelLineIndex(lines, LABEL_ALIASES.domicilio);
-
-  const result: ExtractedIdFields = {
-    nombre: nombreIdx !== -1 ? valueAfterLabel(lines, nombreIdx, 3) : '',
-    domicilio: domicilioIdx !== -1 ? valueAfterLabel(lines, domicilioIdx, 3) : '',
-    curp: curpMatch?.[0] ?? '',
-    claveElector: claveMatch?.[0] ?? '',
-    fechaNacimiento: dateMatch?.[0] ?? '',
-  };
-
-  console.log('[IdOcr] parseIneFields: result =', JSON.stringify(result));
-  return result;
-}
-
-// Convenience wrapper: OCR + parse in one call.
-export async function extractIneFields(imageBase64OrDataUrl: string): Promise<ExtractedIdFields> {
-  const rawText = await extractRawText(imageBase64OrDataUrl);
-  return parseIneFields(rawText);
 }
