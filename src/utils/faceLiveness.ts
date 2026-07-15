@@ -248,20 +248,34 @@ export function trackBlink(detection: FaceDetectionResult, state: BlinkTrackerSt
   return state.blinkDetected;
 }
 
-const CONSISTENCY_DISTANCE_THRESHOLD = 0.5; // looser than the 0.6 ID-match cutoff — same live face across a session should be closer than that
+// Same identity-across-images cutoff as MATCH_DISTANCE_THRESHOLD. Deliberately
+// NOT the tighter 0.5 this used to be — that was tuned assuming near-frontal
+// comparisons, but comparing opposing extreme poses directly (e.g. head
+// turned hard left vs. hard right, both required by the challenge sequence)
+// produces distances well past 0.5 for the same person, since face-api.js
+// descriptors drift meaningfully under large yaw/pitch alone regardless of
+// identity. Confirmed on real device logs: legitimate same-person sessions
+// consistently landed at 0.70-0.82 there.
+const CONSISTENCY_DISTANCE_THRESHOLD = 0.6;
 
-// Compares the face descriptors captured at each of the 4 challenge
-// completions against each other. If someone swaps what's in front of the
+// Compares the face descriptor captured at each of the 4 challenge
+// completions against a single roughly-frontal "reference" descriptor taken
+// the moment a face was first acquired, before any directional move —
+// rather than against each other. If someone swaps what's in front of the
 // camera mid-session (e.g. switches to a held-up photo partway through),
-// the descriptors diverge well past what lighting/angle changes alone
-// would cause for one continuously-tracked live face.
-export function checkDescriptorConsistency(descriptors: Float32Array[]): { consistent: boolean; maxDistance: number } {
+// the swapped descriptor still diverges from the frontal reference well
+// past this cutoff; but two legitimate opposing-extreme poses of the same
+// person no longer get compared directly against each other, which is what
+// previously made this check structurally unpassable (see threshold comment
+// above).
+export function checkDescriptorConsistency(
+  reference: Float32Array,
+  descriptors: Float32Array[]
+): { consistent: boolean; maxDistance: number } {
   let maxDistance = 0;
-  for (let i = 0; i < descriptors.length; i++) {
-    for (let j = i + 1; j < descriptors.length; j++) {
-      const distance = faceapi.euclideanDistance(descriptors[i], descriptors[j]);
-      if (distance > maxDistance) maxDistance = distance;
-    }
+  for (const descriptor of descriptors) {
+    const distance = faceapi.euclideanDistance(reference, descriptor);
+    if (distance > maxDistance) maxDistance = distance;
   }
   const consistent = maxDistance <= CONSISTENCY_DISTANCE_THRESHOLD;
   console.log('[FaceLiveness] checkDescriptorConsistency: maxDistance =', maxDistance.toFixed(4), '| threshold =', CONSISTENCY_DISTANCE_THRESHOLD, '| consistent =', consistent);

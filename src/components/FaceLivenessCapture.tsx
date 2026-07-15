@@ -84,6 +84,11 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   const challengeIndexRef = useRef(0);
   const blinkStateRef = useRef<BlinkTrackerState>(newBlinkTrackerState());
   const challengeDescriptorsRef = useRef<Float32Array[]>([]);
+  // Roughly-frontal descriptor from the very first detected frame, before
+  // any directional challenge starts — used as the consistency-check
+  // reference instead of comparing challenge descriptors against each other
+  // (see checkDescriptorConsistency in faceLiveness.ts for why).
+  const neutralDescriptorRef = useRef<Float32Array | null>(null);
 
   const [state, setState] = useState<CaptureState>('loading-models');
   const [sequence, setSequence] = useState<LivenessChallenge[]>(() => pickChallengeSequence());
@@ -153,9 +158,16 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       }
 
       lastDetectionRef.current = detection;
+      if (!neutralDescriptorRef.current) {
+        neutralDescriptorRef.current = detection.descriptor;
+      }
       setState((prev) => {
         if (prev === 'loading-models' || prev === 'starting-camera' || prev === 'searching') {
-          console.log(`[FaceLivenessCapture] tick: face acquired, presenting move ${challengeIndexRef.current + 1}/4 "${sequence[challengeIndexRef.current]}"`);
+          if (challengeIndexRef.current < sequence.length) {
+            console.log(`[FaceLivenessCapture] tick: face acquired, presenting move ${challengeIndexRef.current + 1}/4 "${sequence[challengeIndexRef.current]}"`);
+          } else {
+            console.log('[FaceLivenessCapture] tick: face re-acquired after all challenges completed');
+          }
           return 'challenge';
         }
         return prev;
@@ -175,7 +187,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
           return;
         }
 
-        const { consistent } = checkDescriptorConsistency(challengeDescriptorsRef.current);
+        const { consistent } = checkDescriptorConsistency(
+          neutralDescriptorRef.current ?? challengeDescriptorsRef.current[0],
+          challengeDescriptorsRef.current
+        );
         if (!consistent) {
           console.log('[FaceLivenessCapture] tick: descriptor consistency check FAILED — face changed mid-session');
           doneRef.current = true;
@@ -280,6 +295,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     challengeStateRef.current = newChallengeState();
     blinkStateRef.current = newBlinkTrackerState();
     challengeDescriptorsRef.current = [];
+    neutralDescriptorRef.current = null;
     lastDetectionRef.current = null;
     doneRef.current = false;
     setSequence(newSequence);
