@@ -222,6 +222,20 @@ export async function uploadPresenceCapture(
   return await res.json();
 }
 
+// REVERSE GEOCODE -- POST /api/geocode/reverse
+// Converts the GPS coordinates captured during presence verification into a
+// street address for the Domicilio field — OCR can't read Domicilio off the
+// ID card (see idOcr.ts), so this is the actual address source.
+export async function reverseGeocode(latitude: number, longitude: number): Promise<{ address: string }> {
+  const res = await fetch(BASE_URL + "/api/geocode/reverse", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ latitude, longitude }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return await res.json();
+}
+
 // CONTRACT -- POST /api/clientFaceRecognition/contract
 export async function submitContractClientFaceRecognition(payload: ContractSubmissionRequest): Promise<ContractSubmissionResponse> {
   const res = await fetch(BASE_URL + "/api/clientFaceRecognition/contract", {

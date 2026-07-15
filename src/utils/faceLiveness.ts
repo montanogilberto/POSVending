@@ -248,15 +248,19 @@ export function trackBlink(detection: FaceDetectionResult, state: BlinkTrackerSt
   return state.blinkDetected;
 }
 
-// Same identity-across-images cutoff as MATCH_DISTANCE_THRESHOLD. Deliberately
-// NOT the tighter 0.5 this used to be — that was tuned assuming near-frontal
-// comparisons, but comparing opposing extreme poses directly (e.g. head
-// turned hard left vs. hard right, both required by the challenge sequence)
-// produces distances well past 0.5 for the same person, since face-api.js
-// descriptors drift meaningfully under large yaw/pitch alone regardless of
-// identity. Confirmed on real device logs: legitimate same-person sessions
-// consistently landed at 0.70-0.82 there.
-const CONSISTENCY_DISTANCE_THRESHOLD = 0.6;
+// Tuned empirically against real device logs across two rounds. Round 1
+// (all-pairs, no reference) landed legitimate same-person sessions at
+// 0.70-0.82 against a 0.5 cutoff — always failed. Round 2 (frontal reference
+// instead of all-pairs, this file's current comparison strategy) only
+// brought that down to 0.67-0.75 against a 0.6 cutoff — comparing a single
+// reference frame against a hard-turned pose still shows this much drift
+// with TinyFaceDetector + no face alignment, so the reference-vs-all-pairs
+// choice matters less than expected. Set well above the observed ~0.82
+// worst case seen so far, accepting this becomes a coarse "wildly different
+// face" backstop rather than a fine-grained spoof check — the ID-photo
+// match (MATCH_DISTANCE_THRESHOLD above), the blink check, and the
+// randomized 4-direction sequence remain the primary anti-spoofing layers.
+const CONSISTENCY_DISTANCE_THRESHOLD = 0.95;
 
 // Compares the face descriptor captured at each of the 4 challenge
 // completions against a single roughly-frontal "reference" descriptor taken

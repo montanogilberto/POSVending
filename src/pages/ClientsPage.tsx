@@ -80,6 +80,7 @@ import {
   uploadClientFaceRecognitionImage,
   upsertClientFaceRecognition,
   uploadPresenceCapture as uploadPresenceCaptureApi,
+  reverseGeocode,
   ContractSubmissionRequest,
   ClientFaceRecognition,
 } from '../api/clientFaceRecognitionApi';
@@ -476,6 +477,20 @@ const ClientsPage: React.FC = () => {
       console.log('[Expediente] handlePresenceCapture: persisted, clientFaceRecognitionId =', record.clientFaceRecognitionId);
     } catch (err) {
       console.error('[Expediente] Failed to upload presence capture:', err);
+    }
+
+    // Domicilio can't be read off the ID (see idOcr.ts) — reverse-geocode
+    // the GPS just captured as the actual address source. Best-effort: a
+    // failure here just leaves Domicilio empty/manual, same as before this
+    // existed.
+    if (result.latitude !== null && result.longitude !== null) {
+      try {
+        const { address } = await reverseGeocode(result.latitude, result.longitude);
+        console.log('[Expediente] handlePresenceCapture: reverse-geocoded address =', address);
+        if (address) setExtractedIdFields((prev) => ({ ...prev, domicilio: address }));
+      } catch (err) {
+        console.error('[Expediente] Reverse geocoding failed:', err);
+      }
     }
   };
 
