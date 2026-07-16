@@ -54,14 +54,18 @@ const loadStoredAuth = (): AuthData => {
   console.log("🔵 UserContext: Loading stored auth from localStorage");
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
+    console.log("[UserContext] loadStoredAuth: raw =", raw);
     if (!raw) return DEFAULT_AUTH;
     const parsed = JSON.parse(raw) as Partial<AuthData>;
-    return {
+    const result = {
       ...DEFAULT_AUTH,
       ...parsed,
       roleCode: normalizeRoleCode(parsed.roleCode),
     };
-  } catch {
+    console.log("[UserContext] loadStoredAuth: resulting isAuthenticated =", result.isAuthenticated);
+    return result;
+  } catch (err) {
+    console.log("[UserContext] loadStoredAuth: parse error, defaulting to logged-out =", err);
     return DEFAULT_AUTH;
   }
 };
@@ -104,7 +108,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   /** Logout — clears everything */
   const logout = () => {
-    console.log("🔴 UserContext LOGOUT called");
+    console.log("🔴 UserContext LOGOUT called. isAuthenticated will become false");
     localStorage.removeItem(STORAGE_KEY);
     setAuth(DEFAULT_AUTH);
   };

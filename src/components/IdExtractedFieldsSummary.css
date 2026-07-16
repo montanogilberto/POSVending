@@ -1,0 +1,46 @@
+.id-extracted-fields {
+  border-top: 1px solid var(--ion-color-light-shade, #e0e0e0);
+  padding-top: 12px;
+}
+
+.id-extracted-fields-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.id-extracted-fields-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ion-color-danger, #eb445a);
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+.id-extracted-field {
+  margin-bottom: 10px;
+}
+
+.id-extracted-field-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--ion-color-medium, #92949c);
+  margin-bottom: 4px;
+}
+
+.id-extracted-field-input {
+  --padding-start: 10px;
+  --padding-end: 10px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  font-size: 0.95rem;
+}
+
+.id-extracted-fields-hint {
+  font-size: 0.78rem;
+  color: var(--ion-color-medium, #92949c);
+  margin-top: 8px;
+}

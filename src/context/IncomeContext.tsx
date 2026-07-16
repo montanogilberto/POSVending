@@ -20,6 +20,26 @@ interface IncomeContextType {
 
 const IncomeContext = createContext<IncomeContextType | undefined>(undefined);
 
+const serializeError = (error: unknown) => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    try {
+      return JSON.parse(JSON.stringify(error));
+    } catch {
+      return { raw: String(error) };
+    }
+  }
+
+  return { raw: String(error) };
+};
+
 export const IncomeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [allIncome, setAllIncome] = useState<Income[]>([]);
 
@@ -32,7 +52,7 @@ export const IncomeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } catch (error: unknown) {
       if ((error as any)?.name !== 'AbortError') {
-        console.error('Error loading incomes:', error);
+        console.error('Error loading incomes (detailed):', serializeError(error));
       }
     }
   }, []);

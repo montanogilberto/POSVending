@@ -58,6 +58,43 @@
   height: 44px;
 }
 
+/* Force search icon to the right and avoid overlap with placeholder/value text */
+.client-searchbar .searchbar-input-container {
+  position: relative;
+}
+
+.client-searchbar .searchbar-search-icon {
+  left: auto !important;
+  right: 12px !important;
+}
+
+.client-searchbar .searchbar-input {
+  padding-left: 14px !important;
+  padding-right: 40px !important;
+}
+
+.client-searchbar .searchbar-clear-button {
+  right: 8px !important;
+}
+
+/* Action sheet styling for cellphone association info */
+.cellphone-info-sheet .action-sheet-title,
+.cellphone-info-sheet .action-sheet-sub-title {
+  white-space: normal !important;
+  text-align: left;
+}
+
+.cellphone-info-sheet .action-sheet-sub-title {
+  font-size: 14px;
+  line-height: 1.4;
+  color: #374151;
+  padding-top: 4px;
+}
+
+.cellphone-info-sheet .action-sheet-group {
+  border-radius: 14px 14px 0 0;
+}
+
 /* Create client form */
 .create-client-form {
   background: #f8f9fa;
@@ -92,29 +129,47 @@
 
 .form-item {
   --background: transparent;
-  --border-color: #ddd;
-  --border-radius: 8px;
+  --border-color: transparent;
+  --border-radius: 12px;
   --border-style: solid;
-  --border-width: 1px;
-  --padding-start: 8px;
+  --border-width: 0;
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --min-height: auto;
   margin-bottom: 4px;
-  min-height: 56px;
+  min-height: auto;
 }
 
 .form-item:focus-within {
-  --border-color: var(--ion-color-primary);
-  --border-width: 2px;
+  --border-color: transparent;
+  --border-width: 0;
+}
+
+.form-item ion-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
 }
 
 .form-input {
-  --padding-start: 8px;
-  font-size: 14px;
+  --border-radius: 12px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  font-size: 15px;
+  width: 100%;
+}
+
+.create-client-form ion-input.form-input.ion-invalid,
+.create-client-form ion-select.form-input.ion-invalid {
+  --highlight-color-focused: var(--ion-color-danger);
+  --highlight-color-invalid: var(--ion-color-danger);
 }
 
 .error-text {
   font-size: 12px;
-  margin-left: 40px;
-  margin-top: -4px;
+  margin-left: 12px;
+  margin-top: 4px;
   margin-bottom: 8px;
   display: block;
 }

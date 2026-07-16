@@ -1,0 +1,130 @@
+.flc-root {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3/4;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #111;
+}
+
+.flc-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* mirror, like a selfie camera */
+}
+
+.flc-hidden-canvas {
+  display: none;
+}
+
+.flc-ring {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  width: 78%;
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+
+.flc-ring-segment {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke 0.25s ease;
+}
+
+.flc-ring-segment--pending {
+  stroke: rgba(255, 255, 255, 0.35);
+}
+
+.flc-ring-segment--active {
+  stroke: var(--ion-color-primary, #3880ff);
+}
+
+.flc-ring-segment--done {
+  stroke: #10b981;
+}
+
+.flc-banner-step {
+  opacity: 0.8;
+  margin-right: 4px;
+}
+
+.flc-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  text-align: center;
+  padding: 24px;
+}
+
+.flc-overlay--error {
+  background: rgba(17, 17, 17, 0.85);
+}
+
+.flc-spinner {
+  width: 48px;
+  height: 48px;
+  color: #fff;
+}
+
+.flc-success-icon {
+  font-size: 56px;
+  color: #10b981;
+}
+
+.flc-error-icon {
+  font-size: 48px;
+  color: #f59e0b;
+}
+
+.flc-retry-button {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 600;
+  background: var(--ion-color-primary, #3880ff);
+  color: #fff;
+}
+
+.flc-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.flc-banner--info {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.flc-banner--challenge {
+  background: var(--ion-color-primary, #3880ff);
+}
+
+.flc-cancel-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}

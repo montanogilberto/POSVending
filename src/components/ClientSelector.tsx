@@ -19,6 +19,7 @@ import {
   IonFooter,
   IonInput,
   IonToast,
+  IonActionSheet,
   IonRow,
   IonCol,
   IonSelect,
@@ -69,6 +70,8 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
+  const [cellphoneInfoMessage, setCellphoneInfoMessage] = useState('');
+  const [showCellphoneInfoSheet, setShowCellphoneInfoSheet] = useState(false);
 
   useEffect(() => {
     if (isOpen && !hasLoaded) {
@@ -224,6 +227,59 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     );
   };
 
+  const handleCellphoneBlurLookup = async () => {
+    const rawCellphone = newClient.cellphone || '';
+    const localDigits = normalizePhoneDigits(rawCellphone);
+    console.log('[ClientSelector] onIonBlur cellphone raw:', rawCellphone, 'digits:', localDigits);
+
+    if (localDigits.length < 7) {
+      console.log('[ClientSelector] lookup skipped: less than 7 digits');
+      return;
+    }
+
+    try {
+      const fetchedClients = await getAllClients();
+      const selectedCountryDigits = selectedCountryCode.replace(/\D/g, '');
+      const fullCandidate = `${selectedCountryDigits}${localDigits}`;
+      console.log('[ClientSelector] fetched clients:', fetchedClients.length, 'selectedCountryDigits:', selectedCountryDigits, 'fullCandidate:', fullCandidate);
+
+      const matchedClient = fetchedClients.find((c) => {
+        const digits = normalizePhoneDigits(c.cellphone || '');
+        const localMatch = digits.endsWith(localDigits) || localDigits.endsWith(digits);
+        const fullMatch = digits === fullCandidate || fullCandidate.endsWith(digits) || digits.endsWith(fullCandidate);
+        const isMatch = localMatch || fullMatch;
+        if (isMatch) {
+          console.log('[ClientSelector] matched client:', {
+            clientId: c.clientId,
+            name: `${c.first_name} ${c.last_name}`.trim(),
+            cellphone: c.cellphone,
+            email: c.email,
+            digits,
+            localMatch,
+            fullMatch,
+          });
+        }
+        return isMatch;
+      });
+
+      if (matchedClient) {
+        const fullName = `${matchedClient.first_name || ''} ${matchedClient.last_name || ''}`.trim();
+        const phoneText = matchedClient.cellphone ? ` • ${matchedClient.cellphone}` : '';
+        const emailText = matchedClient.email ? ` • ${matchedClient.email}` : '';
+        const infoMessage = `Asociado: ${fullName || 'Cliente'}${phoneText}${emailText}`;
+        console.log('[ClientSelector] showing action sheet (matched):', infoMessage);
+        setCellphoneInfoMessage(infoMessage);
+        setShowCellphoneInfoSheet(true);
+      } else {
+        console.log('[ClientSelector] no associated person found for digits:', localDigits, '(no action sheet shown)');
+      }
+    } catch (error) {
+      console.error('[ClientSelector] error looking up cellphone association:', error);
+      setCellphoneInfoMessage('No se pudo validar el teléfono en este momento');
+      setShowCellphoneInfoSheet(true);
+    }
+  };
+
   const handleSaveClient = async () => {
     if (!createIsValid || isCreating) return;
 
@@ -268,16 +324,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         });
 
       if (isDuplicateCellphoneMessage(responseText)) {
-        const existingClient = findByPhone(updatedClients);
-        if (existingClient) {
-          onChange(existingClient);
-          onClose();
-          setToastMessage('El teléfono ya existe. Se seleccionó el cliente existente.');
-          setToastColor('success');
-          setShowToast(true);
-        } else {
-          throw new Error('El teléfono ya existe pero no se encontró el cliente.');
-        }
+        throw new Error('Error: el teléfono ya está registrado. Usa otro número.');
       } else if (apiError && apiError !== '0') {
         throw new Error(apiMsg || apiError || 'Error al crear el cliente');
       } else {
@@ -393,6 +440,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                     value={selectedCountryCode}
                     onIonChange={(e) => setSelectedCountryCode(e.detail.value)}
                     interface="popover"
+                    fill="outline"
                     className="form-input"
                   >
                     <IonSelectOption value="+52">México (+52)</IonSelectOption>
@@ -409,11 +457,40 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                   <IonIcon icon={call} slot="start" color="primary" />
                   <IonLabel position="floating">Teléfono *</IonLabel>
                   <IonInput
+                    fill="outline"
                     value={newClient.cellphone}
-                    onIonChange={(e) => setNewClient(prev => ({ ...prev, cellphone: e.detail.value! }))}
+                    onIonInput={(e: any) => {
+                      const rawValue = e?.target?.value ?? e?.detail?.value ?? '';
+                      const digitsOnly = String(rawValue).replace(/\D/g, '').slice(0, 15);
+                      if (e?.target) {
+                        e.target.value = digitsOnly;
+                      }
+                      setNewClient(prev => ({ ...prev, cellphone: digitsOnly }));
+                    }}
+                    onIonChange={(e) => {
+                      const digitsOnly = String(e.detail.value || '').replace(/\D/g, '').slice(0, 15);
+                      setNewClient(prev => ({ ...prev, cellphone: digitsOnly }));
+                    }}
+                    onKeyDown={(e: any) => {
+                      const allowedControlKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'];
+                      const isDigit = /^[0-9]$/.test(e.key);
+                      if (!isDigit && !allowedControlKeys.includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onPaste={(e: any) => {
+                      e.preventDefault();
+                      const pasted = (e.clipboardData?.getData('text') || '').replace(/\D/g, '');
+                      const nextValue = `${newClient.cellphone || ''}${pasted}`.slice(0, 15);
+                      setNewClient(prev => ({ ...prev, cellphone: nextValue }));
+                    }}
+                    onIonBlur={handleCellphoneBlurLookup}
                     color={createErrors.cellphone ? 'danger' : 'primary'}
-                    className="form-input"
-                    type="tel"
+                    className={`form-input ${createErrors.cellphone ? 'ion-invalid ion-touched' : ''}`}
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength={15}
                   />
                 </IonItem>
                 {createErrors.cellphone && (
@@ -430,10 +507,11 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                   <IonIcon icon={person} slot="start" color="primary" />
                   <IonLabel position="floating">Nombre *</IonLabel>
                   <IonInput
+                    fill="outline"
                     value={newClient.first_name}
                     onIonChange={(e) => setNewClient(prev => ({ ...prev, first_name: e.detail.value! }))}
                     color={createErrors.first_name ? 'danger' : 'primary'}
-                    className="form-input"
+                    className={`form-input ${createErrors.first_name ? 'ion-invalid ion-touched' : ''}`}
                   />
                 </IonItem>
                 {createErrors.first_name && (
@@ -447,10 +525,11 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                   <IonIcon icon={person} slot="start" color="primary" />
                   <IonLabel position="floating">Apellido *</IonLabel>
                   <IonInput
+                    fill="outline"
                     value={newClient.last_name}
                     onIonChange={(e) => setNewClient(prev => ({ ...prev, last_name: e.detail.value! }))}
                     color={createErrors.last_name ? 'danger' : 'primary'}
-                    className="form-input"
+                    className={`form-input ${createErrors.last_name ? 'ion-invalid ion-touched' : ''}`}
                   />
                 </IonItem>
                 {createErrors.last_name && (
@@ -467,10 +546,11 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                   <IonIcon icon={mail} slot="start" color="primary" />
                   <IonLabel position="floating">Email</IonLabel>
                   <IonInput
+                    fill="outline"
                     value={newClient.email}
                     onIonChange={(e) => handleEmailChange(e.detail.value!)}
                     color={createErrors.email.isValid ? (newClient.email ? 'success' : 'primary') : 'danger'}
-                    className="form-input"
+                    className={`form-input ${newClient.email && !createErrors.email.isValid ? 'ion-invalid ion-touched' : ''}`}
                   />
                 </IonItem>
                 {newClient.email && !createErrors.email.isValid && (
@@ -597,6 +677,28 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         message={toastMessage}
         duration={2000}
         color={toastColor}
+      />
+
+      <IonActionSheet
+        isOpen={showCellphoneInfoSheet}
+        cssClass="cellphone-info-sheet"
+        header="Información de teléfono"
+        subHeader={cellphoneInfoMessage}
+        onDidDismiss={() => {
+          console.log('[ClientSelector] action sheet dismissed');
+          setShowCellphoneInfoSheet(false);
+        }}
+        buttons={[
+          {
+            text: 'OK',
+            role: 'confirm',
+            data: { action: 'ok' },
+            handler: () => {
+              console.log('[ClientSelector] action sheet OK tapped');
+              setShowCellphoneInfoSheet(false);
+            },
+          },
+        ]}
       />
     </IonModal>
   );

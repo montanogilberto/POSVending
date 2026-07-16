@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { Redirect, Route, useHistory } from 'react-router-dom';
 import {
   IonApp,
@@ -62,49 +63,49 @@ import {
   from 'ionicons/icons';
   
 
-import Vending from './pages/Vending';
-import Setting from './pages/Setting';
-import Sells from './pages/Sells';
+import Vending from './pages/pos/Vending';
+import Setting from './pages/system/Setting';
+import Sells from './pages/pos/Sells';
 import Dashboard from './pages/Dashboard/Dashboard';
-import ScannerQR from './pages/ScannerQR';
+import ScannerQR from './pages/pos/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/CartPage/CartPage';
-import MovementsPage from './pages/MovementsPage';
-import LedStatusPage from './pages/LedStatusPage';
-import ClientsPage from './pages/ClientsPage';
+import MovementsPage from './pages/finance/MovementsPage';
+import LedStatusPage from './pages/iot/LedStatusPage';
+import ClientsPage from './pages/clients/ClientsPage';
 import ProductsManagementPage from './pages/products/ProductsManagementPage';
-import AlertsPage from './pages/AlertsPage';
-import EmailsPage from './pages/EmailsPage';
+import AlertsPage from './pages/messaging/AlertsPage';
+import EmailsPage from './pages/messaging/EmailsPage';
 import CategoriesPage from './pages/CategoryPage/CategoriesPage';
-import UsersPage from './pages/UsersPage';
-import IncomesPage from './pages/IncomesPage';
-import ExpensesPage from './pages/ExpensesPage';
-import WaterTanksPage from './pages/WaterTanksPage';
-import WaterTanksHistoryPage from './pages/WaterTanksHistoryPage';
+import UsersPage from './pages/admin/UsersPage';
+import IncomesPage from './pages/finance/IncomesPage';
+import ExpensesPage from './pages/finance/ExpensesPage';
+import WaterTanksPage from './pages/iot/WaterTanksPage';
+import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/Receipt/ReceiptPage';
 import Login from './pages/Authentication/Login';
 import ForgotPassword from './pages/Authentication/ForgotPassword';
 import CreateAccount from './pages/Authentication/CreateAccount';
-import SupplierPage from './pages/SupplierPage';
-import LoanPage from './pages/LoanPage';
+import SupplierPage from './pages/admin/SupplierPage';
+import LoanPage from './pages/loans/LoanPage';
 // Lazy-loaded: pulls in the gated @azure/ai-vision-face-ui SDK, which isn't
 // installable without private-feed credentials. Keeping it out of the eager
 // bundle means environments without those credentials can still run the rest
 // of the app; only this route fails to load.
-const ClientFaceRecognitionPage = React.lazy(() => import('./pages/ClientFaceRecognitionPage'));
-import ClientDashboardPage from './pages/ClientDashboardPage';
-import ExpedienteDigitalPage from './pages/ExpedienteDigitalPage';
-import LenderDashboardPage from './pages/LenderDashboardPage';
-import ClientFollowUpPage from './pages/ClientFollowUpPage';
-import PushNotificationPage from './pages/PushNotificationPage';
-import P2PLendingPage from './pages/P2PLendingPage';
-import BorrowerOnboardingPage from './pages/BorrowerOnboardingPage';
-import LoanPaymentPage from './pages/LoanPaymentPage';
+const ClientFaceRecognitionPage = React.lazy(() => import('./pages/clients/ClientFaceRecognitionPage'));
+import ClientDashboardPage from './pages/clients/ClientDashboardPage';
+import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
+import LenderDashboardPage from './pages/clients/LenderDashboardPage';
+import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
+import PushNotificationPage from './pages/messaging/PushNotificationPage';
+import P2PLendingPage from './pages/loans/P2PLendingPage';
+import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
+import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
-import RewardsPage from './pages/RewardsPage';
-import LoanChatPage from './pages/LoanChatPage';
+import RewardsPage from './pages/finance/RewardsPage';
+import LoanChatPage from './pages/loans/LoanChatPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -126,6 +127,8 @@ import { useUser } from './components/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
+import BiometricLockScreen from './components/BiometricLockScreen';
+import { isBiometricLockEnabled, authenticateBiometric } from './utils/biometricAuth';
 
 setupIonicReact();
 
@@ -189,14 +192,18 @@ const AppShell: React.FC = () => {
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
+    let registrationHandle: PluginListenerHandle | undefined;
+    let receivedHandle: PluginListenerHandle | undefined;
+    let cancelled = false;
+
     const registerPush = async () => {
       let permission = await PushNotifications.checkPermissions();
       if (permission.receive === 'prompt') {
         permission = await PushNotifications.requestPermissions();
       }
-      if (permission.receive !== 'granted') return;
+      if (permission.receive !== 'granted' || cancelled) return;
 
-      PushNotifications.addListener('registration', async (token) => {
+      registrationHandle = await PushNotifications.addListener('registration', async (token) => {
         const platform = Capacitor.getPlatform();
         try {
           await fetch(`${import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net'}/registerDevice`, {
@@ -216,7 +223,7 @@ const AppShell: React.FC = () => {
         }
       });
 
-      PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+      receivedHandle = await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
         await LocalNotifications.schedule({
           notifications: [{
             id: Date.now(),
@@ -234,10 +241,11 @@ const AppShell: React.FC = () => {
     registerPush();
 
     return () => {
-      PushNotifications.removeAllListeners();
+      cancelled = true;
+      registrationHandle?.remove();
+      receivedHandle?.remove();
     };
   }, [userId]);
-
 
   const handleLogout = () => {
     logout();
@@ -581,23 +589,146 @@ const AppShell: React.FC = () => {
   );
 };
 
+// Biometric app-lock, rendered ONCE at the app root — not tied to any route,
+// so it survives back/forward navigation and route remounts. It renders as an
+// overlay on top of whatever page is currently showing.
+//
+// isAuthenticatingRef guards against a self-triggering loop: the native
+// biometric prompt runs in its own Activity, so showing/dismissing it
+// pauses/resumes the host app just like backgrounding it would — without this
+// guard, a successful unlock immediately re-triggers the resume listener and
+// re-locks the app.
+const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, username, logout } = useUser();
+  const history = useHistory();
+  const [isLocked, setIsLocked] = useState(false);
+  const isAuthenticatingRef = useRef(false);
+
+  useEffect(() => {
+    console.log('[BiometricLockGate] effect running. isNative =', Capacitor.isNativePlatform(), 'isAuthenticated =', isAuthenticated);
+
+    if (!Capacitor.isNativePlatform() || !isAuthenticated) {
+      console.log('[BiometricLockGate] bailing out early (native/auth check failed), setIsLocked(false)');
+      setIsLocked(false);
+      return;
+    }
+
+    let cancelled = false;
+    let stateChangeHandle: PluginListenerHandle | undefined;
+
+    (async () => {
+      const enabled = await isBiometricLockEnabled();
+      console.log('[BiometricLockGate] cold-start check: enabled =', enabled, 'cancelled =', cancelled);
+      if (!cancelled && enabled) {
+        console.log('[BiometricLockGate] cold-start: setIsLocked(true)');
+        setIsLocked(true);
+      }
+
+      stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
+        console.log('[BiometricLockGate] appStateChange fired. isActive =', isActive, 'isAuthenticatingRef =', isAuthenticatingRef.current);
+        if (!isActive || isAuthenticatingRef.current) {
+          console.log('[BiometricLockGate] appStateChange: ignoring (inactive or mid-authenticate)');
+          return;
+        }
+        const stillEnabled = await isBiometricLockEnabled();
+        console.log('[BiometricLockGate] appStateChange: stillEnabled =', stillEnabled);
+        if (stillEnabled) {
+          console.log('[BiometricLockGate] appStateChange: setIsLocked(true)');
+          setIsLocked(true);
+        }
+      });
+      console.log('[BiometricLockGate] appStateChange listener attached');
+    })();
+
+    return () => {
+      console.log('[BiometricLockGate] effect cleanup, removing listener');
+      cancelled = true;
+      stateChangeHandle?.remove();
+    };
+  }, [isAuthenticated]);
+
+  // IMPORTANT: use history.push here, NOT window.location.href. A hard
+  // navigation reloads the entire page — which remounts BiometricLockGate
+  // itself from scratch, re-running the cold-start check and immediately
+  // re-locking the app in an infinite loop (confirmed via device logs: close
+  // → reload → re-lock → close → reload → re-lock...). history.push is a
+  // normal in-SPA navigation and does not remount this component.
+  const handleUnlock = async () => {
+    console.log('[BiometricLockGate] handleUnlock: called, setting isAuthenticatingRef = true');
+    isAuthenticatingRef.current = true;
+    try {
+      const ok = await authenticateBiometric('Desbloquea la app para continuar');
+      console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
+      if (ok) {
+        console.log('[BiometricLockGate] handleUnlock: SUCCESS, setIsLocked(false) + navigating to /dashboard');
+        setIsLocked(false);
+        history.push('/dashboard');
+      } else {
+        console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
+      }
+    } finally {
+      // The native biometric sheet fires its own "app resumed" event AFTER
+      // its dismiss animation finishes — this lags behind the JS promise
+      // resolving here. Clearing the guard immediately left a gap where that
+      // trailing event slipped through and re-locked the app right after a
+      // successful unlock (confirmed via device logs). Delaying the reset
+      // covers that gap.
+      setTimeout(() => {
+        isAuthenticatingRef.current = false;
+        console.log('[BiometricLockGate] handleUnlock: delayed reset, isAuthenticatingRef = false');
+      }, 1000);
+    }
+  };
+
+  const handleLogout = () => {
+    console.log('[BiometricLockGate] handleLogout: called');
+    setIsLocked(false);
+    logout();
+    history.push('/login');
+  };
+
+  const handleClose = () => {
+    console.log('[BiometricLockGate] handleClose: called, setIsLocked(false) + navigating to /dashboard');
+    setIsLocked(false);
+    history.push('/dashboard');
+  };
+
+  console.log('[BiometricLockGate] render. isLocked =', isLocked, 'isAuthenticated =', isAuthenticated);
+
+  return (
+    <>
+      {children}
+      {isLocked && (
+        <BiometricLockScreen
+          username={username}
+          onUnlock={handleUnlock}
+          onLogout={handleLogout}
+          onClose={handleClose}
+        />
+      )}
+    </>
+  );
+};
+
 const App: React.FC = () => {
   return (
     <IncomeProvider>
       <ProductProvider>
         <IonApp>
           <IonReactRouter>
-            <IonRouterOutlet id="root-outlet">
-              <Route exact path="/login" component={Login} />
-              <Route exact path="/forgot-password" component={ForgotPassword} />
-              <Route exact path="/create-account" component={CreateAccount} />
+            <BiometricLockGate>
+              <IonRouterOutlet id="root-outlet">
+                <Route exact path="/login" component={Login} />
+                <Route exact path="/forgot-password" component={ForgotPassword} />
+                <Route exact path="/create-account" component={CreateAccount} />
 
-              <Route exact path="/">
-                <Redirect to="/login" />
-              </Route>
+                <Route exact path="/">
+                  <Redirect to="/login" />
+                </Route>
 
-              <Route component={AppShell} />
-            </IonRouterOutlet>
+                <Route component={AppShell} />
+              </IonRouterOutlet>
+            </BiometricLockGate>
           </IonReactRouter>
         </IonApp>
       </ProductProvider>

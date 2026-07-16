@@ -130,6 +130,25 @@
 
 .login-eye-btn:hover { color: #6B7280; }
 
+/* ── Biometric toggle ── */
+.login-biometric-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.login-biometric-toggle ion-icon {
+  font-size: 20px;
+  color: #2563EB;
+}
+
+.login-biometric-toggle ion-label {
+  flex: 1;
+}
+
 /* ── Submit button ── */
 .login-submit-btn {
   --background: #2563EB;

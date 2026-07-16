@@ -18,12 +18,15 @@ console.log("🔵 App root rendered with UserProvider & CartProvider");
 const container = document.getElementById('root');
 const root = createRoot(container!);
 
+// StrictMode is intentionally not used here: its dev-only double-mount/cleanup
+// cycle conflicts with IonRouterOutlet's imperative (non-React) page-transition
+// DOM handling, causing a removeChild crash on fast route pushes (e.g. right
+// after login). This is a dev-only interaction — StrictMode is already a no-op
+// in production builds, so this only affects local dev, not what ships.
 root.render(
-  <React.StrictMode>
-    <UserProvider>
-      <CartProvider>
-        <App />
-      </CartProvider>
-    </UserProvider>
-  </React.StrictMode>
+  <UserProvider>
+    <CartProvider>
+      <App />
+    </CartProvider>
+  </UserProvider>
 );
