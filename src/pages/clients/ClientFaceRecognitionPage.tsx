@@ -20,18 +20,18 @@ import {
   IonSpinner,
 } from '@ionic/react';
 import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline } from 'ionicons/icons';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
-import ClientSelector from '../components/ClientSelector';
-import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
-import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
-import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
-import ZoomableImage from '../components/ZoomableImage';
-import PresenceCapture, { PresenceCaptureResult } from '../components/PresenceCapture';
-import SignaturePad from '../components/SignaturePad';
-import { useUser } from '../components/UserContext';
-import { Client } from '../api/clientsApi';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import ClientSelector from '../../components/ClientSelector';
+import GuidedDocumentCapture from '../../components/GuidedDocumentCapture';
+import FaceLivenessCapture, { FaceLivenessResult } from '../../components/FaceLivenessCapture';
+import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary';
+import ZoomableImage from '../../components/ZoomableImage';
+import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
+import SignaturePad from '../../components/SignaturePad';
+import { useUser } from '../../components/UserContext';
+import { Client } from '../../api/clientsApi';
 import {
   submitContractClientFaceRecognition,
   uploadClientFaceRecognitionImage,
@@ -39,11 +39,11 @@ import {
   uploadPresenceCapture as uploadPresenceCaptureApi,
   reverseGeocode,
   ContractSubmissionRequest,
-} from '../api/clientFaceRecognitionApi';
-import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
-import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../utils/faceLiveness';
-import { ExtractedIdFields } from '../utils/idOcr';
-import { cropIneSignatureRegion } from '../utils/signatureCrop';
+} from '../../api/clientFaceRecognitionApi';
+import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biometricAuth';
+import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
+import { ExtractedIdFields } from '../../utils/idOcr';
+import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 
 import './ClientFaceRecognitionPage.css';
 

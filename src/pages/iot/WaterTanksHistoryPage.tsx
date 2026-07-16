@@ -20,7 +20,7 @@ import {
 } from '@ionic/react';
 import { waterOutline, timeOutline, barChartOutline } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
-import { fetchWaterTanks, WaterTank, TankWaterDetail } from '../api/waterTanksApi';
+import { fetchWaterTanks, WaterTank, TankWaterDetail } from '../../api/waterTanksApi';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,

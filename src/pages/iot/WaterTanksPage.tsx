@@ -19,8 +19,8 @@ import {
 } from '@ionic/react';
 import { waterOutline, barChart, refresh } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import Header from '../components/Header';
-import { fetchWaterTanks, WaterTank, startPeriodicWaterTanksUpdate } from '../api/waterTanksApi';
+import Header from '../../components/Header';
+import { fetchWaterTanks, WaterTank, startPeriodicWaterTanksUpdate } from '../../api/waterTanksApi';
 
 const WaterTanksPage: React.FC = () => {
   const history = useHistory();

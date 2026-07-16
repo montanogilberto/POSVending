@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import './shared-card-list.css';
+import '../shared-card-list.css';
 import { IonPage, IonContent, IonList, IonItem, IonLabel, IonText, IonLoading, IonToast, IonFab, IonFabButton, IonIcon, IonAlert, IonModal, IonInput, IonSelect, IonSelectOption, IonDatetime, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSearchbar, IonButton, IonInfiniteScroll, IonInfiniteScrollContent, DatetimeChangeEventDetail, InputInputEventDetail, SelectChangeEventDetail } from '@ionic/react';
 import { addOutline, notificationsOutline, createOutline, trashOutline, eyeOutline, closeOutline, informationCircleOutline, checkmarkCircleOutline, warningOutline, alertCircleOutline, cogOutline } from 'ionicons/icons';
 import { IonHeader, IonToolbar, IonTitle, IonButtons } from '@ionic/react';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
-import { useUser } from '../components/UserContext';
-import { PushNotification, getAllPushNotifications, createPushNotification, updatePushNotification, deletePushNotification } from '../api/pushNotificationsApi';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import { useUser } from '../../components/UserContext';
+import { PushNotification, getAllPushNotifications, createPushNotification, updatePushNotification, deletePushNotification } from '../../api/pushNotificationsApi';
 
 const toHermosillo = (utc: string | undefined): string => {
   if (!utc) return '';

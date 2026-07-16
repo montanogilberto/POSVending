@@ -57,13 +57,13 @@ import {
   checkmarkCircleOutline,
   ellipseOutline,
 } from 'ionicons/icons';
-import { useUser } from '../components/UserContext';
-import { ClientDashboard, getAllClientDashboards } from '../api/clientDashboardApi';
-import { Loan, getAllLoans, createLoan } from '../api/loanApi';
-import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../api/clientFaceRecognitionApi';
-import { Client, getOneClient } from '../api/clientsApi';
-import LoanCompletionRing, { LoanStep } from '../components/LoanCompletionRing';
-import StripeAccountOnboarding from '../components/StripeAccountOnboarding';
+import { useUser } from '../../components/UserContext';
+import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
+import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
+import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
+import { Client, getOneClient } from '../../api/clientsApi';
+import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
+import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';

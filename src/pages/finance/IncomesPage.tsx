@@ -17,18 +17,18 @@ import {
   IonButton,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import Header from '../components/Header';
+import Header from '../../components/Header';
 
-import IncomesChart from '../components/IncomesChart';
-import IncomesFilters from '../components/IncomesFilters';
-import IncomesList from '../components/IncomesList';
-import { fetchAllLaundry } from '../api/laundryApi';
-import { fetchTicket } from '../api/ticketApi';
-import { ReceiptService } from '../services/ReceiptService';
+import IncomesChart from '../../components/IncomesChart';
+import IncomesFilters from '../../components/IncomesFilters';
+import IncomesList from '../../components/IncomesList';
+import { fetchAllLaundry } from '../../api/laundryApi';
+import { fetchTicket } from '../../api/ticketApi';
+import { ReceiptService } from '../../services/ReceiptService';
 
 import { calendar, waterOutline } from 'ionicons/icons';
-import { postIncomeAction } from '../api/incomeApi';
-import { formatCurrencyWithSymbol } from '../utils/formatters';
+import { postIncomeAction } from '../../api/incomeApi';
+import { formatCurrencyWithSymbol } from '../../utils/formatters';
 
 
 interface Income {

@@ -8,12 +8,12 @@ import {
   shieldCheckmarkOutline, arrowForwardOutline, arrowBackOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import { useUser } from '../components/UserContext';
+import { useUser } from '../../components/UserContext';
 import {
   getAllClientFaceRecognitions, updateClientFaceRecognition,
   ClientFaceRecognition,
-} from '../api/clientFaceRecognitionApi';
-import SignaturePad from '../components/SignaturePad';
+} from '../../api/clientFaceRecognitionApi';
+import SignaturePad from '../../components/SignaturePad';
 import './BorrowerOnboardingPage.css';
 
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';

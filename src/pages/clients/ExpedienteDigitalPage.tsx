@@ -28,9 +28,9 @@ import {
   shieldCheckmarkOutline,
   ribbonOutline,
 } from 'ionicons/icons';
-import { useUser } from '../components/UserContext';
-import { Client, getOneClient } from '../api/clientsApi';
-import { ClientFaceRecognition, getAllClientFaceRecognitions } from '../api/clientFaceRecognitionApi';
+import { useUser } from '../../components/UserContext';
+import { Client, getOneClient } from '../../api/clientsApi';
+import { ClientFaceRecognition, getAllClientFaceRecognitions } from '../../api/clientFaceRecognitionApi';
 import './ExpedienteDigitalPage.css';
 import './ClientFaceRecognitionPage.css';
 

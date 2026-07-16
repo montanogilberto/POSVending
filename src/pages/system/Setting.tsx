@@ -36,16 +36,16 @@ import {
   cogOutline,
   fingerPrintOutline,
 } from 'ionicons/icons';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
-import { RoleCode, UiFeature, ROLE_UI } from '../config/rolePermissions';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import { RoleCode, UiFeature, ROLE_UI } from '../../config/rolePermissions';
 import {
   isBiometricAvailable,
   isBiometricLockEnabled,
   setBiometricLockEnabled,
   authenticateBiometric,
-} from '../utils/biometricAuth';
+} from '../../utils/biometricAuth';
 import './Setting.css';
 
 // ── Module definitions ──────────────────────────────────────────────────────

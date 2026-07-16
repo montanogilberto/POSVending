@@ -18,44 +18,44 @@ import {
   IonCardSubtitle,
   IonBadge,
 } from '@ionic/react';
-import { mail, person, checkmarkCircle } from 'ionicons/icons';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
+import { notifications, warning, checkmarkCircle } from 'ionicons/icons';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
 
-interface Email {
+interface Alert {
   id: number;
-  subject: string;
-  from: string;
+  title: string;
   message: string;
+  type: 'info' | 'warning' | 'error';
   timestamp: string;
   read: boolean;
 }
 
-const EmailsPage: React.FC = () => {
-  const [emails, setEmails] = useState<Email[]>([
+const AlertsPage: React.FC = () => {
+  const [alerts, setAlerts] = useState<Alert[]>([
     {
       id: 1,
-      subject: 'Confirmación de pedido',
-      from: 'sistema@posgmo.com',
-      message: 'Su pedido ha sido confirmado exitosamente.',
-      timestamp: '2024-01-15 11:00',
+      title: 'Producto agotado',
+      message: 'El producto "Producto A" se ha agotado en el inventario.',
+      type: 'warning',
+      timestamp: '2024-01-15 10:30',
       read: false,
     },
     {
       id: 2,
-      subject: 'Actualización de inventario',
-      from: 'admin@posgmo.com',
-      message: 'Se ha actualizado el inventario de productos.',
-      timestamp: '2024-01-15 10:30',
+      title: 'Nuevo pedido recibido',
+      message: 'Se ha recibido un nuevo pedido de Juan Pérez.',
+      type: 'info',
+      timestamp: '2024-01-15 09:15',
       read: true,
     },
     {
       id: 3,
-      subject: 'Recordatorio de mantenimiento',
-      from: 'soporte@posgmo.com',
-      message: 'Recuerde realizar el mantenimiento semanal del sistema.',
-      timestamp: '2024-01-14 14:20',
+      title: 'Error en sincronización',
+      message: 'Error al sincronizar datos con el servidor.',
+      type: 'error',
+      timestamp: '2024-01-14 16:45',
       read: false,
     },
   ]);
@@ -76,55 +76,67 @@ const EmailsPage: React.FC = () => {
 
   const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
 
-  const markAsRead = (emailId: number) => {
-    setEmails(emails.map(email =>
-      email.id === emailId ? { ...email, read: true } : email
+  const markAsRead = (alertId: number) => {
+    setAlerts(alerts.map(alert =>
+      alert.id === alertId ? { ...alert, read: true } : alert
     ));
   };
 
   const markAllAsRead = () => {
-    setEmails(emails.map(email => ({ ...email, read: true })));
+    setAlerts(alerts.map(alert => ({ ...alert, read: true })));
   };
 
-  const unreadCount = emails.filter(email => !email.read).length;
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case 'warning': return warning;
+      case 'error': return notifications;
+      default: return checkmarkCircle;
+    }
+  };
+
+  const getAlertColor = (type: string) => {
+    switch (type) {
+      case 'warning': return 'warning';
+      case 'error': return 'danger';
+      default: return 'primary';
+    }
+  };
+
+  const unreadCount = alerts.filter(alert => !alert.read).length;
 
   return (
     <IonPage>
       <Header
         presentAlertPopover={presentAlertPopover}
         presentMailPopover={presentMailPopover}
-        screenTitle={`Correos ${unreadCount > 0 ? `(${unreadCount})` : ''}`}
+        screenTitle={`Alertas ${unreadCount > 0 ? `(${unreadCount})` : ''}`}
         showBackButton={true}
         backButtonText="Menú"
-        backButtonHref="/Laundry"
+        backButtonHref="/dashboard"
       />
 
       <IonContent>
         {unreadCount > 0 && (
           <IonButton expand="block" onClick={markAllAsRead} style={{ margin: '16px' }}>
-            Marcar todos como leídos
+            Marcar todas como leídas
           </IonButton>
         )}
 
         <IonList>
-          {emails.map((email) => (
-            <IonCard key={email.id} style={{ opacity: email.read ? 0.7 : 1 }}>
+          {alerts.map((alert) => (
+            <IonCard key={alert.id} style={{ opacity: alert.read ? 0.7 : 1 }}>
               <IonCardHeader>
                 <IonCardTitle style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <IonIcon icon={mail} color="primary" />
-                  {email.subject}
-                  {!email.read && <IonBadge color="primary">Nuevo</IonBadge>}
+                  <IonIcon icon={getAlertIcon(alert.type)} color={getAlertColor(alert.type)} />
+                  {alert.title}
+                  {!alert.read && <IonBadge color="primary">Nuevo</IonBadge>}
                 </IonCardTitle>
-                <IonCardSubtitle style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <IonIcon icon={person} size="small" />
-                  {email.from}
-                  <span style={{ marginLeft: 'auto' }}>{email.timestamp}</span>
-                </IonCardSubtitle>
+                <IonCardSubtitle>{alert.timestamp}</IonCardSubtitle>
               </IonCardHeader>
               <IonCardContent>
-                <p>{email.message}</p>
-                {!email.read && (
-                  <IonButton fill="clear" size="small" onClick={() => markAsRead(email.id)}>
+                <p>{alert.message}</p>
+                {!alert.read && (
+                  <IonButton fill="clear" size="small" onClick={() => markAsRead(alert.id)}>
                     Marcar como leído
                   </IonButton>
                 )}
@@ -148,4 +160,4 @@ const EmailsPage: React.FC = () => {
   );
 };
 
-export default EmailsPage;
+export default AlertsPage;

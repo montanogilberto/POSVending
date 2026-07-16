@@ -14,10 +14,10 @@ import {
   refreshOutline, createOutline, documentTextOutline, alertCircleOutline,
 } from 'ionicons/icons';
 import { useHistory, useParams, useLocation } from 'react-router-dom';
-import { useUser } from '../components/UserContext';
+import { useUser } from '../../components/UserContext';
 import {
   loanChatApi, LoanMessage, LoanConversation, MsgType,
-} from '../api/loanChatApi';
+} from '../../api/loanChatApi';
 import './LoanChatPage.css';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';

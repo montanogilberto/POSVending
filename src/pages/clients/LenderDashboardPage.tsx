@@ -11,10 +11,10 @@ import {
   checkmarkCircleOutline, alertCircleOutline, ellipseOutline, refreshOutline,
   personCircleOutline, timeOutline, cardOutline, barChartOutline,
 } from 'ionicons/icons';
-import { useUser } from '../components/UserContext';
-import { getAllLoans, Loan } from '../api/loanApi';
-import { getAllClients, Client } from '../api/clientsApi';
-import { getAllClientFaceRecognitions } from '../api/clientFaceRecognitionApi';
+import { useUser } from '../../components/UserContext';
+import { getAllLoans, Loan } from '../../api/loanApi';
+import { getAllClients, Client } from '../../api/clientsApi';
+import { getAllClientFaceRecognitions } from '../../api/clientFaceRecognitionApi';
 import './LenderDashboardPage.css';
 
 const toDate = (utc: string | undefined) => {

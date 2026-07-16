@@ -13,9 +13,9 @@ import {
   checkmarkCircleOutline, removeCircleOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import { useUser } from '../components/UserContext';
-import { canAccess } from '../config/rolePermissions';
-import { rewardsApi, RewardRule, RewardTransaction, RewardBalance } from '../api/rewardsApi';
+import { useUser } from '../../components/UserContext';
+import { canAccess } from '../../config/rolePermissions';
+import { rewardsApi, RewardRule, RewardTransaction, RewardBalance } from '../../api/rewardsApi';
 import './RewardsPage.css';
 
 type Tab = 'overview' | 'rules' | 'transactions';

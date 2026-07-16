@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import './UsersPage.css';
-import './shared-card-list.css';
+import '../shared-card-list.css';
 import {
   IonPage,
   IonContent,
@@ -21,9 +21,9 @@ import {
   IonSearchbar,
 } from '@ionic/react';
 import { add, trash, pencil, camera, personCircle } from 'ionicons/icons';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
 
 interface User {
   id: number;

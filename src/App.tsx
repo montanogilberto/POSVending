@@ -63,49 +63,49 @@ import {
   from 'ionicons/icons';
   
 
-import Vending from './pages/Vending';
-import Setting from './pages/Setting';
-import Sells from './pages/Sells';
+import Vending from './pages/pos/Vending';
+import Setting from './pages/system/Setting';
+import Sells from './pages/pos/Sells';
 import Dashboard from './pages/Dashboard/Dashboard';
-import ScannerQR from './pages/ScannerQR';
+import ScannerQR from './pages/pos/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/CartPage/CartPage';
-import MovementsPage from './pages/MovementsPage';
-import LedStatusPage from './pages/LedStatusPage';
-import ClientsPage from './pages/ClientsPage';
+import MovementsPage from './pages/finance/MovementsPage';
+import LedStatusPage from './pages/iot/LedStatusPage';
+import ClientsPage from './pages/clients/ClientsPage';
 import ProductsManagementPage from './pages/products/ProductsManagementPage';
-import AlertsPage from './pages/AlertsPage';
-import EmailsPage from './pages/EmailsPage';
+import AlertsPage from './pages/messaging/AlertsPage';
+import EmailsPage from './pages/messaging/EmailsPage';
 import CategoriesPage from './pages/CategoryPage/CategoriesPage';
-import UsersPage from './pages/UsersPage';
-import IncomesPage from './pages/IncomesPage';
-import ExpensesPage from './pages/ExpensesPage';
-import WaterTanksPage from './pages/WaterTanksPage';
-import WaterTanksHistoryPage from './pages/WaterTanksHistoryPage';
+import UsersPage from './pages/admin/UsersPage';
+import IncomesPage from './pages/finance/IncomesPage';
+import ExpensesPage from './pages/finance/ExpensesPage';
+import WaterTanksPage from './pages/iot/WaterTanksPage';
+import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/Receipt/ReceiptPage';
 import Login from './pages/Authentication/Login';
 import ForgotPassword from './pages/Authentication/ForgotPassword';
 import CreateAccount from './pages/Authentication/CreateAccount';
-import SupplierPage from './pages/SupplierPage';
-import LoanPage from './pages/LoanPage';
+import SupplierPage from './pages/admin/SupplierPage';
+import LoanPage from './pages/loans/LoanPage';
 // Lazy-loaded: pulls in the gated @azure/ai-vision-face-ui SDK, which isn't
 // installable without private-feed credentials. Keeping it out of the eager
 // bundle means environments without those credentials can still run the rest
 // of the app; only this route fails to load.
-const ClientFaceRecognitionPage = React.lazy(() => import('./pages/ClientFaceRecognitionPage'));
-import ClientDashboardPage from './pages/ClientDashboardPage';
-import ExpedienteDigitalPage from './pages/ExpedienteDigitalPage';
-import LenderDashboardPage from './pages/LenderDashboardPage';
-import ClientFollowUpPage from './pages/ClientFollowUpPage';
-import PushNotificationPage from './pages/PushNotificationPage';
-import P2PLendingPage from './pages/P2PLendingPage';
-import BorrowerOnboardingPage from './pages/BorrowerOnboardingPage';
-import LoanPaymentPage from './pages/LoanPaymentPage';
+const ClientFaceRecognitionPage = React.lazy(() => import('./pages/clients/ClientFaceRecognitionPage'));
+import ClientDashboardPage from './pages/clients/ClientDashboardPage';
+import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
+import LenderDashboardPage from './pages/clients/LenderDashboardPage';
+import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
+import PushNotificationPage from './pages/messaging/PushNotificationPage';
+import P2PLendingPage from './pages/loans/P2PLendingPage';
+import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
+import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
-import RewardsPage from './pages/RewardsPage';
-import LoanChatPage from './pages/LoanChatPage';
+import RewardsPage from './pages/finance/RewardsPage';
+import LoanChatPage from './pages/loans/LoanChatPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';

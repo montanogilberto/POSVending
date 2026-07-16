@@ -12,13 +12,13 @@ import {
   ellipseOutline, trashOutline, refreshOutline, personCircleOutline,
   timeOutline, createOutline, walletOutline, barChartOutline,
 } from 'ionicons/icons';
-import { useUser } from '../components/UserContext';
-import { getAllClients, Client } from '../api/clientsApi';
-import { getAllClientFaceRecognitions } from '../api/clientFaceRecognitionApi';
+import { useUser } from '../../components/UserContext';
+import { getAllClients, Client } from '../../api/clientsApi';
+import { getAllClientFaceRecognitions } from '../../api/clientFaceRecognitionApi';
 import {
   ClientFollowUp, FollowUpType, FollowUpStatus, ClientRisk,
   getAllClientFollowUps, createClientFollowUp, updateClientFollowUp, deleteClientFollowUp,
-} from '../api/clientFollowUpApi';
+} from '../../api/clientFollowUpApi';
 import './ClientFollowUpPage.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

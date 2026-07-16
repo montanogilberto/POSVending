@@ -28,7 +28,7 @@ import {
 } from 'ionicons/icons';
 import { useHistory, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
-import { useUser } from '../components/UserContext';
+import { useUser } from '../../components/UserContext';
 // ── Stripe / Payment types & fetchers (single-use, kept inline) ──────────────
 
 const _api = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
@@ -106,8 +106,8 @@ function createWalletTopUp(clientId: number, companyId: number, amountMXN: numbe
 function createRepaymentIntent(payload: { companyId: number; loanId: number; borrowerId: number; lenderId: number; amountMXN: number; installmentNumber?: number }): Promise<PaymentIntentResponse> {
   return _createPaymentIntent({ companyId: payload.companyId, fromClientId: payload.borrowerId, toClientId: payload.lenderId, amount: Math.round(payload.amountMXN * 100), paymentType: 'loan_repayment', loanId: payload.loanId, description: `Pago préstamo ${payload.loanId} — cuota ${payload.installmentNumber ?? ''}`, metadata: { installmentNumber: String(payload.installmentNumber ?? 1) } });
 }
-import { createPushNotification } from '../api/pushNotificationsApi';
-import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
+import { createPushNotification } from '../../api/pushNotificationsApi';
+import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biometricAuth';
 import './LoanPaymentPage.css';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────

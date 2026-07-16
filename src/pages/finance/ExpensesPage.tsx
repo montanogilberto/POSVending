@@ -17,13 +17,13 @@ import {
   IonCardTitle,
   IonLoading,
 } from '@ionic/react';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
-import ExpensesFilters from '../components/ExpensesFilters';
-import ExpensesList from '../components/ExpensesList';
-import ExpenseForm from '../components/ExpenseForm';
-import { fetchAllExpenses, createExpense, Expense } from '../api/expensesApi';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import ExpensesFilters from '../../components/ExpensesFilters';
+import ExpensesList from '../../components/ExpensesList';
+import ExpenseForm from '../../components/ExpenseForm';
+import { fetchAllExpenses, createExpense, Expense } from '../../api/expensesApi';
 import { cashOutline, addOutline } from 'ionicons/icons';
 
 const ExpensesPage: React.FC = () => {

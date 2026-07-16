@@ -27,13 +27,13 @@ import {
 } from '@ionic/react';
 import { InputInputEventDetail, SearchbarInputEventDetail, SelectChangeEventDetail } from '@ionic/core';
 import { addOutline, trashOutline, createOutline, personCircleOutline } from 'ionicons/icons';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
-import { Loan, getAllLoans, createLoan, updateLoan, deleteLoan } from '../api/loanApi';
-import { Client } from '../api/clientsApi';
-import ClientSelector from '../components/ClientSelector';
-import { useUser } from '../components/UserContext';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import { Loan, getAllLoans, createLoan, updateLoan, deleteLoan } from '../../api/loanApi';
+import { Client } from '../../api/clientsApi';
+import ClientSelector from '../../components/ClientSelector';
+import { useUser } from '../../components/UserContext';
 
 const toHermosillo = (utc: string | undefined): string => {
   if (!utc) return '';

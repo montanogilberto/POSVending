@@ -23,8 +23,8 @@ import {
   sendOutline, handLeftOutline, ribbonOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import { useUser } from '../components/UserContext';
-import { getAllClients, Client, ClientType } from '../api/clientsApi';
+import { useUser } from '../../components/UserContext';
+import { getAllClients, Client, ClientType } from '../../api/clientsApi';
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 // ── Loan Proposal / Offer types & fetchers (single-use, kept inline) ─────────
@@ -169,9 +169,9 @@ async function generateInstallmentSchedule(payload: {
 
 import {
   getAllClientFaceRecognitions, ClientFaceRecognition,
-} from '../api/clientFaceRecognitionApi';
-import { createPushNotification, getAllPushNotifications, PushNotification } from '../api/pushNotificationsApi';
-import { createLoan } from '../api/loanApi';
+} from '../../api/clientFaceRecognitionApi';
+import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
+import { createLoan } from '../../api/loanApi';
 import './P2PLendingPage.css';
 
 // ── helpers ──────────────────────────────────────────────────────────────────

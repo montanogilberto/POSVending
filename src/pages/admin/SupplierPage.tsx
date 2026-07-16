@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './SupplierPage.css';
-import './shared-card-list.css';
+import '../shared-card-list.css';
 import {
   IonPage, IonContent, IonList, IonLabel, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonFab, IonFabButton, IonIcon, IonModal,
@@ -9,17 +9,17 @@ import {
   IonHeader, IonToolbar, IonButtons, IonTitle, IonText
 } from '@ionic/react';
 import { add, pencil, trash, peopleOutline, arrowBack, save, businessOutline } from 'ionicons/icons';
-import Header from '../components/Header';
-import AlertPopover from '../components/PopOver/AlertPopover';
-import MailPopover from '../components/PopOver/MailPopover';
-import { useUser } from '../components/UserContext';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import { useUser } from '../../components/UserContext';
 import {
   getAllSuppliers,
   createSupplier,
   updateSupplier,
   deleteSupplier,
   Supplier
-} from '../api/supplierApi';
+} from '../../api/supplierApi';
 import { SearchbarInputEventDetail, InputInputEventDetail, ToggleChangeEventDetail } from '@ionic/core';
 
 const toHermosillo = (utc: string | undefined): string => {
