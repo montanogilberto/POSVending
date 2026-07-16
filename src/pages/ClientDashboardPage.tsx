@@ -63,6 +63,7 @@ import { Loan, getAllLoans, createLoan } from '../api/loanApi';
 import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../api/clientFaceRecognitionApi';
 import { Client, getOneClient } from '../api/clientsApi';
 import LoanCompletionRing, { LoanStep } from '../components/LoanCompletionRing';
+import StripeAccountOnboarding from '../components/StripeAccountOnboarding';
 
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';
@@ -80,14 +81,6 @@ async function stripeCreateAccount(clientId: number, companyId: number, email: s
   const r = await fetch(`${API_BASE_URL}/stripe/connected-accounts`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ clientId, companyId, email }),
-  });
-  return r.json();
-}
-
-async function stripeOnboardingLink(clientId: number, companyId: number) {
-  const r = await fetch(`${API_BASE_URL}/stripe/onboarding-link`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId, companyId }),
   });
   return r.json();
 }
@@ -205,6 +198,7 @@ const ClientDashboardPage: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [showWithdrawAlert, setShowWithdrawAlert] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [showStripeOnboarding, setShowStripeOnboarding] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payIntentId, setPayIntentId] = useState('');
@@ -296,17 +290,25 @@ const ClientDashboardPage: React.FC = () => {
     setWithdrawing(false);
   };
 
+  // Opens the embedded Stripe onboarding form inline — no external browser
+  // redirect. Live mode doesn't need the AccountLink/hosted-URL flow;
+  // the client fills everything in without ever leaving the app.
   const handleStripeKyc = async () => {
     if (!companyId || !clientId) return;
     setStripeLoading(true);
     try {
       if (!stripeAccount) {
         await stripeCreateAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
+        await fetchStripe();
       }
-      const linkRes = await stripeOnboardingLink(clientId, companyId);
-      if (linkRes.url) window.open(linkRes.url, '_blank');
+      setShowStripeOnboarding(true);
     } catch { setError('Error al iniciar registro bancario'); }
-    finally { setStripeLoading(false); fetchStripe(); }
+    finally { setStripeLoading(false); }
+  };
+
+  const handleStripeOnboardingExit = () => {
+    setShowStripeOnboarding(false);
+    fetchStripe();
   };
 
   const handleCreatePayment = async () => {
@@ -654,7 +656,14 @@ const ClientDashboardPage: React.FC = () => {
           </IonCardHeader>
           <IonCardContent>
             {stripeLoading && <p className="cd-stripe-loading">Verificando...</p>}
-            {!stripeLoading && !stripeAccount && (
+            {!stripeLoading && showStripeOnboarding && clientId && companyId && (
+              <StripeAccountOnboarding
+                clientId={clientId}
+                companyId={companyId}
+                onExit={handleStripeOnboardingExit}
+              />
+            )}
+            {!stripeLoading && !showStripeOnboarding && !stripeAccount && (
               <div className="cd-stripe-empty">
                 <IonIcon icon={cardOutline} className="cd-stripe-big-icon" />
                 <p>Sin cuenta bancaria registrada.</p>
@@ -664,7 +673,7 @@ const ClientDashboardPage: React.FC = () => {
                 </IonButton>
               </div>
             )}
-            {!stripeLoading && stripeAccount && (
+            {!stripeLoading && !showStripeOnboarding && stripeAccount && (
               <div className="cd-stripe-status">
                 <div className="cd-stripe-row">
                   <IonIcon icon={kycDone ? checkmarkCircleOutline : alertCircleOutline}

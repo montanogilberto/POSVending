@@ -89,6 +89,7 @@ import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
 import StripeAccountOnboarding from '../components/StripeAccountOnboarding';
 import SavedCardSetup from '../components/SavedCardSetup';
+import { createPushNotification } from '../api/pushNotificationsApi';
 import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
 import ZoomableImage from '../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../components/PresenceCapture';
@@ -197,7 +198,6 @@ const ClientsPage: React.FC = () => {
   const [stripeExternalAccountLast4, setStripeExternalAccountLast4] = useState('');
   const [stripeExternalAccountType, setStripeExternalAccountType] = useState<'bank_account' | 'card' | ''>('');
   const [hasSavedCard, setHasSavedCard] = useState(false);
-  const [showFinishWithoutBankAlert, setShowFinishWithoutBankAlert] = useState(false);
 
   // Step 2 — document
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
@@ -1260,6 +1260,38 @@ const ClientsPage: React.FC = () => {
     }
   };
 
+  // Doesn't block completion on a missing bank account/card — staff can
+  // still finish onboarding the client now. Instead it surfaces a toast for
+  // whoever's looking at the screen right now, and a push notification so
+  // the client themselves gets a persistent reminder to finish setting up
+  // their payment account (they can't receive/pay a loan until they do).
+  const handleFinishWizard = async () => {
+    if (!stripeKycDone || !hasSavedCard) {
+      const missing = !stripeKycDone && !hasSavedCard
+        ? 'cuenta bancaria/tarjeta de débito y tarjeta para cobros automáticos'
+        : !stripeKycDone
+        ? 'cuenta bancaria/tarjeta de débito'
+        : 'tarjeta para cobros automáticos';
+      toast(`⚠️ Cuenta de pagos incompleta — falta ${missing}. Se notificó al cliente.`);
+      if (createdClientId) {
+        createPushNotification({
+          companyId: Number(companyId),
+          title: '⚠️ Completa tu cuenta de pagos',
+          message: `Aún falta vincular tu ${missing}. No podrás recibir ni pagar un préstamo hasta completarlo.`,
+          notificationType: 'Warning',
+          priority: 'High',
+          targetType: 'User',
+          targetUserId: Number(createdClientId),
+          navigationRoute: '/clients',
+          payloadJson: JSON.stringify({ type: 'PaymentAccountIncomplete', clientId: createdClientId }),
+        }).catch((err) => console.log('[Expediente] handleFinishWizard: push notification failed', err));
+      }
+    }
+    setShowWizard(false);
+    resetWizard();
+    loadClients();
+  };
+
   const renderStep6 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
@@ -1537,10 +1569,7 @@ const ClientsPage: React.FC = () => {
       return (
         <ClientWizardFooterBar
           showBack={false}
-          onPrimary={() => {
-            if (!stripeKycDone || !hasSavedCard) { setShowFinishWithoutBankAlert(true); return; }
-            setShowWizard(false); resetWizard(); loadClients();
-          }}
+          onPrimary={handleFinishWizard}
           variant="submit"
           primary={<>Finalizar <IonIcon icon={checkmark} /></>}
         />
@@ -1686,25 +1715,13 @@ const ClientsPage: React.FC = () => {
           ]}
         />
 
-        {/* ── Finish-without-bank-account/card Alert ─────────────────────────── */}
-        <IonAlert
-          isOpen={showFinishWithoutBankAlert}
-          onDidDismiss={() => setShowFinishWithoutBankAlert(false)}
-          header="Cuenta de pagos pendiente"
-          message={
-            !stripeKycDone && !hasSavedCard
-              ? 'El cliente no ha vinculado una cuenta bancaria/tarjeta de débito (para recibir el depósito) ni una tarjeta para cobros automáticos. No podrá recibir ni pagar un préstamo hasta completarlo. ¿Finalizar de todas formas?'
-              : !stripeKycDone
-              ? 'El cliente no ha vinculado una cuenta bancaria o tarjeta de débito. No podrá recibir el depósito de un préstamo hasta completarlo. ¿Finalizar de todas formas?'
-              : 'El cliente no ha registrado una tarjeta para cobros automáticos. Las cuotas del préstamo no podrán cobrarse automáticamente hasta completarlo. ¿Finalizar de todas formas?'
-          }
-          buttons={[
-            { text: 'Volver', role: 'cancel', handler: () => setShowFinishWithoutBankAlert(false) },
-            { text: 'Finalizar de todas formas', handler: () => { setShowFinishWithoutBankAlert(false); setShowWizard(false); resetWizard(); loadClients(); } },
-          ]}
+        <IonToast
+          isOpen={showToast}
+          onDidDismiss={() => setShowToast(false)}
+          message={toastMessage}
+          duration={toastMessage.startsWith('⚠️') ? 4000 : 2500}
+          color={toastMessage.toLowerCase().includes('error') ? 'danger' : toastMessage.startsWith('⚠️') ? 'warning' : 'success'}
         />
-
-        <IonToast isOpen={showToast} onDidDismiss={() => setShowToast(false)} message={toastMessage} duration={2500} color={toastMessage.toLowerCase().includes('error') ? 'danger' : 'success'} />
       </IonContent>
 
       {/* ── QR View Modal ──────────────────────────────────────────────────── */}
