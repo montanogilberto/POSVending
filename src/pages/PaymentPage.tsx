@@ -21,7 +21,7 @@ import {
   import { useOrder } from '../context/OrderContext';
   import { useState } from 'react';
   import { useHistory } from 'react-router-dom';
-  import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biometricAuth';
+  import { isBiometricLockEnabled, authenticateBiometric } from '../utils/biometricAuth';
   //import { products } from '../data/products';
   
   const PaymentPage: React.FC = () => {
