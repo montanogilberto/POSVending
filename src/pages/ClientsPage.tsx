@@ -744,11 +744,20 @@ const ClientsPage: React.FC = () => {
 
   // ── Wizard renderers ───────────────────────────────────────────────────────
 
+  // The step bar overflow-scrolls horizontally but never moved on its own —
+  // by step 7 the active circle sat off-screen to the right with no way to
+  // tell which step you were on without manually swiping. Scroll the active
+  // step into view whenever it changes.
+  const activeWizardStepRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    activeWizardStepRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [wizardStep]);
+
   const WizardStepBar = () => (
     <div className="wizard-step-indicator">
       {WIZARD_STEPS.map((s, i) => (
         <React.Fragment key={s}>
-          <div className="wizard-step-item">
+          <div className="wizard-step-item" ref={i === wizardStep ? activeWizardStepRef : undefined}>
             <button
               className={`wizard-step-circle${i === wizardStep ? ' active' : ''}${i < wizardStep ? ' completed' : ''}`}
               onClick={() => jumpWizard(i)}
@@ -818,11 +827,12 @@ const ClientsPage: React.FC = () => {
             onIonInput={(e) => setNewClient(p => ({ ...p, email: e.detail.value! }))}
             className={newClient.email && !createErrors.email.isValid ? 'ion-invalid ion-touched' : ''}
             errorText={newClient.email && !createErrors.email.isValid ? createErrors.email.message : undefined}
-          >
-            {newClient.email && createErrors.email.isValid && (
-              <IonIcon icon={checkmarkCircle} slot="end" color="success" aria-hidden="true" />
-            )}
-          </IonInput>
+          />
+          {newClient.email && createErrors.email.isValid && (
+            <p className="wizard-field-success">
+              <IonIcon icon={checkmarkCircle} color="success" aria-hidden="true" /> Email válido
+            </p>
+          )}
         </div>
       </div>
 

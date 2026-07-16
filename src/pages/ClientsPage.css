@@ -787,6 +787,19 @@
   font-size: 15px;
 }
 
+.wizard-field-success {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 0 12px;
+  font-size: 12px;
+  color: var(--ion-color-success, #2dd36f);
+}
+
+.wizard-field-success ion-icon {
+  font-size: 14px;
+}
+
 /* Client type selector */
 .wizard-client-type-section {
   margin-top: 20px;
