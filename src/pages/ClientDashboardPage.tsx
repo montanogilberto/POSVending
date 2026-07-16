@@ -29,6 +29,7 @@ import {
   IonToolbar,
   IonTitle,
   IonButtons,
+  IonAlert,
 } from '@ionic/react';
 
 import {
@@ -110,6 +111,24 @@ async function stripeCreatePaymentIntent(clientId: number, companyId: number, am
   return r.json();
 }
 
+async function getWalletBalance(clientId: number, companyId: number): Promise<{ availableBalance: number } | null> {
+  const r = await fetch(`${API_BASE_URL}/wallet`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId }),
+  });
+  if (!r.ok) return null;
+  const data = await r.json();
+  return data.wallet ?? null;
+}
+
+async function withdrawToBank(clientId: number, companyId: number, amount: number): Promise<{ status?: string; error?: string }> {
+  const r = await fetch(`${API_BASE_URL}/stripe/withdraw`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, companyId, amount }),
+  });
+  return r.json();
+}
+
 type Tab = 'home' | 'loans' | 'payments' | 'activity' | 'profile';
 
 const toHermosillo = (utc: string | undefined): string => {
@@ -183,6 +202,9 @@ const ClientDashboardPage: React.FC = () => {
   const [stripeAccount, setStripeAccount] = useState<any>(null);
   const [stripeTransactions, setStripeTransactions] = useState<any[]>([]);
   const [stripeLoading, setStripeLoading] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [showWithdrawAlert, setShowWithdrawAlert] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payIntentId, setPayIntentId] = useState('');
@@ -239,18 +261,39 @@ const ClientDashboardPage: React.FC = () => {
     setStripeLoading(true);
     console.log('[ClientDashboard] fetchStripe → /stripe/connected-accounts/status', { clientId, companyId });
     try {
-      const [statusRes, txRes] = await Promise.all([
+      const [statusRes, txRes, wallet] = await Promise.all([
         stripeGetStatus(clientId, companyId),
         stripeGetTransactions(clientId, companyId),
+        getWalletBalance(clientId, companyId),
       ]);
       console.log('[ClientDashboard] fetchStripe ✅ status:', statusRes, 'txCount:', txRes.transactions?.length ?? 0);
       setStripeAccount(statusRes.account ?? null);
       setStripeTransactions(txRes.transactions ?? []);
+      setWalletBalance(wallet?.availableBalance ?? 0);
     } catch (err) {
       console.error('[ClientDashboard] fetchStripe ❌', err);
     } finally {
       setStripeLoading(false);
     }
+  };
+
+  const handleWithdraw = async (amountStr: string) => {
+    const amount = Number(amountStr);
+    if (!clientId || !companyId) return;
+    if (!amount || amount <= 0) { setError('Ingresa un monto válido'); return; }
+    if (walletBalance !== null && amount > walletBalance) { setError('El monto supera tu saldo disponible'); return; }
+    setWithdrawing(true);
+    try {
+      const result = await withdrawToBank(clientId, companyId, amount);
+      if (result.error || result.status !== 'succeeded') {
+        throw new Error(result.error || 'No se pudo procesar el retiro.');
+      }
+      setSuccessMsg(`✓ Retiro de $${amount.toFixed(2)} enviado a tu cuenta bancaria`);
+      fetchStripe();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al procesar el retiro');
+    }
+    setWithdrawing(false);
   };
 
   const handleStripeKyc = async () => {
@@ -332,7 +375,7 @@ const ClientDashboardPage: React.FC = () => {
   const loanSteps: LoanStep[] = [
     { label: 'Información general', done: true },
     { label: 'Código QR',           done: !!clientRecord?.qrBlobUrl },
-    { label: 'Cuenta de pago',      done: !!(stripeAccount?.chargesEnabled && stripeAccount?.detailsSubmitted) },
+    { label: 'Cuenta de pago',      done: !!stripeAccount?.hasExternalAccount },
     { label: 'Biométrico',          done: !!faceRecord?.isVerified },
     { label: 'Contrato',            done: !!faceRecord?.contractAccepted },
     { label: 'Pagaré',              done: !!faceRecord?.pagareAccepted },
@@ -593,7 +636,10 @@ const ClientDashboardPage: React.FC = () => {
   );
 
   const renderPayments = () => {
-    const kycDone = stripeAccount?.chargesEnabled && stripeAccount?.detailsSubmitted;
+    // "Verified" here specifically means a bank account/debit card is on
+    // file — that's the piece that determines whether the client can
+    // actually receive or withdraw money, not just generic KYC completion.
+    const kycDone = !!stripeAccount?.hasExternalAccount;
     return (
       <>
         {/* Stripe account status */}
@@ -629,17 +675,17 @@ const ClientDashboardPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="cd-stripe-chips">
+                  <span className={`cd-chip ${stripeAccount.hasExternalAccount ? 'cd-chip-ok' : 'cd-chip-off'}`}>
+                    Cuenta bancaria {stripeAccount.hasExternalAccount ? '✓' : '✗'}
+                  </span>
                   <span className={`cd-chip ${stripeAccount.chargesEnabled ? 'cd-chip-ok' : 'cd-chip-off'}`}>
                     Cobros {stripeAccount.chargesEnabled ? '✓' : '✗'}
                   </span>
                   <span className={`cd-chip ${stripeAccount.payoutsEnabled ? 'cd-chip-ok' : 'cd-chip-off'}`}>
                     Retiros {stripeAccount.payoutsEnabled ? '✓' : '✗'}
                   </span>
-                  <span className={`cd-chip ${stripeAccount.detailsSubmitted ? 'cd-chip-ok' : 'cd-chip-off'}`}>
-                    KYC {stripeAccount.detailsSubmitted ? '✓' : '✗'}
-                  </span>
                 </div>
-                {!kycDone && (
+                {!stripeAccount.hasExternalAccount && (
                   <IonButton shape="round" expand="block" className="cd-stripe-cta" onClick={handleStripeKyc}>
                     <IonIcon icon={documentTextOutline} slot="start" /> Completar verificación
                   </IonButton>
@@ -648,6 +694,35 @@ const ClientDashboardPage: React.FC = () => {
             )}
           </IonCardContent>
         </IonCard>
+
+        {/* Wallet balance / withdraw */}
+        {!stripeLoading && stripeAccount && (
+          <IonCard className="client-dashboard-card cd-stripe-card">
+            <IonCardHeader>
+              <IonCardTitle>Saldo disponible</IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent>
+              <div className="cd-stripe-row">
+                <IonIcon icon={walletOutline} className="cd-stripe-icon-ok" />
+                <div>
+                  <strong>${(walletBalance ?? 0).toFixed(2)} MXN</strong>
+                  <p className="cd-stripe-acct-id">Disponible para retirar a tu cuenta bancaria</p>
+                </div>
+              </div>
+              <IonButton
+                shape="round"
+                expand="block"
+                fill="outline"
+                className="cd-stripe-cta"
+                style={{ marginTop: 12 }}
+                disabled={!stripeAccount.hasExternalAccount || !walletBalance}
+                onClick={() => setShowWithdrawAlert(true)}
+              >
+                <IonIcon icon={cashOutline} slot="start" /> Retirar fondos
+              </IonButton>
+            </IonCardContent>
+          </IonCard>
+        )}
 
         {/* Next payment */}
         {financialSummary?.nextPaymentAmount != null && (
@@ -972,6 +1047,18 @@ const ClientDashboardPage: React.FC = () => {
         <IonLoading isOpen={loading} message="Cargando..." />
         <IonToast isOpen={!!error} message={error} duration={3000} onDidDismiss={() => setError('')} color="danger" />
         <IonToast isOpen={!!successMsg} message={successMsg} duration={2500} onDidDismiss={() => setSuccessMsg('')} color="success" />
+
+        <IonAlert
+          isOpen={showWithdrawAlert}
+          onDidDismiss={() => setShowWithdrawAlert(false)}
+          header="Retirar fondos"
+          message={`Saldo disponible: $${(walletBalance ?? 0).toFixed(2)} MXN. El monto se transferirá a tu cuenta bancaria o tarjeta de débito vinculada.`}
+          inputs={[{ name: 'amount', type: 'number', placeholder: 'Monto a retirar (MXN)', min: 1, max: walletBalance ?? undefined }]}
+          buttons={[
+            { text: 'Cancelar', role: 'cancel' },
+            { text: withdrawing ? 'Procesando...' : 'Retirar', handler: (data) => { handleWithdraw(data.amount); } },
+          ]}
+        />
 
         <section className="dashboard-shell">
           {activeTab === 'home'     && renderHome()}

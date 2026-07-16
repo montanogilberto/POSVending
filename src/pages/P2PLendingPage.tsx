@@ -98,6 +98,75 @@ async function createLoanOffer(payload: Omit<LoanOffer, 'offerId' | 'created_At'
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+// ── Wallet / Stripe disbursement helpers (single-use, kept inline to match
+// the pattern above) ──────────────────────────────────────────────────────
+
+interface WalletBalance {
+  availableBalance: number;
+  reservedBalance: number;
+  totalTopUps: number;
+  totalDisbursed: number;
+  totalRepaid: number;
+}
+
+async function getWallet(clientId: number, companyId: number): Promise<WalletBalance | null> {
+  const res = await fetch(`${API_BASE_URL}/wallet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId }) });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.wallet ?? null;
+}
+
+async function reserveWallet(clientId: number, companyId: number, amountMXN: number): Promise<{ error?: string }> {
+  const res = await fetch(`${API_BASE_URL}/wallet/reserve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN }) });
+  return res.json();
+}
+
+async function releaseWallet(clientId: number, companyId: number, amountMXN: number): Promise<void> {
+  await fetch(`${API_BASE_URL}/wallet/release`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN }) }).catch(() => {});
+}
+
+async function debitWallet(clientId: number, companyId: number, amountMXN: number, type: 'disbursement' | 'withdrawal'): Promise<void> {
+  await fetch(`${API_BASE_URL}/wallet/debit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN, type }) });
+}
+
+async function creditWallet(clientId: number, companyId: number, amountMXN: number, type: 'top_up' | 'repayment_received' | 'disbursement_received'): Promise<void> {
+  await fetch(`${API_BASE_URL}/wallet/credit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN, type }) });
+}
+
+async function withdrawToBank(clientId: number, companyId: number, amount: number): Promise<{ status?: string; error?: string }> {
+  const res = await fetch(`${API_BASE_URL}/stripe/withdraw`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amount }) });
+  return res.json();
+}
+
+async function getStripeAccountStatus(clientId: number, companyId: number): Promise<{ hasExternalAccount?: boolean } | null> {
+  const res = await fetch(`${API_BASE_URL}/stripe/connected-accounts/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId }) });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.account ?? null;
+}
+
+async function getSavedPaymentMethod(clientId: number, companyId: number): Promise<{ stripePaymentMethodId?: string } | null> {
+  const res = await fetch(`${API_BASE_URL}/automated-payments/saved-method`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId }) });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.paymentMethod ?? null;
+}
+
+async function disburseLoan(payload: {
+  companyId: number; loanId?: number; proposalId: number; lenderId: number; borrowerId: number; amount: number;
+}): Promise<{ status?: string; stripeTransferId?: string; error?: string }> {
+  const res = await fetch(`${API_BASE_URL}/stripe/disburse`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  return res.json();
+}
+
+async function generateInstallmentSchedule(payload: {
+  loanId: number; clientId: number; companyId: number; lenderId: number;
+  principalAmount: number; interestRate: number; termMonths: number; disbursementDate: string;
+}): Promise<void> {
+  await fetch(`${API_BASE_URL}/automated-payments/generate-schedule`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {});
+}
+
 import {
   getAllClientFaceRecognitions, ClientFaceRecognition,
 } from '../api/clientFaceRecognitionApi';
@@ -166,6 +235,8 @@ const P2PLendingPage: React.FC = () => {
 
   const [saving, setSaving] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [showWithdrawAlert, setShowWithdrawAlert] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   // ── load data ───────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -185,13 +256,8 @@ const P2PLendingPage: React.FC = () => {
       setMyClient(me);
       // Load wallet balance
       if (clientId && companyId) {
-        fetch(`${API_BASE_URL}/wallet`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clientId, companyId }),
-        })
-          .then(r => r.json())
-          .then(d => { if (d.availableBalance !== undefined) setWalletBalance(d.availableBalance); })
+        getWallet(clientId, companyId)
+          .then(w => { if (w) setWalletBalance(w.availableBalance); })
           .catch(() => {});
       }
     } finally {
@@ -331,46 +397,97 @@ const P2PLendingPage: React.FC = () => {
     setSaving(false);
   };
 
-  // ── Lender accepts proposal → creates Loan ──────────────────────────────
+  // ── Lender accepts proposal → real Stripe disbursement → creates Loan ───
+  // Order matters: verify preconditions, reserve the lender's funds, then
+  // move the actual money via Stripe *before* the Loan/proposal are ever
+  // marked as active — a Stripe failure must never leave a phantom "active"
+  // loan with no funds behind it.
   const acceptProposal = async () => {
     if (!selectedProposal) return;
     setSaving(true);
     try {
-      // 1. Create the actual Loan record
-      await createLoan({
+      const { proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths } = selectedProposal;
+
+      const [borrowerStripe, borrowerCard, lenderWallet] = await Promise.all([
+        getStripeAccountStatus(borrowerId, companyId),
+        getSavedPaymentMethod(borrowerId, companyId),
+        getWallet(lenderId, companyId),
+      ]);
+
+      if (!borrowerStripe?.hasExternalAccount) {
+        throw new Error('El prestatario no ha vinculado una cuenta bancaria o tarjeta de débito. No se puede depositar el préstamo.');
+      }
+      if (!borrowerCard?.stripePaymentMethodId) {
+        throw new Error('El prestatario no ha registrado una tarjeta para el cobro automático de las cuotas.');
+      }
+      if (!lenderWallet || lenderWallet.availableBalance < requestedAmount) {
+        throw new Error('Saldo insuficiente en tu cartera para fondear este préstamo.');
+      }
+
+      // Lock the lender's funds before attempting the transfer.
+      const reserveResult = await reserveWallet(lenderId, companyId, requestedAmount);
+      if (reserveResult.error) throw new Error(reserveResult.error);
+
+      // Real Stripe Transfer to the borrower's Connected Account (from which
+      // Stripe pays out to their bank account/debit card).
+      const disburseResult = await disburseLoan({ companyId, proposalId, lenderId, borrowerId, amount: requestedAmount });
+      if (disburseResult.error || disburseResult.status !== 'succeeded') {
+        await releaseWallet(lenderId, companyId, requestedAmount);
+        throw new Error(disburseResult.error || 'No se pudo transferir el capital al prestatario.');
+      }
+
+      // Money has moved — safe to finalize the ledger and records now.
+      await debitWallet(lenderId, companyId, requestedAmount, 'disbursement');
+      // Credit the borrower's own ledger too — real money just landed on
+      // their Connected Account via the Transfer above, and withdrawToBank()
+      // reads this same ledger, so without this a borrower would show a
+      // real Stripe balance but $0 available to withdraw.
+      await creditWallet(borrowerId, companyId, requestedAmount, 'disbursement_received');
+
+      const disbursementDate = new Date().toISOString();
+      const loan = await createLoan({
         companyId,
         loanNumber: `P2P-${Date.now()}`,
-        clientId: selectedProposal.borrowerId,
-        principalAmount: selectedProposal.requestedAmount,
-        interestRate: selectedProposal.proposedRate,
-        termMonths: selectedProposal.termMonths,
+        clientId: borrowerId,
+        principalAmount: requestedAmount,
+        interestRate: proposedRate,
+        termMonths,
         paymentFrequency: 'monthly',
         loanStatus: 'active',
-        notes: `Préstamo P2P. Prestamista clientId=${selectedProposal.lenderId}`,
-        disbursementDate: new Date().toISOString(),
+        notes: `Préstamo P2P. Prestamista clientId=${lenderId}`,
+        disbursementDate,
       });
 
-      // 2. Update proposal status
-      await updateLoanProposal(selectedProposal.proposalId, {
+      await generateInstallmentSchedule({
+        loanId: loan.loanId,
+        clientId: borrowerId,
+        companyId,
+        lenderId,
+        principalAmount: requestedAmount,
+        interestRate: proposedRate,
+        termMonths,
+        disbursementDate,
+      });
+
+      await updateLoanProposal(proposalId, {
         status: 'accepted',
         respondedAt: new Date().toISOString(),
       }).catch(() => {});
 
-      // 3. Notify the borrower
-      const borrowerClient = clientMap[selectedProposal.borrowerId];
+      const borrowerClient = clientMap[borrowerId];
       await createPushNotification({
         companyId,
         title: '✅ ¡Solicitud aprobada!',
-        message: `Tu préstamo de ${fmt(selectedProposal.requestedAmount)} a ${selectedProposal.proposedRate}% anual ha sido aprobado. El capital estará disponible en breve.`,
+        message: `Tu préstamo de ${fmt(requestedAmount)} a ${proposedRate}% anual fue depositado en tu cuenta bancaria.`,
         notificationType: 'Success',
         priority: 'Critical',
         targetType: 'User',
-        targetUserId: selectedProposal.borrowerId,
+        targetUserId: borrowerId,
         navigationRoute: '/loans',
-        payloadJson: JSON.stringify({ type: 'ProposalAccepted', proposalId: selectedProposal.proposalId }),
+        payloadJson: JSON.stringify({ type: 'ProposalAccepted', proposalId }),
       });
 
-      setToast(`✓ Préstamo aprobado — ${fmt(selectedProposal.requestedAmount)} para ${borrowerClient?.first_name ?? 'prestatario'}`);
+      setToast(`✓ Préstamo aprobado y depositado — ${fmt(requestedAmount)} para ${borrowerClient?.first_name ?? 'prestatario'}`);
       setShowAcceptAlert(false);
       setSelectedProposal(null);
       load();
@@ -409,6 +526,25 @@ const P2PLendingPage: React.FC = () => {
       setToast(e?.message ?? 'Error');
     }
     setSaving(false);
+  };
+
+  // ── Withdraw wallet balance to bank account ─────────────────────────────
+  const handleWithdraw = async (amountStr: string) => {
+    const amount = Number(amountStr);
+    if (!amount || amount <= 0) { setToast('Ingresa un monto válido'); return; }
+    if (walletBalance !== null && amount > walletBalance) { setToast('El monto supera tu saldo disponible'); return; }
+    setWithdrawing(true);
+    try {
+      const result = await withdrawToBank(clientId, companyId, amount);
+      if (result.error || result.status !== 'succeeded') {
+        throw new Error(result.error || 'No se pudo procesar el retiro.');
+      }
+      setToast(`✓ Retiro de ${fmt(amount)} enviado a tu cuenta bancaria`);
+      load();
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : 'Error al procesar el retiro');
+    }
+    setWithdrawing(false);
   };
 
   // ── render helpers ──────────────────────────────────────────────────────
@@ -509,12 +645,25 @@ const P2PLendingPage: React.FC = () => {
           <IonRefresherContent />
         </IonRefresher>
 
-        {/* ── Lender top-up button ── */}
+        {/* ── Lender top-up / withdraw buttons ── */}
         {isLender && (
-          <IonButton expand="block" fill="outline" className="p2p-topup-btn" onClick={goTopUp}>
-            <IonIcon icon={walletOutline} slot="start" />
-            Recargar cartera con tarjeta
-          </IonButton>
+          <div className="p2p-wallet-actions">
+            <IonButton expand="block" fill="outline" className="p2p-topup-btn" onClick={goTopUp}>
+              <IonIcon icon={walletOutline} slot="start" />
+              Recargar cartera con tarjeta
+            </IonButton>
+            <IonButton
+              expand="block"
+              fill="outline"
+              color="medium"
+              className="p2p-topup-btn"
+              disabled={!walletBalance}
+              onClick={() => setShowWithdrawAlert(true)}
+            >
+              <IonIcon icon={cashOutline} slot="start" />
+              Retirar fondos a mi cuenta bancaria
+            </IonButton>
+          </div>
         )}
 
         {/* ── KPI row (lender) ── */}
@@ -847,6 +996,23 @@ const P2PLendingPage: React.FC = () => {
         buttons={[
           { text: 'Cancelar', role: 'cancel' },
           { text: 'Rechazar', handler: rejectProposal, cssClass: 'alert-button-danger' },
+        ]}
+      />
+
+      {/* ── Withdraw alert ── */}
+      <IonAlert
+        isOpen={showWithdrawAlert}
+        onDidDismiss={() => setShowWithdrawAlert(false)}
+        header="Retirar fondos"
+        message={`Saldo disponible: ${walletBalance !== null ? fmt(walletBalance) : '—'}. El monto se transferirá a tu cuenta bancaria o tarjeta de débito vinculada.`}
+        inputs={[{ name: 'amount', type: 'number', placeholder: 'Monto a retirar (MXN)', min: 1, max: walletBalance ?? undefined }]}
+        buttons={[
+          { text: 'Cancelar', role: 'cancel' },
+          {
+            text: withdrawing ? 'Procesando...' : 'Retirar',
+            cssClass: 'alert-button-confirm',
+            handler: (data) => { handleWithdraw(data.amount); },
+          },
         ]}
       />
     </IonPage>

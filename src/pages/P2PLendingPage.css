@@ -55,7 +55,13 @@
   color: #15803d;
 }
 
-/* ── Top-up button ── */
+/* ── Top-up / withdraw buttons ── */
+.p2p-wallet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .p2p-topup-btn {
   margin: 12px 14px 0;
   --border-radius: 12px;

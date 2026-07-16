@@ -88,6 +88,7 @@ import LoanCompletionRing from '../components/LoanCompletionRing';
 import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
 import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
 import StripeAccountOnboarding from '../components/StripeAccountOnboarding';
+import SavedCardSetup from '../components/SavedCardSetup';
 import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
 import ZoomableImage from '../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../components/PresenceCapture';
@@ -189,7 +190,14 @@ const ClientsPage: React.FC = () => {
 
   // Step 6 — Stripe
   const [stripeAccountId, setStripeAccountId] = useState('');
+  // "KYC done" here specifically means a bank account/debit card is on file —
+  // that's the piece that actually matters (money can't be deposited without
+  // it), not just that the client clicked through Stripe's form.
   const [stripeKycDone, setStripeKycDone] = useState(false);
+  const [stripeExternalAccountLast4, setStripeExternalAccountLast4] = useState('');
+  const [stripeExternalAccountType, setStripeExternalAccountType] = useState<'bank_account' | 'card' | ''>('');
+  const [hasSavedCard, setHasSavedCard] = useState(false);
+  const [showFinishWithoutBankAlert, setShowFinishWithoutBankAlert] = useState(false);
 
   // Step 2 — document
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
@@ -395,6 +403,9 @@ const ClientsPage: React.FC = () => {
     setContractSignatureBase64('');
     setStripeAccountId('');
     setStripeKycDone(false);
+    setStripeExternalAccountLast4('');
+    setStripeExternalAccountType('');
+    setHasSavedCard(false);
     setQrBlobUrl('');
     setQrUploading(false);
     clientFaceRecognitionIdRef.current = undefined;
@@ -1238,10 +1249,12 @@ const ClientsPage: React.FC = () => {
     if (!createdClientId) return;
     try {
       const status = await stripeGetAccountStatus(Number(createdClientId), Number(companyId));
-      const done = !!status?.account?.detailsSubmitted;
-      console.log('[Expediente] handleStripeOnboardingExit: detailsSubmitted =', done);
-      setStripeKycDone(done);
-      toast(done ? 'Registro bancario completado ✓' : 'El registro bancario quedó incompleto.');
+      const hasExternalAccount = !!status?.account?.hasExternalAccount;
+      console.log('[Expediente] handleStripeOnboardingExit: hasExternalAccount =', hasExternalAccount, 'detailsSubmitted =', status?.account?.detailsSubmitted);
+      setStripeKycDone(hasExternalAccount);
+      setStripeExternalAccountLast4(status?.account?.externalAccountLast4 || '');
+      setStripeExternalAccountType(status?.account?.externalAccountType || '');
+      toast(hasExternalAccount ? 'Cuenta bancaria vinculada ✓' : 'Aún falta vincular una cuenta bancaria o tarjeta de débito.');
     } catch (err) {
       console.log('[Expediente] handleStripeOnboardingExit: FAILED to refresh status', err);
     }
@@ -1269,7 +1282,9 @@ const ClientsPage: React.FC = () => {
             {newClient.first_name} {newClient.last_name}
           </span>
           <span className="wizard-stripe-status-sub">
-            {stripeKycDone ? 'Cuenta bancaria verificada ✓' : 'Verificación pendiente'}
+            {stripeKycDone
+              ? `Cuenta bancaria vinculada ✓${stripeExternalAccountLast4 ? ` (${stripeExternalAccountType === 'card' ? 'tarjeta' : 'cuenta'} •••• ${stripeExternalAccountLast4})` : ''}`
+              : 'Falta vincular cuenta bancaria o tarjeta de débito'}
           </span>
           {stripeAccountId && (
             <span className="wizard-stripe-account-id">{stripeAccountId}</span>
@@ -1299,6 +1314,22 @@ const ClientsPage: React.FC = () => {
               Puedes generarla desde el dashboard del cliente una vez guardado.
             </span>
           </div>
+        </div>
+      )}
+
+      {createdClientId && (
+        <div className="wizard-stripe-section">
+          <div className="wizard-step-header" style={{ marginTop: 8 }}>
+            <h3 className="wizard-substep-title">Tarjeta para cobros automáticos</h3>
+            <p className="wizard-step-desc">
+              Se usará para cobrar automáticamente las cuotas del préstamo — es distinta de la cuenta bancaria de arriba, que es para recibir el depósito.
+            </p>
+          </div>
+          <SavedCardSetup
+            clientId={Number(createdClientId)}
+            companyId={Number(companyId)}
+            onSaved={() => setHasSavedCard(true)}
+          />
         </div>
       )}
     </div>
@@ -1506,7 +1537,10 @@ const ClientsPage: React.FC = () => {
       return (
         <ClientWizardFooterBar
           showBack={false}
-          onPrimary={() => { setShowWizard(false); resetWizard(); loadClients(); }}
+          onPrimary={() => {
+            if (!stripeKycDone || !hasSavedCard) { setShowFinishWithoutBankAlert(true); return; }
+            setShowWizard(false); resetWizard(); loadClients();
+          }}
           variant="submit"
           primary={<>Finalizar <IonIcon icon={checkmark} /></>}
         />
@@ -1649,6 +1683,24 @@ const ClientsPage: React.FC = () => {
           buttons={[
             { text: 'Cancelar', role: 'cancel', handler: () => setShowDeleteAlert(false) },
             { text: 'Eliminar', role: 'destructive', handler: confirmDelete },
+          ]}
+        />
+
+        {/* ── Finish-without-bank-account/card Alert ─────────────────────────── */}
+        <IonAlert
+          isOpen={showFinishWithoutBankAlert}
+          onDidDismiss={() => setShowFinishWithoutBankAlert(false)}
+          header="Cuenta de pagos pendiente"
+          message={
+            !stripeKycDone && !hasSavedCard
+              ? 'El cliente no ha vinculado una cuenta bancaria/tarjeta de débito (para recibir el depósito) ni una tarjeta para cobros automáticos. No podrá recibir ni pagar un préstamo hasta completarlo. ¿Finalizar de todas formas?'
+              : !stripeKycDone
+              ? 'El cliente no ha vinculado una cuenta bancaria o tarjeta de débito. No podrá recibir el depósito de un préstamo hasta completarlo. ¿Finalizar de todas formas?'
+              : 'El cliente no ha registrado una tarjeta para cobros automáticos. Las cuotas del préstamo no podrán cobrarse automáticamente hasta completarlo. ¿Finalizar de todas formas?'
+          }
+          buttons={[
+            { text: 'Volver', role: 'cancel', handler: () => setShowFinishWithoutBankAlert(false) },
+            { text: 'Finalizar de todas formas', handler: () => { setShowFinishWithoutBankAlert(false); setShowWizard(false); resetWizard(); loadClients(); } },
           ]}
         />
 
