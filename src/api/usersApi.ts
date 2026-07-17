@@ -87,6 +87,7 @@ export interface CreateUserPayload {
   roleCode?: string;
   companyId?: number;
   branchId?: number;
+  clientId?: number;  // links this login to an existing dbo.clients row (checkContact match, no account yet)
 }
 
 export interface UserSaveResponse {
@@ -146,6 +147,17 @@ export interface ContactCheckResult {
   stepBiometric?: number;
   stepContract?: number;
   stepPagare?: number;
+  // Registration wizard progress (Cuenta/Perfil/Verificar/Acceso) — lets a
+  // returning contact resume at the first incomplete step instead of
+  // always being sent to login. See sp_checkContact v5.
+  stepProfile?: number;       // 1 once appProfile is saved (step "Perfil")
+  stepVerify?: number;        // 1 once identityVerified=1 (step "Verificar")
+  stepAccess?: number;        // 1 once a userCompanies row exists (step "Acceso")
+  regComplete?: number;       // 1 only when hasAccount + all 3 steps above are 1
+  appProfile?: string | null;
+  enabledModules?: string[] | null;
+  branchId?: number | null;
+  roleCode?: string | null;
 }
 
 /** POST /check_contact — looks up a phone or email in clients + users tables */
@@ -158,6 +170,25 @@ export const checkContact = async (contact: string): Promise<ContactCheckResult>
   });
   const data = await res.json();
   console.log('[checkContact] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+};
+
+export interface UsernameCheckResult {
+  available: boolean;
+  suggestions: string[];
+}
+
+/** POST /check_username — checks availability, suggests free alternatives if taken */
+export const checkUsername = async (username: string): Promise<UsernameCheckResult> => {
+  console.log('[checkUsername] username=', username);
+  const res = await fetch(`${API_BASE_URL}/check_username`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
+  });
+  const data = await res.json();
+  console.log('[checkUsername] RESPONSE status=%d', res.status, data);
   if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
   return data;
 };
@@ -178,13 +209,18 @@ export const sendVerificationCode = async (
   if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
 };
 
-/** POST /verify_code — validates OTP, returns { valid: boolean } */
-export const verifyCode = async (target: string, code: string): Promise<boolean> => {
-  console.log('[verifyCode] target=%s code=%s', target, code);
+/**
+ * POST /verify_code — validates OTP, returns { valid: boolean }.
+ * userId, when passed, lets the backend persist identityVerified=1 on
+ * dbo.users (registration wizard step "Verificar") so a returning contact
+ * isn't asked to re-verify.
+ */
+export const verifyCode = async (target: string, code: string, userId?: number): Promise<boolean> => {
+  console.log('[verifyCode] target=%s code=%s userId=%s', target, code, userId);
   const res = await fetch(`${API_BASE_URL}/verify_code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target, code }),
+    body: JSON.stringify({ target, code, userId }),
   });
   const data = await res.json();
   console.log('[verifyCode] RESPONSE status=%d', res.status, data);
