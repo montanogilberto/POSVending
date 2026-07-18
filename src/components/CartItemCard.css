@@ -173,7 +173,7 @@
   }
 }
 
-/* Touch optimization for kiosk/POS */
+/* Touch optimization for kiosk/dashboard */
 @media (pointer: coarse) {
   .cart-item-card {
     min-height: 80px;

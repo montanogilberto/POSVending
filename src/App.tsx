@@ -67,11 +67,11 @@ import {
   from 'ionicons/icons';
   
 
-import Vending from './pages/pos/Vending';
+//import Vending from './pages/dashboard/Vending';
 import Setting from './pages/system/Setting';
-import Sells from './pages/pos/Sells';
+//mport Sells from './pages/dashboard/Sells';
 import Dashboard from './pages/Dashboard/Dashboard';
-import ScannerQR from './pages/pos/ScannerQR';
+//import ScannerQR from './pages/dashboard/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
@@ -521,11 +521,11 @@ const AppShell: React.FC = () => {
       <IonPage id="main">
         <IonTabs>
           <IonRouterOutlet>
-            <PrivateRoute exact path="/pos" component={Vending} />
+            
             <PrivateRoute exact path="/setting" component={Setting} />
-            <PrivateRoute exact path="/sells" component={Sells} />
+            
             <PrivateRoute exact path="/dashboard" component={Dashboard} />
-            <PrivateRoute exact path="/scannerqr" component={ScannerQR} />
+            
 
             <PrivateRoute exact path="/category" component={Category} />
             <PrivateRoute exact path="/products/:productId" component={ProductDetailPage} />

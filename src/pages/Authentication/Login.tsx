@@ -10,6 +10,7 @@ import { useUser } from '../../components/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
 import { canAccess, normalizeRoleCode } from '../../config/rolePermissions';
+import { getPostLoginRoute } from '../../utils/postLoginRoute';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/CompanySelector/CompanySelector';
 import {
@@ -26,7 +27,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const history = useHistory();
-  const { login, setUserData, isAuthenticated, roleCode } = useUser();
+  const { login, setUserData, isAuthenticated, roleCode, clientId } = useUser();
 
   const usernameRef = useRef<string>('');
   const passwordRef = useRef<string>('');
@@ -84,13 +85,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     // instead of asking them to type credentials again.
     if (nextValue && isAuthenticated) {
       console.log('[Login] handleBiometricToggle: already authenticated, redirecting by role =', roleCode);
-      if (roleCode === 'borrower' || roleCode === 'lender') {
-        history.push('/p2p-lending');
-      } else if (roleCode === 'business' || roleCode === 'employee') {
-        history.push('/pos');
-      } else {
-        history.push('/dashboard');
-      }
+      history.push(getPostLoginRoute(roleCode, clientId));
     } else {
       console.log('[Login] handleBiometricToggle: not redirecting (nextValue/isAuthenticated false)');
     }
@@ -249,23 +244,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   const navigateAfterLogin = (pending: typeof pendingUserRef.current) => {
-    const role = pending?.roleCode;
-    if (role === 'borrower' || role === 'lender') {
-      // SmartLoans accounts land on their own dashboard, not the shared
-      // browse-offers page. Every SmartLoans signup gets a linked clientId
-      // (CreateAccount.tsx now requires a phone for it) — clientId here
-      // should never be 0, but guard anyway rather than push a broken route.
-      if (pending?.clientId) {
-        history.push(`/client-dashboard/${pending.clientId}`);
-      } else {
-        console.warn('[Login] borrower/lender with no clientId — falling back to /dashboard', pending);
-        history.push('/dashboard');
-      }
-    } else if (role === 'business' || role === 'employee') {
-      history.push('/pos');
-    } else {
-      history.push('/dashboard');
+    if ((pending?.roleCode === 'borrower' || pending?.roleCode === 'lender') && !pending?.clientId) {
+      console.warn('[Login] borrower/lender with no clientId — falling back to /dashboard', pending);
     }
+    history.push(getPostLoginRoute(pending?.roleCode, pending?.clientId));
   };
 
   const handleSkipOpenCash = () => {

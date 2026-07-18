@@ -15,6 +15,8 @@ import { getAllCompanies, getBranchesByCompany, Company, CompanyBranch } from '.
 import { RoleCode, ROLE_GROUPS } from '../../config/rolePermissions';
 import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, checkUsername, ContactCheckResult } from '../../api/usersApi';
 import { createOrUpdateClient, getAllClients, ClientType } from '../../api/clientsApi';
+import { useUser } from '../../components/UserContext';
+import { getPostLoginRoute } from '../../utils/postLoginRoute';
 
 // ── Application profiles ────────────────────────────────────────────────────
 
@@ -94,6 +96,16 @@ const STEPS = ['Cuenta', 'Perfil', 'Verificar', 'Acceso'];
 
 const CreateAccount: React.FC = () => {
   const history = useHistory();
+  const { isAuthenticated, roleCode: sessionRoleCode, clientId: sessionClientId } = useUser();
+
+  // An already-authenticated visitor (e.g. still logged in from a previous
+  // session) shouldn't see the signup form or the app's tab bar bleeding
+  // through underneath it — send them straight to their own dashboard.
+  useEffect(() => {
+    if (isAuthenticated) {
+      history.replace(getPostLoginRoute(sessionRoleCode, sessionClientId));
+    }
+  }, [isAuthenticated, sessionRoleCode, sessionClientId, history]);
 
   const [step, setStep] = useState(0);
 
@@ -120,6 +132,8 @@ const CreateAccount: React.FC = () => {
   // is NOT NULL + UNIQUE, so an email-only signup (no client row created at
   // step "Cuenta") needs a phone collected here before it can proceed.
   const [loansPhone, setLoansPhone] = useState('');
+  const [loansPhoneCheck, setLoansPhoneCheck] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const loansPhoneTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [username, setUsername]         = useState('');
 
@@ -263,6 +277,30 @@ const CreateAccount: React.FC = () => {
         }
       }, 600);
     }
+  };
+
+  // Phone collected on step "Perfil" for an email-only SmartLoans signup —
+  // clients.cellphone is NOT NULL + UNIQUE, so check it's not already taken
+  // before letting the client row get created (same checkContact used for
+  // the main contact field, same debounce pattern).
+  const handleLoansPhoneChange = (v: string) => {
+    setLoansPhone(v);
+    setLoansPhoneCheck('idle');
+    if (loansPhoneTimerRef.current) clearTimeout(loansPhoneTimerRef.current);
+
+    if (!isPhoneValid(v)) return;
+
+    setLoansPhoneCheck('checking');
+    loansPhoneTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await checkContact(normalizePhone(v));
+        console.log('[loansPhoneLookup] result=', result);
+        setLoansPhoneCheck(result.found ? 'taken' : 'available');
+      } catch (err) {
+        console.error('[loansPhoneLookup] ERROR', err);
+        setLoansPhoneCheck('idle'); // fail open — backend UNIQUE constraint is the real guard
+      }
+    }, 600);
   };
 
   const handleUsernameChange = (v: string) => {
@@ -539,9 +577,15 @@ const CreateAccount: React.FC = () => {
 
   const handleStep1Next = async () => {
     if (!selectedProfile) { setMessage('Selecciona un perfil de aplicación.'); return; }
-    if (needsClientPhone && !isPhoneValid(loansPhone)) {
-      setMessage('Ingresa un teléfono válido para continuar con SmartLoans.');
-      return;
+    if (needsClientPhone) {
+      if (!isPhoneValid(loansPhone)) {
+        setMessage('Ingresa un teléfono válido para continuar con SmartLoans.');
+        return;
+      }
+      if (loansPhoneCheck !== 'available') {
+        setMessage(loansPhoneCheck === 'taken' ? 'Este teléfono ya está registrado.' : 'Espera a que se verifique el teléfono.');
+        return;
+      }
     }
     setLoading(true);
     console.log('[handleStep1Next] userId=%d profile=%s modules=%o', createdUserId, selectedProfile, enabledModules);
@@ -1007,10 +1051,26 @@ const CreateAccount: React.FC = () => {
           <IonInput
             fill="outline" label="Teléfono (requerido para SmartLoans)" labelPlacement="floating"
             type="tel" value={loansPhone}
-            onIonInput={e => setLoansPhone(e.detail.value || '')}
-            className={loansPhone && !isPhoneValid(loansPhone) ? 'ion-invalid ion-touched' : ''}
-            errorText={loansPhone && !isPhoneValid(loansPhone) ? 'Ingresa un teléfono válido.' : undefined}
+            onIonInput={e => handleLoansPhoneChange(e.detail.value || '')}
+            className={(loansPhone && !isPhoneValid(loansPhone)) || loansPhoneCheck === 'taken' ? 'ion-invalid ion-touched' : ''}
+            errorText={
+              loansPhone && !isPhoneValid(loansPhone) ? 'Ingresa un teléfono válido.'
+              : loansPhoneCheck === 'taken' ? 'Este teléfono ya está registrado.'
+              : undefined
+            }
           />
+          {loansPhoneCheck === 'checking' && (
+            <div className="ca-lookup-row">
+              <IonSpinner name="crescent" style={{ width: 14, height: 14 }} />
+              <span>Verificando disponibilidad…</span>
+            </div>
+          )}
+          {loansPhoneCheck === 'available' && (
+            <div className="ca-lookup-row" style={{ color: '#059669' }}>
+              <IonIcon icon={checkmark} style={{ fontSize: 14 }} />
+              <span>Teléfono disponible</span>
+            </div>
+          )}
         </div>
       )}
 
