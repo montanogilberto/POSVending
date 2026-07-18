@@ -469,7 +469,14 @@ const AppShell: React.FC = () => {
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'loanChat') && (
-              <IonItem button routerLink="/loan-chat/new" title="Chat de Préstamo">
+              <IonItem
+                button
+                // Borrowers land in a chat with the SmartLoans virtual agent
+                // (clientId must match LOANCHAT_AGENT_CLIENT_ID in the backend .env)
+                // by default, since there's no conversation-list view yet.
+                routerLink={roleCode === 'borrower' ? '/loan-chat/new?lenderId=2127' : '/loan-chat/new'}
+                title="Chat de Préstamo"
+              >
                 <IonIcon icon={chatbubblesOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Chat de Préstamo</IonLabel>}
               </IonItem>

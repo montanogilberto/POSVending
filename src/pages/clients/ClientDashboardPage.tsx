@@ -495,7 +495,11 @@ const ClientDashboardPage: React.FC = () => {
     { label: 'Información general', done: true },
     { label: 'Código QR',           done: !!clientRecord?.qrBlobUrl },
     { label: 'Cuenta de pago',      done: !!stripeAccount?.hasExternalAccount },
-    { label: 'Biométrico',          done: !!faceRecord?.isVerified },
+    {
+      label: 'Biométrico',
+      done: !!faceRecord?.isVerified,
+      onClick: () => history.push('/clientFaceRecognitions', { clientId }),
+    },
     { label: 'Contrato',            done: !!faceRecord?.contractAccepted },
     { label: 'Pagaré',              done: !!faceRecord?.pagareAccepted },
   ];

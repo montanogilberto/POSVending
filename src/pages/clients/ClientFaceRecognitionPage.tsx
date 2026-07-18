@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   IonPage,
   IonContent,
@@ -31,7 +32,7 @@ import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
 import SignaturePad from '../../components/SignaturePad';
 import { useUser } from '../../components/UserContext';
-import { Client } from '../../api/clientsApi';
+import { Client, getOneClient } from '../../api/clientsApi';
 import {
   submitContractClientFaceRecognition,
   uploadClientFaceRecognitionImage,
@@ -98,6 +99,20 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setPopoverState({ ...popoverState, showMailPopover: false });
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const location = useLocation<{ clientId?: number } | undefined>();
+
+  // Deep-link from the client dashboard's "Biométrico" progress step —
+  // pre-select the client so the borrower skips the staff-facing picker.
+  useEffect(() => {
+    const deepLinkClientId = location.state?.clientId;
+    if (!deepLinkClientId) return;
+    getOneClient({ clients: [{ clientId: deepLinkClientId }] })
+      .then((clients) => {
+        if (clients[0]) setSelectedClient(clients[0]);
+      })
+      .catch((err) => console.warn('[Expediente] Failed to preselect client from dashboard link', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
   const [idFrontImageBase64, setIdFrontImageBase64] = useState<string>('');
   const [idBackImageBase64, setIdBackImageBase64] = useState<string>('');
