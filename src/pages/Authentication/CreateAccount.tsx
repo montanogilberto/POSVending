@@ -40,7 +40,7 @@ const APP_PROFILES: AppProfile[] = [
   },
   {
     id: 'loans',
-    label: 'Préstamos P2P',
+    label: 'SmartLoans',
     description: 'Créditos, chat, validación facial y pagos Stripe.',
     icon: '💰',
     modules: ['clients', 'clientFaceRecognition', 'pushNotifications', 'loanChat', 'accounting_ledger'],
@@ -81,6 +81,8 @@ const CLIENT_TYPES: { id: ClientType; icon: string; label: string; desc: string;
   { id: 'lawyer',   icon: '⚖️', label: 'Licenciado en derecho', desc: 'Asesoría legal',             color: '#b45309' },
 ];
 
+const DEFAULT_ROLE_BY_PROFILE: Record<string, RoleCode> = { pos: 'employee', loans: 'borrower', custom: 'employee' };
+
 const ROLE_COLOR: Record<string, string> = {
   admin: '#dc2626', manager: '#d97706', employee: '#2563eb',
   borrower: '#059669', lender: '#7c3aed', business: '#0369a1', viewer: '#6b7280',
@@ -113,6 +115,11 @@ const CreateAccount: React.FC = () => {
   // dbo.clients row is only created in that case). Was previously hardcoded
   // to 'borrower'; the client now picks it themselves.
   const [clientType, setClientType] = useState<ClientType>('borrower');
+
+  // SmartLoans (step "Perfil") requires a dbo.clients row — clients.cellphone
+  // is NOT NULL + UNIQUE, so an email-only signup (no client row created at
+  // step "Cuenta") needs a phone collected here before it can proceed.
+  const [loansPhone, setLoansPhone] = useState('');
 
   const [username, setUsername]         = useState('');
 
@@ -160,6 +167,26 @@ const CreateAccount: React.FC = () => {
   useEffect(() => {
     getAllCompanies().then(setCompanies).catch(() => setCompanies([]));
   }, []);
+
+  // The SmartLoans profile only ever runs under one company — auto-select
+  // it instead of showing the POS company picker. This also closes the gap
+  // that let step "Acceso" finish with no company selected at all (the
+  // account would then keep whatever role/company it had before, silently
+  // ignoring the role just chosen in the wizard).
+  useEffect(() => {
+    if (selectedProfile !== 'loans' || companies.length === 0) return;
+    const smartLoans = companies.find(c => c.name.trim().toLowerCase() === 'smartloans');
+    if (!smartLoans || selectedCompany?.companyId === smartLoans.companyId) return;
+    console.log('[autoSelectSmartLoans] companyId=', smartLoans.companyId);
+    setSelectedCompany(smartLoans);
+    setSelectedBranch(null);
+    getBranchesByCompany(smartLoans.companyId)
+      .then(list => {
+        setBranches(list);
+        if (list.length > 0) setSelectedBranch(list[0]);
+      })
+      .catch(() => setBranches([]));
+  }, [selectedProfile, companies, selectedCompany]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -278,6 +305,11 @@ const CreateAccount: React.FC = () => {
   const contactEmail    = contactType === 'email' ? contact.trim() : '';
   const contactPhone    = contactType === 'phone' ? normalizePhone(contact) : '';
 
+  // The phone actually usable for the dbo.clients row — either the original
+  // contact (if it was a phone) or the one collected on step "Perfil" for an
+  // email-only SmartLoans signup.
+  const effectivePhone  = contactPhone || (loansPhone ? normalizePhone(loansPhone) : '');
+
   // Derived: what target and channel to use in verification
   // Phone is always normalized to E.164 so Twilio accepts it
   const verifyTarget  = contactType === 'phone' ? normalizePhone(contact) : contact.trim();
@@ -336,8 +368,7 @@ const CreateAccount: React.FC = () => {
     console.log('[selectProfile] profile=%s modules=%o', profile.id, profile.modules);
     setSelectedProfile(profile.id);
     setEnabledModules(profile.id === 'custom' ? [] : [...profile.modules]);
-    const defaults: Record<string, RoleCode> = { pos: 'employee', loans: 'borrower', custom: 'employee' };
-    setUserRole(defaults[profile.id] ?? 'employee');
+    setUserRole(DEFAULT_ROLE_BY_PROFILE[profile.id] ?? 'employee');
   };
 
   const toggleModule = (id: string) => {
@@ -384,7 +415,10 @@ const CreateAccount: React.FC = () => {
         // Resume at the first incomplete step, prefilling whatever was
         // already saved so it isn't asked again.
         if (existingRecord.stepProfile === 1) {
-          if (existingRecord.appProfile) setSelectedProfile(existingRecord.appProfile);
+          if (existingRecord.appProfile) {
+            setSelectedProfile(existingRecord.appProfile);
+            setUserRole(DEFAULT_ROLE_BY_PROFILE[existingRecord.appProfile] ?? 'employee');
+          }
           if (existingRecord.enabledModules) setEnabledModules(existingRecord.enabledModules);
           markSaved(1);
         }
@@ -497,16 +531,57 @@ const CreateAccount: React.FC = () => {
   };
 
   // Step 1 → save profile + modules → advance to verification.
-  // Client creation now happens at step "Cuenta" (handleStep0Next), alongside
-  // the user itself, for any signup with a phone — not deferred here anymore.
+  // Client creation normally happens at step "Cuenta" (handleStep0Next),
+  // alongside the user itself, for any signup with a phone. An email-only
+  // signup that picks SmartLoans here still needs a dbo.clients row
+  // (clients.cellphone is NOT NULL + UNIQUE) — collected and created below.
+  const needsClientPhone = selectedProfile === 'loans' && !createdClientId && !contactPhone;
+
   const handleStep1Next = async () => {
     if (!selectedProfile) { setMessage('Selecciona un perfil de aplicación.'); return; }
+    if (needsClientPhone && !isPhoneValid(loansPhone)) {
+      setMessage('Ingresa un teléfono válido para continuar con SmartLoans.');
+      return;
+    }
     setLoading(true);
     console.log('[handleStep1Next] userId=%d profile=%s modules=%o', createdUserId, selectedProfile, enabledModules);
     try {
       if (createdUserId) {
         const data = await updateUser(createdUserId, { appProfile: selectedProfile, enabledModules });
         console.log('[handleStep1Next] response', data);
+      }
+
+      if (needsClientPhone && createdUserId) {
+        const [firstName, ...rest] = username.trim().split(/\s+/);
+        const lastName = rest.join(' ') || '-';
+        console.log('[handleStep1Next] creating client for SmartLoans (email-only signup), phone=%s', effectivePhone);
+        try {
+          await createOrUpdateClient({
+            clients: [{
+              clientId: 0,
+              first_name: firstName || username.trim(),
+              last_name: lastName,
+              cellphone: effectivePhone,
+              email: contactEmail,
+              clientType,
+              action: '1',
+            }],
+          });
+          // sp_clients doesn't hand back the new clientId directly — re-fetch
+          // and match by contact, same pattern used in handleStep0Next.
+          const allClients = await getAllClients();
+          const digits = (v: string) => v.replace(/\D/g, '');
+          const match = allClients.find(c => digits(c.cellphone || '') === digits(effectivePhone));
+          console.log('[handleStep1Next] client created, matched clientId=', match?.clientId);
+          if (match) {
+            setCreatedClientId(match.clientId);
+            await updateUser(createdUserId, { clientId: match.clientId, cellphone: effectivePhone });
+          }
+        } catch (clientErr) {
+          console.error('[handleStep1Next] client creation ERROR', clientErr);
+          setMessage((clientErr as Error).message ?? 'Error al crear el registro de cliente.');
+          return;
+        }
       }
 
       markSaved(1);
@@ -521,6 +596,7 @@ const CreateAccount: React.FC = () => {
 
   // Step 3 → save role/company/branch → done
   const handleStep3Submit = async () => {
+    if (!selectedCompany) { setMessage('Selecciona una empresa.'); return; }
     setLoading(true);
     console.log('[handleStep3Submit] userId=%d role=%s companyId=%d branchId=%d',
       createdUserId, userRole, selectedCompany?.companyId, selectedBranch?.branchId);
@@ -548,7 +624,7 @@ const CreateAccount: React.FC = () => {
               companyId: selectedCompany.companyId,
               first_name: firstName || username.trim(),
               last_name: lastName,
-              cellphone: contactPhone,
+              cellphone: effectivePhone,
               email: contactEmail,
               clientType,
               action: '2',
@@ -924,6 +1000,20 @@ const CreateAccount: React.FC = () => {
         })}
       </div>
 
+      {/* SmartLoans needs a dbo.clients row (cellphone NOT NULL + UNIQUE) —
+          collect it here when the signup was email-only. */}
+      {needsClientPhone && (
+        <div className="ca-form-fields" style={{ marginTop: 16, marginBottom: 4 }}>
+          <IonInput
+            fill="outline" label="Teléfono (requerido para SmartLoans)" labelPlacement="floating"
+            type="tel" value={loansPhone}
+            onIonInput={e => setLoansPhone(e.detail.value || '')}
+            className={loansPhone && !isPhoneValid(loansPhone) ? 'ion-invalid ion-touched' : ''}
+            errorText={loansPhone && !isPhoneValid(loansPhone) ? 'Ingresa un teléfono válido.' : undefined}
+          />
+        </div>
+      )}
+
       {/* Active modules summary */}
       {selectedProfile && selectedProfile !== 'custom' && (
         <div className="ca-modules-summary">
@@ -1018,50 +1108,60 @@ const CreateAccount: React.FC = () => {
           })}
         </div>
 
-        {/* Company / branch */}
-        <p className="ca-section-label">
-          {branchScreen ? (
-            <button type="button" className="ca-back-inline" onClick={() => setBranchScreen(false)}>
-              <IonIcon icon={chevronBack} /> {selectedCompany?.name}
-            </button>
-          ) : 'Empresa:'}
-        </p>
+        {/* Company / branch — the SmartLoans profile is scoped to SmartLoans only,
+            auto-selected above, so there's nothing to pick here. */}
+        {selectedProfile === 'loans' ? (
+          <div className="ca-summary-box" style={{ marginBottom: 20 }}>
+            <div className="ca-summary-row"><span>Empresa</span><strong>{selectedCompany?.name ?? 'SmartLoans'}</strong></div>
+            <div className="ca-summary-row"><span>Sucursal</span><strong>{selectedBranch?.name ?? '—'}</strong></div>
+          </div>
+        ) : (
+          <>
+            <p className="ca-section-label">
+              {branchScreen ? (
+                <button type="button" className="ca-back-inline" onClick={() => setBranchScreen(false)}>
+                  <IonIcon icon={chevronBack} /> {selectedCompany?.name}
+                </button>
+              ) : 'Empresa:'}
+            </p>
 
-        <div className="ca-company-list">
-          {!branchScreen ? (
-            companies.length === 0
-              ? <p className="ca-empty-msg">No hay empresas disponibles.</p>
-              : companies.map(c => (
-                <button
-                  key={c.companyId}
-                  type="button"
-                  className={`ca-company-btn${selectedCompany?.companyId === c.companyId ? ' selected' : ''}`}
-                  onClick={() => handleSelectCompany(c)}
-                >
-                  <div className="ca-company-icon">🏢</div>
-                  <span className="ca-company-name">{c.name}</span>
-                  <IonIcon icon={chevronForward} className="ca-company-arrow" />
-                </button>
-              ))
-          ) : (
-            branches.length === 0
-              ? <p className="ca-empty-msg">Sin sucursales — se vinculará solo la empresa.</p>
-              : branches.map(b => (
-                <button
-                  key={b.branchId}
-                  type="button"
-                  className={`ca-company-btn${selectedBranch?.branchId === b.branchId ? ' selected' : ''}`}
-                  onClick={() => setSelectedBranch(prev => prev?.branchId === b.branchId ? null : b)}
-                >
-                  <div className="ca-company-icon">📍</div>
-                  <span className="ca-company-name">{b.name}</span>
-                  {selectedBranch?.branchId === b.branchId
-                    ? <IonIcon icon={checkmark} className="ca-company-check" />
-                    : <IonIcon icon={chevronForward} className="ca-company-arrow" />}
-                </button>
-              ))
-          )}
-        </div>
+            <div className="ca-company-list">
+              {!branchScreen ? (
+                companies.length === 0
+                  ? <p className="ca-empty-msg">No hay empresas disponibles.</p>
+                  : companies.map(c => (
+                    <button
+                      key={c.companyId}
+                      type="button"
+                      className={`ca-company-btn${selectedCompany?.companyId === c.companyId ? ' selected' : ''}`}
+                      onClick={() => handleSelectCompany(c)}
+                    >
+                      <div className="ca-company-icon">🏢</div>
+                      <span className="ca-company-name">{c.name}</span>
+                      <IonIcon icon={chevronForward} className="ca-company-arrow" />
+                    </button>
+                  ))
+              ) : (
+                branches.length === 0
+                  ? <p className="ca-empty-msg">Sin sucursales — se vinculará solo la empresa.</p>
+                  : branches.map(b => (
+                    <button
+                      key={b.branchId}
+                      type="button"
+                      className={`ca-company-btn${selectedBranch?.branchId === b.branchId ? ' selected' : ''}`}
+                      onClick={() => setSelectedBranch(prev => prev?.branchId === b.branchId ? null : b)}
+                    >
+                      <div className="ca-company-icon">📍</div>
+                      <span className="ca-company-name">{b.name}</span>
+                      {selectedBranch?.branchId === b.branchId
+                        ? <IonIcon icon={checkmark} className="ca-company-check" />
+                        : <IonIcon icon={chevronForward} className="ca-company-arrow" />}
+                    </button>
+                  ))
+              )}
+            </div>
+          </>
+        )}
 
         {/* Summary */}
         <div className="ca-summary-box">

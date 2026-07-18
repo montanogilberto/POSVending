@@ -3,7 +3,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
-import { Redirect, Route, useHistory } from 'react-router-dom';
+import { Redirect, Route, useHistory, useLocation } from 'react-router-dom';
 import {
   IonApp,
   IonIcon,
@@ -59,6 +59,10 @@ import {
   chatbubblesOutline,
   chevronBackOutline,
   chevronForwardOutline,
+  homeOutline,
+  cardOutline,
+  pulseOutline,
+  personCircleOutline,
 }
   from 'ionicons/icons';
   
@@ -155,9 +159,17 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 };
 
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName, avatarUrl, userId, roleCode, roleName, setAvatarUrl } =
+  const { logout, username, companyName, branchName, avatarUrl, userId, clientId, roleCode, roleName, setAvatarUrl } =
     useUser();
+  const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
   const history = useHistory();
+  const location = useLocation();
+  // ClientDashboardPage's 5 sections are ?tab=... on one route, not separate
+  // routes — IonTabs matches tabs by path only (ignores query string), so a
+  // plain href would treat all 5 buttons as "already on this tab" and never
+  // navigate. Push manually and track the active one from the URL instead.
+  const activeClientDashboardTab = new URLSearchParams(location.search).get('tab') || 'home';
+  const goClientDashboardTab = (tab: string) => history.push(`/client-dashboard/${clientId}?tab=${tab}`);
   const [profileImageSrc, setProfileImageSrc] = useState(() =>
     resolveAvatarUrl(avatarUrl)
   );
@@ -439,9 +451,9 @@ const AppShell: React.FC = () => {
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'clients') && (
-              <IonItem button routerLink="/p2p-lending" title="Préstamos P2P">
+              <IonItem button routerLink="/p2p-lending" title="SmartLoans">
                 <IonIcon icon={walletOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Préstamos P2P</IonLabel>}
+                {!menuCollapsed && <IonLabel>SmartLoans</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -561,10 +573,33 @@ const AppShell: React.FC = () => {
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
-            <IonTabButton tab="dashboard" href="/dashboard">
-              <IonIcon aria-hidden="true" icon={home} />
-              <IonLabel>Dashboard</IonLabel>
-            </IonTabButton>
+            {isSmartLoansRole ? [
+              <IonTabButton key="cd-home" tab="cd-home" selected={activeClientDashboardTab === 'home'} onClick={() => goClientDashboardTab('home')}>
+                <IonIcon aria-hidden="true" icon={homeOutline} />
+                <IonLabel>Home</IonLabel>
+              </IonTabButton>,
+              <IonTabButton key="cd-loans" tab="cd-loans" selected={activeClientDashboardTab === 'loans'} onClick={() => goClientDashboardTab('loans')}>
+                <IonIcon aria-hidden="true" icon={walletOutline} />
+                <IonLabel>Préstamos</IonLabel>
+              </IonTabButton>,
+              <IonTabButton key="cd-payments" tab="cd-payments" selected={activeClientDashboardTab === 'payments'} onClick={() => goClientDashboardTab('payments')}>
+                <IonIcon aria-hidden="true" icon={cardOutline} />
+                <IonLabel>Pagos</IonLabel>
+              </IonTabButton>,
+              <IonTabButton key="cd-activity" tab="cd-activity" selected={activeClientDashboardTab === 'activity'} onClick={() => goClientDashboardTab('activity')}>
+                <IonIcon aria-hidden="true" icon={pulseOutline} />
+                <IonLabel>Actividad</IonLabel>
+              </IonTabButton>,
+              <IonTabButton key="cd-profile" tab="cd-profile" selected={activeClientDashboardTab === 'profile'} onClick={() => goClientDashboardTab('profile')}>
+                <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                <IonLabel>Perfil</IonLabel>
+              </IonTabButton>,
+            ] : (
+              <IonTabButton tab="dashboard" href="/dashboard">
+                <IonIcon aria-hidden="true" icon={home} />
+                <IonLabel>Dashboard</IonLabel>
+              </IonTabButton>
+            )}
 
             <div
               className="menu-tab-slot menu-tab"

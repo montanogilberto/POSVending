@@ -9,7 +9,7 @@ import { eye, eyeOff, fingerPrintOutline } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
-import { normalizeRoleCode } from '../../config/rolePermissions';
+import { canAccess, normalizeRoleCode } from '../../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/CompanySelector/CompanySelector';
 import {
@@ -213,6 +213,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
     setShowCompanySelector(false);
 
+    // Cash register is a POS concept — skip entirely for roles that don't
+    // have POS access (e.g. borrower/lender on a SmartLoans account),
+    // instead of prompting every role to open a register that isn't theirs.
+    if (!canAccess(roleCode, 'pos')) {
+      console.log('💰 [CashRegister][Login] roleCode has no pos access — skipping cash register check.', { roleCode });
+      onLoginSuccess?.();
+      navigateAfterLogin(pending);
+      return;
+    }
+
     // Ask user to open cash register if currently closed (before navigating)
     try {
       console.log('💰 [CashRegister][Login] Checking cash register status...', { companyId, userId: pending.userId });
@@ -241,7 +251,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const navigateAfterLogin = (pending: typeof pendingUserRef.current) => {
     const role = pending?.roleCode;
     if (role === 'borrower' || role === 'lender') {
-      history.push('/p2p-lending');
+      // SmartLoans accounts land on their own dashboard, not the shared
+      // browse-offers page. Every SmartLoans signup gets a linked clientId
+      // (CreateAccount.tsx now requires a phone for it) — clientId here
+      // should never be 0, but guard anyway rather than push a broken route.
+      if (pending?.clientId) {
+        history.push(`/client-dashboard/${pending.clientId}`);
+      } else {
+        console.warn('[Login] borrower/lender with no clientId — falling back to /dashboard', pending);
+        history.push('/dashboard');
+      }
     } else if (role === 'business' || role === 'employee') {
       history.push('/pos');
     } else {
