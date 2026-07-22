@@ -59,6 +59,7 @@ import {
   chatbubbleOutline,
   copyOutline,
   folderOutline,
+  mailOutline,
 } from 'ionicons/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
@@ -70,6 +71,7 @@ import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../.
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
 import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
+import MailPopover from '../../components/PopOver/MailPopover';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
 
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
@@ -205,6 +207,16 @@ const ClientDashboardPage: React.FC = () => {
   const [editingProfile, setEditingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', email: '', cellphone: '' });
+
+  // Header — mail popover, same component/pattern the rest of the app uses
+  // (e.g. Dashboard.tsx). Notification icon just deep-links to /pushNotifications,
+  // no local popover needed for that one.
+  const [showMailPopover, setShowMailPopover] = useState(false);
+  const [mailPopoverEvent, setMailPopoverEvent] = useState<Event | undefined>(undefined);
+  const presentMailPopover = (e: React.MouseEvent) => {
+    setMailPopoverEvent(e.nativeEvent);
+    setShowMailPopover(true);
+  };
 
   // Profile tab — QR / invite-a-friend actions (mirrors ClientsPage.tsx's
   // staff-facing versions, minus the staff-only bits like Eliminar)
@@ -628,7 +640,12 @@ const ClientDashboardPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <IonIcon icon={notificationsOutline} className="hero-bell" />
+            {loanCompletionPct < 100 && (
+              <div className="hero-progress-pill">
+                <span className="hero-progress-pct">{loanCompletionPct}%</span>
+                <span className="hero-progress-label">listo</span>
+              </div>
+            )}
           </div>
           <div className="hero-balance">
             <span>Crédito disponible</span>
@@ -726,10 +743,7 @@ const ClientDashboardPage: React.FC = () => {
           <IonCardTitle>Progreso para Préstamo</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} />
-            <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
-          </div>
+          <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
           {loanCompletionPct < 100 && (
             <>
               <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
@@ -1438,23 +1452,28 @@ const ClientDashboardPage: React.FC = () => {
   // ── Main render ───────────────────────────────────────────────────────────
   return (
     <IonPage>
-      {activeTab !== 'home' && (
-        <IonHeader>
-          <IonToolbar>
-            <IonButtons slot="start">
-              <IonButton onClick={() => history.goBack()}>
-                <IonIcon icon={arrowBack} slot="icon-only" />
-              </IonButton>
-            </IonButtons>
-            <IonTitle>Dashboard Cliente</IonTitle>
-            <IonButtons slot="end">
-              <IonButton onClick={() => history.push(`/client-followup/${clientId}`)}>
-                <IonIcon icon={calendarOutline} slot="icon-only" />
-              </IonButton>
-            </IonButtons>
-          </IonToolbar>
-        </IonHeader>
-      )}
+      <IonHeader>
+        <IonToolbar>
+          <IonButtons slot="start">
+            <IonButton onClick={() => history.goBack()}>
+              <IonIcon icon={arrowBack} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
+          <IonTitle>Dashboard Cliente</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={() => history.push(`/client-followup/${clientId}`)}>
+              <IonIcon icon={calendarOutline} slot="icon-only" />
+            </IonButton>
+            <IonButton onClick={() => history.push('/pushNotifications')}>
+              <IonIcon icon={notificationsOutline} slot="icon-only" />
+            </IonButton>
+            <IonButton onClick={presentMailPopover}>
+              <IonIcon icon={mailOutline} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
+        </IonToolbar>
+      </IonHeader>
+      <MailPopover isOpen={showMailPopover} event={mailPopoverEvent} onDidDismiss={() => setShowMailPopover(false)} />
 
       <IonContent fullscreen className="ion-padding client-dashboard-page fintech-surface">
         <IonLoading isOpen={loading} message="Cargando..." />
