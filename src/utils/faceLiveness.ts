@@ -137,7 +137,14 @@ export function pickChallengeSequence(): LivenessChallenge[] {
 }
 
 const YAW_OFFSET_RATIO = 0.18; // left/right — confirmed against real device logs (0.34 / -0.187 observed)
-const PITCH_OFFSET_RATIO = 0.15; // up/down — heuristic, may need on-device threshold tuning
+const PITCH_UP_OFFSET_RATIO = 0.15; // up — confirmed reliable against real device logs (-0.208 observed)
+// "down" needs a lower bar than "up": confirmed via device logs that tilting
+// the head down destabilizes face-api.js's landmark detection much more than
+// tilting up (repeated "face not detected" frames only during the down
+// challenge, none during up/left/right) — chin/jaw contour foreshortens and
+// eyelids partially close, so the same 0.15 threshold took ~27s to satisfy
+// instead of under a second like every other direction.
+const PITCH_DOWN_OFFSET_RATIO = 0.10;
 
 export interface ChallengeFrameState {
   /** true once the challenge's motion was actually observed this attempt */
@@ -189,11 +196,11 @@ export function evaluateChallengeFrame(
   const faceHeight = Math.abs(chin.y - eyeMidY) || 1;
   const offsetYRatio = (noseTip.y - (eyeMidY + chin.y) / 2) / faceHeight;
 
-  if (challenge === 'down' && offsetYRatio > PITCH_OFFSET_RATIO) {
+  if (challenge === 'down' && offsetYRatio > PITCH_DOWN_OFFSET_RATIO) {
     if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[down]: offsetYRatio =', offsetYRatio.toFixed(3), '→ challenge COMPLETE');
     state.triggered = true;
   }
-  if (challenge === 'up' && offsetYRatio < -PITCH_OFFSET_RATIO) {
+  if (challenge === 'up' && offsetYRatio < -PITCH_UP_OFFSET_RATIO) {
     if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[up]: offsetYRatio =', offsetYRatio.toFixed(3), '→ challenge COMPLETE');
     state.triggered = true;
   }

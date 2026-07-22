@@ -43,7 +43,7 @@ import {
   ContractSubmissionRequest,
 } from '../../api/clientFaceRecognitionApi';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
-import { ExtractedIdFields } from '../../utils/idOcr';
+import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
 
@@ -135,6 +135,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState('');
+  const ocrRanForRef = useRef('');
   const [presenceResult, setPresenceResult] = useState<PresenceCaptureResult | null>(null);
   const [contractSignatureBase64, setContractSignatureBase64] = useState<string>('');
   // Tracks the ClientFaceRecognition row created on first capture, so later
@@ -144,6 +147,54 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const STEPS = continueToPayments
     ? ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', 'Cuenta de pago']
     : ['Cliente y documento', 'Captura', 'Verificación', 'Contrato'];
+
+  // Runs OCR against the front+back ID captures as soon as both are ready —
+  // in the background, independent of which step/sub-step is on screen.
+  // Previously this only fired once the client actually reached the review
+  // screen right after capture, so the fields were still empty/"loading"
+  // right when shown. Kicking it off here instead means the ~30-60s the
+  // client spends on presence capture + liveness gives the OCR call time to
+  // finish well before the review UI (now shown at the Contrato step) ever
+  // appears.
+  useEffect(() => {
+    if (!idFrontImageBase64 || !idBackImageBase64) return;
+    const key = `${idFrontImageBase64.length}:${idBackImageBase64.length}`;
+    if (ocrRanForRef.current === key) return;
+    ocrRanForRef.current = key;
+
+    let cancelled = false;
+    console.log('[Expediente] OCR effect: running OCR on front+back captures');
+    setOcrLoading(true);
+    setOcrError('');
+
+    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
+      .then(([front, back]) => {
+        if (cancelled) return;
+        const merged: ExtractedIdFields = {
+          nombre: front.nombre || back.nombre,
+          domicilio: front.domicilio || back.domicilio,
+          curp: front.curp || back.curp,
+          claveElector: front.claveElector || back.claveElector,
+          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento,
+        };
+        console.log('[Expediente] OCR effect: merged result', JSON.stringify(merged));
+        setExtractedIdFields(merged);
+      })
+      .catch((err) => {
+        console.log('[Expediente] OCR effect: FAILED', String(err));
+        if (!cancelled) {
+          setOcrError('No se pudo leer la identificación automáticamente. Completa los datos manualmente.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOcrLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idFrontImageBase64, idBackImageBase64]);
 
   const validateStep = (): boolean => {
     if (step === 0) {
@@ -816,7 +867,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <IonCardContent>
             <h2 className="cfr-capture-title">Confirma que la información sea correcta</h2>
             <p className="cfr-capture-desc">
-              Revisa los datos y las capturas de la identificación antes de continuar con la validación facial.
+              Revisa las capturas de la identificación antes de continuar con la validación facial. Los datos
+              extraídos de tu identificación se revisan más adelante, antes de firmar el contrato.
             </p>
 
             <div className="ion-margin-top">
@@ -836,13 +888,6 @@ const ClientFaceRecognitionPage: React.FC = () => {
                 {idBackImageBase64 && <ZoomableImage src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
               </div>
             </div>
-
-            <IdExtractedFieldsSummary
-              idFrontImageBase64={idFrontImageBase64}
-              idBackImageBase64={idBackImageBase64}
-              fields={extractedIdFields}
-              onFieldsChange={setExtractedIdFields}
-            />
 
             <IonItem className="ion-margin-top" lines="none">
               <IonLabel className="ion-text-wrap">Confirmo que la información y las capturas de la identificación son correctas</IonLabel>
@@ -1027,6 +1072,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <p><strong>Presencia registrada:</strong> {presenceResult ? 'Sí ✓' : 'No'}</p>
             <p><strong>Contrato aceptado en:</strong> {contractAcceptedAt || 'Pendiente de envío'}</p>
           </div>
+
+          <IdExtractedFieldsSummary
+            fields={extractedIdFields}
+            onFieldsChange={setExtractedIdFields}
+            ocrLoading={ocrLoading}
+            ocrError={ocrError}
+          />
 
           <IonContent className="contract-terms-content ion-padding" scrollY={true}>
             <p><strong>Términos y Condiciones del Contrato:</strong></p>

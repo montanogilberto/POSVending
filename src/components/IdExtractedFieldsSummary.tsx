@@ -1,14 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { IonInput, IonSpinner, IonIcon } from '@ionic/react';
 import { alertCircleOutline } from 'ionicons/icons';
-import { extractIneFields, ExtractedIdFields } from '../utils/idOcr';
+import { ExtractedIdFields } from '../utils/idOcr';
 import './IdExtractedFieldsSummary.css';
 
 interface IdExtractedFieldsSummaryProps {
-  idFrontImageBase64: string;
-  idBackImageBase64: string;
   fields: ExtractedIdFields;
   onFieldsChange: (fields: ExtractedIdFields) => void;
+  ocrLoading: boolean;
+  ocrError: string;
 }
 
 // Domicilio and Clave de Elector are required on the contract (see
@@ -25,61 +25,16 @@ const FIELD_LABELS: Array<{ key: keyof ExtractedIdFields; label: string }> = [
   { key: 'fechaNacimiento', label: 'Fecha de nacimiento' },
 ];
 
-// Runs OCR against the front+back ID captures (once per pair of images) and
-// renders the results as editable inputs — office staff/client confirm or
-// correct these before continuing, since handheld-photo OCR is never fully
-// reliable. Front and back are both scanned because CURP/name/address land
-// on different sides depending on the INE card revision.
+// Pure display/edit component — the OCR fetch itself runs in the parent
+// (ClientFaceRecognitionPage) as soon as front+back captures are ready, so
+// it has time to finish in the background before this is ever shown (see
+// that component's OCR effect for why).
 const IdExtractedFieldsSummary: React.FC<IdExtractedFieldsSummaryProps> = ({
-  idFrontImageBase64,
-  idBackImageBase64,
   fields,
   onFieldsChange,
+  ocrLoading,
+  ocrError,
 }) => {
-  const [ocrLoading, setOcrLoading] = useState(false);
-  const [ocrError, setOcrError] = useState('');
-  const ranForRef = useRef('');
-
-  useEffect(() => {
-    if (!idFrontImageBase64 || !idBackImageBase64) return;
-    const key = `${idFrontImageBase64.length}:${idBackImageBase64.length}`;
-    if (ranForRef.current === key) return;
-    ranForRef.current = key;
-
-    let cancelled = false;
-    console.log('[IdExtractedFieldsSummary] running OCR on front+back captures');
-    setOcrLoading(true);
-    setOcrError('');
-
-    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
-      .then(([front, back]) => {
-        if (cancelled) return;
-        const merged: ExtractedIdFields = {
-          nombre: front.nombre || back.nombre,
-          domicilio: front.domicilio || back.domicilio,
-          curp: front.curp || back.curp,
-          claveElector: front.claveElector || back.claveElector,
-          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento,
-        };
-        console.log('[IdExtractedFieldsSummary] OCR merged result', JSON.stringify(merged));
-        onFieldsChange(merged);
-      })
-      .catch((err) => {
-        console.log('[IdExtractedFieldsSummary] OCR FAILED', String(err));
-        if (!cancelled) {
-          setOcrError('No se pudo leer la identificación automáticamente. Completa los datos manualmente.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setOcrLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idFrontImageBase64, idBackImageBase64]);
-
   return (
     <div className="id-extracted-fields ion-margin-top">
       <div className="id-extracted-fields-header">

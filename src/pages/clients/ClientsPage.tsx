@@ -96,7 +96,7 @@ import PresenceCapture, { PresenceCaptureResult } from '../../components/Presenc
 import SignaturePad from '../../components/SignaturePad';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
-import { ExtractedIdFields } from '../../utils/idOcr';
+import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 
 const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   nombre: '',
@@ -218,6 +218,50 @@ const ClientsPage: React.FC = () => {
   const [selfieBlobUrl, setSelfieBlobUrl] = useState('');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState(false);
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState('');
+  const ocrRanForRef = useRef('');
+
+  // Runs OCR against the front+back ID captures as soon as both are ready
+  // (moved out of IdExtractedFieldsSummary, which is now a pure display
+  // component — see ClientFaceRecognitionPage.tsx for the fuller rationale).
+  useEffect(() => {
+    if (!idFrontImageBase64 || !idBackImageBase64) return;
+    const key = `${idFrontImageBase64.length}:${idBackImageBase64.length}`;
+    if (ocrRanForRef.current === key) return;
+    ocrRanForRef.current = key;
+
+    let cancelled = false;
+    setOcrLoading(true);
+    setOcrError('');
+
+    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
+      .then(([front, back]) => {
+        if (cancelled) return;
+        setExtractedIdFields((prev) => ({
+          ...prev,
+          nombre: front.nombre || back.nombre || prev.nombre,
+          domicilio: front.domicilio || back.domicilio || prev.domicilio,
+          curp: front.curp || back.curp || prev.curp,
+          claveElector: front.claveElector || back.claveElector || prev.claveElector,
+          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento || prev.fechaNacimiento,
+        }));
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.log('[ClientsPage] OCR effect: FAILED', String(err));
+          setOcrError('No se pudo leer la identificación automáticamente. Completa los datos manualmente.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOcrLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idFrontImageBase64, idBackImageBase64]);
 
   // Step 3 — presence (video + GPS evidence)
   const [presenceResult, setPresenceResult] = useState<PresenceCaptureResult | null>(null);
@@ -1066,10 +1110,10 @@ const ClientsPage: React.FC = () => {
           </div>
 
           <IdExtractedFieldsSummary
-            idFrontImageBase64={idFrontImageBase64}
-            idBackImageBase64={idBackImageBase64}
             fields={extractedIdFields}
             onFieldsChange={setExtractedIdFields}
+            ocrLoading={ocrLoading}
+            ocrError={ocrError}
           />
 
           <div className="wizard-checkbox-list ion-margin-top">
