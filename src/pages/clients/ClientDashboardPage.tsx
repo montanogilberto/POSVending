@@ -60,11 +60,12 @@ import {
   copyOutline,
 } from 'ionicons/icons';
 import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'qrcode';
 import { useUser } from '../../components/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
 import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
-import { Client, getOneClient, createOrUpdateClient } from '../../api/clientsApi';
+import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
 import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
@@ -78,15 +79,22 @@ async function stripeGetStatus(clientId: number, companyId: number) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ clientId, companyId }),
   });
-  return r.json();
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'No se pudo consultar la cuenta bancaria.');
+  return data;
 }
 
+// Callers rely on a thrown error to know account creation actually failed —
+// without checking r.ok/data.error here, a failed create silently looks like
+// success and the caller proceeds straight into a broken onboarding embed.
 async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
   const r = await fetch(`${API_BASE_URL}/stripe/connected-accounts`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ clientId, companyId, email }),
   });
-  return r.json();
+  const data = await r.json();
+  if (!r.ok || data.error) throw new Error(data.error || 'No se pudo crear la cuenta bancaria.');
+  return data;
 }
 
 async function stripeGetTransactions(clientId: number, companyId: number) {
@@ -216,6 +224,7 @@ const ClientDashboardPage: React.FC = () => {
   // staff-facing versions, minus the staff-only bits like Eliminar)
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrDownloading, setQrDownloading] = useState(false);
+  const [qrGenerating, setQrGenerating] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
 
@@ -356,6 +365,51 @@ const ClientDashboardPage: React.FC = () => {
     }
   };
 
+  // Self-service QR generation — mirrors the auto-upload the staff wizard
+  // does in ClientsPage.tsx when a client is first created, for clients
+  // whose QR was never generated at signup. Returns whether a QR exists
+  // (already did, or was just created) so callers can chain off it.
+  const ensureQrGenerated = async (): Promise<boolean> => {
+    if (!clientRecord) return false;
+    if (clientRecord.qrBlobUrl) return true;
+    try {
+      const qrValue = buildClientQrValue(clientRecord.clientId, clientRecord.first_name, clientRecord.last_name);
+      const dataUrl = await QRCode.toDataURL(qrValue, { width: 512, errorCorrectionLevel: 'H' });
+      const { qrBlobUrl } = await uploadClientQr(clientRecord.clientId, companyId, dataUrl);
+      setClientRecord(prev => (prev ? { ...prev, qrBlobUrl } : prev));
+      return true;
+    } catch (err) {
+      setError('Error al generar el código QR.');
+      return false;
+    }
+  };
+
+  const handleGenerateQr = async () => {
+    if (qrGenerating) return;
+    setQrGenerating(true);
+    try {
+      if (await ensureQrGenerated()) setShowQrModal(true);
+    } finally {
+      setQrGenerating(false);
+    }
+  };
+
+  // Single continuous onboarding flow — QR (silent, if missing) → document +
+  // biometric capture + contract (ClientFaceRecognitionPage) → bank account
+  // (Stripe), chained via continueToPayments instead of dropping the client
+  // back on this dashboard between each step.
+  const [wizardStarting, setWizardStarting] = useState(false);
+  const handleStartWizard = async () => {
+    if (wizardStarting || !clientId) return;
+    setWizardStarting(true);
+    try {
+      await ensureQrGenerated();
+      history.push('/clientFaceRecognitions', { clientId, continueToPayments: true });
+    } finally {
+      setWizardStarting(false);
+    }
+  };
+
   // Invite-a-friend — unlike ClientsPage.tsx's staff version (which targets
   // one specific client's phone), this has no fixed recipient: the client
   // picks who to send it to from their own WhatsApp/SMS contacts.
@@ -491,17 +545,31 @@ const ClientDashboardPage: React.FC = () => {
       .catch(() => {});
   }, [companyId, clientId]);
 
+  // Biométrico/Contrato/Pagaré/Cuenta de pago are one continuous process
+  // (document capture → verification → contract → bank account, all inside
+  // ClientFaceRecognitionPage's own multi-step wizard) — so all four launch
+  // the same handleStartWizard rather than sending the client to four
+  // different disconnected places. Código QR stays separate: it's a single
+  // instant action (view/download), not part of that camera+Stripe flow.
   const loanSteps: LoanStep[] = [
     { label: 'Información general', done: true },
-    { label: 'Código QR',           done: !!clientRecord?.qrBlobUrl },
-    { label: 'Cuenta de pago',      done: !!stripeAccount?.hasExternalAccount },
+    {
+      label: 'Código QR',
+      done: !!clientRecord?.qrBlobUrl,
+      onClick: handleGenerateQr,
+    },
+    {
+      label: 'Cuenta de pago',
+      done: !!stripeAccount?.hasExternalAccount,
+      onClick: handleStartWizard,
+    },
     {
       label: 'Biométrico',
       done: !!faceRecord?.isVerified,
-      onClick: () => history.push('/clientFaceRecognitions', { clientId }),
+      onClick: handleStartWizard,
     },
-    { label: 'Contrato',            done: !!faceRecord?.contractAccepted },
-    { label: 'Pagaré',              done: !!faceRecord?.pagareAccepted },
+    { label: 'Contrato', done: !!faceRecord?.contractAccepted, onClick: handleStartWizard },
+    { label: 'Pagaré',   done: !!faceRecord?.pagareAccepted,   onClick: handleStartWizard },
   ];
   const loanCompletionPct = Math.round((loanSteps.filter(s => s.done).length / loanSteps.length) * 100);
 
@@ -620,9 +688,18 @@ const ClientDashboardPage: React.FC = () => {
             <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
           </div>
           {loanCompletionPct < 100 && (
-            <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
-              Completa todos los pasos para acceder al crédito.
-            </p>
+            <>
+              <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
+                Completa todos los pasos para acceder al crédito.
+              </p>
+              {(!faceRecord?.isVerified || !faceRecord?.contractAccepted || !faceRecord?.pagareAccepted || !stripeAccount?.hasExternalAccount) && (
+                <IonButton expand="block" shape="round" className="client-dashboard-action-button"
+                  style={{ marginTop: 12 }} disabled={wizardStarting} onClick={handleStartWizard}>
+                  <IonIcon icon={addCircleOutline} slot="start" />
+                  {wizardStarting ? 'Cargando...' : 'Continuar registro'}
+                </IonButton>
+              )}
+            </>
           )}
           {loanCompletionPct === 100 && (
             <p style={{ fontSize: 12, color: '#059669', marginTop: 12, marginBottom: 0, fontWeight: 600 }}>
@@ -1307,21 +1384,23 @@ const ClientDashboardPage: React.FC = () => {
   // ── Main render ───────────────────────────────────────────────────────────
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
-              <IonIcon icon={arrowBack} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-          <IonTitle>Dashboard Cliente</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={() => history.push(`/client-followup/${clientId}`)}>
-              <IonIcon icon={calendarOutline} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
+      {activeTab !== 'home' && (
+        <IonHeader>
+          <IonToolbar>
+            <IonButtons slot="start">
+              <IonButton onClick={() => history.goBack()}>
+                <IonIcon icon={arrowBack} slot="icon-only" />
+              </IonButton>
+            </IonButtons>
+            <IonTitle>Dashboard Cliente</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => history.push(`/client-followup/${clientId}`)}>
+                <IonIcon icon={calendarOutline} slot="icon-only" />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+      )}
 
       <IonContent fullscreen className="ion-padding client-dashboard-page fintech-surface">
         <IonLoading isOpen={loading} message="Cargando..." />

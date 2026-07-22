@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { loadConnectAndInitialize, StripeConnectInstance } from '@stripe/connect-js';
 import { ConnectComponentsProvider, ConnectAccountOnboarding } from '@stripe/react-connect-js';
-import { IonSpinner } from '@ionic/react';
+import { IonButton, IonSpinner } from '@ionic/react';
 import './StripeAccountOnboarding.css';
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
@@ -58,7 +58,12 @@ const StripeAccountOnboarding: React.FC<StripeAccountOnboardingProps> = ({ clien
   }, []);
 
   if (error) {
-    return <div className="stripe-onboarding-error">{error}</div>;
+    return (
+      <div className="stripe-onboarding-error">
+        <p>{error}</p>
+        <IonButton size="small" fill="outline" onClick={onExit}>Reintentar</IonButton>
+      </div>
+    );
   }
 
   if (!connectInstance) {

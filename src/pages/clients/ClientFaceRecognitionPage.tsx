@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage,
   IonContent,
@@ -31,6 +31,7 @@ import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary'
 import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
 import SignaturePad from '../../components/SignaturePad';
+import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import { useUser } from '../../components/UserContext';
 import { Client, getOneClient } from '../../api/clientsApi';
 import {
@@ -99,12 +100,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setPopoverState({ ...popoverState, showMailPopover: false });
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const location = useLocation<{ clientId?: number } | undefined>();
+  const location = useLocation<{ clientId?: number; continueToPayments?: boolean } | undefined>();
+  const history = useHistory();
 
-  // Deep-link from the client dashboard's "Biométrico" progress step —
-  // pre-select the client so the borrower skips the staff-facing picker.
+  // Deep-link from the client dashboard's onboarding checklist — pre-select
+  // the client so the borrower skips the staff-facing picker, and (when
+  // continueToPayments is set) chain straight into bank-account setup after
+  // the contract step instead of dropping the client back on the dashboard
+  // to hunt down the next item themselves.
+  const deepLinkClientId = location.state?.clientId;
+  const continueToPayments = !!location.state?.continueToPayments;
+
   useEffect(() => {
-    const deepLinkClientId = location.state?.clientId;
     if (!deepLinkClientId) return;
     getOneClient({ clients: [{ clientId: deepLinkClientId }] })
       .then((clients) => {
@@ -134,7 +141,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
 
-  const STEPS = ['Cliente y documento', 'Captura', 'Verificación', 'Contrato'];
+  const STEPS = continueToPayments
+    ? ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', 'Cuenta de pago']
+    : ['Cliente y documento', 'Captura', 'Verificación', 'Contrato'];
 
   const validateStep = (): boolean => {
     if (step === 0) {
@@ -473,10 +482,15 @@ const ClientFaceRecognitionPage: React.FC = () => {
         setToastMessage(`Error al enviar el contrato: ${response.msg || ''}`);
         setShowToast(true);
       } else {
-        console.log('[Expediente] handleSubmitContract: SUCCESS — record persisted, resetting wizard');
         setToastMessage('¡Contrato aceptado y enviado exitosamente!');
         setShowToast(true);
-        resetWizard();
+        if (continueToPayments) {
+          console.log('[Expediente] handleSubmitContract: SUCCESS — advancing to Cuenta de pago step');
+          setStep(4);
+        } else {
+          console.log('[Expediente] handleSubmitContract: SUCCESS — record persisted, resetting wizard');
+          resetWizard();
+        }
       }
     } catch (err) {
       console.log('[Expediente] handleSubmitContract: FAILED', err);
@@ -644,6 +658,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
         );
       }
 
+      return null;
+    }
+
+    if (step === 4) {
+      // Cuenta de pago — the embedded Stripe form drives its own completion
+      // (onExit below), there's nothing to submit/go-back to here.
       return null;
     }
 
@@ -972,7 +992,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       );
     }
 
-    return (
+    if (step === 3) return (
       <IonCard className="client-face-recognition-step-card">
         <IonCardHeader>
           <IonCardTitle>Paso 4: Aceptación de Contrato</IonCardTitle>
@@ -1032,6 +1052,28 @@ const ClientFaceRecognitionPage: React.FC = () => {
         </IonCardContent>
       </IonCard>
     );
+
+    // step === 4 — Cuenta de pago, only reachable after a successful
+    // contract submission when this wizard was launched from the client
+    // dashboard's onboarding checklist (continueToPayments).
+    if (deepLinkClientId && companyId) {
+      return (
+        <IonCard className="client-face-recognition-step-card">
+          <IonCardHeader>
+            <IonCardTitle>Paso 5: Cuenta de pago</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            <p>Registra tu tarjeta o CLABE para recibir y enviar pagos.</p>
+            <StripeAccountOnboarding
+              clientId={deepLinkClientId}
+              companyId={companyId}
+              onExit={() => history.push(`/client-dashboard/${deepLinkClientId}?tab=home`)}
+            />
+          </IonCardContent>
+        </IonCard>
+      );
+    }
+    return null;
   };
 
   return (

@@ -283,7 +283,7 @@ const AppShell: React.FC = () => {
       <IonMenu menuId="main-menu" contentId="main" side="start" className={menuCollapsed ? 'menu-rail' : ''}>
         <IonHeader className="menu-header">
           <IonToolbar>
-            {!menuCollapsed && <IonTitle>POS GMO</IonTitle>}
+            {!menuCollapsed && <IonTitle>{isSmartLoansRole ? 'SmartLoans' : 'POS GMO'}</IonTitle>}
             <IonButtons slot="end">
               <IonButton fill="clear" size="small" onClick={() => setMenuCollapsed(c => !c)} className="menu-collapse-btn">
                 <IonIcon icon={menuCollapsed ? chevronForwardOutline : chevronBackOutline} />
