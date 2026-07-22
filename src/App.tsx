@@ -133,6 +133,7 @@ import { canAccess } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import BiometricLockScreen from './components/BiometricLockScreen';
 import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
+import { getPostLoginRoute } from './utils/postLoginRoute';
 
 setupIonicReact();
 
@@ -644,7 +645,7 @@ const AppShell: React.FC = () => {
 // own confirmation prompts, and without a shared guard each of those would
 // falsely read as the user backgrounding the app and re-lock mid-flow.
 const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, username, logout } = useUser();
+  const { isAuthenticated, username, roleCode, clientId, logout } = useUser();
   const history = useHistory();
   const [isLocked, setIsLocked] = useState(false);
 
@@ -704,9 +705,13 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
     const ok = await authenticateBiometric('Desbloquea la app para continuar');
     console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
     if (ok) {
-      console.log('[BiometricLockGate] handleUnlock: SUCCESS, setIsLocked(false) + navigating to /dashboard');
+      // Route by role, same as Login.tsx — this used to hardcode '/dashboard'
+      // (the POS dashboard) for everyone, which sent borrower/lender users to
+      // the wrong screen after unlocking instead of their own client dashboard.
+      const targetRoute = getPostLoginRoute(roleCode, clientId);
+      console.log('[BiometricLockGate] handleUnlock: SUCCESS, roleCode =', roleCode, 'clientId =', clientId, '→ navigating to', targetRoute);
       setIsLocked(false);
-      history.push('/dashboard');
+      history.push(targetRoute);
     } else {
       console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
     }

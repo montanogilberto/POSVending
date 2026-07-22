@@ -42,7 +42,6 @@ import {
   reverseGeocode,
   ContractSubmissionRequest,
 } from '../../api/clientFaceRecognitionApi';
-import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biometricAuth';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
@@ -302,14 +301,14 @@ const ClientFaceRecognitionPage: React.FC = () => {
     }
   };
 
-  const startLivenessSession = async () => {
+  const startLivenessSession = () => {
+    // No extra biometric re-confirmation here — the app-level lock
+    // (BiometricLockGate) already gated entry to this whole authenticated
+    // session. Calling authenticateBiometric() again mid-wizard pauses/
+    // resumes the app for its native prompt, which was derailing the wizard
+    // (confirmed via device logs: the wizard's state was lost right after
+    // this second prompt).
     console.log('[Expediente] startLivenessSession: user tapped "Iniciar proceso"');
-    if (await isBiometricLockEnabled()) {
-      console.log('[Expediente] startLivenessSession: biometric lock enabled, requesting device confirmation first');
-      const confirmed = await authenticateBiometric('Confirma tu identidad para iniciar la verificación');
-      console.log('[Expediente] startLivenessSession: biometric confirmation result =', confirmed);
-      if (!confirmed) return;
-    }
     setError('');
     setLivenessStatus('in-progress');
     setCaptureSubStep('liveness-active');

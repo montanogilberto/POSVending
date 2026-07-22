@@ -11,6 +11,12 @@ interface IdExtractedFieldsSummaryProps {
   onFieldsChange: (fields: ExtractedIdFields) => void;
 }
 
+// Domicilio and Clave de Elector are required on the contract (see
+// contractPdf.ts) despite neither being reliably auto-extractable (confirmed
+// via extensive on-device testing: the INE's anti-copy watermark defeats
+// OCR, and a Gemini-vision alternative fabricated a different address/clave
+// on nearly every call against the same photo) — kept here as manual-entry
+// fields the client fills in by hand.
 const FIELD_LABELS: Array<{ key: keyof ExtractedIdFields; label: string }> = [
   { key: 'nombre', label: 'Nombre' },
   { key: 'domicilio', label: 'Domicilio' },
