@@ -727,6 +727,39 @@ const CreateAccount: React.FC = () => {
 
   // ── Step 0: Credentials ───────────────────────────────────────────────────
 
+  // Shared "Tipo de cliente" picker — rendered wherever a dbo.clients row is
+  // about to be created, so clientType is always a real choice (never left
+  // at its 'borrower' default) regardless of which signup path got here.
+  const renderClientTypePicker = () => (
+    <div style={{ marginBottom: 16 }}>
+      <p className="ca-step-desc" style={{ textAlign: 'left', margin: '0 0 8px' }}>Tipo de cliente:</p>
+      <div className="ca-profile-list">
+        {CLIENT_TYPES.map(t => {
+          const selected = clientType === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className={`ca-profile-btn${selected ? ' selected' : ''}`}
+              style={selected ? { borderColor: t.color, background: `${t.color}14` } : undefined}
+              onClick={() => setClientType(t.id)}
+            >
+              <div className="ca-profile-icon-wrap" style={selected ? { background: `${t.color}20`, color: t.color } : undefined}>
+                <span style={{ fontSize: 20 }}>{t.icon}</span>
+              </div>
+              <div className="ca-profile-text">
+                <span className="ca-profile-name" style={selected ? { color: t.color } : undefined}>{t.label}</span>
+                <span className="ca-profile-desc">{t.desc}</span>
+              </div>
+              <div className={`ca-radio-dot${selected ? ' selected' : ''}`}
+                style={selected ? { borderColor: t.color, background: t.color } : undefined} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   const renderStep0 = () => (
     <div className="ca-step-body">
       <div className="ca-step-header">
@@ -884,38 +917,13 @@ const CreateAccount: React.FC = () => {
           </div>
         )}
 
-        {/* A dbo.clients row is only created for a new phone-based signup —
-            let the client pick what kind of client they are instead of
-            defaulting everyone to "Acreditado". */}
-        {contactCheck === 'new' && contactType === 'phone' && (
-          <div style={{ marginBottom: 16 }}>
-            <p className="ca-step-desc" style={{ textAlign: 'left', margin: '0 0 8px' }}>Tipo de cliente:</p>
-            <div className="ca-profile-list">
-              {CLIENT_TYPES.map(t => {
-                const selected = clientType === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`ca-profile-btn${selected ? ' selected' : ''}`}
-                    style={selected ? { borderColor: t.color, background: `${t.color}14` } : undefined}
-                    onClick={() => setClientType(t.id)}
-                  >
-                    <div className="ca-profile-icon-wrap" style={selected ? { background: `${t.color}20`, color: t.color } : undefined}>
-                      <span style={{ fontSize: 20 }}>{t.icon}</span>
-                    </div>
-                    <div className="ca-profile-text">
-                      <span className="ca-profile-name" style={selected ? { color: t.color } : undefined}>{t.label}</span>
-                      <span className="ca-profile-desc">{t.desc}</span>
-                    </div>
-                    <div className={`ca-radio-dot${selected ? ' selected' : ''}`}
-                      style={selected ? { borderColor: t.color, background: t.color } : undefined} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* A dbo.clients row is created immediately for a new phone-based
+            signup — let the client pick what kind of client they are
+            instead of defaulting everyone to "Acreditado". (Email-first
+            signups get the same picker later, in renderStep1, once we know
+            they'll need a dbo.clients row for SmartLoans — see
+            needsClientPhone.) */}
+        {contactCheck === 'new' && contactType === 'phone' && renderClientTypePicker()}
 
         <IonInput
           fill="outline" label="Nombre de usuario" labelPlacement="floating"
@@ -1045,7 +1053,10 @@ const CreateAccount: React.FC = () => {
       </div>
 
       {/* SmartLoans needs a dbo.clients row (cellphone NOT NULL + UNIQUE) —
-          collect it here when the signup was email-only. */}
+          collect it here when the signup was email-only, and let the client
+          pick their clientType too (the phone-first picker in renderStep0
+          never ran for this path — see contactType === 'phone' gate there). */}
+      {needsClientPhone && renderClientTypePicker()}
       {needsClientPhone && (
         <div className="ca-form-fields" style={{ marginTop: 16, marginBottom: 4 }}>
           <IonInput

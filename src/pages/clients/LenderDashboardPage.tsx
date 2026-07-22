@@ -15,7 +15,7 @@ import {
 import { useUser } from '../../components/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
 import { getAllClients, Client } from '../../api/clientsApi';
-import { getAllClientFaceRecognitions } from '../../api/clientFaceRecognitionApi';
+import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../api/stripeApi';
 import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
@@ -59,6 +59,21 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selfieMap, setSelfieMap] = useState<Record<number, string>>({});
   const [lender, setLender] = useState<Client | null>(null);
+
+  // The lender's own identity verification — digital contracts (loanContracts,
+  // signed via the same ClientFaceRecognitionPage wizard borrowers use)
+  // require both parties to be biometrically verified, not just the borrower.
+  const [faceRecord, setFaceRecord] = useState<ClientFaceRecognition | null>(null);
+  const [wizardStarting, setWizardStarting] = useState(false);
+  const handleStartVerification = () => {
+    if (wizardStarting || !lenderClientId) return;
+    setWizardStarting(true);
+    history.push('/clientFaceRecognitions', {
+      clientId: lenderClientId,
+      continueToPayments: true,
+      returnTo: `/lender-dashboard/${lenderClientId}`,
+    });
+  };
 
   // Stripe — lets the lender fund loan disbursements (money out to
   // borrowers) and receive repayments (money back in). Same pattern as
@@ -130,6 +145,7 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
       const map: Record<number, string> = {};
       faceRecs.forEach(f => { if (f.clientSelfieBlobUrl) map[f.clientId] = f.clientSelfieBlobUrl; });
       setSelfieMap(map);
+      setFaceRecord(faceRecs.find(f => f.clientId === lenderClientId) ?? null);
     } catch (e) {
       console.log('[LenderDashboard] fetchAll ❌', e);
       setError((e as Error).message);
@@ -218,6 +234,35 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
             ))}
           </IonRow>
         </IonGrid>
+
+        {/* Identity verification — loanContracts requires both the borrower
+            AND the lender to have gone through biometric verification +
+            signature before a digital contract is valid. Reuses the same
+            wizard borrowers use (ClientFaceRecognitionPage), scoped to this
+            lender's own clientId. */}
+        <IonCard className="ld-card">
+          <IonCardHeader><IonCardTitle>Verificación de identidad</IonCardTitle></IonCardHeader>
+          <IonCardContent>
+            {faceRecord?.isVerified && faceRecord?.contractAccepted && faceRecord?.pagareAccepted ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: 26, color: '#059669' }} />
+                <strong>Identidad verificada</strong>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                <IonIcon icon={personCircleOutline} style={{ fontSize: 40, color: '#9ca3af' }} />
+                <p style={{ margin: '8px 0 4px', color: '#374151' }}>Verificación pendiente.</p>
+                <p style={{ margin: '0 0 14px', fontSize: 13, color: '#6b7280' }}>
+                  Requerida para firmar contratos digitales con tus prestatarios.
+                </p>
+                <IonButton shape="round" expand="block" disabled={wizardStarting} onClick={handleStartVerification}>
+                  <IonIcon icon={addCircleOutline} slot="start" />
+                  {wizardStarting ? 'Cargando...' : 'Verificar identidad'}
+                </IonButton>
+              </div>
+            )}
+          </IonCardContent>
+        </IonCard>
 
         {/* Cuenta de pago — funds loan disbursements and receives repayments */}
         <IonCard className="ld-card">

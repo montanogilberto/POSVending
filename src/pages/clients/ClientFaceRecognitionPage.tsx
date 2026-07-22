@@ -101,16 +101,19 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setPopoverState({ ...popoverState, showMailPopover: false });
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const location = useLocation<{ clientId?: number; continueToPayments?: boolean } | undefined>();
+  const location = useLocation<{ clientId?: number; continueToPayments?: boolean; returnTo?: string } | undefined>();
   const history = useHistory();
 
-  // Deep-link from the client dashboard's onboarding checklist — pre-select
-  // the client so the borrower skips the staff-facing picker, and (when
+  // Deep-link from the client (or lender) dashboard's onboarding checklist —
+  // pre-select the client so they skip the staff-facing picker, and (when
   // continueToPayments is set) chain straight into bank-account setup after
-  // the contract step instead of dropping the client back on the dashboard
-  // to hunt down the next item themselves.
+  // the contract step instead of dropping them back on the dashboard to hunt
+  // down the next item themselves. returnTo lets either dashboard say where
+  // "done" goes back to — defaults to the borrower dashboard for callers
+  // that predate this (e.g. old deep links) that don't pass it.
   const deepLinkClientId = location.state?.clientId;
   const continueToPayments = !!location.state?.continueToPayments;
+  const returnTo = location.state?.returnTo || `/client-dashboard/${deepLinkClientId}?tab=home`;
 
   useEffect(() => {
     if (!deepLinkClientId) return;
@@ -1180,7 +1183,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
               <StripeAccountOnboarding
                 clientId={deepLinkClientId}
                 companyId={companyId}
-                onExit={() => history.push(`/client-dashboard/${deepLinkClientId}?tab=home`)}
+                onExit={() => history.push(returnTo)}
               />
             )}
           </IonCardContent>

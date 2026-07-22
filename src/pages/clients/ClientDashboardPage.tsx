@@ -58,6 +58,7 @@ import {
   logoWhatsapp,
   chatbubbleOutline,
   copyOutline,
+  folderOutline,
 } from 'ionicons/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
@@ -568,6 +569,16 @@ const ClientDashboardPage: React.FC = () => {
     a.activityType?.toLowerCase().includes('payment')
   );
 
+  // Weighted by principal instead of a plain average — a $50k loan at 12%
+  // should move the summary more than a $2k loan at 30%. Previously this
+  // card just read activeLoans[0], silently dropping every other loan.
+  const avgInterestRate = (() => {
+    const totalPrincipal = activeLoans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
+    if (!activeLoans.length) return null;
+    if (totalPrincipal <= 0) return activeLoans[0].interestRate;
+    return activeLoans.reduce((sum, l) => sum + l.interestRate * (l.principalAmount || 0), 0) / totalPrincipal;
+  })();
+
   // ── Create loan ───────────────────────────────────────────────────────────
   const handleCreateLoan = async () => {
     if (!companyId || !clientId) return;
@@ -630,8 +641,16 @@ const ClientDashboardPage: React.FC = () => {
       <IonGrid className="summary-grid">
         <IonRow>
           {[
-            { icon: cashOutline,    label: 'Disponible',       value: `$${availableCredit.toFixed(2)}` },
-            { icon: barChartOutline,label: 'Saldo actual',     value: `$${activeLoanBalance.toFixed(2)}` },
+            // "Disponible" used to duplicate the hero's "Crédito disponible"
+            // (same availableCredit value shown twice) — swapped for the
+            // active loans' rate, which isn't shown anywhere else on Home.
+            // Weighted average across ALL active loans, not just the first.
+            {
+              icon: barChartOutline, label: 'Tasa de interés',
+              value: avgInterestRate !== null ? `${avgInterestRate.toFixed(1)}%` : '—',
+              hint: activeLoans.length > 1 ? `promedio de ${activeLoans.length} préstamos` : undefined,
+            },
+            { icon: cashOutline,    label: 'Saldo actual',     value: `$${activeLoanBalance.toFixed(2)}` },
             { icon: receiptOutline, label: 'Próximo pago',     value: `$${nextPaymentAmount.toFixed(2)}` },
             { icon: walletOutline,  label: 'Préstamos activos',value: String(activeLoans.length) },
           ].map(c => (
@@ -641,6 +660,7 @@ const ClientDashboardPage: React.FC = () => {
                   <IonIcon icon={c.icon} className="summary-icon" />
                   <p>{c.label}</p>
                   <h3>{c.value}</h3>
+                  {c.hint && <small style={{ color: '#9ca3af' }}>{c.hint}</small>}
                 </IonCardContent>
               </IonCard>
             </IonCol>
@@ -663,6 +683,40 @@ const ClientDashboardPage: React.FC = () => {
           <div className="utilization-track">
             <div className="utilization-fill" style={{ width: `${utilizationPct}%` }} />
           </div>
+          {/* The identity/contract/pagaré/cuenta-de-pago factors that used to
+              be listed here are the same four booleans "Progreso para
+              Préstamo" already tracks below (as Biométrico/Contrato/Pagaré/
+              Cuenta de pago) — kept in one place instead of repeating it. */}
+        </IonCardContent>
+      </IonCard>
+
+      {/* Registered account — nowhere else on Home shows which account/card
+          will actually receive funds. Reuses stripeAccount, already fetched
+          on mount for the wizard checklist below. */}
+      <IonCard className="client-dashboard-card">
+        <IonCardHeader><IonCardTitle>Cuenta de pago</IonCardTitle></IonCardHeader>
+        <IonCardContent>
+          {stripeAccount?.hasExternalAccount ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <IonIcon icon={checkmarkCircleOutline} style={{ color: '#059669', fontSize: 26 }} />
+              <div>
+                <strong>
+                  {stripeAccount.externalAccountBankName || (stripeAccount.externalAccountType === 'card' ? 'Tarjeta' : 'Cuenta bancaria')}
+                </strong>
+                <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
+                  {stripeAccount.externalAccountType === 'card' ? 'Tarjeta' : 'CLABE'} terminada en {stripeAccount.externalAccountLast4 || '····'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <div>
+                <strong>Sin cuenta registrada</strong>
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>Necesaria para recibir tu préstamo.</p>
+              </div>
+              <IonButton size="small" fill="outline" onClick={() => goTab('payments')}>Agregar</IonButton>
+            </div>
+          )}
         </IonCardContent>
       </IonCard>
 
@@ -726,6 +780,15 @@ const ClientDashboardPage: React.FC = () => {
                 <IonButton expand="block" shape="round" fill="outline" className="client-dashboard-action-button"
                   onClick={() => goTab('profile')}>
                   <IonIcon icon={personCircleOutline} slot="start" /> Mis datos
+                </IonButton>
+              </IonCol>
+              {/* Virtual folder — was only reachable from the Profile tab's
+                  "Acciones" card before; surfaced here too since it's the
+                  client's permanent document archive (ID, contract, pagaré). */}
+              <IonCol size="12">
+                <IonButton expand="block" shape="round" fill="outline" className="client-dashboard-action-button"
+                  onClick={() => history.push(`/client-expediente/${clientId}`)}>
+                  <IonIcon icon={folderOutline} slot="start" /> Carpeta virtual
                 </IonButton>
               </IonCol>
             </IonRow>
