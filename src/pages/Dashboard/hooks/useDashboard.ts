@@ -54,12 +54,14 @@ export const useDashboard = () => {
   });
 
   const refreshDashboardData = () => {
+    console.log('[Dashboard] refreshDashboardData: loading incomes, companyId =', companyId);
     const controller = new AbortController();
     loadIncomes(controller.signal).catch(() => {});
     return () => controller.abort();
   };
 
   useEffect(() => {
+    console.log('[Dashboard] initial-load effect: mounting, companyId =', companyId, 'userId =', userId);
     return refreshDashboardData();
   // loadIncomes is stable (useCallback with no deps) — omitting it avoids double-fetch
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,6 +226,7 @@ export const useDashboard = () => {
 
     try {
       const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+      console.log('[Dashboard] handleConfirmSale → /pos_laundry', { itemCount: cart.length, total });
 
       const response = await fetch(
         'https://smartloansbackend.azurewebsites.net/pos_laundry',
@@ -245,25 +248,30 @@ export const useDashboard = () => {
       );
 
       if (!response.ok) throw new Error();
+      console.log('[Dashboard] handleConfirmSale ✅ sale confirmed, total =', total);
 
       setToastMessage(`Venta confirmada: $${total.toFixed(2)}`);
       setShowToast(true);
       setCart([]);
       setShowCart(false);
       loadIncomes();
-    } catch {
+    } catch (err) {
+      console.log('[Dashboard] handleConfirmSale ❌', err);
       setToastMessage('Error al confirmar la venta.');
       setShowToast(true);
     }
   };
 
   const handleShowReceipt = async (incomeId: number) => {
+    console.log('[Dashboard] handleShowReceipt: fetching ticket, incomeId =', incomeId);
     try {
       const ticket = await fetchTicket(incomeId.toString());
       if (!ticket) throw new Error();
+      console.log('[Dashboard] handleShowReceipt ✅', ticket);
 
       history.push('/receipt', { ticketData: ticket });
-    } catch {
+    } catch (err) {
+      console.log('[Dashboard] handleShowReceipt ❌', err);
       setToastMessage('Error al obtener el recibo.');
       setShowToast(true);
     }

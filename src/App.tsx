@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -132,7 +132,7 @@ import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import BiometricLockScreen from './components/BiometricLockScreen';
-import { isBiometricLockEnabled, authenticateBiometric } from './utils/biometricAuth';
+import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
 
 setupIonicReact();
 
@@ -635,16 +635,18 @@ const AppShell: React.FC = () => {
 // so it survives back/forward navigation and route remounts. It renders as an
 // overlay on top of whatever page is currently showing.
 //
-// isAuthenticatingRef guards against a self-triggering loop: the native
-// biometric prompt runs in its own Activity, so showing/dismissing it
-// pauses/resumes the host app just like backgrounding it would — without this
-// guard, a successful unlock immediately re-triggers the resume listener and
-// re-locks the app.
+// isBiometricPromptInProgress() (biometricAuth.ts) guards against a
+// self-triggering loop: the native biometric prompt runs in its own
+// Activity, so showing/dismissing it pauses/resumes the host app just like
+// backgrounding it would. That guard is shared across every caller of
+// authenticateBiometric() (not just this gate's own unlock flow) — pages
+// like ClientFaceRecognitionPage or PaymentPage call it directly for their
+// own confirmation prompts, and without a shared guard each of those would
+// falsely read as the user backgrounding the app and re-lock mid-flow.
 const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, username, logout } = useUser();
   const history = useHistory();
   const [isLocked, setIsLocked] = useState(false);
-  const isAuthenticatingRef = useRef(false);
 
   useEffect(() => {
     console.log('[BiometricLockGate] effect running. isNative =', Capacitor.isNativePlatform(), 'isAuthenticated =', isAuthenticated);
@@ -667,8 +669,8 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
       }
 
       stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
-        console.log('[BiometricLockGate] appStateChange fired. isActive =', isActive, 'isAuthenticatingRef =', isAuthenticatingRef.current);
-        if (!isActive || isAuthenticatingRef.current) {
+        console.log('[BiometricLockGate] appStateChange fired. isActive =', isActive, 'isBiometricPromptInProgress =', isBiometricPromptInProgress());
+        if (!isActive || isBiometricPromptInProgress()) {
           console.log('[BiometricLockGate] appStateChange: ignoring (inactive or mid-authenticate)');
           return;
         }
@@ -696,29 +698,17 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // → reload → re-lock → close → reload → re-lock...). history.push is a
   // normal in-SPA navigation and does not remount this component.
   const handleUnlock = async () => {
-    console.log('[BiometricLockGate] handleUnlock: called, setting isAuthenticatingRef = true');
-    isAuthenticatingRef.current = true;
-    try {
-      const ok = await authenticateBiometric('Desbloquea la app para continuar');
-      console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
-      if (ok) {
-        console.log('[BiometricLockGate] handleUnlock: SUCCESS, setIsLocked(false) + navigating to /dashboard');
-        setIsLocked(false);
-        history.push('/dashboard');
-      } else {
-        console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
-      }
-    } finally {
-      // The native biometric sheet fires its own "app resumed" event AFTER
-      // its dismiss animation finishes — this lags behind the JS promise
-      // resolving here. Clearing the guard immediately left a gap where that
-      // trailing event slipped through and re-locked the app right after a
-      // successful unlock (confirmed via device logs). Delaying the reset
-      // covers that gap.
-      setTimeout(() => {
-        isAuthenticatingRef.current = false;
-        console.log('[BiometricLockGate] handleUnlock: delayed reset, isAuthenticatingRef = false');
-      }, 1000);
+    console.log('[BiometricLockGate] handleUnlock: called');
+    // authenticateBiometric() itself now sets the shared in-progress guard
+    // (see biometricAuth.ts) — no need to manage it here.
+    const ok = await authenticateBiometric('Desbloquea la app para continuar');
+    console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
+    if (ok) {
+      console.log('[BiometricLockGate] handleUnlock: SUCCESS, setIsLocked(false) + navigating to /dashboard');
+      setIsLocked(false);
+      history.push('/dashboard');
+    } else {
+      console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
     }
   };
 

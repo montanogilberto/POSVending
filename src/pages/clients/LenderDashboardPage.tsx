@@ -57,7 +57,11 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const [lender, setLender] = useState<Client | null>(null);
 
   const fetchAll = async () => {
-    if (!companyId) return;
+    if (!companyId) {
+      console.log('[LenderDashboard] fetchAll skipped — companyId:', companyId);
+      return;
+    }
+    console.log('[LenderDashboard] fetchAll → loans/clients/faceRecords', { companyId, lenderClientId });
     setLoading(true);
     try {
       const [allLoans, allClients, faceRecs] = await Promise.all([
@@ -65,6 +69,7 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
         getAllClients(),
         getAllClientFaceRecognitions(companyId),
       ]);
+      console.log('[LenderDashboard] fetchAll ✅ loans:', allLoans.length, 'clients:', allClients.length, 'faceRecs:', faceRecs.length);
       // Loans funded by this lender: loanStatus is meaningful, filter by lenderClientId if your API supports it
       // For now we show all company loans as the lender's portfolio
       setLoans(allLoans);
@@ -74,13 +79,17 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
       faceRecs.forEach(f => { if (f.clientSelfieBlobUrl) map[f.clientId] = f.clientSelfieBlobUrl; });
       setSelfieMap(map);
     } catch (e) {
+      console.log('[LenderDashboard] fetchAll ❌', e);
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchAll(); }, [companyId, lenderClientId]);
+  useEffect(() => {
+    console.log('[LenderDashboard] initial-load effect: mounting, companyId =', companyId, 'lenderClientId =', lenderClientId);
+    fetchAll();
+  }, [companyId, lenderClientId]);
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
   const activeLoans   = loans.filter(l => l.loanStatus === 'Active');

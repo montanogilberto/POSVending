@@ -176,6 +176,8 @@ const ClientDashboardPage: React.FC = () => {
   const { companyId, clientId: contextClientId, username, avatarUrl } = useUser();
   const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
 
+  console.log('[ClientDashboard] render. clientId =', clientId, 'companyId =', companyId, 'tab query =', location.search);
+
   const [activeTab, setActiveTab] = useState<Tab>('home');
 
   // The global bottom tab bar (App.tsx) links here with ?tab=... instead of
@@ -183,6 +185,7 @@ const ClientDashboardPage: React.FC = () => {
   // keep activeTab in sync with it.
   useEffect(() => {
     const tabParam = new URLSearchParams(location.search).get('tab') as Tab | null;
+    console.log('[ClientDashboard] tab-sync effect: tabParam =', tabParam);
     if (tabParam && ['home', 'loans', 'payments', 'activity', 'profile'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
@@ -488,6 +491,7 @@ const ClientDashboardPage: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log('[ClientDashboard] initial-load effect: fetching dashboard/loans/stripe/faceRecord for clientId =', clientId, 'companyId =', companyId);
     fetchDashboard();
     fetchLoans();
     fetchStripe();
@@ -495,6 +499,7 @@ const ClientDashboardPage: React.FC = () => {
       getAllClientFaceRecognitions(companyId)
         .then(records => {
           const r = records.find(x => x.clientId === Number(clientId));
+          console.log('[ClientDashboard] initial-load effect: faceRecord =', r ?? null);
           setFaceRecord(r ?? null);
         })
         .catch(() => {});
@@ -530,6 +535,7 @@ const ClientDashboardPage: React.FC = () => {
 
   useEffect(() => {
     if (!companyId || !clientId) return;
+    console.log('[ClientDashboard] fetchCreditScore → /credit-score', { clientId, companyId });
     fetch(`${API_BASE_URL}/credit-score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -537,6 +543,7 @@ const ClientDashboardPage: React.FC = () => {
     })
       .then(r => r.json())
       .then(d => {
+        console.log('[ClientDashboard] fetchCreditScore ✅', d);
         if (d.score) {
           setCreditScore(d.score);
           setCreditScoreLabel(d.label ?? '');
