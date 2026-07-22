@@ -46,6 +46,7 @@ import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidenc
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
+import { createOrRefreshStripeAccount } from '../../api/stripeApi';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -137,6 +138,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState('');
+  const [stripeAccountReady, setStripeAccountReady] = useState(false);
+  const [stripeAccountError, setStripeAccountError] = useState('');
   const ocrRanForRef = useRef('');
   const [presenceResult, setPresenceResult] = useState<PresenceCaptureResult | null>(null);
   const [contractSignatureBase64, setContractSignatureBase64] = useState<string>('');
@@ -195,6 +198,32 @@ const ClientFaceRecognitionPage: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idFrontImageBase64, idBackImageBase64]);
+
+  // Ensures a Stripe connected account exists before mounting the embedded
+  // onboarding form at step 4 — the backend's create-or-refresh endpoint is
+  // safe to call even if one already exists. Without this, StripeAccountOnboarding
+  // called /stripe/account-session directly against a client who never had an
+  // account, which always 404s with "No connected account found. Create one
+  // first." (confirmed via device logs).
+  const ensureStripeAccount = async () => {
+    if (!deepLinkClientId || !companyId) return;
+    setStripeAccountError('');
+    try {
+      await createOrRefreshStripeAccount(deepLinkClientId, companyId, `client${deepLinkClientId}@posgmo.mx`);
+      console.log('[Expediente] ensureStripeAccount: ready');
+      setStripeAccountReady(true);
+    } catch (err) {
+      console.log('[Expediente] ensureStripeAccount: FAILED', String(err));
+      setStripeAccountError((err as Error).message ?? 'No se pudo preparar la cuenta bancaria.');
+    }
+  };
+
+  useEffect(() => {
+    if (step === 4 && !stripeAccountReady && !stripeAccountError) {
+      ensureStripeAccount();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const validateStep = (): boolean => {
     if (step === 0) {
@@ -1135,11 +1164,25 @@ const ClientFaceRecognitionPage: React.FC = () => {
           </IonCardHeader>
           <IonCardContent>
             <p>Registra tu tarjeta o CLABE para recibir y enviar pagos.</p>
-            <StripeAccountOnboarding
-              clientId={deepLinkClientId}
-              companyId={companyId}
-              onExit={() => history.push(`/client-dashboard/${deepLinkClientId}?tab=home`)}
-            />
+            {stripeAccountError && (
+              <div className="stripe-onboarding-error">
+                <p>{stripeAccountError}</p>
+                <IonButton size="small" fill="outline" onClick={ensureStripeAccount}>Reintentar</IonButton>
+              </div>
+            )}
+            {!stripeAccountError && !stripeAccountReady && (
+              <div className="stripe-onboarding-loading">
+                <IonSpinner name="crescent" />
+                <p>Preparando tu cuenta...</p>
+              </div>
+            )}
+            {stripeAccountReady && (
+              <StripeAccountOnboarding
+                clientId={deepLinkClientId}
+                companyId={companyId}
+                onExit={() => history.push(`/client-dashboard/${deepLinkClientId}?tab=home`)}
+              />
+            )}
           </IonCardContent>
         </IonCard>
       );

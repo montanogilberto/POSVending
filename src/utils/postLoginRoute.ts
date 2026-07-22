@@ -4,7 +4,10 @@
  * against an already-authenticated user seeing the signup form).
  */
 export function getPostLoginRoute(roleCode: string | undefined, clientId: number | undefined): string {
-  if (roleCode === 'borrower' || roleCode === 'lender') {
+  if (roleCode === 'lender') {
+    return clientId ? `/lender-dashboard/${clientId}` : '/dashboard';
+  }
+  if (roleCode === 'borrower') {
     return clientId ? `/client-dashboard/${clientId}` : '/dashboard';
   }
   if (roleCode === 'business' || roleCode === 'employee') {

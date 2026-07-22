@@ -9,12 +9,16 @@ import {
 import {
   arrowBack, cashOutline, trendingUpOutline, peopleOutline, walletOutline,
   checkmarkCircleOutline, alertCircleOutline, ellipseOutline, refreshOutline,
-  personCircleOutline, timeOutline, cardOutline, barChartOutline,
+  personCircleOutline, timeOutline, cardOutline, barChartOutline, addCircleOutline,
+  documentTextOutline,
 } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
 import { getAllClients, Client } from '../../api/clientsApi';
 import { getAllClientFaceRecognitions } from '../../api/clientFaceRecognitionApi';
+import { listContractsForClient } from '../../api/digitalContractsApi';
+import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../api/stripeApi';
+import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import './LenderDashboardPage.css';
 
 const toDate = (utc: string | undefined) => {
@@ -56,23 +60,71 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const [selfieMap, setSelfieMap] = useState<Record<number, string>>({});
   const [lender, setLender] = useState<Client | null>(null);
 
+  // Stripe — lets the lender fund loan disbursements (money out to
+  // borrowers) and receive repayments (money back in). Same pattern as
+  // ClientDashboardPage.tsx's Payments tab.
+  const [stripeAccount, setStripeAccount] = useState<StripeConnectedAccount | null>(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeError, setStripeError] = useState('');
+  const [showStripeOnboarding, setShowStripeOnboarding] = useState(false);
+
+  const fetchStripeStatus = async () => {
+    if (!companyId || !lenderClientId) return;
+    console.log('[LenderDashboard] fetchStripeStatus →', { lenderClientId, companyId });
+    try {
+      const res = await getStripeAccountStatus(lenderClientId, companyId);
+      console.log('[LenderDashboard] fetchStripeStatus ✅', res);
+      setStripeAccount(res.account ?? null);
+    } catch (err) {
+      console.log('[LenderDashboard] fetchStripeStatus ❌', err);
+    }
+  };
+
+  const handleStripeKyc = async () => {
+    if (!companyId || !lenderClientId) return;
+    setStripeLoading(true);
+    setStripeError('');
+    try {
+      await createOrRefreshStripeAccount(lenderClientId, companyId, `client${lenderClientId}@posgmo.mx`);
+      await fetchStripeStatus();
+      setShowStripeOnboarding(true);
+    } catch (err) {
+      console.log('[LenderDashboard] handleStripeKyc ❌', err);
+      setStripeError((err as Error).message ?? 'Error al iniciar registro bancario');
+    } finally {
+      setStripeLoading(false);
+    }
+  };
+
+  const handleStripeOnboardingExit = () => {
+    setShowStripeOnboarding(false);
+    fetchStripeStatus();
+  };
+
   const fetchAll = async () => {
     if (!companyId) {
       console.log('[LenderDashboard] fetchAll skipped — companyId:', companyId);
       return;
     }
-    console.log('[LenderDashboard] fetchAll → loans/clients/faceRecords', { companyId, lenderClientId });
+    console.log('[LenderDashboard] fetchAll → loans/clients/faceRecords/contracts', { companyId, lenderClientId });
     setLoading(true);
     try {
-      const [allLoans, allClients, faceRecs] = await Promise.all([
+      const [allLoans, allClients, faceRecs, contracts] = await Promise.all([
         getAllLoans(companyId),
         getAllClients(),
         getAllClientFaceRecognitions(companyId),
+        listContractsForClient(companyId, lenderClientId),
       ]);
-      console.log('[LenderDashboard] fetchAll ✅ loans:', allLoans.length, 'clients:', allClients.length, 'faceRecs:', faceRecs.length);
-      // Loans funded by this lender: loanStatus is meaningful, filter by lenderClientId if your API supports it
-      // For now we show all company loans as the lender's portfolio
-      setLoans(allLoans);
+      // loans has no lenderId column at all — the only place that link
+      // exists is loanContracts (borrowerClientId/lenderClientId), so we
+      // scope to this lender's actual portfolio by joining through the
+      // contract's loanId instead of showing every company loan.
+      const myLoanIds = new Set(
+        contracts.filter(c => c.lenderClientId === lenderClientId).map(c => c.loanId)
+      );
+      const myLoans = allLoans.filter(l => myLoanIds.has(l.loanId));
+      console.log('[LenderDashboard] fetchAll ✅ loans:', allLoans.length, '→ scoped to lender:', myLoans.length, 'clients:', allClients.length, 'faceRecs:', faceRecs.length);
+      setLoans(myLoans);
       setClients(allClients);
       setLender(allClients.find(c => c.clientId === lenderClientId) ?? null);
       const map: Record<number, string> = {};
@@ -89,6 +141,8 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   useEffect(() => {
     console.log('[LenderDashboard] initial-load effect: mounting, companyId =', companyId, 'lenderClientId =', lenderClientId);
     fetchAll();
+    fetchStripeStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, lenderClientId]);
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
@@ -164,6 +218,73 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
             ))}
           </IonRow>
         </IonGrid>
+
+        {/* Cuenta de pago — funds loan disbursements and receives repayments */}
+        <IonCard className="ld-card">
+          <IonCardHeader>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <IonCardTitle>Cuenta de pago</IonCardTitle>
+              <IonButton fill="clear" size="small" onClick={fetchStripeStatus}>
+                <IonIcon icon={refreshOutline} slot="icon-only" />
+              </IonButton>
+            </div>
+          </IonCardHeader>
+          <IonCardContent>
+            {stripeError && (
+              <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 10 }}>{stripeError}</p>
+            )}
+
+            {showStripeOnboarding ? (
+              <StripeAccountOnboarding
+                clientId={lenderClientId}
+                companyId={Number(companyId)}
+                onExit={handleStripeOnboardingExit}
+              />
+            ) : !stripeAccount ? (
+              <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                <IonIcon icon={cardOutline} style={{ fontSize: 40, color: '#9ca3af' }} />
+                <p style={{ margin: '8px 0 4px', color: '#374151' }}>Sin cuenta bancaria registrada.</p>
+                <p style={{ margin: '0 0 14px', fontSize: 13, color: '#6b7280' }}>
+                  Registra tu cuenta o tarjeta para fondear préstamos y recibir los pagos de tus prestatarios.
+                </p>
+                <IonButton shape="round" expand="block" disabled={stripeLoading} onClick={handleStripeKyc}>
+                  <IonIcon icon={addCircleOutline} slot="start" />
+                  {stripeLoading ? 'Procesando...' : 'Registrar cuenta'}
+                </IonButton>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <IonIcon
+                    icon={stripeAccount.hasExternalAccount ? checkmarkCircleOutline : alertCircleOutline}
+                    style={{ fontSize: 26, color: stripeAccount.hasExternalAccount ? '#059669' : '#b45309' }}
+                  />
+                  <div>
+                    <strong>{stripeAccount.hasExternalAccount ? 'Cuenta verificada' : 'Verificación pendiente'}</strong>
+                    <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{stripeAccount.connectedAccountId}</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <IonBadge color={stripeAccount.hasExternalAccount ? 'success' : 'medium'}>
+                    Cuenta bancaria {stripeAccount.hasExternalAccount ? '✓' : '✗'}
+                  </IonBadge>
+                  <IonBadge color={stripeAccount.chargesEnabled ? 'success' : 'medium'}>
+                    Cobros {stripeAccount.chargesEnabled ? '✓' : '✗'}
+                  </IonBadge>
+                  <IonBadge color={stripeAccount.payoutsEnabled ? 'success' : 'medium'}>
+                    Retiros {stripeAccount.payoutsEnabled ? '✓' : '✗'}
+                  </IonBadge>
+                </div>
+                {!stripeAccount.hasExternalAccount && (
+                  <IonButton shape="round" expand="block" disabled={stripeLoading} onClick={handleStripeKyc}>
+                    <IonIcon icon={documentTextOutline} slot="start" />
+                    {stripeLoading ? 'Procesando...' : 'Completar verificación'}
+                  </IonButton>
+                )}
+              </div>
+            )}
+          </IonCardContent>
+        </IonCard>
 
         {/* Collection rate */}
         <IonCard className="ld-card">

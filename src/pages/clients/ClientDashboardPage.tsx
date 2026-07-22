@@ -66,6 +66,7 @@ import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboa
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
 import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
+import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
 import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
@@ -74,28 +75,9 @@ const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';
 
 // ── Stripe helpers ────────────────────────────────────────────────────────────
-async function stripeGetStatus(clientId: number, companyId: number) {
-  const r = await fetch(`${API_BASE_URL}/stripe/connected-accounts/status`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId, companyId }),
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || 'No se pudo consultar la cuenta bancaria.');
-  return data;
-}
-
-// Callers rely on a thrown error to know account creation actually failed —
-// without checking r.ok/data.error here, a failed create silently looks like
-// success and the caller proceeds straight into a broken onboarding embed.
-async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
-  const r = await fetch(`${API_BASE_URL}/stripe/connected-accounts`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId, companyId, email }),
-  });
-  const data = await r.json();
-  if (!r.ok || data.error) throw new Error(data.error || 'No se pudo crear la cuenta bancaria.');
-  return data;
-}
+// getStripeAccountStatus/createOrRefreshStripeAccount now live in
+// api/stripeApi.ts, shared with LenderDashboardPage.tsx and
+// ClientFaceRecognitionPage.tsx instead of being copy-pasted per page.
 
 async function stripeGetTransactions(clientId: number, companyId: number) {
   const r = await fetch(`${API_BASE_URL}/stripe/transactions`, {
@@ -296,7 +278,7 @@ const ClientDashboardPage: React.FC = () => {
     console.log('[ClientDashboard] fetchStripe → /stripe/connected-accounts/status', { clientId, companyId });
     try {
       const [statusRes, txRes, wallet] = await Promise.all([
-        stripeGetStatus(clientId, companyId),
+        getStripeAccountStatus(clientId, companyId),
         stripeGetTransactions(clientId, companyId),
         getWalletBalance(clientId, companyId),
       ]);
@@ -461,7 +443,7 @@ const ClientDashboardPage: React.FC = () => {
     setStripeLoading(true);
     try {
       if (!stripeAccount) {
-        await stripeCreateAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
+        await createOrRefreshStripeAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
         await fetchStripe();
       }
       setShowStripeOnboarding(true);
@@ -1148,15 +1130,17 @@ const ClientDashboardPage: React.FC = () => {
         <IonCardHeader><IonCardTitle>Acciones</IonCardTitle></IonCardHeader>
         <IonCardContent>
           {/* Portfolio (/lender-dashboard) and Seguimiento (/client-followup)
-              are deliberately NOT linked here yet — both are staff-shaped
-              pages: LenderDashboardPage currently shows every loan/client in
-              the company (not scoped to one lender), and
-              ClientFollowUpPage exposes full create/edit/delete over
-              staff collections notes. Linking them for self-service as-is
-              would leak other clients' data / let a client delete their own
-              audit history. Scope those pages first, then add the buttons
-              back (see ExpedienteDigitalPage for the read-only, safe
-              pattern already followed below). */}
+              are deliberately NOT linked here — this page is the BORROWER's
+              own dashboard, so there's nothing here for it to link to.
+              LenderDashboardPage is now correctly scoped per lender (joined
+              through loanContracts.lenderClientId — loans has no lenderId
+              column of its own) and reached directly via getPostLoginRoute
+              for roleCode === 'lender', not through this page. ClientFollowUpPage
+              still stays unlinked from any client-facing view — it exposes
+              full create/edit/delete over staff collections notes, so a
+              client seeing it could view/delete their own audit history.
+              See ExpedienteDigitalPage for the read-only, safe pattern to
+              follow if client-facing follow-up visibility is ever built. */}
           <IonGrid>
             <IonRow>
               <IonCol size="6">
