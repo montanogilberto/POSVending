@@ -46,6 +46,7 @@ import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biome
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
+import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -444,6 +445,20 @@ const ClientFaceRecognitionPage: React.FC = () => {
         }
       }
 
+      const pdfParams = {
+        clientId: Number(selectedClient?.clientId),
+        nombre: extractedIdFields.nombre,
+        domicilio: extractedIdFields.domicilio,
+        curp: extractedIdFields.curp,
+        claveElector: extractedIdFields.claveElector,
+        fechaNacimiento: extractedIdFields.fechaNacimiento,
+        documentType,
+        isVerified,
+        confidenceScore,
+        acceptedAtISO: now,
+        signatureDataUrl: contractSignatureBase64,
+      };
+
       const payload: ContractSubmissionRequest = {
         clientFaceRecognitionId: clientFaceRecognitionIdRef.current,
         companyId: Number(companyId),
@@ -454,11 +469,16 @@ const ClientFaceRecognitionPage: React.FC = () => {
         clientSelfieBlobUrl,
         confidenceScore,
         isVerified,
+        nombre: extractedIdFields.nombre,
+        domicilio: extractedIdFields.domicilio,
+        curp: extractedIdFields.curp,
+        claveElector: extractedIdFields.claveElector,
+        fechaNacimiento: extractedIdFields.fechaNacimiento,
         contractAccepted: true,
-        contractPdfBase64: btoa('Contrato de crédito aceptado electrónicamente'),
+        contractPdfBase64: generateContractPdfBase64(pdfParams),
         contractAcceptedAt: now,
         pagareAccepted: true,
-        pagarePdfBase64: btoa('Pagaré aceptado electrónicamente'),
+        pagarePdfBase64: generatePagarePdfBase64({ ...pdfParams, hasPhysicalPagare }),
         hasPhysicalPagare,
         idSignatureCropBase64: idSignatureCropBase64 ? idSignatureCropBase64.split(',')[1] : undefined,
         contractSignatureBase64: contractSignatureBase64.split(',')[1],
