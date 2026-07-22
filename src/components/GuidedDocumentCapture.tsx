@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { IonIcon } from '@ionic/react';
-import { helpCircleOutline, personOutline, warningOutline } from 'ionicons/icons';
+import { apertureOutline, cameraOutline, helpCircleOutline, personOutline, warningOutline } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { Camera } from '@capacitor/camera';
 import { analyzeFrame, computeFullResBlurVariance, OverlayRect, PositionHint } from '../utils/documentCaptureAnalysis';
@@ -21,6 +21,32 @@ type ImageCaptureConstructor = new (track: MediaStreamTrack) => MinimalImageCapt
 
 function getImageCaptureConstructor(): ImageCaptureConstructor | undefined {
   return (window as unknown as { ImageCapture?: ImageCaptureConstructor }).ImageCapture;
+}
+
+// Focus control (focusMode/applyConstraints 'advanced') is part of the draft
+// Image Capture spec — supported on some Chrome/Android camera stacks, not
+// in every TS DOM lib version and not on iOS Safari/WKWebView. Same
+// defensive local-shape + try/catch pattern as ImageCapture above: attempt
+// it, and quietly report "not supported" rather than assume it works.
+interface FocusTrackCapabilities {
+  focusMode?: string[];
+}
+
+async function tryAutofocus(track: MediaStreamTrack): Promise<boolean> {
+  const capableTrack = track as unknown as { getCapabilities?: () => FocusTrackCapabilities };
+  const modes = capableTrack.getCapabilities?.()?.focusMode ?? [];
+  // 'single-shot' forces one fresh focus pass — closer to a real
+  // tap-to-focus. Fall back to re-applying 'continuous', which on several
+  // Android camera stacks is enough to nudge a stuck autofocus into
+  // re-hunting even without single-shot support.
+  const mode = modes.includes('single-shot') ? 'single-shot' : modes.includes('continuous') ? 'continuous' : undefined;
+  if (!mode) return false;
+  try {
+    await track.applyConstraints({ advanced: [{ focusMode: mode }] } as unknown as MediaTrackConstraints);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const POSITION_HINT_LABEL: Record<PositionHint, string> = {
@@ -132,6 +158,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [positionHint, setPositionHint] = useState<PositionHint>('move-closer');
+  const [focusMessage, setFocusMessage] = useState('');
 
   const stopStream = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -240,6 +267,27 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     setState('captured');
     setTimeout(() => onCapture(base64), 350);
   }, [onCapture, stopStream]);
+
+  // Lets the client force a photo instead of waiting on the auto-stability
+  // gate — glare, low light, or a stuck autofocus can keep the frame from
+  // ever scoring "stable" even when the card is legible enough to shoot.
+  const handleManualCapture = useCallback(() => {
+    if (capturedRef.current || state === 'initializing' || state === 'error' || state === 'captured') return;
+    capturedRef.current = true;
+    captureFrame();
+  }, [captureFrame, state]);
+
+  // Nudges the camera to refocus — mainly useful when the frame is stuck
+  // "aligning"/"searching" because autofocus never locked on its own.
+  const handleAutofocus = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const ok = await tryAutofocus(track);
+    if (!ok) {
+      setFocusMessage('Tu cámara no soporta enfoque manual. Intenta acercarte o alejarte un poco.');
+      setTimeout(() => setFocusMessage(''), 3000);
+    }
+  }, []);
 
   const tick = useCallback(
     (timestamp: number) => {
@@ -422,9 +470,26 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
         </div>
       )}
 
-      <button type="button" className="gdc-help-button" onClick={onHelp}>
-        <IonIcon icon={helpCircleOutline} /> Ayuda
-      </button>
+      {focusMessage && <div className="gdc-focus-message">{focusMessage}</div>}
+
+      {state !== 'error' && (
+        <div className="gdc-controls">
+          <button type="button" className="gdc-control-button" onClick={handleAutofocus}>
+            <IonIcon icon={apertureOutline} /> Enfocar
+          </button>
+          <button
+            type="button"
+            className="gdc-control-button gdc-control-button--primary"
+            onClick={handleManualCapture}
+            disabled={state === 'initializing' || state === 'captured'}
+          >
+            <IonIcon icon={cameraOutline} /> Capturar
+          </button>
+          <button type="button" className="gdc-control-button" onClick={onHelp}>
+            <IonIcon icon={helpCircleOutline} /> Ayuda
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -137,11 +137,19 @@
   color: #f87171;
 }
 
-.gdc-help-button {
+.gdc-controls {
   position: absolute;
   bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  z-index: 2;
+  padding: 0 16px;
+}
+
+.gdc-control-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -152,5 +160,30 @@
   padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
+}
+
+.gdc-control-button:disabled {
+  opacity: 0.5;
+}
+
+.gdc-control-button--primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.gdc-focus-message {
+  position: absolute;
+  left: 50%;
+  bottom: 62px;
+  transform: translateX(-50%);
+  max-width: 90%;
+  white-space: normal;
+  text-align: center;
+  background: rgba(17, 17, 17, 0.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 14px;
   z-index: 2;
 }
