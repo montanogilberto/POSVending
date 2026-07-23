@@ -5,6 +5,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useUser } from './UserContext';
 import './Header.css';
 
 interface HeaderProps {
@@ -26,6 +27,9 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const history = useHistory();
   const { cart } = useCart();
+  const { roleCode } = useUser();
+  // No shopping cart concept in the SmartLoans (borrower/lender) experience.
+  const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
   const [unreadCount, setUnreadCount] = useState(0);
   const listenerRef = useRef<any>(null);
 
@@ -66,16 +70,18 @@ const Header: React.FC<HeaderProps> = ({
         </IonButtons>
         <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>{screenTitle}</IonTitle>
         <IonButtons slot="end">
-          <IonButton onClick={handleCartClick} title="Cart" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
-            <span className="icon-with-badge">
-              <IonIcon icon={cartOutline} style={{ fontSize: '28px' }} />
-              {totalQuantity > 0 && (
-                <IonBadge className="badge-side" color="danger">
-                  {totalQuantity}
-                </IonBadge>
-              )}
-            </span>
-          </IonButton>
+          {!isSmartLoansRole && (
+            <IonButton onClick={handleCartClick} title="Cart" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
+              <span className="icon-with-badge">
+                <IonIcon icon={cartOutline} style={{ fontSize: '28px' }} />
+                {totalQuantity > 0 && (
+                  <IonBadge className="badge-side" color="danger">
+                    {totalQuantity}
+                  </IonBadge>
+                )}
+              </span>
+            </IonButton>
+          )}
           <IonButton onClick={handleNotificationsClick} title="Notifications" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
             <span className="icon-with-badge">
               <IonIcon icon={notificationsOutline} style={{ fontSize: '28px' }} />

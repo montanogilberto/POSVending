@@ -29,7 +29,6 @@ import {
   IonButtons,
   setupIonicReact,
 } from '@ionic/react';
-import { menuController } from '@ionic/core';
 import { IonReactRouter } from '@ionic/react-router';
 import {
   cash,
@@ -45,7 +44,6 @@ import {
   mail,
   grid,
   person,
-  menu,
   water,
   storefrontOutline,
   cashOutline,
@@ -263,10 +261,6 @@ const AppShell: React.FC = () => {
   const handleLogout = () => {
     logout();
     history.push('/login');
-  };
-
-  const openMainMenu = async () => {
-    await menuController.open('main-menu');
   };
 
   return (
@@ -609,22 +603,6 @@ const AppShell: React.FC = () => {
               </IonTabButton>
             )}
 
-            <div
-              className="menu-tab-slot menu-tab"
-              role="button"
-              tabIndex={0}
-              aria-label="Abrir menú"
-              onClick={openMainMenu}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  openMainMenu();
-                }
-              }}
-            >
-              <IonIcon aria-hidden="true" icon={menu} />
-              <IonLabel className="menu-tab-bar-label">Menú</IonLabel>
-            </div>
           </IonTabBar>
         </IonTabs>
       </IonPage>

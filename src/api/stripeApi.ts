@@ -37,12 +37,15 @@ export async function createOrRefreshStripeAccount(
   companyId: number,
   email: string
 ): Promise<{ account: StripeConnectedAccount }> {
+  const payload = { clientId, companyId, email };
+  console.log('[stripeApi] createOrRefreshStripeAccount → POST /stripe/connected-accounts', payload);
   const res = await fetch(BASE_URL + "/stripe/connected-accounts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clientId, companyId, email }),
+    body: JSON.stringify(payload),
   });
   const data = await res.json();
+  console.log('[stripeApi] createOrRefreshStripeAccount ← status:', res.status, 'body:', data);
   if (!res.ok || data.error) throw new Error(data.error || "No se pudo crear la cuenta bancaria.");
   return data;
 }

@@ -38,14 +38,11 @@ import {
   barChartOutline,
   walletOutline,
   checkmarkCircle,
-  notificationsOutline,
   cardOutline,
   pulseOutline,
   personCircleOutline,
   timeOutline,
   closeOutline,
-  arrowBack,
-  calendarOutline,
   addCircleOutline,
   documentTextOutline,
   refreshOutline,
@@ -59,7 +56,6 @@ import {
   chatbubbleOutline,
   copyOutline,
   folderOutline,
-  mailOutline,
 } from 'ionicons/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
@@ -71,6 +67,8 @@ import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../.
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
 import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
 
@@ -208,15 +206,22 @@ const ClientDashboardPage: React.FC = () => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', email: '', cellphone: '' });
 
-  // Header — mail popover, same component/pattern the rest of the app uses
-  // (e.g. Dashboard.tsx). Notification icon just deep-links to /pushNotifications,
-  // no local popover needed for that one.
-  const [showMailPopover, setShowMailPopover] = useState(false);
-  const [mailPopoverEvent, setMailPopoverEvent] = useState<Event | undefined>(undefined);
-  const presentMailPopover = (e: React.MouseEvent) => {
-    setMailPopoverEvent(e.nativeEvent);
-    setShowMailPopover(true);
-  };
+  // Header — same shared Header/AlertPopover/MailPopover components and
+  // popoverState shape used everywhere else in the app (Dashboard.tsx,
+  // ClientFaceRecognitionPage.tsx), instead of a one-off custom toolbar.
+  const [popoverState, setPopoverState] = useState<{
+    showAlertPopover: boolean;
+    showMailPopover: boolean;
+    event?: Event;
+  }>({ showAlertPopover: false, showMailPopover: false });
+  const presentAlertPopover = (e: React.MouseEvent) =>
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  const dismissAlertPopover = () =>
+    setPopoverState({ ...popoverState, showAlertPopover: false });
+  const presentMailPopover = (e: React.MouseEvent) =>
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  const dismissMailPopover = () =>
+    setPopoverState({ ...popoverState, showMailPopover: false });
 
   // Profile tab — QR / invite-a-friend actions (mirrors ClientsPage.tsx's
   // staff-facing versions, minus the staff-only bits like Eliminar)
@@ -460,7 +465,10 @@ const ClientDashboardPage: React.FC = () => {
         await fetchStripe();
       }
       setShowStripeOnboarding(true);
-    } catch { setError('Error al iniciar registro bancario'); }
+    } catch (err) {
+      console.log('[ClientDashboard] handleStripeKyc ❌', err);
+      setError((err as Error).message ?? 'Error al iniciar registro bancario');
+    }
     finally { setStripeLoading(false); }
   };
 
@@ -1454,28 +1462,21 @@ const ClientDashboardPage: React.FC = () => {
   // ── Main render ───────────────────────────────────────────────────────────
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
-              <IonIcon icon={arrowBack} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-          <IonTitle>Dashboard Cliente</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={() => history.push(`/client-followup/${clientId}`)}>
-              <IonIcon icon={calendarOutline} slot="icon-only" />
-            </IonButton>
-            <IonButton onClick={() => history.push('/pushNotifications')}>
-              <IonIcon icon={notificationsOutline} slot="icon-only" />
-            </IonButton>
-            <IonButton onClick={presentMailPopover}>
-              <IonIcon icon={mailOutline} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
-      <MailPopover isOpen={showMailPopover} event={mailPopoverEvent} onDidDismiss={() => setShowMailPopover(false)} />
+      <Header
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle="Dashboard Cliente"
+      />
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
 
       <IonContent fullscreen className="ion-padding client-dashboard-page fintech-surface">
         <IonLoading isOpen={loading} message="Cargando..." />
