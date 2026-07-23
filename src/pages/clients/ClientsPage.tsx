@@ -232,19 +232,33 @@ const ClientsPage: React.FC = () => {
     ocrRanForRef.current = key;
 
     let cancelled = false;
+    console.log('[ClientsPage] OCR effect: running OCR on front+back captures', {
+      frontSource: idFrontBlobUrl ? 'blobUrl' : 'base64',
+      backSource: idBackBlobUrl ? 'blobUrl' : 'base64',
+      idFrontBlobUrl: idFrontBlobUrl || '(not uploaded yet)',
+      idBackBlobUrl: idBackBlobUrl || '(not uploaded yet)',
+    });
     setOcrLoading(true);
     setOcrError('');
 
-    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
-      .then(([front, back]) => {
+    // Single call for both sides — see idOcr.ts. Blob URLs when the early
+    // upload has landed, base64 otherwise.
+    extractIneFields({
+      frontUrl: idFrontBlobUrl || undefined,
+      backUrl: idBackBlobUrl || undefined,
+      frontBase64: idFrontImageBase64,
+      backBase64: idBackImageBase64,
+    })
+      .then(({ fields, lowConfidenceFields }) => {
         if (cancelled) return;
+        console.log('[ClientsPage] OCR effect: result', JSON.stringify(fields), 'lowConfidence:', lowConfidenceFields);
         setExtractedIdFields((prev) => ({
           ...prev,
-          nombre: front.nombre || back.nombre || prev.nombre,
-          domicilio: front.domicilio || back.domicilio || prev.domicilio,
-          curp: front.curp || back.curp || prev.curp,
-          claveElector: front.claveElector || back.claveElector || prev.claveElector,
-          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento || prev.fechaNacimiento,
+          nombre: fields.nombre || prev.nombre,
+          domicilio: fields.domicilio || prev.domicilio,
+          curp: fields.curp || prev.curp,
+          claveElector: fields.claveElector || prev.claveElector,
+          fechaNacimiento: fields.fechaNacimiento || prev.fechaNacimiento,
         }));
       })
       .catch((err) => {

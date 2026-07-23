@@ -169,22 +169,29 @@ const ClientFaceRecognitionPage: React.FC = () => {
     ocrRanForRef.current = key;
 
     let cancelled = false;
-    console.log('[Expediente] OCR effect: running OCR on front+back captures');
+    console.log('[Expediente] OCR effect: running OCR on front+back captures', {
+      frontSource: idFrontImageBlobUrl ? 'blobUrl' : 'base64',
+      backSource: idBackImageBlobUrl ? 'blobUrl' : 'base64',
+      idFrontImageBlobUrl: idFrontImageBlobUrl || '(not uploaded yet)',
+      idBackImageBlobUrl: idBackImageBlobUrl || '(not uploaded yet)',
+    });
     setOcrLoading(true);
     setOcrError('');
 
-    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
-      .then(([front, back]) => {
+    // One call for both sides — the agent reconciles front/back itself, so
+    // the old two-call + merge dance is gone. Blob URLs are used when the
+    // early upload has already landed; base64 covers the case where it
+    // hasn't (or failed), so OCR still starts as soon as the captures exist.
+    extractIneFields({
+      frontUrl: idFrontImageBlobUrl || undefined,
+      backUrl: idBackImageBlobUrl || undefined,
+      frontBase64: idFrontImageBase64,
+      backBase64: idBackImageBase64,
+    })
+      .then(({ fields, lowConfidenceFields }) => {
         if (cancelled) return;
-        const merged: ExtractedIdFields = {
-          nombre: front.nombre || back.nombre,
-          domicilio: front.domicilio || back.domicilio,
-          curp: front.curp || back.curp,
-          claveElector: front.claveElector || back.claveElector,
-          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento,
-        };
-        console.log('[Expediente] OCR effect: merged result', JSON.stringify(merged));
-        setExtractedIdFields(merged);
+        console.log('[Expediente] OCR effect: result', JSON.stringify(fields), 'lowConfidence:', lowConfidenceFields);
+        setExtractedIdFields(fields);
       })
       .catch((err) => {
         console.log('[Expediente] OCR effect: FAILED', String(err));

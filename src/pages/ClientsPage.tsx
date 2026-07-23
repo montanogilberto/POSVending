@@ -235,16 +235,21 @@ const ClientsPage: React.FC = () => {
     setOcrLoading(true);
     setOcrError('');
 
-    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
-      .then(([front, back]) => {
+    extractIneFields({
+      frontUrl: idFrontBlobUrl || undefined,
+      backUrl: idBackBlobUrl || undefined,
+      frontBase64: idFrontImageBase64,
+      backBase64: idBackImageBase64,
+    })
+      .then(({ fields }) => {
         if (cancelled) return;
         setExtractedIdFields((prev) => ({
           ...prev,
-          nombre: front.nombre || back.nombre || prev.nombre,
-          domicilio: front.domicilio || back.domicilio || prev.domicilio,
-          curp: front.curp || back.curp || prev.curp,
-          claveElector: front.claveElector || back.claveElector || prev.claveElector,
-          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento || prev.fechaNacimiento,
+          nombre: fields.nombre || prev.nombre,
+          domicilio: fields.domicilio || prev.domicilio,
+          curp: fields.curp || prev.curp,
+          claveElector: fields.claveElector || prev.claveElector,
+          fechaNacimiento: fields.fechaNacimiento || prev.fechaNacimiento,
         }));
       })
       .catch((err) => {

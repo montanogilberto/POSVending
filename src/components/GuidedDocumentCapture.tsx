@@ -3,7 +3,13 @@ import { IonIcon } from '@ionic/react';
 import { apertureOutline, cameraOutline, helpCircleOutline, personOutline, warningOutline } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { Camera } from '@capacitor/camera';
-import { analyzeFrame, computeFullResBlurVariance, OverlayRect, PositionHint } from '../utils/documentCaptureAnalysis';
+import {
+  analyzeFrame,
+  computeCaptureSharpness,
+  detectCardGeometry,
+  OverlayRect,
+  PositionHint,
+} from '../utils/documentCaptureAnalysis';
 import './GuidedDocumentCapture.css';
 
 type CaptureState = 'initializing' | 'searching' | 'aligning' | 'stable' | 'captured' | 'error';
@@ -255,12 +261,58 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     if (!ctx) return;
     ctx.drawImage(drawSource, cropX, cropY, cropW, cropH, 0, 0, outputW, outputH);
 
-    // Logged (not gated on yet) to calibrate a real full-resolution
-    // sharpness threshold — the live-gating blurScore is measured on a
-    // heavily downsampled 240px analysis canvas, which smooths away blur
-    // that's still present at this capture's native resolution.
-    const fullResVariance = computeFullResBlurVariance(ctx.getImageData(0, 0, outputW, outputH));
-    console.log('[GuidedDocumentCapture] captureFrame: fullResBlurVariance =', fullResVariance);
+    // Real quality gate, measured on the final crop rather than the 240px
+    // live-analysis canvas that smooths blur away. Both checks are calibrated
+    // against two captures of the same INE: the wizard's own blurry one, which
+    // the extraction agent read as the wrong surname, wrong street and wrong
+    // date of birth while still reporting full confidence, and a sharp phone
+    // photo of the same card that extracted perfectly.
+    const captureImageData = ctx.getImageData(0, 0, outputW, outputH);
+    const sharpness = computeCaptureSharpness(captureImageData);
+    const geometry = detectCardGeometry(captureImageData);
+
+    console.log('[GuidedDocumentCapture] captureFrame: quality =', {
+      sharpness: Math.round(sharpness),
+      minRequired: MIN_CAPTURE_SHARPNESS,
+      coverage: geometry.coverage.toFixed(3),
+      minCoverage: MIN_CARD_COVERAGE,
+      tiltDegrees: geometry.tiltDegrees.toFixed(1),
+      keystoneRatio: geometry.keystoneRatio.toFixed(3),
+      isFrontalAdvisory: geometry.isFrontal,
+      effectiveCardDpi: Math.round((outputW * Math.sqrt(geometry.coverage)) / 85.6 * 25.4),
+    });
+
+    // Reject rather than accept a capture the agent would silently misread.
+    // Only sharpness and coverage gate — the tilt/keystone numbers are not
+    // calibrated yet and ranked the two known captures backwards, so they
+    // only drive guidance text (see detectCardGeometry).
+    const tooBlurry = sharpness < MIN_CAPTURE_SHARPNESS;
+    const tooSmall = geometry.detected && geometry.coverage < MIN_CARD_COVERAGE;
+    if (tooBlurry || tooSmall) {
+      const reason = tooBlurry
+        ? 'La foto salió borrosa. Mantén el teléfono quieto y espera a que enfoque.'
+        : 'Acerca más la credencial para que llene el recuadro.';
+      console.log(
+        '[GuidedDocumentCapture] captureFrame: REJECTED —',
+        tooBlurry ? 'sharpness' : 'coverage',
+        { sharpness: Math.round(sharpness), coverage: geometry.coverage.toFixed(3) }
+      );
+      setRejectionMessage(reason);
+      setTimeout(() => setRejectionMessage(''), 4000);
+      // Resume scanning: the stream is still live, so just clear the latch
+      // and restart the analysis loop for another attempt.
+      consecutiveGoodRef.current = 0;
+      capturedRef.current = false;
+      setState('searching');
+      // Via a ref: tick depends on captureFrame, so calling it directly here
+      // would make the two useCallbacks circular.
+      rafRef.current = requestAnimationFrame((t) => tickRef.current?.(t));
+      return;
+    }
+
+    if (!geometry.isFrontal) {
+      console.log('[GuidedDocumentCapture] captureFrame: accepted but not face-on (advisory)');
+    }
 
     const base64 = canvas.toDataURL('image/jpeg', 0.92);
     stopStream();
