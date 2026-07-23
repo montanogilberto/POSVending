@@ -1,0 +1,63 @@
+.nco-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nco-steps {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.nco-step {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3f4f6;
+}
+
+.nco-step-active {
+  background: var(--ion-color-primary, #3b82f6);
+  color: #fff;
+}
+
+.nco-list {
+  margin: 0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.nco-tos {
+  white-space: normal;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.nco-hint {
+  font-size: 12px;
+  color: #6b7280;
+  display: block;
+  padding: 0 4px;
+}
+
+.nco-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin: 0;
+}
+
+.nco-done {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.nco-done-icon {
+  font-size: 44px;
+  color: #059669;
+}
+
+.nco-done p {
+  margin: 8px 0 4px;
+  font-weight: 600;
+}
