@@ -102,6 +102,24 @@ const MIN_BLUR_SCORE = 70;
 // state from getUserMedia, so a longer required steady streak is the
 // practical proxy.
 const STABILITY_FRAMES_REQUIRED = 14;
+
+// Full-resolution capture gates. Both are measured on the final crop, where
+// the live 240px analysis canvas can't see the blur that actually breaks
+// extraction — see computeCaptureSharpness for why the previous
+// Laplacian-variance metric ranked good and bad captures backwards.
+//
+// Calibrated against two captures of the same INE: the wizard's own blurry
+// one scored 370 sharpness / 0.42 coverage and was misread by the extraction
+// agent (wrong surname, street and date of birth, reported at full
+// confidence); a sharp phone photo of the same card scored ~1080 / 0.79 and
+// extracted every field correctly. Thresholds sit between the two with margin,
+// but this is a two-sample calibration — watch the logged values on real
+// devices and tighten once there's a real distribution.
+const MIN_CAPTURE_SHARPNESS = 600;
+// The blurry capture filled only 42% of its 1100px crop, so the card resolved
+// at ~208 DPI against the ~300 DPI MAX_OUTPUT_WIDTH is sized for. Under-filling
+// costs resolution before blur is even a factor.
+const MIN_CARD_COVERAGE = 0.55;
 const ANALYSIS_INTERVAL_MS = 100; // ~10 fps
 const ANALYSIS_CANVAS_WIDTH = 240;
 
@@ -159,12 +177,15 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const previousGrayRef = useRef<Uint8ClampedArray | null>(null);
   const consecutiveGoodRef = useRef(0);
   const capturedRef = useRef(false);
+  // Breaks the captureFrame <-> tick useCallback cycle (see captureFrame).
+  const tickRef = useRef<((timestamp: number) => void) | null>(null);
 
   const [state, setState] = useState<CaptureState>('initializing');
   const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [positionHint, setPositionHint] = useState<PositionHint>('move-closer');
   const [focusMessage, setFocusMessage] = useState('');
+  const [rejectionMessage, setRejectionMessage] = useState('');
 
   const stopStream = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -423,6 +444,13 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     [captureFrame]
   );
 
+  // captureFrame restarts the analysis loop through this ref after rejecting a
+  // capture, which it can't do by calling tick directly without the two
+  // useCallbacks becoming circular.
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -523,6 +551,11 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       )}
 
       {focusMessage && <div className="gdc-focus-message">{focusMessage}</div>}
+
+      {/* Shown when a capture was taken but rejected as too blurry or too
+          small — the stream is still live and scanning has resumed, so this
+          tells the client what to change before the next attempt. */}
+      {rejectionMessage && <div className="gdc-focus-message">{rejectionMessage}</div>}
 
       {state !== 'error' && (
         <div className="gdc-controls">
