@@ -169,12 +169,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
     ocrRanForRef.current = key;
 
     let cancelled = false;
-    console.log('[Expediente] OCR effect: running OCR on front+back captures', {
+    console.log('[Expediente] OCR effect: running OCR on front+back captures', JSON.stringify({
       frontSource: idFrontImageBlobUrl ? 'blobUrl' : 'base64',
       backSource: idBackImageBlobUrl ? 'blobUrl' : 'base64',
       idFrontImageBlobUrl: idFrontImageBlobUrl || '(not uploaded yet)',
       idBackImageBlobUrl: idBackImageBlobUrl || '(not uploaded yet)',
-    });
+    }));
     setOcrLoading(true);
     setOcrError('');
 

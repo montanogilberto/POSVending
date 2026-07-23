@@ -120,6 +120,9 @@ const MIN_CAPTURE_SHARPNESS = 600;
 // at ~208 DPI against the ~300 DPI MAX_OUTPUT_WIDTH is sized for. Under-filling
 // costs resolution before blur is even a factor.
 const MIN_CARD_COVERAGE = 0.55;
+// How many rejected attempts before the manual shutter is allowed to override
+// the quality gate — see the escape hatch in captureFrame.
+const FORCE_AFTER_REJECTIONS = 3;
 const ANALYSIS_INTERVAL_MS = 100; // ~10 fps
 const ANALYSIS_CANVAS_WIDTH = 240;
 
@@ -179,6 +182,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const capturedRef = useRef(false);
   // Breaks the captureFrame <-> tick useCallback cycle (see captureFrame).
   const tickRef = useRef<((timestamp: number) => void) | null>(null);
+  const rejectionCountRef = useRef(0);
 
   const [state, setState] = useState<CaptureState>('initializing');
   const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
@@ -193,7 +197,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     streamRef.current = null;
   }, []);
 
-  const captureFrame = useCallback(async () => {
+  const captureFrame = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     const container = containerRef.current;
@@ -292,16 +296,19 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     const sharpness = computeCaptureSharpness(captureImageData);
     const geometry = detectCardGeometry(captureImageData);
 
-    console.log('[GuidedDocumentCapture] captureFrame: quality =', {
+    // JSON.stringify, not a bare object: Capacitor's Android console bridge
+    // renders objects as "[object Object]", which made the first round of
+    // these logs useless for calibrating the thresholds below.
+    console.log('[GuidedDocumentCapture] captureFrame: quality =', JSON.stringify({
       sharpness: Math.round(sharpness),
       minRequired: MIN_CAPTURE_SHARPNESS,
-      coverage: geometry.coverage.toFixed(3),
+      coverage: Number(geometry.coverage.toFixed(3)),
       minCoverage: MIN_CARD_COVERAGE,
-      tiltDegrees: geometry.tiltDegrees.toFixed(1),
-      keystoneRatio: geometry.keystoneRatio.toFixed(3),
+      tiltDegrees: Number(geometry.tiltDegrees.toFixed(1)),
+      keystoneRatio: Number(geometry.keystoneRatio.toFixed(3)),
       isFrontalAdvisory: geometry.isFrontal,
       effectiveCardDpi: Math.round((outputW * Math.sqrt(geometry.coverage)) / 85.6 * 25.4),
-    });
+    }));
 
     // Reject rather than accept a capture the agent would silently misread.
     // Only sharpness and coverage gate — the tilt/keystone numbers are not
@@ -309,14 +316,34 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     // only drive guidance text (see detectCardGeometry).
     const tooBlurry = sharpness < MIN_CAPTURE_SHARPNESS;
     const tooSmall = geometry.detected && geometry.coverage < MIN_CARD_COVERAGE;
-    if (tooBlurry || tooSmall) {
+
+    // Escape hatch. Some cameras will never clear these thresholds — the
+    // manual shutter exists precisely because a stuck autofocus or bad light
+    // can keep the automatic gate from ever firing, and gating it too would
+    // turn "blurry photo" into "cannot onboard at all", which is worse. After
+    // FORCE_AFTER_REJECTIONS rejections the client's next manual press goes
+    // through regardless, logged loudly so these show up in device logs.
+    const exhaustedRetries = rejectionCountRef.current >= FORCE_AFTER_REJECTIONS;
+    if ((tooBlurry || tooSmall) && force && exhaustedRetries) {
+      console.warn(
+        '[GuidedDocumentCapture] captureFrame: FORCED past quality gate after',
+        rejectionCountRef.current, 'rejections —',
+        JSON.stringify({ sharpness: Math.round(sharpness), coverage: Number(geometry.coverage.toFixed(3)) }),
+        'extraction on this image may be unreliable; expect manual correction.'
+      );
+    } else if (tooBlurry || tooSmall) {
+      rejectionCountRef.current += 1;
       const reason = tooBlurry
         ? 'La foto salió borrosa. Mantén el teléfono quieto y espera a que enfoque.'
         : 'Acerca más la credencial para que llene el recuadro.';
       console.log(
         '[GuidedDocumentCapture] captureFrame: REJECTED —',
         tooBlurry ? 'sharpness' : 'coverage',
-        { sharpness: Math.round(sharpness), coverage: geometry.coverage.toFixed(3) }
+        JSON.stringify({
+          sharpness: Math.round(sharpness),
+          coverage: Number(geometry.coverage.toFixed(3)),
+          rejectionCount: rejectionCountRef.current,
+        })
       );
       setRejectionMessage(reason);
       setTimeout(() => setRejectionMessage(''), 4000);
@@ -347,7 +374,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const handleManualCapture = useCallback(() => {
     if (capturedRef.current || state === 'initializing' || state === 'error' || state === 'captured') return;
     capturedRef.current = true;
-    captureFrame();
+    captureFrame({ force: true });
   }, [captureFrame, state]);
 
   // Nudges the camera to refocus — mainly useful when the frame is stuck

@@ -232,12 +232,12 @@ const ClientsPage: React.FC = () => {
     ocrRanForRef.current = key;
 
     let cancelled = false;
-    console.log('[ClientsPage] OCR effect: running OCR on front+back captures', {
+    console.log('[ClientsPage] OCR effect: running OCR on front+back captures', JSON.stringify({
       frontSource: idFrontBlobUrl ? 'blobUrl' : 'base64',
       backSource: idBackBlobUrl ? 'blobUrl' : 'base64',
       idFrontBlobUrl: idFrontBlobUrl || '(not uploaded yet)',
       idBackBlobUrl: idBackBlobUrl || '(not uploaded yet)',
-    });
+    }));
     setOcrLoading(true);
     setOcrError('');
 

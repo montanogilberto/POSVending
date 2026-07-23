@@ -78,7 +78,10 @@ export async function extractIneFields(input: IdExtractionInput): Promise<IdExtr
   const usingFront = payload.imageFrontUrl ? 'url' : payload.imageFrontBase64 ? 'base64' : 'none';
   const usingBack = payload.imageBackUrl ? 'url' : payload.imageBackBase64 ? 'base64' : 'none';
 
-  console.log('[IdOcr] extractIneFields: START', {
+  // JSON.stringify, not a bare object: Capacitor's Android console bridge
+  // prints objects as "[object Object]", which made these logs useless on
+  // device exactly when they were needed.
+  console.log('[IdOcr] extractIneFields: START', JSON.stringify({
     endpoint: `${AGENT_BASE}/extract-id-fields`,
     front: usingFront,
     back: usingBack,
@@ -87,7 +90,7 @@ export async function extractIneFields(input: IdExtractionInput): Promise<IdExtr
     frontBase64Length: payload.imageFrontBase64?.length ?? 0,
     backBase64Length: payload.imageBackBase64?.length ?? 0,
     payloadKeys: Object.keys(payload),
-  });
+  }));
 
   if (usingFront === 'none') {
     console.log('[IdOcr] extractIneFields: ABORT — no front image (url or base64) provided');
@@ -129,7 +132,7 @@ export async function extractIneFields(input: IdExtractionInput): Promise<IdExtr
     // Per-field breakdown — the useful signal when a client reports "it only
     // filled in some of my data": shows exactly which fields came back empty
     // (not legible) vs. flagged (read, but verify).
-    console.log('[IdOcr] extractIneFields: RESULT', {
+    console.log('[IdOcr] extractIneFields: RESULT', JSON.stringify({
       elapsedMs,
       nombre: fields.nombre || '(empty)',
       domicilio: fields.domicilio || '(empty)',
@@ -138,7 +141,7 @@ export async function extractIneFields(input: IdExtractionInput): Promise<IdExtr
       fechaNacimiento: fields.fechaNacimiento || '(empty)',
       lowConfidenceFields,
       emptyFields: (Object.keys(fields) as Array<keyof ExtractedIdFields>).filter((k) => !fields[k]),
-    });
+    }));
 
     return { fields, lowConfidenceFields };
   } catch (err) {

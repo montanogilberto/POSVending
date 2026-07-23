@@ -33,6 +33,11 @@ interface FaceLivenessCaptureProps {
 }
 
 const ANALYSIS_INTERVAL_MS = 150;
+// Consecutive undetected frames tolerated before the UI falls back to
+// "searching" and re-presents the instruction. At 150ms/frame this rides out
+// roughly half a second of dropout — matching the 2-4 frame gaps observed on
+// device during the down challenge — without masking a real loss of the face.
+const FACE_LOST_GRACE_FRAMES = 4;
 
 // Fixed compass position per direction (SVG angle: 0deg = 3 o'clock, clockwise).
 const RING_TARGET_DEG: Record<LivenessChallenge, number> = {
@@ -81,6 +86,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   const doneRef = useRef(false);
   const challengeStateRef = useRef<ChallengeFrameState>(newChallengeState());
   const lastDetectionRef = useRef<FaceDetectionResult | null>(null);
+  const missedFramesRef = useRef(0);
   const challengeIndexRef = useRef(0);
   const blinkStateRef = useRef<BlinkTrackerState>(newBlinkTrackerState());
   const challengeDescriptorsRef = useRef<Float32Array[]>([]);
@@ -151,12 +157,22 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       if (doneRef.current) return;
 
       if (!detection) {
-        lastDetectionRef.current = null;
-        setState((prev) => (prev === 'captured' ? prev : 'searching'));
+        // Tolerate brief dropouts instead of falling back to "searching" on a
+        // single missed frame. Device logs show the down challenge losing the
+        // face for 2-4 consecutive frames at a time while the user is holding
+        // the pose correctly — each of those reset the UI and re-presented the
+        // same instruction, so the prompt visibly flickered and the challenge
+        // looked broken even though the head position was fine.
+        missedFramesRef.current += 1;
+        if (missedFramesRef.current >= FACE_LOST_GRACE_FRAMES) {
+          lastDetectionRef.current = null;
+          setState((prev) => (prev === 'captured' ? prev : 'searching'));
+        }
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
 
+      missedFramesRef.current = 0;
       lastDetectionRef.current = detection;
       if (!neutralDescriptorRef.current) {
         neutralDescriptorRef.current = detection.descriptor;
@@ -297,6 +313,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     challengeDescriptorsRef.current = [];
     neutralDescriptorRef.current = null;
     lastDetectionRef.current = null;
+    missedFramesRef.current = 0;
     doneRef.current = false;
     setSequence(newSequence);
     setChallengeIndex(0);
