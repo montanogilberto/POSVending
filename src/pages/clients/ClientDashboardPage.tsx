@@ -640,16 +640,18 @@ const ClientDashboardPage: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+          <div className="hero-balance">
+            <div>
+              <span>Crédito disponible</span>
+              <h1>${availableCredit.toFixed(2)}</h1>
+            </div>
             {loanCompletionPct < 100 && (
               <div className="hero-progress-pill">
                 <span className="hero-progress-pct">{loanCompletionPct}%</span>
                 <span className="hero-progress-label">listo</span>
               </div>
             )}
-          </div>
-          <div className="hero-balance">
-            <span>Crédito disponible</span>
-            <h1>${availableCredit.toFixed(2)}</h1>
           </div>
         </IonCardContent>
       </IonCard>

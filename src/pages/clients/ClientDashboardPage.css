@@ -96,6 +96,10 @@
 
 .hero-balance {
   margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
 .hero-progress-pill {
