@@ -13,7 +13,10 @@ import {
 } from 'ionicons/icons';
 import { getAllCompanies, getBranchesByCompany, Company, CompanyBranch } from '../../api/companiesApi';
 import { RoleCode, ROLE_GROUPS } from '../../config/rolePermissions';
-import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, ContactCheckResult } from '../../api/usersApi';
+import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, checkUsername, ContactCheckResult } from '../../api/usersApi';
+import { createOrUpdateClient, getAllClients, ClientType } from '../../api/clientsApi';
+import { useUser } from '../../components/UserContext';
+import { getPostLoginRoute } from '../../utils/postLoginRoute';
 
 // ── Application profiles ────────────────────────────────────────────────────
 
@@ -39,7 +42,7 @@ const APP_PROFILES: AppProfile[] = [
   },
   {
     id: 'loans',
-    label: 'Préstamos P2P',
+    label: 'SmartLoans',
     description: 'Créditos, chat, validación facial y pagos Stripe.',
     icon: '💰',
     modules: ['clients', 'clientFaceRecognition', 'pushNotifications', 'loanChat', 'accounting_ledger'],
@@ -70,6 +73,18 @@ const ALL_MODULES = [
   { id: 'loanChat',              label: 'Chat de Préstamos' },
 ];
 
+// Client type is a real choice the client makes at signup (previously
+// hardcoded to 'borrower' for every phone-based registration) — mirrors
+// the selector in ClientsPage.tsx's client wizard.
+const CLIENT_TYPES: { id: ClientType; icon: string; label: string; desc: string; color: string }[] = [
+  { id: 'borrower', icon: '📋', label: 'Acreditado',            desc: 'Solicita préstamo',          color: '#2563eb' },
+  { id: 'lender',   icon: '💼', label: 'Prestamista',           desc: 'Financia préstamos',         color: '#15803d' },
+  { id: 'both',     icon: '🔄', label: 'Ambos',                 desc: 'Acreditado y prestamista',   color: '#7c3aed' },
+  { id: 'lawyer',   icon: '⚖️', label: 'Licenciado en derecho', desc: 'Asesoría legal',             color: '#b45309' },
+];
+
+const DEFAULT_ROLE_BY_PROFILE: Record<string, RoleCode> = { pos: 'employee', loans: 'borrower', custom: 'employee' };
+
 const ROLE_COLOR: Record<string, string> = {
   admin: '#dc2626', manager: '#d97706', employee: '#2563eb',
   borrower: '#059669', lender: '#7c3aed', business: '#0369a1', viewer: '#6b7280',
@@ -81,6 +96,16 @@ const STEPS = ['Cuenta', 'Perfil', 'Verificar', 'Acceso'];
 
 const CreateAccount: React.FC = () => {
   const history = useHistory();
+  const { isAuthenticated, roleCode: sessionRoleCode, clientId: sessionClientId } = useUser();
+
+  // An already-authenticated visitor (e.g. still logged in from a previous
+  // session) shouldn't see the signup form or the app's tab bar bleeding
+  // through underneath it — send them straight to their own dashboard.
+  useEffect(() => {
+    if (isAuthenticated) {
+      history.replace(getPostLoginRoute(sessionRoleCode, sessionClientId));
+    }
+  }, [isAuthenticated, sessionRoleCode, sessionClientId, history]);
 
   const [step, setStep] = useState(0);
 
@@ -94,7 +119,29 @@ const CreateAccount: React.FC = () => {
   const [existingRecord, setExistingRecord] = useState<ContactCheckResult | null>(null);
   const lookupTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Known client (matched by phone) missing email on file — optional field to
+  // complete their client record while they claim their account.
+  const [completeEmail, setCompleteEmail] = useState('');
+
+  // Client type — only asked for brand-new phone-based registrations (a
+  // dbo.clients row is only created in that case). Was previously hardcoded
+  // to 'borrower'; the client now picks it themselves.
+  const [clientType, setClientType] = useState<ClientType>('borrower');
+
+  // SmartLoans (step "Perfil") requires a dbo.clients row — clients.cellphone
+  // is NOT NULL + UNIQUE, so an email-only signup (no client row created at
+  // step "Cuenta") needs a phone collected here before it can proceed.
+  const [loansPhone, setLoansPhone] = useState('');
+  const [loansPhoneCheck, setLoansPhoneCheck] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const loansPhoneTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [username, setUsername]         = useState('');
+
+  // Username availability — debounced check against dbo.users.name
+  const [usernameCheck, setUsernameCheck] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
+  const usernameTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [password, setPassword]         = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword]         = useState(false);
@@ -123,6 +170,9 @@ const CreateAccount: React.FC = () => {
 
   // Persisted user ID from step 0 save — used for steps 1-3 updates
   const [createdUserId, setCreatedUserId] = useState<number | null>(null);
+  // Client stub created at step "Perfil" when profile === 'loans'; patched with
+  // companyId at step "Acceso" once it's known (clients.companyId is nullable).
+  const [createdClientId, setCreatedClientId] = useState<number | null>(null);
   const [stepSaved, setStepSaved] = useState<boolean[]>([false, false, false, false]);
 
   const [loading, setLoading] = useState(false);
@@ -131,6 +181,26 @@ const CreateAccount: React.FC = () => {
   useEffect(() => {
     getAllCompanies().then(setCompanies).catch(() => setCompanies([]));
   }, []);
+
+  // The SmartLoans profile only ever runs under one company — auto-select
+  // it instead of showing the POS company picker. This also closes the gap
+  // that let step "Acceso" finish with no company selected at all (the
+  // account would then keep whatever role/company it had before, silently
+  // ignoring the role just chosen in the wizard).
+  useEffect(() => {
+    if (selectedProfile !== 'loans' || companies.length === 0) return;
+    const smartLoans = companies.find(c => c.name.trim().toLowerCase() === 'smartloans');
+    if (!smartLoans || selectedCompany?.companyId === smartLoans.companyId) return;
+    console.log('[autoSelectSmartLoans] companyId=', smartLoans.companyId);
+    setSelectedCompany(smartLoans);
+    setSelectedBranch(null);
+    getBranchesByCompany(smartLoans.companyId)
+      .then(list => {
+        setBranches(list);
+        if (list.length > 0) setSelectedBranch(list[0]);
+      })
+      .catch(() => setBranches([]));
+  }, [selectedProfile, companies, selectedCompany]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -209,9 +279,74 @@ const CreateAccount: React.FC = () => {
     }
   };
 
+  // Phone collected on step "Perfil" for an email-only SmartLoans signup —
+  // clients.cellphone is NOT NULL + UNIQUE, so check it's not already taken
+  // before letting the client row get created (same checkContact used for
+  // the main contact field, same debounce pattern).
+  const handleLoansPhoneChange = (v: string) => {
+    setLoansPhone(v);
+    setLoansPhoneCheck('idle');
+    if (loansPhoneTimerRef.current) clearTimeout(loansPhoneTimerRef.current);
+
+    if (!isPhoneValid(v)) return;
+
+    setLoansPhoneCheck('checking');
+    loansPhoneTimerRef.current = setTimeout(async () => {
+      try {
+        const result = await checkContact(normalizePhone(v));
+        console.log('[loansPhoneLookup] result=', result);
+        setLoansPhoneCheck(result.found ? 'taken' : 'available');
+      } catch (err) {
+        console.error('[loansPhoneLookup] ERROR', err);
+        setLoansPhoneCheck('idle'); // fail open — backend UNIQUE constraint is the real guard
+      }
+    }, 600);
+  };
+
+  const handleUsernameChange = (v: string) => {
+    setUsername(v);
+    setUsernameCheck('idle');
+    setUsernameSuggestions([]);
+    if (usernameTimerRef.current) clearTimeout(usernameTimerRef.current);
+
+    const trimmed = v.trim();
+    if (trimmed.length < 3) return; // too short to bother checking
+
+    setUsernameCheck('checking');
+    usernameTimerRef.current = setTimeout(async () => {
+      try {
+        console.log('[usernameCheck] checking username=', trimmed);
+        const result = await checkUsername(trimmed);
+        console.log('[usernameCheck] result=', result);
+        if (result.available) {
+          setUsernameCheck('available');
+          setUsernameSuggestions([]);
+        } else {
+          setUsernameCheck('taken');
+          setUsernameSuggestions(result.suggestions || []);
+        }
+      } catch (err) {
+        console.error('[usernameCheck] ERROR', err);
+        setUsernameCheck('idle'); // fail open — don't block on a check we couldn't run
+      }
+    }, 500);
+  };
+
+  const applyUsernameSuggestion = (s: string) => {
+    console.log('[usernameCheck] suggestion applied=', s);
+    setUsername(s);
+    setUsernameCheck('available');
+    setUsernameSuggestions([]);
+  };
+
   // For createUser: route to correct field based on detected type
   const contactEmail    = contactType === 'email' ? contact.trim() : '';
   const contactPhone    = contactType === 'phone' ? normalizePhone(contact) : '';
+
+  // The phone actually usable for the dbo.clients row — either the original
+  // contact (if it was a phone) or the one collected on step "Perfil" for an
+  // email-only SmartLoans signup.
+  const effectivePhone  = contactPhone || (loansPhone ? normalizePhone(loansPhone) : '');
 
   // Derived: what target and channel to use in verification
   // Phone is always normalized to E.164 so Twilio accepts it
@@ -248,7 +383,7 @@ const CreateAccount: React.FC = () => {
     setVerifyingCode(true);
     console.log('[handleVerifyCode] target=%s code=%s', verifyTarget, enteredCode);
     try {
-      const valid = await verifyCode(verifyTarget, enteredCode);
+      const valid = await verifyCode(verifyTarget, enteredCode, createdUserId ?? undefined);
       console.log('[handleVerifyCode] valid=', valid);
       if (!valid) { setMessage('Código incorrecto o expirado. Intenta de nuevo.'); return; }
       setIdentityVerified(true);
@@ -265,25 +400,34 @@ const CreateAccount: React.FC = () => {
   const strength = pwdStrength(password);
 
   const contactValid = contactType !== 'unknown';
-  const step0Valid = contactValid && username.trim() && strength !== '' && password === confirmPassword;
+  const step0Valid = contactValid && username.trim() && usernameCheck !== 'taken' && strength !== '' && password === confirmPassword;
 
   const selectProfile = (profile: AppProfile) => {
+    console.log('[selectProfile] profile=%s modules=%o', profile.id, profile.modules);
     setSelectedProfile(profile.id);
     setEnabledModules(profile.id === 'custom' ? [] : [...profile.modules]);
-    const defaults: Record<string, RoleCode> = { pos: 'employee', loans: 'borrower', custom: 'employee' };
-    setUserRole(defaults[profile.id] ?? 'employee');
+    setUserRole(DEFAULT_ROLE_BY_PROFILE[profile.id] ?? 'employee');
   };
 
-  const toggleModule = (id: string) =>
+  const toggleModule = (id: string) => {
+    console.log('[toggleModule] id=%s', id);
     setEnabledModules(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
+  };
 
   const handleSelectCompany = async (company: Company) => {
+    console.log('[handleSelectCompany] companyId=%d name=%s', company.companyId, company.name);
     setSelectedCompany(company);
     setSelectedBranch(null);
     setBranches([]);
     setBranchScreen(true);
-    try { setBranches(await getBranchesByCompany(company.companyId)); }
-    catch { setBranches([]); }
+    try {
+      const branchList = await getBranchesByCompany(company.companyId);
+      console.log('[handleSelectCompany] branches=%o', branchList);
+      setBranches(branchList);
+    } catch (err) {
+      console.error('[handleSelectCompany] ERROR', err);
+      setBranches([]);
+    }
   };
 
   const markSaved = (s: number) =>
@@ -296,30 +440,126 @@ const CreateAccount: React.FC = () => {
     console.log('[handleStep0Next] contact=%s type=%s existing=%o', contact, contactType, existingRecord);
     try {
       let uid: number | null = null;
+      // Which step to land on next — only existing accounts with an
+      // incomplete registration resume anywhere but "Perfil" (step 1).
+      let resumeAtStep = 1;
 
       if (existingRecord?.found && existingRecord.userId) {
         // Existing user account → just update credentials (password reset / link)
         console.log('[handleStep0Next] updating existing userId=', existingRecord.userId);
         await updateUser(existingRecord.userId, { name: username, password });
         uid = existingRecord.userId;
+
+        // Resume at the first incomplete step, prefilling whatever was
+        // already saved so it isn't asked again.
+        if (existingRecord.stepProfile === 1) {
+          if (existingRecord.appProfile) {
+            setSelectedProfile(existingRecord.appProfile);
+            setUserRole(DEFAULT_ROLE_BY_PROFILE[existingRecord.appProfile] ?? 'employee');
+          }
+          if (existingRecord.enabledModules) setEnabledModules(existingRecord.enabledModules);
+          markSaved(1);
+        }
+        if (existingRecord.stepVerify === 1) {
+          setIdentityVerified(true);
+          markSaved(2);
+        }
+        if (existingRecord.stepProfile !== 1) resumeAtStep = 1;
+        else if (existingRecord.stepVerify !== 1) resumeAtStep = 2;
+        else if (existingRecord.stepAccess !== 1) resumeAtStep = 3;
+        console.log('[handleStep0Next] resuming incomplete registration at step=%d', resumeAtStep);
+      } else if (existingRecord?.found && existingRecord.clientId) {
+        // Known client (staff-onboarded), no account yet — "Cliente encontrado,
+        // completa el registro". Link the new login to that clientId instead of
+        // creating a disconnected user row.
+        console.log('[handleStep0Next] existing client clientId=%d, no account yet — creating linked user', existingRecord.clientId);
+        const data = await createUser({
+          email:     contactEmail || completeEmail || undefined,
+          cellphone: contactPhone || undefined,
+          name:      username,
+          password,
+          clientId:  existingRecord.clientId,
+        });
+        console.log('[handleStep0Next] createUser (linked) response', data);
+        const rawUid = data.userId ?? data.id ?? (data as any).users?.[0]?.userId;
+        uid = rawUid ? Number(rawUid) : null;
+        setCreatedClientId(existingRecord.clientId);
+
+        // Client matched via phone and had no email on file — complete it.
+        if (completeEmail.trim()) {
+          console.log('[handleStep0Next] completing client email=%s for clientId=%d', completeEmail, existingRecord.clientId);
+          try {
+            const [firstName, ...rest] = (existingRecord.firstName ? `${existingRecord.firstName} ${existingRecord.lastName ?? ''}` : username).trim().split(/\s+/);
+            await createOrUpdateClient({
+              clients: [{
+                clientId: existingRecord.clientId,
+                first_name: existingRecord.firstName || firstName || username.trim(),
+                last_name:  existingRecord.lastName || rest.join(' ') || '-',
+                cellphone:  existingRecord.cellphone || contactPhone,
+                email:      completeEmail.trim(),
+                action: '2',
+              }],
+            });
+          } catch (completeErr) {
+            console.error('[handleStep0Next] complete client email ERROR', completeErr);
+          }
+        }
       } else {
-        // New record — create user
+        // New record — create the client at the same time as the user, not a
+        // later step, so they're never left disconnected. Only possible with
+        // a real phone number: clients.cellphone is NOT NULL + UNIQUE, so an
+        // email-only signup still can't get a client row (same constraint as
+        // before — a blank placeholder would collide on the second such signup).
+        let newClientId: number | null = null;
+        if (contactPhone) {
+          const [firstName, ...rest] = username.trim().split(/\s+/);
+          const lastName = rest.join(' ') || '-';
+          console.log('[handleStep0Next] creating client alongside new user for', firstName, lastName);
+          try {
+            await createOrUpdateClient({
+              clients: [{
+                clientId: 0,
+                first_name: firstName || username.trim(),
+                last_name: lastName,
+                cellphone: contactPhone,
+                email: contactEmail,
+                clientType,
+                action: '1',
+              }],
+            });
+            // sp_clients doesn't hand back the new clientId directly — re-fetch
+            // and match by contact, same pattern used in ClientSelector.tsx.
+            const allClients = await getAllClients();
+            const digits = (v: string) => v.replace(/\D/g, '');
+            const match = allClients.find(c => digits(c.cellphone || '') === digits(contactPhone));
+            console.log('[handleStep0Next] client created, matched clientId=', match?.clientId);
+            if (match) newClientId = match.clientId;
+          } catch (clientErr) {
+            console.error('[handleStep0Next] client creation ERROR', clientErr);
+          }
+        } else {
+          console.log('[handleStep0Next] email-only contact — skipping client creation (no phone to satisfy clients.cellphone NOT NULL+UNIQUE)');
+        }
+
+        // New record — create user, already linked to the client if one was created
         const data = await createUser({
           email:     contactEmail || undefined,
           cellphone: contactPhone || undefined,
           name:      username,
           password,
+          clientId:  newClientId ?? undefined,
         });
         console.log('[handleStep0Next] createUser response', data);
         const rawUid = data.userId ?? data.id ?? (data as any).users?.[0]?.userId;
         console.log('[handleStep0Next] extracted uid=', rawUid);
         uid = rawUid ? Number(rawUid) : null;
+        if (newClientId) setCreatedClientId(newClientId);
       }
 
       if (uid) setCreatedUserId(uid);
       setVerifyChannel(contactType === 'phone' ? 'sms' : 'email');
       markSaved(0);
-      setStep(1);
+      setStep(resumeAtStep);
     } catch (err) {
       console.error('[handleStep0Next] ERROR', err);
       setMessage((err as Error).message ?? 'Error al guardar las credenciales.');
@@ -328,9 +568,25 @@ const CreateAccount: React.FC = () => {
     }
   };
 
-  // Step 1 → save profile + modules, advance to verification
+  // Step 1 → save profile + modules → advance to verification.
+  // Client creation normally happens at step "Cuenta" (handleStep0Next),
+  // alongside the user itself, for any signup with a phone. An email-only
+  // signup that picks SmartLoans here still needs a dbo.clients row
+  // (clients.cellphone is NOT NULL + UNIQUE) — collected and created below.
+  const needsClientPhone = selectedProfile === 'loans' && !createdClientId && !contactPhone;
+
   const handleStep1Next = async () => {
     if (!selectedProfile) { setMessage('Selecciona un perfil de aplicación.'); return; }
+    if (needsClientPhone) {
+      if (!isPhoneValid(loansPhone)) {
+        setMessage('Ingresa un teléfono válido para continuar con SmartLoans.');
+        return;
+      }
+      if (loansPhoneCheck !== 'available') {
+        setMessage(loansPhoneCheck === 'taken' ? 'Este teléfono ya está registrado.' : 'Espera a que se verifique el teléfono.');
+        return;
+      }
+    }
     setLoading(true);
     console.log('[handleStep1Next] userId=%d profile=%s modules=%o', createdUserId, selectedProfile, enabledModules);
     try {
@@ -338,6 +594,40 @@ const CreateAccount: React.FC = () => {
         const data = await updateUser(createdUserId, { appProfile: selectedProfile, enabledModules });
         console.log('[handleStep1Next] response', data);
       }
+
+      if (needsClientPhone && createdUserId) {
+        const [firstName, ...rest] = username.trim().split(/\s+/);
+        const lastName = rest.join(' ') || '-';
+        console.log('[handleStep1Next] creating client for SmartLoans (email-only signup), phone=%s', effectivePhone);
+        try {
+          await createOrUpdateClient({
+            clients: [{
+              clientId: 0,
+              first_name: firstName || username.trim(),
+              last_name: lastName,
+              cellphone: effectivePhone,
+              email: contactEmail,
+              clientType,
+              action: '1',
+            }],
+          });
+          // sp_clients doesn't hand back the new clientId directly — re-fetch
+          // and match by contact, same pattern used in handleStep0Next.
+          const allClients = await getAllClients();
+          const digits = (v: string) => v.replace(/\D/g, '');
+          const match = allClients.find(c => digits(c.cellphone || '') === digits(effectivePhone));
+          console.log('[handleStep1Next] client created, matched clientId=', match?.clientId);
+          if (match) {
+            setCreatedClientId(match.clientId);
+            await updateUser(createdUserId, { clientId: match.clientId, cellphone: effectivePhone });
+          }
+        } catch (clientErr) {
+          console.error('[handleStep1Next] client creation ERROR', clientErr);
+          setMessage((clientErr as Error).message ?? 'Error al crear el registro de cliente.');
+          return;
+        }
+      }
+
       markSaved(1);
       setStep(2);
     } catch (err) {
@@ -350,6 +640,7 @@ const CreateAccount: React.FC = () => {
 
   // Step 3 → save role/company/branch → done
   const handleStep3Submit = async () => {
+    if (!selectedCompany) { setMessage('Selecciona una empresa.'); return; }
     setLoading(true);
     console.log('[handleStep3Submit] userId=%d role=%s companyId=%d branchId=%d',
       createdUserId, userRole, selectedCompany?.companyId, selectedBranch?.branchId);
@@ -362,6 +653,33 @@ const CreateAccount: React.FC = () => {
         });
         console.log('[handleStep3Submit] response', data);
       }
+
+      if (createdClientId && selectedCompany?.companyId) {
+        // sp_clients' UPDATE action overwrites first_name/last_name/cellphone/email
+        // unconditionally (no NULLIF) — must resend the real values, not blanks,
+        // or this patch would wipe the client stub created at step "Perfil".
+        const [firstName, ...rest] = username.trim().split(/\s+/);
+        const lastName = rest.join(' ') || '-';
+        console.log('[handleStep3Submit] patching clientId=%d companyId=%d', createdClientId, selectedCompany.companyId);
+        try {
+          const clientData = await createOrUpdateClient({
+            clients: [{
+              clientId: createdClientId,
+              companyId: selectedCompany.companyId,
+              first_name: firstName || username.trim(),
+              last_name: lastName,
+              cellphone: effectivePhone,
+              email: contactEmail,
+              clientType,
+              action: '2',
+            }],
+          });
+          console.log('[handleStep3Submit] client companyId patch response', clientData);
+        } catch (clientErr) {
+          console.error('[handleStep3Submit] client companyId patch ERROR', clientErr);
+        }
+      }
+
       markSaved(3);
       setMessage('¡Cuenta creada exitosamente!');
       setTimeout(() => history.push('/login'), 1400);
@@ -374,12 +692,14 @@ const CreateAccount: React.FC = () => {
   };
 
   const goNext = () => {
+    console.log('[goNext] from step=%d (%s)', step, STEPS[step]);
     if (step === 0) { handleStep0Next(); return; }
     if (step === 1) { handleStep1Next(); return; }
     // step 2 is verify — handled inline by renderStep2 buttons (no footer Next)
   };
 
   const goBack = () => {
+    console.log('[goBack] from step=%d branchScreen=%s', step, branchScreen);
     if (branchScreen) { setBranchScreen(false); return; }
     setStep(s => s - 1);
   };
@@ -406,6 +726,39 @@ const CreateAccount: React.FC = () => {
   );
 
   // ── Step 0: Credentials ───────────────────────────────────────────────────
+
+  // Shared "Tipo de cliente" picker — rendered wherever a dbo.clients row is
+  // about to be created, so clientType is always a real choice (never left
+  // at its 'borrower' default) regardless of which signup path got here.
+  const renderClientTypePicker = () => (
+    <div style={{ marginBottom: 16 }}>
+      <p className="ca-step-desc" style={{ textAlign: 'left', margin: '0 0 8px' }}>Tipo de cliente:</p>
+      <div className="ca-profile-list">
+        {CLIENT_TYPES.map(t => {
+          const selected = clientType === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className={`ca-profile-btn${selected ? ' selected' : ''}`}
+              style={selected ? { borderColor: t.color, background: `${t.color}14` } : undefined}
+              onClick={() => setClientType(t.id)}
+            >
+              <div className="ca-profile-icon-wrap" style={selected ? { background: `${t.color}20`, color: t.color } : undefined}>
+                <span style={{ fontSize: 20 }}>{t.icon}</span>
+              </div>
+              <div className="ca-profile-text">
+                <span className="ca-profile-name" style={selected ? { color: t.color } : undefined}>{t.label}</span>
+                <span className="ca-profile-desc">{t.desc}</span>
+              </div>
+              <div className={`ca-radio-dot${selected ? ' selected' : ''}`}
+                style={selected ? { borderColor: t.color, background: t.color } : undefined} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   const renderStep0 = () => (
     <div className="ca-step-body">
@@ -449,12 +802,14 @@ const CreateAccount: React.FC = () => {
         )}
 
         {contactCheck === 'found' && existingRecord && (() => {
-          const hasAcc = existingRecord.hasAccount === 1;
+          const hasAcc      = existingRecord.hasAccount === 1;
+          const regComplete = existingRecord.regComplete === 1;
           const pct    = existingRecord.completionPct ?? 0;
           const steps  = existingRecord.stepsCompleted ?? 0;
 
-          // ── Existing account → prompt to login instead ──────────────────
-          if (hasAcc) {
+          // ── Account fully registered (Cuenta+Perfil+Verificar+Acceso all
+          // done) → prompt to login instead of letting the wizard restart ──
+          if (hasAcc && regComplete) {
             return (
               <div className="ca-lookup-card ca-lookup-card--has-account">
                 <div className="ca-lookup-card-icon">🔒</div>
@@ -473,6 +828,27 @@ const CreateAccount: React.FC = () => {
                   >
                     Ir al inicio de sesión →
                   </button>
+                </div>
+              </div>
+            );
+          }
+
+          // ── Account exists but the wizard was abandoned partway → resume
+          // at the first incomplete step (handled in handleStep0Next) ─────
+          if (hasAcc && !regComplete) {
+            const missing = [
+              existingRecord.stepProfile !== 1 && 'Perfil de aplicación',
+              existingRecord.stepVerify  !== 1 && 'Verificación de identidad',
+              existingRecord.stepAccess  !== 1 && 'Rol y empresa (Acceso)',
+            ].filter(Boolean) as string[];
+            return (
+              <div className="ca-lookup-card ca-lookup-card--found">
+                <div className="ca-lookup-card-icon">⏳</div>
+                <div className="ca-lookup-card-body">
+                  <div className="ca-lookup-card-title">Registro incompleto</div>
+                  <div className="ca-lookup-card-detail">
+                    Ya tienes una cuenta, pero falta completar: {missing.join(', ')}. Continúa donde te quedaste.
+                  </div>
                 </div>
               </div>
             );
@@ -513,6 +889,19 @@ const CreateAccount: React.FC = () => {
                     </span>
                   ))}
                 </div>
+                {!existingRecord.email && (
+                  <div className="ca-complete-field">
+                    <IonInput
+                      fill="outline" label="Email (opcional, completa tu registro)" labelPlacement="floating"
+                      type="email" value={completeEmail}
+                      onIonInput={e => {
+                        const v = e.detail.value || '';
+                        console.log('[completeEmail] value=', v);
+                        setCompleteEmail(v);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -528,11 +917,51 @@ const CreateAccount: React.FC = () => {
           </div>
         )}
 
+        {/* A dbo.clients row is created immediately for a new phone-based
+            signup — let the client pick what kind of client they are
+            instead of defaulting everyone to "Acreditado". (Email-first
+            signups get the same picker later, in renderStep1, once we know
+            they'll need a dbo.clients row for SmartLoans — see
+            needsClientPhone.) */}
+        {contactCheck === 'new' && contactType === 'phone' && renderClientTypePicker()}
+
         <IonInput
           fill="outline" label="Nombre de usuario" labelPlacement="floating"
           type="text" value={username}
-          onIonInput={e => setUsername(e.detail.value || '')}
+          onIonInput={e => handleUsernameChange(e.detail.value || '')}
+          className={usernameCheck === 'taken' ? 'ion-invalid ion-touched' : ''}
+          errorText={usernameCheck === 'taken' ? 'Este nombre de usuario ya existe.' : undefined}
         />
+
+        {usernameCheck === 'checking' && (
+          <div className="ca-lookup-row">
+            <IonSpinner name="crescent" style={{ width: 14, height: 14 }} />
+            <span>Verificando disponibilidad…</span>
+          </div>
+        )}
+
+        {usernameCheck === 'available' && (
+          <div className="ca-lookup-row" style={{ color: '#059669' }}>
+            <IonIcon icon={checkmark} style={{ fontSize: 14 }} />
+            <span>Nombre de usuario disponible</span>
+          </div>
+        )}
+
+        {usernameCheck === 'taken' && usernameSuggestions.length > 0 && (
+          <div className="ca-username-suggestions">
+            <span className="ca-username-suggestions-label">Prueba con:</span>
+            {usernameSuggestions.map(s => (
+              <button
+                key={s}
+                type="button"
+                className="ca-username-suggestion-chip"
+                onClick={() => applyUsernameSuggestion(s)}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="ca-password-wrap">
           <IonInput
@@ -622,6 +1051,39 @@ const CreateAccount: React.FC = () => {
           );
         })}
       </div>
+
+      {/* SmartLoans needs a dbo.clients row (cellphone NOT NULL + UNIQUE) —
+          collect it here when the signup was email-only, and let the client
+          pick their clientType too (the phone-first picker in renderStep0
+          never ran for this path — see contactType === 'phone' gate there). */}
+      {needsClientPhone && renderClientTypePicker()}
+      {needsClientPhone && (
+        <div className="ca-form-fields" style={{ marginTop: 16, marginBottom: 4 }}>
+          <IonInput
+            fill="outline" label="Teléfono (requerido para SmartLoans)" labelPlacement="floating"
+            type="tel" value={loansPhone}
+            onIonInput={e => handleLoansPhoneChange(e.detail.value || '')}
+            className={(loansPhone && !isPhoneValid(loansPhone)) || loansPhoneCheck === 'taken' ? 'ion-invalid ion-touched' : ''}
+            errorText={
+              loansPhone && !isPhoneValid(loansPhone) ? 'Ingresa un teléfono válido.'
+              : loansPhoneCheck === 'taken' ? 'Este teléfono ya está registrado.'
+              : undefined
+            }
+          />
+          {loansPhoneCheck === 'checking' && (
+            <div className="ca-lookup-row">
+              <IonSpinner name="crescent" style={{ width: 14, height: 14 }} />
+              <span>Verificando disponibilidad…</span>
+            </div>
+          )}
+          {loansPhoneCheck === 'available' && (
+            <div className="ca-lookup-row" style={{ color: '#059669' }}>
+              <IonIcon icon={checkmark} style={{ fontSize: 14 }} />
+              <span>Teléfono disponible</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Active modules summary */}
       {selectedProfile && selectedProfile !== 'custom' && (
@@ -717,50 +1179,60 @@ const CreateAccount: React.FC = () => {
           })}
         </div>
 
-        {/* Company / branch */}
-        <p className="ca-section-label">
-          {branchScreen ? (
-            <button type="button" className="ca-back-inline" onClick={() => setBranchScreen(false)}>
-              <IonIcon icon={chevronBack} /> {selectedCompany?.name}
-            </button>
-          ) : 'Empresa:'}
-        </p>
+        {/* Company / branch — the SmartLoans profile is scoped to SmartLoans only,
+            auto-selected above, so there's nothing to pick here. */}
+        {selectedProfile === 'loans' ? (
+          <div className="ca-summary-box" style={{ marginBottom: 20 }}>
+            <div className="ca-summary-row"><span>Empresa</span><strong>{selectedCompany?.name ?? 'SmartLoans'}</strong></div>
+            <div className="ca-summary-row"><span>Sucursal</span><strong>{selectedBranch?.name ?? '—'}</strong></div>
+          </div>
+        ) : (
+          <>
+            <p className="ca-section-label">
+              {branchScreen ? (
+                <button type="button" className="ca-back-inline" onClick={() => setBranchScreen(false)}>
+                  <IonIcon icon={chevronBack} /> {selectedCompany?.name}
+                </button>
+              ) : 'Empresa:'}
+            </p>
 
-        <div className="ca-company-list">
-          {!branchScreen ? (
-            companies.length === 0
-              ? <p className="ca-empty-msg">No hay empresas disponibles.</p>
-              : companies.map(c => (
-                <button
-                  key={c.companyId}
-                  type="button"
-                  className={`ca-company-btn${selectedCompany?.companyId === c.companyId ? ' selected' : ''}`}
-                  onClick={() => handleSelectCompany(c)}
-                >
-                  <div className="ca-company-icon">🏢</div>
-                  <span className="ca-company-name">{c.name}</span>
-                  <IonIcon icon={chevronForward} className="ca-company-arrow" />
-                </button>
-              ))
-          ) : (
-            branches.length === 0
-              ? <p className="ca-empty-msg">Sin sucursales — se vinculará solo la empresa.</p>
-              : branches.map(b => (
-                <button
-                  key={b.branchId}
-                  type="button"
-                  className={`ca-company-btn${selectedBranch?.branchId === b.branchId ? ' selected' : ''}`}
-                  onClick={() => setSelectedBranch(prev => prev?.branchId === b.branchId ? null : b)}
-                >
-                  <div className="ca-company-icon">📍</div>
-                  <span className="ca-company-name">{b.name}</span>
-                  {selectedBranch?.branchId === b.branchId
-                    ? <IonIcon icon={checkmark} className="ca-company-check" />
-                    : <IonIcon icon={chevronForward} className="ca-company-arrow" />}
-                </button>
-              ))
-          )}
-        </div>
+            <div className="ca-company-list">
+              {!branchScreen ? (
+                companies.length === 0
+                  ? <p className="ca-empty-msg">No hay empresas disponibles.</p>
+                  : companies.map(c => (
+                    <button
+                      key={c.companyId}
+                      type="button"
+                      className={`ca-company-btn${selectedCompany?.companyId === c.companyId ? ' selected' : ''}`}
+                      onClick={() => handleSelectCompany(c)}
+                    >
+                      <div className="ca-company-icon">🏢</div>
+                      <span className="ca-company-name">{c.name}</span>
+                      <IonIcon icon={chevronForward} className="ca-company-arrow" />
+                    </button>
+                  ))
+              ) : (
+                branches.length === 0
+                  ? <p className="ca-empty-msg">Sin sucursales — se vinculará solo la empresa.</p>
+                  : branches.map(b => (
+                    <button
+                      key={b.branchId}
+                      type="button"
+                      className={`ca-company-btn${selectedBranch?.branchId === b.branchId ? ' selected' : ''}`}
+                      onClick={() => setSelectedBranch(prev => prev?.branchId === b.branchId ? null : b)}
+                    >
+                      <div className="ca-company-icon">📍</div>
+                      <span className="ca-company-name">{b.name}</span>
+                      {selectedBranch?.branchId === b.branchId
+                        ? <IonIcon icon={checkmark} className="ca-company-check" />
+                        : <IonIcon icon={chevronForward} className="ca-company-arrow" />}
+                    </button>
+                  ))
+              )}
+            </div>
+          </>
+        )}
 
         {/* Summary */}
         <div className="ca-summary-box">
@@ -941,7 +1413,7 @@ const CreateAccount: React.FC = () => {
                 type="button"
                 className="ca-btn-next"
                 onClick={goNext}
-                disabled={loading || (step === 0 && existingRecord?.hasAccount === 1)}
+                disabled={loading || (step === 0 && existingRecord?.regComplete === 1)}
               >
                 {loading ? <IonSpinner name="crescent" style={{ width: 18, height: 18 }} /> : <>Siguiente <IonIcon icon={chevronForward} /></>}
               </button>

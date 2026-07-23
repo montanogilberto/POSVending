@@ -94,16 +94,38 @@
   color: #148742;
 }
 
-.hero-bell {
-  font-size: 1.35rem;
-  color: #2154db;
-  background: rgba(33, 84, 219, 0.12);
-  padding: 9px;
-  border-radius: 50%;
-}
-
 .hero-balance {
   margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.hero-progress-pill {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.hero-progress-pct {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2563eb;
+  line-height: 1;
+}
+
+.hero-progress-label {
+  font-size: 0.6rem;
+  color: #6b7280;
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
 .hero-balance span {

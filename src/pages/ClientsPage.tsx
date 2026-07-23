@@ -67,13 +67,13 @@ import {
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
-import { useUser } from '../../components/UserContext';
-import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr } from '../../api/clientsApi';
+import Header from '../components/Header';
+import AlertPopover from '../components/PopOver/AlertPopover';
+import MailPopover from '../components/PopOver/MailPopover';
+import { useUser } from '../components/UserContext';
+import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr } from '../api/clientsApi';
 import QRCode from 'qrcode';
-import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
+import { buildClientQrValue, downloadClientQrPdf } from '../utils/clientQrPdf';
 import {
   submitContractClientFaceRecognition,
   getAllClientFaceRecognitions,
@@ -83,20 +83,20 @@ import {
   reverseGeocode,
   ContractSubmissionRequest,
   ClientFaceRecognition,
-} from '../../api/clientFaceRecognitionApi';
-import LoanCompletionRing from '../../components/LoanCompletionRing';
-import GuidedDocumentCapture from '../../components/GuidedDocumentCapture';
-import FaceLivenessCapture, { FaceLivenessResult } from '../../components/FaceLivenessCapture';
-import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
-import SavedCardSetup from '../../components/SavedCardSetup';
-import { createPushNotification } from '../../api/pushNotificationsApi';
-import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary';
-import ZoomableImage from '../../components/ZoomableImage';
-import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
-import SignaturePad from '../../components/SignaturePad';
-import { cropIneSignatureRegion } from '../../utils/signatureCrop';
-import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
-import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
+} from '../api/clientFaceRecognitionApi';
+import LoanCompletionRing from '../components/LoanCompletionRing';
+import GuidedDocumentCapture from '../components/GuidedDocumentCapture';
+import FaceLivenessCapture, { FaceLivenessResult } from '../components/FaceLivenessCapture';
+import StripeAccountOnboarding from '../components/StripeAccountOnboarding';
+import SavedCardSetup from '../components/SavedCardSetup';
+import { createPushNotification } from '../api/pushNotificationsApi';
+import IdExtractedFieldsSummary from '../components/IdExtractedFieldsSummary';
+import ZoomableImage from '../components/ZoomableImage';
+import PresenceCapture, { PresenceCaptureResult } from '../components/PresenceCapture';
+import SignaturePad from '../components/SignaturePad';
+import { cropIneSignatureRegion } from '../utils/signatureCrop';
+import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../utils/faceLiveness';
+import { ExtractedIdFields, extractIneFields } from '../utils/idOcr';
 
 const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   nombre: '',
@@ -366,7 +366,7 @@ const ClientsPage: React.FC = () => {
   // ── Delete ─────────────────────────────────────────────────────────────────
   // ── App store links (update with real URLs once published) ───────────────
   const PLAY_STORE_URL  = 'https://play.google.com/store/apps/details?id=com.lavanderia.gmo';
-  const APP_STORE_URL   = 'https://apps.apple.com/app/pos-gmo/id000000000';
+  const APP_STORE_URL   = 'https://apps.apple.com/app/dashboard-gmo/id000000000';
 
   const buildShareMessage = (client: Client): string => {
     const name  = `${client.first_name} ${client.last_name}`;

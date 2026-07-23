@@ -4,6 +4,21 @@ import { Capacitor } from '@capacitor/core';
 
 const BIOMETRIC_LOCK_ENABLED_KEY = 'biometricLockEnabled';
 
+// Shared across every caller of authenticateBiometric() (not just
+// BiometricLockGate's own unlock flow) — the native biometric sheet runs in
+// its own Activity, so showing/dismissing it pauses/resumes the host app
+// just like backgrounding it would. Any page that calls authenticateBiometric
+// directly (payment authorization, liveness confirmation, enabling the lock
+// itself, etc.) would otherwise trigger BiometricLockGate's appStateChange
+// listener and get re-locked mid-flow, since that listener only knew to
+// ignore pauses it caused itself. Setting this flag here instead means every
+// caller is covered without each one needing its own guard.
+let isPromptInProgress = false;
+
+export function isBiometricPromptInProgress(): boolean {
+  return isPromptInProgress;
+}
+
 export async function isBiometricAvailable(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) {
     console.log('[BiometricAuth] isBiometricAvailable: web platform, returning false');
@@ -29,6 +44,7 @@ export async function authenticateBiometric(reason: string): Promise<boolean> {
     console.log('[BiometricAuth] authenticateBiometric: web platform, auto-resolving true');
     return true;
   }
+  isPromptInProgress = true;
   try {
     await BiometricAuth.authenticate({
       reason,
@@ -40,6 +56,16 @@ export async function authenticateBiometric(reason: string): Promise<boolean> {
   } catch (err) {
     console.log('[BiometricAuth] authenticateBiometric: FAILED/CANCELLED =', err);
     return false;
+  } finally {
+    // The native biometric sheet fires its own "app resumed" event AFTER its
+    // dismiss animation finishes — this lags behind the promise resolving
+    // here. Clearing the guard immediately leaves a gap where that trailing
+    // event slips through and BiometricLockGate re-locks right after a
+    // successful prompt (confirmed via device logs). Delaying the reset
+    // covers that gap.
+    setTimeout(() => {
+      isPromptInProgress = false;
+    }, 1000);
   }
 }
 

@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
-import { Redirect, Route, useHistory } from 'react-router-dom';
+import { Redirect, Route, useHistory, useLocation } from 'react-router-dom';
 import {
   IonApp,
   IonIcon,
@@ -29,7 +29,6 @@ import {
   IonButtons,
   setupIonicReact,
 } from '@ionic/react';
-import { menuController } from '@ionic/core';
 import { IonReactRouter } from '@ionic/react-router';
 import {
   cash,
@@ -45,7 +44,6 @@ import {
   mail,
   grid,
   person,
-  menu,
   water,
   storefrontOutline,
   cashOutline,
@@ -59,15 +57,19 @@ import {
   chatbubblesOutline,
   chevronBackOutline,
   chevronForwardOutline,
+  homeOutline,
+  cardOutline,
+  pulseOutline,
+  personCircleOutline,
 }
   from 'ionicons/icons';
   
 
-import Vending from './pages/pos/Vending';
+//import Vending from './pages/dashboard/Vending';
 import Setting from './pages/system/Setting';
-import Sells from './pages/pos/Sells';
+//mport Sells from './pages/dashboard/Sells';
 import Dashboard from './pages/Dashboard/Dashboard';
-import ScannerQR from './pages/pos/ScannerQR';
+//import ScannerQR from './pages/dashboard/ScannerQR';
 import Category from './pages/CategoryPage/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
@@ -128,7 +130,8 @@ import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import BiometricLockScreen from './components/BiometricLockScreen';
-import { isBiometricLockEnabled, authenticateBiometric } from './utils/biometricAuth';
+import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
+import { getPostLoginRoute } from './utils/postLoginRoute';
 
 setupIonicReact();
 
@@ -155,9 +158,17 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 };
 
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName, avatarUrl, userId, roleCode, roleName, setAvatarUrl } =
+  const { logout, username, companyName, branchName, avatarUrl, userId, clientId, roleCode, roleName, setAvatarUrl } =
     useUser();
+  const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
   const history = useHistory();
+  const location = useLocation();
+  // ClientDashboardPage's 5 sections are ?tab=... on one route, not separate
+  // routes — IonTabs matches tabs by path only (ignores query string), so a
+  // plain href would treat all 5 buttons as "already on this tab" and never
+  // navigate. Push manually and track the active one from the URL instead.
+  const activeClientDashboardTab = new URLSearchParams(location.search).get('tab') || 'home';
+  const goClientDashboardTab = (tab: string) => history.push(`/client-dashboard/${clientId}?tab=${tab}`);
   const [profileImageSrc, setProfileImageSrc] = useState(() =>
     resolveAvatarUrl(avatarUrl)
   );
@@ -252,10 +263,6 @@ const AppShell: React.FC = () => {
     history.push('/login');
   };
 
-  const openMainMenu = async () => {
-    await menuController.open('main-menu');
-  };
-
   return (
     <IonSplitPane
       contentId="main"
@@ -271,7 +278,7 @@ const AppShell: React.FC = () => {
       <IonMenu menuId="main-menu" contentId="main" side="start" className={menuCollapsed ? 'menu-rail' : ''}>
         <IonHeader className="menu-header">
           <IonToolbar>
-            {!menuCollapsed && <IonTitle>POS GMO</IonTitle>}
+            {!menuCollapsed && <IonTitle>{isSmartLoansRole ? 'SmartLoans' : 'POS GMO'}</IonTitle>}
             <IonButtons slot="end">
               <IonButton fill="clear" size="small" onClick={() => setMenuCollapsed(c => !c)} className="menu-collapse-btn">
                 <IonIcon icon={menuCollapsed ? chevronForwardOutline : chevronBackOutline} />
@@ -439,9 +446,9 @@ const AppShell: React.FC = () => {
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'clients') && (
-              <IonItem button routerLink="/p2p-lending" title="Préstamos P2P">
+              <IonItem button routerLink="/p2p-lending" title="SmartLoans">
                 <IonIcon icon={walletOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Préstamos P2P</IonLabel>}
+                {!menuCollapsed && <IonLabel>SmartLoans</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -457,7 +464,14 @@ const AppShell: React.FC = () => {
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'loanChat') && (
-              <IonItem button routerLink="/loan-chat/new" title="Chat de Préstamo">
+              <IonItem
+                button
+                // Borrowers land in a chat with the SmartLoans virtual agent
+                // (clientId must match LOANCHAT_AGENT_CLIENT_ID in the backend .env)
+                // by default, since there's no conversation-list view yet.
+                routerLink={roleCode === 'borrower' ? '/loan-chat/new?lenderId=2127' : '/loan-chat/new'}
+                title="Chat de Préstamo"
+              >
                 <IonIcon icon={chatbubblesOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Chat de Préstamo</IonLabel>}
               </IonItem>
@@ -509,11 +523,11 @@ const AppShell: React.FC = () => {
       <IonPage id="main">
         <IonTabs>
           <IonRouterOutlet>
-            <PrivateRoute exact path="/pos" component={Vending} />
+            
             <PrivateRoute exact path="/setting" component={Setting} />
-            <PrivateRoute exact path="/sells" component={Sells} />
+            
             <PrivateRoute exact path="/dashboard" component={Dashboard} />
-            <PrivateRoute exact path="/scannerqr" component={ScannerQR} />
+            
 
             <PrivateRoute exact path="/category" component={Category} />
             <PrivateRoute exact path="/products/:productId" component={ProductDetailPage} />
@@ -561,27 +575,34 @@ const AppShell: React.FC = () => {
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom" className="custom-tabbar">
-            <IonTabButton tab="dashboard" href="/dashboard">
-              <IonIcon aria-hidden="true" icon={home} />
-              <IonLabel>Dashboard</IonLabel>
-            </IonTabButton>
+            {isSmartLoansRole ? [
+              <IonTabButton key="cd-home" tab="cd-home" selected={activeClientDashboardTab === 'home'} onClick={() => goClientDashboardTab('home')}>
+                <IonIcon aria-hidden="true" icon={homeOutline} />
+                <IonLabel>Home</IonLabel>
+              </IonTabButton>,
+              <IonTabButton key="cd-loans" tab="cd-loans" selected={activeClientDashboardTab === 'loans'} onClick={() => goClientDashboardTab('loans')}>
+                <IonIcon aria-hidden="true" icon={walletOutline} />
+                <IonLabel>Préstamos</IonLabel>
+              </IonTabButton>,
+              <IonTabButton key="cd-payments" tab="cd-payments" selected={activeClientDashboardTab === 'payments'} onClick={() => goClientDashboardTab('payments')}>
+                <IonIcon aria-hidden="true" icon={cardOutline} />
+                <IonLabel>Pagos</IonLabel>
+              </IonTabButton>,
+              <IonTabButton key="cd-activity" tab="cd-activity" selected={activeClientDashboardTab === 'activity'} onClick={() => goClientDashboardTab('activity')}>
+                <IonIcon aria-hidden="true" icon={pulseOutline} />
+                <IonLabel>Actividad</IonLabel>
+              </IonTabButton>,
+              <IonTabButton key="cd-profile" tab="cd-profile" selected={activeClientDashboardTab === 'profile'} onClick={() => goClientDashboardTab('profile')}>
+                <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                <IonLabel>Perfil</IonLabel>
+              </IonTabButton>,
+            ] : (
+              <IonTabButton tab="dashboard" href="/dashboard">
+                <IonIcon aria-hidden="true" icon={home} />
+                <IonLabel>Dashboard</IonLabel>
+              </IonTabButton>
+            )}
 
-            <div
-              className="menu-tab-slot menu-tab"
-              role="button"
-              tabIndex={0}
-              aria-label="Abrir menú"
-              onClick={openMainMenu}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  openMainMenu();
-                }
-              }}
-            >
-              <IonIcon aria-hidden="true" icon={menu} />
-              <IonLabel className="menu-tab-bar-label">Menú</IonLabel>
-            </div>
           </IonTabBar>
         </IonTabs>
       </IonPage>
@@ -593,16 +614,18 @@ const AppShell: React.FC = () => {
 // so it survives back/forward navigation and route remounts. It renders as an
 // overlay on top of whatever page is currently showing.
 //
-// isAuthenticatingRef guards against a self-triggering loop: the native
-// biometric prompt runs in its own Activity, so showing/dismissing it
-// pauses/resumes the host app just like backgrounding it would — without this
-// guard, a successful unlock immediately re-triggers the resume listener and
-// re-locks the app.
+// isBiometricPromptInProgress() (biometricAuth.ts) guards against a
+// self-triggering loop: the native biometric prompt runs in its own
+// Activity, so showing/dismissing it pauses/resumes the host app just like
+// backgrounding it would. That guard is shared across every caller of
+// authenticateBiometric() (not just this gate's own unlock flow) — pages
+// like ClientFaceRecognitionPage or PaymentPage call it directly for their
+// own confirmation prompts, and without a shared guard each of those would
+// falsely read as the user backgrounding the app and re-lock mid-flow.
 const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, username, logout } = useUser();
+  const { isAuthenticated, username, roleCode, clientId, logout } = useUser();
   const history = useHistory();
   const [isLocked, setIsLocked] = useState(false);
-  const isAuthenticatingRef = useRef(false);
 
   useEffect(() => {
     console.log('[BiometricLockGate] effect running. isNative =', Capacitor.isNativePlatform(), 'isAuthenticated =', isAuthenticated);
@@ -625,8 +648,8 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
       }
 
       stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
-        console.log('[BiometricLockGate] appStateChange fired. isActive =', isActive, 'isAuthenticatingRef =', isAuthenticatingRef.current);
-        if (!isActive || isAuthenticatingRef.current) {
+        console.log('[BiometricLockGate] appStateChange fired. isActive =', isActive, 'isBiometricPromptInProgress =', isBiometricPromptInProgress());
+        if (!isActive || isBiometricPromptInProgress()) {
           console.log('[BiometricLockGate] appStateChange: ignoring (inactive or mid-authenticate)');
           return;
         }
@@ -654,29 +677,21 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
   // → reload → re-lock → close → reload → re-lock...). history.push is a
   // normal in-SPA navigation and does not remount this component.
   const handleUnlock = async () => {
-    console.log('[BiometricLockGate] handleUnlock: called, setting isAuthenticatingRef = true');
-    isAuthenticatingRef.current = true;
-    try {
-      const ok = await authenticateBiometric('Desbloquea la app para continuar');
-      console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
-      if (ok) {
-        console.log('[BiometricLockGate] handleUnlock: SUCCESS, setIsLocked(false) + navigating to /dashboard');
-        setIsLocked(false);
-        history.push('/dashboard');
-      } else {
-        console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
-      }
-    } finally {
-      // The native biometric sheet fires its own "app resumed" event AFTER
-      // its dismiss animation finishes — this lags behind the JS promise
-      // resolving here. Clearing the guard immediately left a gap where that
-      // trailing event slipped through and re-locked the app right after a
-      // successful unlock (confirmed via device logs). Delaying the reset
-      // covers that gap.
-      setTimeout(() => {
-        isAuthenticatingRef.current = false;
-        console.log('[BiometricLockGate] handleUnlock: delayed reset, isAuthenticatingRef = false');
-      }, 1000);
+    console.log('[BiometricLockGate] handleUnlock: called');
+    // authenticateBiometric() itself now sets the shared in-progress guard
+    // (see biometricAuth.ts) — no need to manage it here.
+    const ok = await authenticateBiometric('Desbloquea la app para continuar');
+    console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
+    if (ok) {
+      // Route by role, same as Login.tsx — this used to hardcode '/dashboard'
+      // (the POS dashboard) for everyone, which sent borrower/lender users to
+      // the wrong screen after unlocking instead of their own client dashboard.
+      const targetRoute = getPostLoginRoute(roleCode, clientId);
+      console.log('[BiometricLockGate] handleUnlock: SUCCESS, roleCode =', roleCode, 'clientId =', clientId, '→ navigating to', targetRoute);
+      setIsLocked(false);
+      history.push(targetRoute);
+    } else {
+      console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
     }
   };
 

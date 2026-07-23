@@ -9,7 +9,8 @@ import { eye, eyeOff, fingerPrintOutline } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
-import { normalizeRoleCode } from '../../config/rolePermissions';
+import { canAccess, normalizeRoleCode } from '../../config/rolePermissions';
+import { getPostLoginRoute } from '../../utils/postLoginRoute';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/CompanySelector/CompanySelector';
 import {
@@ -26,7 +27,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const history = useHistory();
-  const { login, setUserData, isAuthenticated, roleCode } = useUser();
+  const { login, setUserData, isAuthenticated, roleCode, clientId } = useUser();
 
   const usernameRef = useRef<string>('');
   const passwordRef = useRef<string>('');
@@ -84,13 +85,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     // instead of asking them to type credentials again.
     if (nextValue && isAuthenticated) {
       console.log('[Login] handleBiometricToggle: already authenticated, redirecting by role =', roleCode);
-      if (roleCode === 'borrower' || roleCode === 'lender') {
-        history.push('/p2p-lending');
-      } else if (roleCode === 'business' || roleCode === 'employee') {
-        history.push('/pos');
-      } else {
-        history.push('/dashboard');
-      }
+      history.push(getPostLoginRoute(roleCode, clientId));
     } else {
       console.log('[Login] handleBiometricToggle: not redirecting (nextValue/isAuthenticated false)');
     }
@@ -213,6 +208,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
     setShowCompanySelector(false);
 
+    // Cash register is a POS concept — skip entirely for roles that don't
+    // have POS access (e.g. borrower/lender on a SmartLoans account),
+    // instead of prompting every role to open a register that isn't theirs.
+    if (!canAccess(roleCode, 'pos')) {
+      console.log('💰 [CashRegister][Login] roleCode has no pos access — skipping cash register check.', { roleCode });
+      onLoginSuccess?.();
+      navigateAfterLogin(pending);
+      return;
+    }
+
     // Ask user to open cash register if currently closed (before navigating)
     try {
       console.log('💰 [CashRegister][Login] Checking cash register status...', { companyId, userId: pending.userId });
@@ -239,14 +244,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   const navigateAfterLogin = (pending: typeof pendingUserRef.current) => {
-    const role = pending?.roleCode;
-    if (role === 'borrower' || role === 'lender') {
-      history.push('/p2p-lending');
-    } else if (role === 'business' || role === 'employee') {
-      history.push('/pos');
-    } else {
-      history.push('/dashboard');
+    if ((pending?.roleCode === 'borrower' || pending?.roleCode === 'lender') && !pending?.clientId) {
+      console.warn('[Login] borrower/lender with no clientId — falling back to /dashboard', pending);
     }
+    history.push(getPostLoginRoute(pending?.roleCode, pending?.clientId));
   };
 
   const handleSkipOpenCash = () => {

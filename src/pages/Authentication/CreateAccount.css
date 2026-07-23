@@ -125,6 +125,37 @@
   border: 1.5px solid;
 }
 
+.ca-username-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px 6px;
+}
+
+.ca-username-suggestions-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-right: 2px;
+}
+
+.ca-username-suggestion-chip {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 20px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ca-username-suggestion-chip:hover {
+  background: #dbeafe;
+}
+
 .ca-lookup-card--found {
   background: #f0fdf4;
   border-color: #86efac;
@@ -147,6 +178,8 @@
 }
 
 .ca-lookup-card-body { flex: 1; }
+
+.ca-complete-field { margin-top: 10px; }
 
 .ca-lookup-card-title {
   font-size: 13px;

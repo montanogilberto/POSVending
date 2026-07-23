@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage,
   IonContent,
@@ -38,52 +38,47 @@ import {
   barChartOutline,
   walletOutline,
   checkmarkCircle,
-  callOutline,
-  logoWhatsapp,
-  mailOutline,
-  notificationsOutline,
-  homeOutline,
   cardOutline,
   pulseOutline,
   personCircleOutline,
   timeOutline,
   closeOutline,
-  arrowBack,
-  calendarOutline,
   addCircleOutline,
   documentTextOutline,
   refreshOutline,
   alertCircleOutline,
   checkmarkCircleOutline,
   ellipseOutline,
+  qrCodeOutline,
+  shareOutline,
+  downloadOutline,
+  logoWhatsapp,
+  chatbubbleOutline,
+  copyOutline,
+  folderOutline,
 } from 'ionicons/icons';
+import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'qrcode';
 import { useUser } from '../../components/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
 import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
-import { Client, getOneClient } from '../../api/clientsApi';
+import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
+import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
 import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
+import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
 
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';
 
 // ── Stripe helpers ────────────────────────────────────────────────────────────
-async function stripeGetStatus(clientId: number, companyId: number) {
-  const r = await fetch(`${API_BASE_URL}/stripe/connected-accounts/status`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId, companyId }),
-  });
-  return r.json();
-}
-
-async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
-  const r = await fetch(`${API_BASE_URL}/stripe/connected-accounts`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId, companyId, email }),
-  });
-  return r.json();
-}
+// getStripeAccountStatus/createOrRefreshStripeAccount now live in
+// api/stripeApi.ts, shared with LenderDashboardPage.tsx and
+// ClientFaceRecognitionPage.tsx instead of being copy-pasted per page.
 
 async function stripeGetTransactions(clientId: number, companyId: number) {
   const r = await fetch(`${API_BASE_URL}/stripe/transactions`, {
@@ -160,10 +155,25 @@ const PAGE_SIZE = 10;
 const ClientDashboardPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
+  const location = useLocation();
   const { companyId, clientId: contextClientId, username, avatarUrl } = useUser();
   const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
 
+  console.log('[ClientDashboard] render. clientId =', clientId, 'companyId =', companyId, 'tab query =', location.search);
+
   const [activeTab, setActiveTab] = useState<Tab>('home');
+
+  // The global bottom tab bar (App.tsx) links here with ?tab=... instead of
+  // separate routes, since these 5 sections are local state on one page —
+  // keep activeTab in sync with it.
+  useEffect(() => {
+    const tabParam = new URLSearchParams(location.search).get('tab') as Tab | null;
+    console.log('[ClientDashboard] tab-sync effect: tabParam =', tabParam);
+    if (tabParam && ['home', 'loans', 'payments', 'activity', 'profile'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -190,6 +200,36 @@ const ClientDashboardPage: React.FC = () => {
   // Face recognition / completion
   const [faceRecord, setFaceRecord] = useState<ClientFaceRecognition | null>(null);
   const [clientRecord, setClientRecord] = useState<Client | null>(null);
+
+  // Profile tab — self-service edit of the client's own contact info
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ first_name: '', last_name: '', email: '', cellphone: '' });
+
+  // Header — same shared Header/AlertPopover/MailPopover components and
+  // popoverState shape used everywhere else in the app (Dashboard.tsx,
+  // ClientFaceRecognitionPage.tsx), instead of a one-off custom toolbar.
+  const [popoverState, setPopoverState] = useState<{
+    showAlertPopover: boolean;
+    showMailPopover: boolean;
+    event?: Event;
+  }>({ showAlertPopover: false, showMailPopover: false });
+  const presentAlertPopover = (e: React.MouseEvent) =>
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  const dismissAlertPopover = () =>
+    setPopoverState({ ...popoverState, showAlertPopover: false });
+  const presentMailPopover = (e: React.MouseEvent) =>
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  const dismissMailPopover = () =>
+    setPopoverState({ ...popoverState, showMailPopover: false });
+
+  // Profile tab — QR / invite-a-friend actions (mirrors ClientsPage.tsx's
+  // staff-facing versions, minus the staff-only bits like Eliminar)
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrDownloading, setQrDownloading] = useState(false);
+  const [qrGenerating, setQrGenerating] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   // Stripe state
   const [stripeAccount, setStripeAccount] = useState<any>(null);
@@ -256,7 +296,7 @@ const ClientDashboardPage: React.FC = () => {
     console.log('[ClientDashboard] fetchStripe → /stripe/connected-accounts/status', { clientId, companyId });
     try {
       const [statusRes, txRes, wallet] = await Promise.all([
-        stripeGetStatus(clientId, companyId),
+        getStripeAccountStatus(clientId, companyId),
         stripeGetTransactions(clientId, companyId),
         getWalletBalance(clientId, companyId),
       ]);
@@ -269,6 +309,129 @@ const ClientDashboardPage: React.FC = () => {
     } finally {
       setStripeLoading(false);
     }
+  };
+
+  const refreshClientRecord = async () => {
+    if (!clientId) return;
+    try {
+      const list = await getOneClient({ clients: [{ clientId: Number(clientId) }] });
+      setClientRecord(list[0] ?? null);
+    } catch (err) {
+      console.error('[ClientDashboard] refreshClientRecord ❌', err);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!clientId) return;
+    if (!profileForm.first_name.trim() || !profileForm.last_name.trim()) {
+      setError('Nombre y apellido son obligatorios.');
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      await createOrUpdateClient({
+        clients: [{
+          clientId,
+          companyId: companyId || undefined,
+          first_name: profileForm.first_name.trim(),
+          last_name: profileForm.last_name.trim(),
+          email: profileForm.email.trim(),
+          cellphone: profileForm.cellphone.trim(),
+          action: '2',
+        }],
+      });
+      await refreshClientRecord();
+      setEditingProfile(false);
+      setSuccessMsg('Datos actualizados correctamente.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al actualizar tus datos.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleDownloadQrPdf = async () => {
+    if (!clientRecord) return;
+    setQrDownloading(true);
+    try {
+      await downloadClientQrPdf({
+        clientId: clientRecord.clientId,
+        firstName: clientRecord.first_name,
+        lastName: clientRecord.last_name,
+        cellphone: clientRecord.cellphone,
+        email: clientRecord.email,
+      });
+    } catch (err) {
+      setError('Error al generar el PDF del QR.');
+    } finally {
+      setQrDownloading(false);
+    }
+  };
+
+  // Self-service QR generation — mirrors the auto-upload the staff wizard
+  // does in ClientsPage.tsx when a client is first created, for clients
+  // whose QR was never generated at signup. Returns whether a QR exists
+  // (already did, or was just created) so callers can chain off it.
+  const ensureQrGenerated = async (): Promise<boolean> => {
+    if (!clientRecord) return false;
+    if (clientRecord.qrBlobUrl) return true;
+    try {
+      const qrValue = buildClientQrValue(clientRecord.clientId, clientRecord.first_name, clientRecord.last_name);
+      const dataUrl = await QRCode.toDataURL(qrValue, { width: 512, errorCorrectionLevel: 'H' });
+      const { qrBlobUrl } = await uploadClientQr(clientRecord.clientId, companyId, dataUrl);
+      setClientRecord(prev => (prev ? { ...prev, qrBlobUrl } : prev));
+      return true;
+    } catch (err) {
+      setError('Error al generar el código QR.');
+      return false;
+    }
+  };
+
+  const handleGenerateQr = async () => {
+    if (qrGenerating) return;
+    setQrGenerating(true);
+    try {
+      if (await ensureQrGenerated()) setShowQrModal(true);
+    } finally {
+      setQrGenerating(false);
+    }
+  };
+
+  // Single continuous onboarding flow — QR (silent, if missing) → document +
+  // biometric capture + contract (ClientFaceRecognitionPage) → bank account
+  // (Stripe), chained via continueToPayments instead of dropping the client
+  // back on this dashboard between each step.
+  const [wizardStarting, setWizardStarting] = useState(false);
+  const handleStartWizard = async () => {
+    if (wizardStarting || !clientId) return;
+    setWizardStarting(true);
+    try {
+      await ensureQrGenerated();
+      history.push('/clientFaceRecognitions', { clientId, continueToPayments: true });
+    } finally {
+      setWizardStarting(false);
+    }
+  };
+
+  // Invite-a-friend — unlike ClientsPage.tsx's staff version (which targets
+  // one specific client's phone), this has no fixed recipient: the client
+  // picks who to send it to from their own WhatsApp/SMS contacts.
+  const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.lavanderia.gmo';
+  const APP_STORE_URL  = 'https://apps.apple.com/app/pos-gmo/id000000000';
+  const buildInviteMessage = (): string => {
+    const store = `📱 Android: ${PLAY_STORE_URL}\n🍎 iOS: ${APP_STORE_URL}`;
+    return `¡Hola! 👋\n\nTe invito a descargar la app *SmartLoans* para solicitar u ofrecer préstamos fácilmente.\n\n${store}`;
+  };
+  const openWhatsAppShare = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(buildInviteMessage())}`, '_blank');
+  };
+  const openSmsShare = () => {
+    window.open(`sms:?body=${encodeURIComponent(buildInviteMessage())}`, '_blank');
+  };
+  const copyInviteMessage = async () => {
+    await navigator.clipboard.writeText(buildInviteMessage());
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
   };
 
   const handleWithdraw = async (amountStr: string) => {
@@ -298,11 +461,14 @@ const ClientDashboardPage: React.FC = () => {
     setStripeLoading(true);
     try {
       if (!stripeAccount) {
-        await stripeCreateAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
+        await createOrRefreshStripeAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
         await fetchStripe();
       }
       setShowStripeOnboarding(true);
-    } catch { setError('Error al iniciar registro bancario'); }
+    } catch (err) {
+      console.log('[ClientDashboard] handleStripeKyc ❌', err);
+      setError((err as Error).message ?? 'Error al iniciar registro bancario');
+    }
     finally { setStripeLoading(false); }
   };
 
@@ -328,6 +494,7 @@ const ClientDashboardPage: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log('[ClientDashboard] initial-load effect: fetching dashboard/loans/stripe/faceRecord for clientId =', clientId, 'companyId =', companyId);
     fetchDashboard();
     fetchLoans();
     fetchStripe();
@@ -335,14 +502,26 @@ const ClientDashboardPage: React.FC = () => {
       getAllClientFaceRecognitions(companyId)
         .then(records => {
           const r = records.find(x => x.clientId === Number(clientId));
+          console.log('[ClientDashboard] initial-load effect: faceRecord =', r ?? null);
           setFaceRecord(r ?? null);
         })
         .catch(() => {});
-      getOneClient({ clients: [{ clientId: Number(clientId) }] })
-        .then(list => setClientRecord(list[0] ?? null))
-        .catch(() => {});
+      refreshClientRecord();
     }
   }, [companyId, clientId]);
+
+  // Keep the edit form in sync with the latest fetched record — but not
+  // while the client is actively editing, or every refetch would clobber
+  // their in-progress typing.
+  useEffect(() => {
+    if (editingProfile) return;
+    setProfileForm({
+      first_name: clientRecord?.first_name ?? '',
+      last_name:  clientRecord?.last_name  ?? '',
+      email:      clientRecord?.email      ?? '',
+      cellphone:  clientRecord?.cellphone  ?? '',
+    });
+  }, [clientRecord, editingProfile]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const availableCredit   = financialSummary?.availableCredit   ?? 0;
@@ -359,6 +538,7 @@ const ClientDashboardPage: React.FC = () => {
 
   useEffect(() => {
     if (!companyId || !clientId) return;
+    console.log('[ClientDashboard] fetchCreditScore → /credit-score', { clientId, companyId });
     fetch(`${API_BASE_URL}/credit-score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -366,6 +546,7 @@ const ClientDashboardPage: React.FC = () => {
     })
       .then(r => r.json())
       .then(d => {
+        console.log('[ClientDashboard] fetchCreditScore ✅', d);
         if (d.score) {
           setCreditScore(d.score);
           setCreditScoreLabel(d.label ?? '');
@@ -374,13 +555,31 @@ const ClientDashboardPage: React.FC = () => {
       .catch(() => {});
   }, [companyId, clientId]);
 
+  // Biométrico/Contrato/Pagaré/Cuenta de pago are one continuous process
+  // (document capture → verification → contract → bank account, all inside
+  // ClientFaceRecognitionPage's own multi-step wizard) — so all four launch
+  // the same handleStartWizard rather than sending the client to four
+  // different disconnected places. Código QR stays separate: it's a single
+  // instant action (view/download), not part of that camera+Stripe flow.
   const loanSteps: LoanStep[] = [
     { label: 'Información general', done: true },
-    { label: 'Código QR',           done: !!clientRecord?.qrBlobUrl },
-    { label: 'Cuenta de pago',      done: !!stripeAccount?.hasExternalAccount },
-    { label: 'Biométrico',          done: !!faceRecord?.isVerified },
-    { label: 'Contrato',            done: !!faceRecord?.contractAccepted },
-    { label: 'Pagaré',              done: !!faceRecord?.pagareAccepted },
+    {
+      label: 'Código QR',
+      done: !!clientRecord?.qrBlobUrl,
+      onClick: handleGenerateQr,
+    },
+    {
+      label: 'Cuenta de pago',
+      done: !!stripeAccount?.hasExternalAccount,
+      onClick: handleStartWizard,
+    },
+    {
+      label: 'Biométrico',
+      done: !!faceRecord?.isVerified,
+      onClick: handleStartWizard,
+    },
+    { label: 'Contrato', done: !!faceRecord?.contractAccepted, onClick: handleStartWizard },
+    { label: 'Pagaré',   done: !!faceRecord?.pagareAccepted,   onClick: handleStartWizard },
   ];
   const loanCompletionPct = Math.round((loanSteps.filter(s => s.done).length / loanSteps.length) * 100);
 
@@ -389,6 +588,16 @@ const ClientDashboardPage: React.FC = () => {
     a.activityType?.toLowerCase().includes('pago') ||
     a.activityType?.toLowerCase().includes('payment')
   );
+
+  // Weighted by principal instead of a plain average — a $50k loan at 12%
+  // should move the summary more than a $2k loan at 30%. Previously this
+  // card just read activeLoans[0], silently dropping every other loan.
+  const avgInterestRate = (() => {
+    const totalPrincipal = activeLoans.reduce((sum, l) => sum + (l.principalAmount || 0), 0);
+    if (!activeLoans.length) return null;
+    if (totalPrincipal <= 0) return activeLoans[0].interestRate;
+    return activeLoans.reduce((sum, l) => sum + l.interestRate * (l.principalAmount || 0), 0) / totalPrincipal;
+  })();
 
   // ── Create loan ───────────────────────────────────────────────────────────
   const handleCreateLoan = async () => {
@@ -413,7 +622,10 @@ const ClientDashboardPage: React.FC = () => {
   };
 
   // ── Tab navigation ────────────────────────────────────────────────────────
-  const goTab = (tab: Tab) => setActiveTab(tab);
+  const goTab = (tab: Tab) => {
+    setActiveTab(tab);
+    history.replace(`/client-dashboard/${clientId}?tab=${tab}`);
+  };
 
   // ── Renderers ─────────────────────────────────────────────────────────────
 
@@ -433,15 +645,21 @@ const ClientDashboardPage: React.FC = () => {
                   <IonBadge className="status-badge verified">
                     <IonIcon icon={checkmarkCircle} /> Verificado
                   </IonBadge>
-                  <IonBadge className="status-badge tier">Nivel Gold</IonBadge>
                 </div>
               </div>
             </div>
-            <IonIcon icon={notificationsOutline} className="hero-bell" />
           </div>
           <div className="hero-balance">
-            <span>Crédito disponible</span>
-            <h1>${availableCredit.toFixed(2)}</h1>
+            <div>
+              <span>Crédito disponible</span>
+              <h1>${availableCredit.toFixed(2)}</h1>
+            </div>
+            {loanCompletionPct < 100 && (
+              <div className="hero-progress-pill">
+                <span className="hero-progress-pct">{loanCompletionPct}%</span>
+                <span className="hero-progress-label">listo</span>
+              </div>
+            )}
           </div>
         </IonCardContent>
       </IonCard>
@@ -450,8 +668,16 @@ const ClientDashboardPage: React.FC = () => {
       <IonGrid className="summary-grid">
         <IonRow>
           {[
-            { icon: cashOutline,    label: 'Disponible',       value: `$${availableCredit.toFixed(2)}` },
-            { icon: barChartOutline,label: 'Saldo actual',     value: `$${activeLoanBalance.toFixed(2)}` },
+            // "Disponible" used to duplicate the hero's "Crédito disponible"
+            // (same availableCredit value shown twice) — swapped for the
+            // active loans' rate, which isn't shown anywhere else on Home.
+            // Weighted average across ALL active loans, not just the first.
+            {
+              icon: barChartOutline, label: 'Tasa de interés',
+              value: avgInterestRate !== null ? `${avgInterestRate.toFixed(1)}%` : '—',
+              hint: activeLoans.length > 1 ? `promedio de ${activeLoans.length} préstamos` : undefined,
+            },
+            { icon: cashOutline,    label: 'Saldo actual',     value: `$${activeLoanBalance.toFixed(2)}` },
             { icon: receiptOutline, label: 'Próximo pago',     value: `$${nextPaymentAmount.toFixed(2)}` },
             { icon: walletOutline,  label: 'Préstamos activos',value: String(activeLoans.length) },
           ].map(c => (
@@ -461,6 +687,7 @@ const ClientDashboardPage: React.FC = () => {
                   <IonIcon icon={c.icon} className="summary-icon" />
                   <p>{c.label}</p>
                   <h3>{c.value}</h3>
+                  {c.hint && <small style={{ color: '#9ca3af' }}>{c.hint}</small>}
                 </IonCardContent>
               </IonCard>
             </IonCol>
@@ -483,6 +710,40 @@ const ClientDashboardPage: React.FC = () => {
           <div className="utilization-track">
             <div className="utilization-fill" style={{ width: `${utilizationPct}%` }} />
           </div>
+          {/* The identity/contract/pagaré/cuenta-de-pago factors that used to
+              be listed here are the same four booleans "Progreso para
+              Préstamo" already tracks below (as Biométrico/Contrato/Pagaré/
+              Cuenta de pago) — kept in one place instead of repeating it. */}
+        </IonCardContent>
+      </IonCard>
+
+      {/* Registered account — nowhere else on Home shows which account/card
+          will actually receive funds. Reuses stripeAccount, already fetched
+          on mount for the wizard checklist below. */}
+      <IonCard className="client-dashboard-card">
+        <IonCardHeader><IonCardTitle>Cuenta de pago</IonCardTitle></IonCardHeader>
+        <IonCardContent>
+          {stripeAccount?.hasExternalAccount ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <IonIcon icon={checkmarkCircleOutline} style={{ color: '#059669', fontSize: 26 }} />
+              <div>
+                <strong>
+                  {stripeAccount.externalAccountBankName || (stripeAccount.externalAccountType === 'card' ? 'Tarjeta' : 'Cuenta bancaria')}
+                </strong>
+                <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
+                  {stripeAccount.externalAccountType === 'card' ? 'Tarjeta' : 'CLABE'} terminada en {stripeAccount.externalAccountLast4 || '····'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <div>
+                <strong>Sin cuenta registrada</strong>
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>Necesaria para recibir tu préstamo.</p>
+              </div>
+              <IonButton size="small" fill="outline" onClick={() => goTab('payments')}>Agregar</IonButton>
+            </div>
+          )}
         </IonCardContent>
       </IonCard>
 
@@ -492,51 +753,26 @@ const ClientDashboardPage: React.FC = () => {
           <IonCardTitle>Progreso para Préstamo</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} />
-            <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
-          </div>
+          <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
           {loanCompletionPct < 100 && (
-            <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
-              Completa todos los pasos para acceder al crédito.
-            </p>
+            <>
+              <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
+                Completa todos los pasos para acceder al crédito.
+              </p>
+              {(!faceRecord?.isVerified || !faceRecord?.contractAccepted || !faceRecord?.pagareAccepted || !stripeAccount?.hasExternalAccount) && (
+                <IonButton expand="block" shape="round" className="client-dashboard-action-button"
+                  style={{ marginTop: 12 }} disabled={wizardStarting} onClick={handleStartWizard}>
+                  <IonIcon icon={addCircleOutline} slot="start" />
+                  {wizardStarting ? 'Cargando...' : 'Continuar registro'}
+                </IonButton>
+              )}
+            </>
           )}
           {loanCompletionPct === 100 && (
             <p style={{ fontSize: 12, color: '#059669', marginTop: 12, marginBottom: 0, fontWeight: 600 }}>
               ✓ Perfil completo — elegible para solicitar préstamo.
             </p>
           )}
-        </IonCardContent>
-      </IonCard>
-
-      {/* Agent */}
-      <IonCard className="client-dashboard-card agent-card">
-        <IonCardHeader><IonCardTitle>Tu Agente</IonCardTitle></IonCardHeader>
-        <IonCardContent>
-          <div className="agent-top">
-            <IonAvatar className="agent-avatar">
-              <img src={avatarUrl} alt="Agent" />
-            </IonAvatar>
-            <div>
-              <h3>Ana Gómez</h3>
-              <p>ID AGT-1024</p>
-              <IonBadge className="status-badge available">Disponible</IonBadge>
-            </div>
-          </div>
-          <div className="agent-actions">
-            <IonButton shape="round" fill="solid" href="tel:+15550001234">
-              <IonIcon icon={callOutline} slot="start" /> Llamar
-            </IonButton>
-            <IonButton shape="round" fill="outline" href="https://wa.me/15550001234" target="_blank">
-              <IonIcon icon={logoWhatsapp} slot="start" /> WhatsApp
-            </IonButton>
-            <IonButton shape="round" fill="outline" href="mailto:agent@posgmo.com">
-              <IonIcon icon={mailOutline} slot="start" /> Email
-            </IonButton>
-          </div>
-          <IonNote className="agent-last-contact">
-            <IonIcon icon={timeOutline} /> Último contacto: Hoy, 09:45 AM
-          </IonNote>
         </IonCardContent>
       </IonCard>
 
@@ -568,6 +804,15 @@ const ClientDashboardPage: React.FC = () => {
                 <IonButton expand="block" shape="round" fill="outline" className="client-dashboard-action-button"
                   onClick={() => goTab('profile')}>
                   <IonIcon icon={personCircleOutline} slot="start" /> Mis datos
+                </IonButton>
+              </IonCol>
+              {/* Virtual folder — was only reachable from the Profile tab's
+                  "Acciones" card before; surfaced here too since it's the
+                  client's permanent document archive (ID, contract, pagaré). */}
+              <IonCol size="12">
+                <IonButton expand="block" shape="round" fill="outline" className="client-dashboard-action-button"
+                  onClick={() => history.push(`/client-expediente/${clientId}`)}>
+                  <IonIcon icon={folderOutline} slot="start" /> Carpeta virtual
                 </IonButton>
               </IonCol>
             </IonRow>
@@ -863,33 +1108,214 @@ const ClientDashboardPage: React.FC = () => {
   );
 
   const renderProfile = () => (
-    <IonCard className="client-dashboard-card">
-      <IonCardContent>
-        <div className="hero-top" style={{ marginBottom: 20 }}>
-          <div className="hero-profile">
-            <IonAvatar className="hero-avatar">
-              <img src={avatarUrl} alt="avatar" />
-            </IonAvatar>
-            <div>
-              <h2 className="hero-name">{username || 'Cliente POS GMO'}</h2>
-              <div className="hero-meta">
-                <IonBadge className="status-badge verified">
-                  <IonIcon icon={checkmarkCircle} /> Verificado
-                </IonBadge>
+    <>
+      <IonCard className="client-dashboard-card">
+        <IonCardContent>
+          <div className="hero-top" style={{ marginBottom: 20 }}>
+            <div className="hero-profile">
+              <IonAvatar className="hero-avatar">
+                <img src={avatarUrl} alt="avatar" />
+              </IonAvatar>
+              <div>
+                <h2 className="hero-name">{username || 'Cliente POS GMO'}</h2>
+                <div className="hero-meta">
+                  <IonBadge className="status-badge verified">
+                    <IonIcon icon={checkmarkCircle} /> Verificado
+                  </IonBadge>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <IonList lines="full" className="cd-profile-list">
-          <IonItem><IonLabel><strong>ID Cliente</strong></IonLabel><IonNote slot="end">{clientId}</IonNote></IonItem>
-          <IonItem><IonLabel><strong>Empresa</strong></IonLabel><IonNote slot="end">{companyId}</IonNote></IonItem>
-          <IonItem><IonLabel><strong>Préstamos totales</strong></IonLabel><IonNote slot="end">{loans.length}</IonNote></IonItem>
-          <IonItem><IonLabel><strong>Préstamos activos</strong></IonLabel><IonNote slot="end">{activeLoans.length}</IonNote></IonItem>
-          <IonItem><IonLabel><strong>Crédito disponible</strong></IonLabel><IonNote slot="end">${availableCredit.toFixed(2)}</IonNote></IonItem>
-          <IonItem><IonLabel><strong>Score crediticio</strong></IonLabel><IonNote slot="end">{creditScore !== null ? `${creditScore} — ${creditScoreLabel}` : 'Calculando...'}</IonNote></IonItem>
-        </IonList>
-      </IonCardContent>
-    </IonCard>
+          <IonList lines="full" className="cd-profile-list">
+            <IonItem><IonLabel><strong>ID Cliente</strong></IonLabel><IonNote slot="end">{clientId}</IonNote></IonItem>
+            <IonItem><IonLabel><strong>Empresa</strong></IonLabel><IonNote slot="end">{companyId}</IonNote></IonItem>
+            <IonItem><IonLabel><strong>Préstamos totales</strong></IonLabel><IonNote slot="end">{loans.length}</IonNote></IonItem>
+            <IonItem><IonLabel><strong>Préstamos activos</strong></IonLabel><IonNote slot="end">{activeLoans.length}</IonNote></IonItem>
+            <IonItem><IonLabel><strong>Crédito disponible</strong></IonLabel><IonNote slot="end">${availableCredit.toFixed(2)}</IonNote></IonItem>
+            <IonItem><IonLabel><strong>Score crediticio</strong></IonLabel><IonNote slot="end">{creditScore !== null ? `${creditScore} — ${creditScoreLabel}` : 'Calculando...'}</IonNote></IonItem>
+          </IonList>
+        </IonCardContent>
+      </IonCard>
+
+      <IonCard className="client-dashboard-card">
+        <IonCardHeader>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <IonCardTitle>Mis datos</IonCardTitle>
+            {!editingProfile && (
+              <IonButton fill="clear" size="small" onClick={() => setEditingProfile(true)}>
+                <IonIcon icon={personCircleOutline} slot="start" /> Editar
+              </IonButton>
+            )}
+          </div>
+        </IonCardHeader>
+        <IonCardContent>
+          {!editingProfile ? (
+            <IonList lines="full" className="cd-profile-list">
+              <IonItem><IonLabel><strong>Nombre</strong></IonLabel><IonNote slot="end">{clientRecord?.first_name || '—'}</IonNote></IonItem>
+              <IonItem><IonLabel><strong>Apellido</strong></IonLabel><IonNote slot="end">{clientRecord?.last_name || '—'}</IonNote></IonItem>
+              <IonItem><IonLabel><strong>Email</strong></IonLabel><IonNote slot="end">{clientRecord?.email || '—'}</IonNote></IonItem>
+              <IonItem><IonLabel><strong>Teléfono</strong></IonLabel><IonNote slot="end">{clientRecord?.cellphone || '—'}</IonNote></IonItem>
+            </IonList>
+          ) : (
+            <div className="cd-loan-form">
+              <div className="cd-form-group">
+                <label>Nombre</label>
+                <IonInput
+                  value={profileForm.first_name}
+                  onIonInput={e => setProfileForm(p => ({ ...p, first_name: e.detail.value || '' }))}
+                  className="cd-form-input"
+                />
+              </div>
+              <div className="cd-form-group">
+                <label>Apellido</label>
+                <IonInput
+                  value={profileForm.last_name}
+                  onIonInput={e => setProfileForm(p => ({ ...p, last_name: e.detail.value || '' }))}
+                  className="cd-form-input"
+                />
+              </div>
+              <div className="cd-form-group">
+                <label>Email</label>
+                <IonInput
+                  type="email"
+                  value={profileForm.email}
+                  onIonInput={e => setProfileForm(p => ({ ...p, email: e.detail.value || '' }))}
+                  className="cd-form-input"
+                />
+              </div>
+              <div className="cd-form-group">
+                <label>Teléfono</label>
+                <IonInput
+                  type="tel"
+                  value={profileForm.cellphone}
+                  onIonInput={e => setProfileForm(p => ({ ...p, cellphone: e.detail.value || '' }))}
+                  className="cd-form-input"
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <IonButton
+                  expand="block" shape="round" fill="outline" style={{ flex: 1 }}
+                  disabled={savingProfile}
+                  onClick={() => { setEditingProfile(false); }}
+                >
+                  Cancelar
+                </IonButton>
+                <IonButton
+                  expand="block" shape="round" className="client-dashboard-action-button" style={{ flex: 1 }}
+                  disabled={savingProfile}
+                  onClick={handleSaveProfile}
+                >
+                  {savingProfile ? 'Guardando...' : 'Guardar'}
+                </IonButton>
+              </div>
+            </div>
+          )}
+        </IonCardContent>
+      </IonCard>
+
+      <IonCard className="client-dashboard-card">
+        <IonCardHeader><IonCardTitle>Acciones</IonCardTitle></IonCardHeader>
+        <IonCardContent>
+          {/* Portfolio (/lender-dashboard) and Seguimiento (/client-followup)
+              are deliberately NOT linked here — this page is the BORROWER's
+              own dashboard, so there's nothing here for it to link to.
+              LenderDashboardPage is now correctly scoped per lender (joined
+              through loanContracts.lenderClientId — loans has no lenderId
+              column of its own) and reached directly via getPostLoginRoute
+              for roleCode === 'lender', not through this page. ClientFollowUpPage
+              still stays unlinked from any client-facing view — it exposes
+              full create/edit/delete over staff collections notes, so a
+              client seeing it could view/delete their own audit history.
+              See ExpedienteDigitalPage for the read-only, safe pattern to
+              follow if client-facing follow-up visibility is ever built. */}
+          <IonGrid>
+            <IonRow>
+              <IonCol size="6">
+                <IonButton expand="block" fill="outline" shape="round" className="client-dashboard-action-button"
+                  onClick={() => setShowQrModal(true)}>
+                  <IonIcon icon={qrCodeOutline} slot="start" /> QR
+                </IonButton>
+              </IonCol>
+              <IonCol size="6">
+                <IonButton expand="block" fill="outline" shape="round" className="client-dashboard-action-button"
+                  onClick={() => setShowShareModal(true)}>
+                  <IonIcon icon={shareOutline} slot="start" /> Invitar
+                </IonButton>
+              </IonCol>
+              <IonCol size="6">
+                <IonButton expand="block" fill="outline" shape="round" className="client-dashboard-action-button"
+                  onClick={() => history.push(`/client-expediente/${clientId}`)}>
+                  <IonIcon icon={documentTextOutline} slot="start" /> Expediente
+                </IonButton>
+              </IonCol>
+            </IonRow>
+          </IonGrid>
+        </IonCardContent>
+      </IonCard>
+
+      {/* QR modal */}
+      <IonModal isOpen={showQrModal} onDidDismiss={() => setShowQrModal(false)} breakpoints={[0, 0.6]} initialBreakpoint={0.6}>
+        <IonHeader className="ion-no-border">
+          <IonToolbar>
+            <IonTitle>Código QR</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowQrModal(false)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {clientRecord && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <QRCodeSVG
+                value={buildClientQrValue(clientRecord.clientId, clientRecord.first_name, clientRecord.last_name)}
+                size={220}
+                level="H"
+                includeMargin
+              />
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 18 }}>{clientRecord.first_name} {clientRecord.last_name}</p>
+                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>{clientRecord.cellphone}</p>
+                <p style={{ margin: '2px 0 0', color: '#9ca3af', fontSize: 12 }}>ID: {clientRecord.clientId}</p>
+              </div>
+              <IonButton expand="block" onClick={handleDownloadQrPdf} disabled={qrDownloading} style={{ width: '100%' }}>
+                {qrDownloading ? 'Generando...' : (<><IonIcon icon={downloadOutline} slot="start" /> Descargar QR como PDF</>)}
+              </IonButton>
+            </div>
+          )}
+        </IonContent>
+      </IonModal>
+
+      {/* Invite-a-friend modal */}
+      <IonModal isOpen={showShareModal} onDidDismiss={() => { setShowShareModal(false); setShareCopied(false); }} breakpoints={[0, 0.6]} initialBreakpoint={0.6}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Invitar a un amigo</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowShareModal(false)}>
+                <IonIcon icon={closeOutline} slot="icon-only" />
+              </IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', margin: '0 0 8px' }}>Vista previa del mensaje:</p>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '12px 14px', fontSize: 13, color: '#14532d', whiteSpace: 'pre-line', marginBottom: 20, lineHeight: 1.6 }}>
+            {buildInviteMessage()}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <IonButton expand="block" shape="round" onClick={openWhatsAppShare} style={{ '--background': '#25D366', '--color': '#fff' }}>
+              <IonIcon icon={logoWhatsapp} slot="start" /> Enviar por WhatsApp
+            </IonButton>
+            <IonButton expand="block" shape="round" fill="outline" onClick={openSmsShare}>
+              <IonIcon icon={chatbubbleOutline} slot="start" /> Enviar por SMS
+            </IonButton>
+            <IonButton expand="block" shape="round" fill="outline" color="medium" onClick={copyInviteMessage}>
+              <IonIcon icon={copyOutline} slot="start" /> {shareCopied ? '✓ Mensaje copiado' : 'Copiar mensaje'}
+            </IonButton>
+          </div>
+        </IonContent>
+      </IonModal>
+    </>
   );
 
   // ── Loan request modal ────────────────────────────────────────────────────
@@ -1036,21 +1462,21 @@ const ClientDashboardPage: React.FC = () => {
   // ── Main render ───────────────────────────────────────────────────────────
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
-              <IonIcon icon={arrowBack} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-          <IonTitle>Dashboard Cliente</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={() => history.push(`/client-followup/${clientId}`)}>
-              <IonIcon icon={calendarOutline} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
+      <Header
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle="Dashboard Cliente"
+      />
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
 
       <IonContent fullscreen className="ion-padding client-dashboard-page fintech-surface">
         <IonLoading isOpen={loading} message="Cargando..." />
@@ -1081,30 +1507,6 @@ const ClientDashboardPage: React.FC = () => {
 
         {renderLoanModal()}
         {renderPayModal()}
-
-        <nav className="floating-bottom-nav">
-          {([
-            { id: 'home',     icon: homeOutline,          label: 'Home' },
-            { id: 'loans',    icon: walletOutline,         label: 'Préstamos' },
-            { id: 'payments', icon: cardOutline,           label: 'Pagos' },
-            { id: 'activity', icon: pulseOutline,          label: 'Actividad' },
-            { id: 'profile',  icon: personCircleOutline,   label: 'Perfil' },
-          ] as { id: Tab; icon: string; label: string }[]).map(item => (
-            <button
-              key={item.id}
-              className={`nav-item ${activeTab === item.id ? 'nav-item-active' : ''}`}
-              type="button"
-              onClick={() => goTab(item.id)}
-            >
-              {activeTab === item.id ? (
-                <span className="nav-active-pill"><IonIcon icon={item.icon} /></span>
-              ) : (
-                <IonIcon icon={item.icon} />
-              )}
-              <small>{item.label}</small>
-            </button>
-          ))}
-        </nav>
       </IonContent>
     </IonPage>
   );

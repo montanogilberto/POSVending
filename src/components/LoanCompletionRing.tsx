@@ -3,6 +3,7 @@ import React from 'react';
 export interface LoanStep {
   label: string;
   done: boolean;
+  onClick?: () => void;
 }
 
 interface Props {
@@ -68,27 +69,42 @@ const LoanCompletionRing: React.FC<Props> = ({
 
       {showSteps && steps && steps.length > 0 && (
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {steps.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {steps.map((s, i) => {
+            const clickable = !s.done && !!s.onClick;
+            return (
               <div
+                key={i}
+                onClick={clickable ? s.onClick : undefined}
                 style={{
-                  width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: s.done ? '#d1fae5' : '#f3f4f6',
-                  border: `2px solid ${s.done ? '#059669' : '#d1d5db'}`,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  cursor: clickable ? 'pointer' : 'default',
                 }}
               >
-                {s.done && (
-                  <svg width="10" height="10" viewBox="0 0 10 10">
-                    <polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#059669" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
+                <div
+                  style={{
+                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: s.done ? '#d1fae5' : '#f3f4f6',
+                    border: `2px solid ${s.done ? '#059669' : '#d1d5db'}`,
+                  }}
+                >
+                  {s.done && (
+                    <svg width="10" height="10" viewBox="0 0 10 10">
+                      <polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#059669" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <span style={{
+                  fontSize: 13,
+                  color: s.done ? '#111827' : clickable ? '#2563eb' : '#9ca3af',
+                  fontWeight: s.done ? 600 : clickable ? 600 : 400,
+                  textDecoration: clickable ? 'underline' : 'none',
+                }}>
+                  {s.label}
+                </span>
               </div>
-              <span style={{ fontSize: 13, color: s.done ? '#111827' : '#9ca3af', fontWeight: s.done ? 600 : 400 }}>
-                {s.label}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

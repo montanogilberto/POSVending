@@ -8,6 +8,9 @@
   border-bottom-left-radius: 16px;
   border-bottom-right-radius: 16px;
   margin-bottom: 10px;
+  max-width: 860px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 .supplier-searchbar {
@@ -19,6 +22,9 @@
 .supplier-list {
   padding: 14px 16px;
   background: var(--ion-background-color, #f4f6f9);
+  max-width: 860px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 .supplier-card {

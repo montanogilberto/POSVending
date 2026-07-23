@@ -12,6 +12,14 @@ export interface ClientFaceRecognition {
   confidenceScore: number;
   isVerified: boolean;
 
+  // Identity fields extracted (and human-reviewed/corrected) from the ID —
+  // carried through to the contract/pagaré PDFs, see contractPdf.ts.
+  nombre?: string;
+  domicilio?: string;
+  curp?: string;
+  claveElector?: string;
+  fechaNacimiento?: string;
+
   // Legal Contract Data
   contractAccepted: boolean;
   contractPdfBlobUrl?: string;
@@ -63,6 +71,14 @@ export interface ContractSubmissionRequest {
   clientSelfieBlobUrl: string;
   confidenceScore: number;
   isVerified: boolean;
+
+  // Identity fields extracted (and human-reviewed/corrected) from the ID —
+  // persisted alongside this record and baked into the generated PDFs.
+  nombre?: string;
+  domicilio?: string;
+  curp?: string;
+  claveElector?: string;
+  fechaNacimiento?: string;
 
   // Contract
   contractAccepted: boolean;

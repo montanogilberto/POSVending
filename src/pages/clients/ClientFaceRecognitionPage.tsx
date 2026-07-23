@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage,
   IonContent,
@@ -30,8 +31,9 @@ import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary'
 import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
 import SignaturePad from '../../components/SignaturePad';
+import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import { useUser } from '../../components/UserContext';
-import { Client } from '../../api/clientsApi';
+import { Client, getOneClient } from '../../api/clientsApi';
 import {
   submitContractClientFaceRecognition,
   uploadClientFaceRecognitionImage,
@@ -40,10 +42,11 @@ import {
   reverseGeocode,
   ContractSubmissionRequest,
 } from '../../api/clientFaceRecognitionApi';
-import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biometricAuth';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
-import { ExtractedIdFields } from '../../utils/idOcr';
+import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
+import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
+import { createOrRefreshStripeAccount } from '../../api/stripeApi';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -98,6 +101,29 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setPopoverState({ ...popoverState, showMailPopover: false });
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const location = useLocation<{ clientId?: number; continueToPayments?: boolean; returnTo?: string } | undefined>();
+  const history = useHistory();
+
+  // Deep-link from the client (or lender) dashboard's onboarding checklist —
+  // pre-select the client so they skip the staff-facing picker, and (when
+  // continueToPayments is set) chain straight into bank-account setup after
+  // the contract step instead of dropping them back on the dashboard to hunt
+  // down the next item themselves. returnTo lets either dashboard say where
+  // "done" goes back to — defaults to the borrower dashboard for callers
+  // that predate this (e.g. old deep links) that don't pass it.
+  const deepLinkClientId = location.state?.clientId;
+  const continueToPayments = !!location.state?.continueToPayments;
+  const returnTo = location.state?.returnTo || `/client-dashboard/${deepLinkClientId}?tab=home`;
+
+  useEffect(() => {
+    if (!deepLinkClientId) return;
+    getOneClient({ clients: [{ clientId: deepLinkClientId }] })
+      .then((clients) => {
+        if (clients[0]) setSelectedClient(clients[0]);
+      })
+      .catch((err) => console.warn('[Expediente] Failed to preselect client from dashboard link', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
   const [idFrontImageBase64, setIdFrontImageBase64] = useState<string>('');
   const [idBackImageBase64, setIdBackImageBase64] = useState<string>('');
@@ -113,13 +139,94 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState('');
+  const [stripeAccountReady, setStripeAccountReady] = useState(false);
+  const [stripeAccountError, setStripeAccountError] = useState('');
+  const ocrRanForRef = useRef('');
   const [presenceResult, setPresenceResult] = useState<PresenceCaptureResult | null>(null);
   const [contractSignatureBase64, setContractSignatureBase64] = useState<string>('');
   // Tracks the ClientFaceRecognition row created on first capture, so later
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
 
-  const STEPS = ['Cliente y documento', 'Captura', 'Verificación', 'Contrato'];
+  const STEPS = continueToPayments
+    ? ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', 'Cuenta de pago']
+    : ['Cliente y documento', 'Captura', 'Verificación', 'Contrato'];
+
+  // Runs OCR against the front+back ID captures as soon as both are ready —
+  // in the background, independent of which step/sub-step is on screen.
+  // Previously this only fired once the client actually reached the review
+  // screen right after capture, so the fields were still empty/"loading"
+  // right when shown. Kicking it off here instead means the ~30-60s the
+  // client spends on presence capture + liveness gives the OCR call time to
+  // finish well before the review UI (now shown at the Contrato step) ever
+  // appears.
+  useEffect(() => {
+    if (!idFrontImageBase64 || !idBackImageBase64) return;
+    const key = `${idFrontImageBase64.length}:${idBackImageBase64.length}`;
+    if (ocrRanForRef.current === key) return;
+    ocrRanForRef.current = key;
+
+    let cancelled = false;
+    console.log('[Expediente] OCR effect: running OCR on front+back captures');
+    setOcrLoading(true);
+    setOcrError('');
+
+    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
+      .then(([front, back]) => {
+        if (cancelled) return;
+        const merged: ExtractedIdFields = {
+          nombre: front.nombre || back.nombre,
+          domicilio: front.domicilio || back.domicilio,
+          curp: front.curp || back.curp,
+          claveElector: front.claveElector || back.claveElector,
+          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento,
+        };
+        console.log('[Expediente] OCR effect: merged result', JSON.stringify(merged));
+        setExtractedIdFields(merged);
+      })
+      .catch((err) => {
+        console.log('[Expediente] OCR effect: FAILED', String(err));
+        if (!cancelled) {
+          setOcrError('No se pudo leer la identificación automáticamente. Completa los datos manualmente.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOcrLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idFrontImageBase64, idBackImageBase64]);
+
+  // Ensures a Stripe connected account exists before mounting the embedded
+  // onboarding form at step 4 — the backend's create-or-refresh endpoint is
+  // safe to call even if one already exists. Without this, StripeAccountOnboarding
+  // called /stripe/account-session directly against a client who never had an
+  // account, which always 404s with "No connected account found. Create one
+  // first." (confirmed via device logs).
+  const ensureStripeAccount = async () => {
+    if (!deepLinkClientId || !companyId) return;
+    setStripeAccountError('');
+    try {
+      await createOrRefreshStripeAccount(deepLinkClientId, companyId, `client${deepLinkClientId}@posgmo.mx`);
+      console.log('[Expediente] ensureStripeAccount: ready');
+      setStripeAccountReady(true);
+    } catch (err) {
+      console.log('[Expediente] ensureStripeAccount: FAILED', String(err));
+      setStripeAccountError((err as Error).message ?? 'No se pudo preparar la cuenta bancaria.');
+    }
+  };
+
+  useEffect(() => {
+    if (step === 4 && !stripeAccountReady && !stripeAccountError) {
+      ensureStripeAccount();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   const validateStep = (): boolean => {
     if (step === 0) {
@@ -277,14 +384,14 @@ const ClientFaceRecognitionPage: React.FC = () => {
     }
   };
 
-  const startLivenessSession = async () => {
+  const startLivenessSession = () => {
+    // No extra biometric re-confirmation here — the app-level lock
+    // (BiometricLockGate) already gated entry to this whole authenticated
+    // session. Calling authenticateBiometric() again mid-wizard pauses/
+    // resumes the app for its native prompt, which was derailing the wizard
+    // (confirmed via device logs: the wizard's state was lost right after
+    // this second prompt).
     console.log('[Expediente] startLivenessSession: user tapped "Iniciar proceso"');
-    if (await isBiometricLockEnabled()) {
-      console.log('[Expediente] startLivenessSession: biometric lock enabled, requesting device confirmation first');
-      const confirmed = await authenticateBiometric('Confirma tu identidad para iniciar la verificación');
-      console.log('[Expediente] startLivenessSession: biometric confirmation result =', confirmed);
-      if (!confirmed) return;
-    }
     setError('');
     setLivenessStatus('in-progress');
     setCaptureSubStep('liveness-active');
@@ -420,6 +527,20 @@ const ClientFaceRecognitionPage: React.FC = () => {
         }
       }
 
+      const pdfParams = {
+        clientId: Number(selectedClient?.clientId),
+        nombre: extractedIdFields.nombre,
+        domicilio: extractedIdFields.domicilio,
+        curp: extractedIdFields.curp,
+        claveElector: extractedIdFields.claveElector,
+        fechaNacimiento: extractedIdFields.fechaNacimiento,
+        documentType,
+        isVerified,
+        confidenceScore,
+        acceptedAtISO: now,
+        signatureDataUrl: contractSignatureBase64,
+      };
+
       const payload: ContractSubmissionRequest = {
         clientFaceRecognitionId: clientFaceRecognitionIdRef.current,
         companyId: Number(companyId),
@@ -430,11 +551,16 @@ const ClientFaceRecognitionPage: React.FC = () => {
         clientSelfieBlobUrl,
         confidenceScore,
         isVerified,
+        nombre: extractedIdFields.nombre,
+        domicilio: extractedIdFields.domicilio,
+        curp: extractedIdFields.curp,
+        claveElector: extractedIdFields.claveElector,
+        fechaNacimiento: extractedIdFields.fechaNacimiento,
         contractAccepted: true,
-        contractPdfBase64: btoa('Contrato de crédito aceptado electrónicamente'),
+        contractPdfBase64: generateContractPdfBase64(pdfParams),
         contractAcceptedAt: now,
         pagareAccepted: true,
-        pagarePdfBase64: btoa('Pagaré aceptado electrónicamente'),
+        pagarePdfBase64: generatePagarePdfBase64({ ...pdfParams, hasPhysicalPagare }),
         hasPhysicalPagare,
         idSignatureCropBase64: idSignatureCropBase64 ? idSignatureCropBase64.split(',')[1] : undefined,
         contractSignatureBase64: contractSignatureBase64.split(',')[1],
@@ -458,10 +584,15 @@ const ClientFaceRecognitionPage: React.FC = () => {
         setToastMessage(`Error al enviar el contrato: ${response.msg || ''}`);
         setShowToast(true);
       } else {
-        console.log('[Expediente] handleSubmitContract: SUCCESS — record persisted, resetting wizard');
         setToastMessage('¡Contrato aceptado y enviado exitosamente!');
         setShowToast(true);
-        resetWizard();
+        if (continueToPayments) {
+          console.log('[Expediente] handleSubmitContract: SUCCESS — advancing to Cuenta de pago step');
+          setStep(4);
+        } else {
+          console.log('[Expediente] handleSubmitContract: SUCCESS — record persisted, resetting wizard');
+          resetWizard();
+        }
       }
     } catch (err) {
       console.log('[Expediente] handleSubmitContract: FAILED', err);
@@ -632,6 +763,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
       return null;
     }
 
+    if (step === 4) {
+      // Cuenta de pago — the embedded Stripe form drives its own completion
+      // (onExit below), there's nothing to submit/go-back to here.
+      return null;
+    }
+
     return (
       <div className="wizard-footer">
         {step > 0 && (
@@ -762,7 +899,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
           <IonCardContent>
             <h2 className="cfr-capture-title">Confirma que la información sea correcta</h2>
             <p className="cfr-capture-desc">
-              Revisa los datos y las capturas de la identificación antes de continuar con la validación facial.
+              Revisa las capturas de la identificación antes de continuar con la validación facial. Los datos
+              extraídos de tu identificación se revisan más adelante, antes de firmar el contrato.
             </p>
 
             <div className="ion-margin-top">
@@ -782,13 +920,6 @@ const ClientFaceRecognitionPage: React.FC = () => {
                 {idBackImageBase64 && <ZoomableImage src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
               </div>
             </div>
-
-            <IdExtractedFieldsSummary
-              idFrontImageBase64={idFrontImageBase64}
-              idBackImageBase64={idBackImageBase64}
-              fields={extractedIdFields}
-              onFieldsChange={setExtractedIdFields}
-            />
 
             <IonItem className="ion-margin-top" lines="none">
               <IonLabel className="ion-text-wrap">Confirmo que la información y las capturas de la identificación son correctas</IonLabel>
@@ -957,7 +1088,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       );
     }
 
-    return (
+    if (step === 3) return (
       <IonCard className="client-face-recognition-step-card">
         <IonCardHeader>
           <IonCardTitle>Paso 4: Aceptación de Contrato</IonCardTitle>
@@ -973,6 +1104,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <p><strong>Presencia registrada:</strong> {presenceResult ? 'Sí ✓' : 'No'}</p>
             <p><strong>Contrato aceptado en:</strong> {contractAcceptedAt || 'Pendiente de envío'}</p>
           </div>
+
+          <IdExtractedFieldsSummary
+            fields={extractedIdFields}
+            onFieldsChange={setExtractedIdFields}
+            ocrLoading={ocrLoading}
+            ocrError={ocrError}
+          />
 
           <IonContent className="contract-terms-content ion-padding" scrollY={true}>
             <p><strong>Términos y Condiciones del Contrato:</strong></p>
@@ -1017,6 +1155,42 @@ const ClientFaceRecognitionPage: React.FC = () => {
         </IonCardContent>
       </IonCard>
     );
+
+    // step === 4 — Cuenta de pago, only reachable after a successful
+    // contract submission when this wizard was launched from the client
+    // dashboard's onboarding checklist (continueToPayments).
+    if (deepLinkClientId && companyId) {
+      return (
+        <IonCard className="client-face-recognition-step-card">
+          <IonCardHeader>
+            <IonCardTitle>Paso 5: Cuenta de pago</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            <p>Registra tu tarjeta o CLABE para recibir y enviar pagos.</p>
+            {stripeAccountError && (
+              <div className="stripe-onboarding-error">
+                <p>{stripeAccountError}</p>
+                <IonButton size="small" fill="outline" onClick={ensureStripeAccount}>Reintentar</IonButton>
+              </div>
+            )}
+            {!stripeAccountError && !stripeAccountReady && (
+              <div className="stripe-onboarding-loading">
+                <IonSpinner name="crescent" />
+                <p>Preparando tu cuenta...</p>
+              </div>
+            )}
+            {stripeAccountReady && (
+              <StripeAccountOnboarding
+                clientId={deepLinkClientId}
+                companyId={companyId}
+                onExit={() => history.push(returnTo)}
+              />
+            )}
+          </IonCardContent>
+        </IonCard>
+      );
+    }
+    return null;
   };
 
   return (

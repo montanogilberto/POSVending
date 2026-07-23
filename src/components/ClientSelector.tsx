@@ -25,7 +25,7 @@ import {
   IonSelect,
   IonSelectOption,
 } from '@ionic/react';
-import { person, close, checkmarkCircle, business, add, mail, call, save } from 'ionicons/icons';
+import { person, close, checkmarkCircle, business, add, save } from 'ionicons/icons';
 import { Client, getAllClients, createOrUpdateClient } from '../api/clientsApi';
 
 interface ClientSelectorProps {
@@ -434,30 +434,30 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
 
             <IonRow>
               <IonCol size="12">
-                <IonItem className="form-item">
-                  <IonLabel position="stacked">País</IonLabel>
+                <div className="field-group">
                   <IonSelect
+                    fill="outline"
+                    label="País"
+                    labelPlacement="floating"
                     value={selectedCountryCode}
                     onIonChange={(e) => setSelectedCountryCode(e.detail.value)}
                     interface="popover"
-                    fill="outline"
-                    className="form-input"
                   >
                     <IonSelectOption value="+52">México (+52)</IonSelectOption>
                     <IonSelectOption value="+1">Estados Unidos (+1)</IonSelectOption>
                     <IonSelectOption value="+1">Canadá (+1)</IonSelectOption>
                   </IonSelect>
-                </IonItem>
+                </div>
               </IonCol>
             </IonRow>
 
             <IonRow>
               <IonCol size="12">
-                <IonItem className="form-item">
-                  <IonIcon icon={call} slot="start" color="primary" />
-                  <IonLabel position="floating">Teléfono *</IonLabel>
+                <div className="field-group">
                   <IonInput
                     fill="outline"
+                    label="Teléfono *"
+                    labelPlacement="floating"
                     value={newClient.cellphone}
                     onIonInput={(e: any) => {
                       const rawValue = e?.target?.value ?? e?.detail?.value ?? '';
@@ -485,79 +485,63 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                       setNewClient(prev => ({ ...prev, cellphone: nextValue }));
                     }}
                     onIonBlur={handleCellphoneBlurLookup}
-                    color={createErrors.cellphone ? 'danger' : 'primary'}
-                    className={`form-input ${createErrors.cellphone ? 'ion-invalid ion-touched' : ''}`}
+                    className={createErrors.cellphone ? 'ion-invalid ion-touched' : ''}
+                    errorText={createErrors.cellphone}
                     type="text"
                     inputmode="numeric"
                     pattern="[0-9]*"
                     maxlength={15}
                   />
-                </IonItem>
-                {createErrors.cellphone && (
-                  <IonText color="danger" className="error-text">
-                    {createErrors.cellphone}
-                  </IonText>
-                )}
+                </div>
               </IonCol>
             </IonRow>
 
             <IonRow>
               <IonCol size="6">
-                <IonItem className="form-item">
-                  <IonIcon icon={person} slot="start" color="primary" />
-                  <IonLabel position="floating">Nombre *</IonLabel>
+                <div className="field-group">
                   <IonInput
                     fill="outline"
+                    label="Nombre *"
+                    labelPlacement="floating"
                     value={newClient.first_name}
                     onIonChange={(e) => setNewClient(prev => ({ ...prev, first_name: e.detail.value! }))}
-                    color={createErrors.first_name ? 'danger' : 'primary'}
-                    className={`form-input ${createErrors.first_name ? 'ion-invalid ion-touched' : ''}`}
+                    className={createErrors.first_name ? 'ion-invalid ion-touched' : ''}
+                    errorText={createErrors.first_name}
                   />
-                </IonItem>
-                {createErrors.first_name && (
-                  <IonText color="danger" className="error-text">
-                    {createErrors.first_name}
-                  </IonText>
-                )}
+                </div>
               </IonCol>
               <IonCol size="6">
-                <IonItem className="form-item">
-                  <IonIcon icon={person} slot="start" color="primary" />
-                  <IonLabel position="floating">Apellido *</IonLabel>
+                <div className="field-group">
                   <IonInput
                     fill="outline"
+                    label="Apellido *"
+                    labelPlacement="floating"
                     value={newClient.last_name}
                     onIonChange={(e) => setNewClient(prev => ({ ...prev, last_name: e.detail.value! }))}
-                    color={createErrors.last_name ? 'danger' : 'primary'}
-                    className={`form-input ${createErrors.last_name ? 'ion-invalid ion-touched' : ''}`}
+                    className={createErrors.last_name ? 'ion-invalid ion-touched' : ''}
+                    errorText={createErrors.last_name}
                   />
-                </IonItem>
-                {createErrors.last_name && (
-                  <IonText color="danger" className="error-text">
-                    {createErrors.last_name}
-                  </IonText>
-                )}
+                </div>
               </IonCol>
             </IonRow>
 
             <IonRow>
               <IonCol size="12">
-                <IonItem className="form-item">
-                  <IonIcon icon={mail} slot="start" color="primary" />
-                  <IonLabel position="floating">Email</IonLabel>
+                <div className="field-group">
                   <IonInput
                     fill="outline"
+                    label="Email"
+                    labelPlacement="floating"
+                    type="email"
                     value={newClient.email}
                     onIonChange={(e) => handleEmailChange(e.detail.value!)}
-                    color={createErrors.email.isValid ? (newClient.email ? 'success' : 'primary') : 'danger'}
-                    className={`form-input ${newClient.email && !createErrors.email.isValid ? 'ion-invalid ion-touched' : ''}`}
+                    className={newClient.email && !createErrors.email.isValid ? 'ion-invalid ion-touched' : ''}
+                    errorText={newClient.email && !createErrors.email.isValid ? createErrors.email.message : undefined}
                   />
-                </IonItem>
-                {newClient.email && !createErrors.email.isValid && (
-                  <IonText color="danger" className="error-text">
-                    {createErrors.email.message}
-                  </IonText>
-                )}
+                  {newClient.email && createErrors.email.isValid && (
+                    <p className="field-success">Email válido</p>
+                  )}
+                </div>
               </IonCol>
             </IonRow>
 

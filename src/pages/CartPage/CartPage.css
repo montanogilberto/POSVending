@@ -523,7 +523,7 @@
   }
 }
 
-/* Touch optimization for kiosk/POS */
+/* Touch optimization for kiosk/dashboard */
 @media (pointer: coarse) {
   .cart-button-primary {
     min-height: 64px;
