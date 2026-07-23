@@ -18,7 +18,7 @@ import { getAllClients, Client } from '../../api/clientsApi';
 import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../api/stripeApi';
-import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import './LenderDashboardPage.css';
 
 const toDate = (utc: string | undefined) => {
@@ -109,6 +109,11 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
     } finally {
       setStripeLoading(false);
     }
+  };
+
+  const handleStripeOnboardingExit = () => {
+    setShowStripeOnboarding(false);
+    fetchStripeStatus();
   };
 
   const fetchAll = async () => {
@@ -275,14 +280,10 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
             )}
 
             {showStripeOnboarding ? (
-              <NativeConnectOnboarding
+              <StripeAccountOnboarding
                 clientId={lenderClientId}
                 companyId={Number(companyId)}
-                email={`client${lenderClientId}@posgmo.mx`}
-                onProgress={(done) => {
-                  fetchStripeStatus();
-                  if (done) setShowStripeOnboarding(false);
-                }}
+                onExit={handleStripeOnboardingExit}
               />
             ) : !stripeAccount ? (
               <div style={{ textAlign: 'center', padding: '8px 0' }}>

@@ -66,7 +66,7 @@ import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/c
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
-import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -453,9 +453,9 @@ const ClientDashboardPage: React.FC = () => {
     setWithdrawing(false);
   };
 
-  // Starts Stripe KYC with a fully native, redirect-free form (NativeConnectOnboarding)
-  // on every platform — no embedded Connect iframe, no connect.stripe.com. Just
-  // ensures the connected account exists first so the status chips render.
+  // Opens the embedded Stripe onboarding form inline — no external browser
+  // redirect. Live mode doesn't need the AccountLink/hosted-URL flow;
+  // the client fills everything in without ever leaving the app.
   const handleStripeKyc = async () => {
     if (!companyId || !clientId) return;
     setStripeLoading(true);
@@ -470,6 +470,11 @@ const ClientDashboardPage: React.FC = () => {
       setError((err as Error).message ?? 'Error al iniciar registro bancario');
     }
     finally { setStripeLoading(false); }
+  };
+
+  const handleStripeOnboardingExit = () => {
+    setShowStripeOnboarding(false);
+    fetchStripe();
   };
 
   const handleCreatePayment = async () => {
@@ -897,14 +902,10 @@ const ClientDashboardPage: React.FC = () => {
           <IonCardContent>
             {stripeLoading && <p className="cd-stripe-loading">Verificando...</p>}
             {!stripeLoading && showStripeOnboarding && clientId && companyId && (
-              <NativeConnectOnboarding
+              <StripeAccountOnboarding
                 clientId={clientId}
                 companyId={companyId}
-                email={`client${clientId}@posgmo.mx`}
-                onProgress={(done) => {
-                  fetchStripe();
-                  if (done) setShowStripeOnboarding(false);
-                }}
+                onExit={handleStripeOnboardingExit}
               />
             )}
             {!stripeLoading && !showStripeOnboarding && !stripeAccount && (

@@ -31,7 +31,7 @@ import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary'
 import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
 import SignaturePad from '../../components/SignaturePad';
-import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import { useUser } from '../../components/UserContext';
 import { Client, getOneClient } from '../../api/clientsApi';
 import {
@@ -1180,11 +1180,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
               </div>
             )}
             {stripeAccountReady && (
-              <NativeConnectOnboarding
+              <StripeAccountOnboarding
                 clientId={deepLinkClientId}
                 companyId={companyId}
-                email={`client${deepLinkClientId}@posgmo.mx`}
-                onProgress={(done) => { if (done) history.push(returnTo); }}
+                onExit={() => history.push(returnTo)}
               />
             )}
           </IonCardContent>

@@ -27,10 +27,8 @@ import {
   shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import { useHistory, useLocation } from 'react-router-dom';
-import { Capacitor } from '@capacitor/core';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { useUser } from '../../components/UserContext';
-import { openStripeOnboardingUrl } from '../../utils/stripeOnboarding';
 // ── Stripe / Payment types & fetchers (single-use, kept inline) ──────────────
 
 const _api = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
@@ -250,25 +248,13 @@ const LoanPaymentPage: React.FC = () => {
       if (!connAccount) {
         await createConnectedAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
       }
-      // On native, window.location.origin is capacitor://localhost, which
-      // Stripe rejects as a return/refresh URL and the in-app browser can't
-      // load, so use a public HTTPS base there. We detect the user's return
-      // from the in-app browser's dismissal, not these URLs.
-      const base = Capacitor.isNativePlatform()
-        ? (import.meta.env.VITE_WEB_URL ?? _api)
-        : window.location.origin;
       const { url } = await getOnboardingLink(
         clientId, companyId,
-        `${base}/p2p-lending`,
-        `${base}/payment?mode=${mode}&amount=${amountQP}&loanId=${loanId}&lenderId=${lenderId}`,
+        `${window.location.origin}/p2p-lending`,
+        `${window.location.origin}/payment?mode=${mode}&amount=${amountQP}&loanId=${loanId}&lenderId=${lenderId}`,
       );
-      // Open in an in-app browser (native) instead of the system browser, and
-      // re-check the connected account's status when the user returns.
-      await openStripeOnboardingUrl(url, async () => {
-        const acct = await getConnectedAccount(clientId, companyId);
-        setConnAccount(acct);
-      });
-      showToast('Completa tu verificación y regresa a la app', 'primary');
+      window.open(url, '_blank');
+      showToast('Completa tu verificación en la ventana que se abrió y regresa aquí', 'primary');
     } catch (e: any) {
       showToast(e?.message ?? 'Error al iniciar verificación', 'danger');
     }
