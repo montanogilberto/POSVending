@@ -31,7 +31,7 @@ import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary'
 import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
 import SignaturePad from '../../components/SignaturePad';
-import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
+import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
 import { useUser } from '../../components/UserContext';
 import { Client, getOneClient } from '../../api/clientsApi';
 import {
@@ -46,9 +46,7 @@ import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidenc
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
-import { Capacitor } from '@capacitor/core';
 import { createOrRefreshStripeAccount } from '../../api/stripeApi';
-import { startHostedStripeOnboarding } from '../../utils/stripeOnboarding';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -1181,25 +1179,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
                 <p>Preparando tu cuenta...</p>
               </div>
             )}
-            {stripeAccountReady && !Capacitor.isNativePlatform() && (
-              <StripeAccountOnboarding
+            {stripeAccountReady && (
+              <NativeConnectOnboarding
                 clientId={deepLinkClientId}
                 companyId={companyId}
-                onExit={() => history.push(returnTo)}
+                email={`client${deepLinkClientId}@posgmo.mx`}
+                onProgress={(done) => { if (done) history.push(returnTo); }}
               />
-            )}
-            {/* Native: embedded Connect components aren't supported inside a
-                WebView, so open Stripe's hosted onboarding in an in-app browser
-                and return to the dashboard (which re-checks status) on exit. */}
-            {stripeAccountReady && Capacitor.isNativePlatform() && (
-              <IonButton
-                expand="block"
-                onClick={() =>
-                  startHostedStripeOnboarding(deepLinkClientId, companyId, () => history.push(returnTo))
-                }
-              >
-                Registrar cuenta bancaria
-              </IonButton>
             )}
           </IonCardContent>
         </IonCard>

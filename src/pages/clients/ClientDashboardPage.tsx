@@ -64,11 +64,9 @@ import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboa
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
 import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
-import { Capacitor } from '@capacitor/core';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
-import { startHostedStripeOnboarding } from '../../utils/stripeOnboarding';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
-import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
+import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -455,12 +453,9 @@ const ClientDashboardPage: React.FC = () => {
     setWithdrawing(false);
   };
 
-  // Starts Stripe KYC without ever kicking the user out to the system browser.
-  // On the web we render Stripe's embedded onboarding form inline. On native
-  // (Capacitor) the embedded Connect components aren't supported inside a
-  // WebView — they render partway and then bounce the user to connect.stripe.com
-  // in the external browser — so we open Stripe's hosted onboarding in an in-app
-  // browser (Custom Tabs / SFSafariViewController) and re-check status on return.
+  // Starts Stripe KYC with a fully native, redirect-free form (NativeConnectOnboarding)
+  // on every platform — no embedded Connect iframe, no connect.stripe.com. Just
+  // ensures the connected account exists first so the status chips render.
   const handleStripeKyc = async () => {
     if (!companyId || !clientId) return;
     setStripeLoading(true);
@@ -469,21 +464,12 @@ const ClientDashboardPage: React.FC = () => {
         await createOrRefreshStripeAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
         await fetchStripe();
       }
-      if (Capacitor.isNativePlatform()) {
-        await startHostedStripeOnboarding(clientId, companyId, () => fetchStripe());
-      } else {
-        setShowStripeOnboarding(true);
-      }
+      setShowStripeOnboarding(true);
     } catch (err) {
       console.log('[ClientDashboard] handleStripeKyc ❌', err);
       setError((err as Error).message ?? 'Error al iniciar registro bancario');
     }
     finally { setStripeLoading(false); }
-  };
-
-  const handleStripeOnboardingExit = () => {
-    setShowStripeOnboarding(false);
-    fetchStripe();
   };
 
   const handleCreatePayment = async () => {
@@ -911,10 +897,14 @@ const ClientDashboardPage: React.FC = () => {
           <IonCardContent>
             {stripeLoading && <p className="cd-stripe-loading">Verificando...</p>}
             {!stripeLoading && showStripeOnboarding && clientId && companyId && (
-              <StripeAccountOnboarding
+              <NativeConnectOnboarding
                 clientId={clientId}
                 companyId={companyId}
-                onExit={handleStripeOnboardingExit}
+                email={`client${clientId}@posgmo.mx`}
+                onProgress={(done) => {
+                  fetchStripe();
+                  if (done) setShowStripeOnboarding(false);
+                }}
               />
             )}
             {!stripeLoading && !showStripeOnboarding && !stripeAccount && (
