@@ -27,6 +27,26 @@ export async function getStripeAccountStatus(
   return await res.json();
 }
 
+// ONBOARDING LINK -- POST /stripe/onboarding-link
+// Returns a Stripe-hosted Account Link (connect.stripe.com). Used on native,
+// where Stripe's embedded Connect components aren't supported inside a mobile
+// WebView, so the hosted form is opened in an in-app browser instead (see
+// utils/stripeOnboarding.ts).
+export async function getStripeOnboardingLink(
+  clientId: number,
+  companyId: number,
+  returnUrl: string,
+  refreshUrl: string
+): Promise<{ url: string }> {
+  const res = await fetch(BASE_URL + "/stripe/onboarding-link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId, companyId, returnUrl, refreshUrl }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // CREATE OR REFRESH -- POST /stripe/connected-accounts
 // Safe to call even if an account already exists — the backend checks first
 // and only creates when missing (see modules/stripe_payments.py's

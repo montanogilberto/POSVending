@@ -64,7 +64,9 @@ import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboa
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
 import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
+import { Capacitor } from '@capacitor/core';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
+import { startHostedStripeOnboarding } from '../../utils/stripeOnboarding';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
 import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
 import Header from '../../components/Header';
@@ -453,9 +455,12 @@ const ClientDashboardPage: React.FC = () => {
     setWithdrawing(false);
   };
 
-  // Opens the embedded Stripe onboarding form inline — no external browser
-  // redirect. Live mode doesn't need the AccountLink/hosted-URL flow;
-  // the client fills everything in without ever leaving the app.
+  // Starts Stripe KYC without ever kicking the user out to the system browser.
+  // On the web we render Stripe's embedded onboarding form inline. On native
+  // (Capacitor) the embedded Connect components aren't supported inside a
+  // WebView — they render partway and then bounce the user to connect.stripe.com
+  // in the external browser — so we open Stripe's hosted onboarding in an in-app
+  // browser (Custom Tabs / SFSafariViewController) and re-check status on return.
   const handleStripeKyc = async () => {
     if (!companyId || !clientId) return;
     setStripeLoading(true);
@@ -464,7 +469,11 @@ const ClientDashboardPage: React.FC = () => {
         await createOrRefreshStripeAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
         await fetchStripe();
       }
-      setShowStripeOnboarding(true);
+      if (Capacitor.isNativePlatform()) {
+        await startHostedStripeOnboarding(clientId, companyId, () => fetchStripe());
+      } else {
+        setShowStripeOnboarding(true);
+      }
     } catch (err) {
       console.log('[ClientDashboard] handleStripeKyc ❌', err);
       setError((err as Error).message ?? 'Error al iniciar registro bancario');

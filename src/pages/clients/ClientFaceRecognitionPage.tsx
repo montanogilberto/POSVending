@@ -46,7 +46,9 @@ import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidenc
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
+import { Capacitor } from '@capacitor/core';
 import { createOrRefreshStripeAccount } from '../../api/stripeApi';
+import { startHostedStripeOnboarding } from '../../utils/stripeOnboarding';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -1179,12 +1181,25 @@ const ClientFaceRecognitionPage: React.FC = () => {
                 <p>Preparando tu cuenta...</p>
               </div>
             )}
-            {stripeAccountReady && (
+            {stripeAccountReady && !Capacitor.isNativePlatform() && (
               <StripeAccountOnboarding
                 clientId={deepLinkClientId}
                 companyId={companyId}
                 onExit={() => history.push(returnTo)}
               />
+            )}
+            {/* Native: embedded Connect components aren't supported inside a
+                WebView, so open Stripe's hosted onboarding in an in-app browser
+                and return to the dashboard (which re-checks status) on exit. */}
+            {stripeAccountReady && Capacitor.isNativePlatform() && (
+              <IonButton
+                expand="block"
+                onClick={() =>
+                  startHostedStripeOnboarding(deepLinkClientId, companyId, () => history.push(returnTo))
+                }
+              >
+                Registrar cuenta bancaria
+              </IonButton>
             )}
           </IonCardContent>
         </IonCard>
