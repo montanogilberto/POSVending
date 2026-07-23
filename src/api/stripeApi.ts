@@ -49,3 +49,61 @@ export async function createOrRefreshStripeAccount(
   if (!res.ok || data.error) throw new Error(data.error || "No se pudo crear la cuenta bancaria.");
   return data;
 }
+
+// ── Native (redirect-free) Connect onboarding ───────────────────────────────
+// Back the NativeConnectOnboarding form: KYC/bank collected with native inputs
+// and submitted to Stripe via the backend — no connect.stripe.com redirect.
+// Requires the backend Custom-account endpoints (/kyc, /bank).
+
+export interface ConnectKycPayload {
+  firstName: string;
+  lastName: string;
+  dobDay: number;
+  dobMonth: number;
+  dobYear: number;
+  email: string;
+  phone?: string;
+  taxId?: string; // RFC / CURP
+  address: {
+    line1: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string; // ISO-2, e.g. "MX"
+  };
+  acceptedTos: boolean;
+}
+
+// KYC -- POST /stripe/connected-accounts/kyc
+export async function submitConnectedAccountKyc(
+  clientId: number,
+  companyId: number,
+  kyc: ConnectKycPayload
+): Promise<{ account: StripeConnectedAccount }> {
+  const res = await fetch(BASE_URL + "/stripe/connected-accounts/kyc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId, companyId, ...kyc }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || "No se pudo guardar la información de identidad.");
+  return data;
+}
+
+// BANK -- POST /stripe/connected-accounts/bank
+// `bankToken` is a Stripe.js token created client-side — a bank_account token
+// (btok_, from a CLABE) OR a debit-card token (tok_, from the CardElement).
+export async function attachExternalBankAccount(
+  clientId: number,
+  companyId: number,
+  bankToken: string
+): Promise<{ account: StripeConnectedAccount }> {
+  const res = await fetch(BASE_URL + "/stripe/connected-accounts/bank", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId, companyId, bankToken }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || "No se pudo registrar la cuenta bancaria.");
+  return data;
+}

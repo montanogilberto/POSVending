@@ -66,7 +66,7 @@ import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/c
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
-import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
+import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -902,10 +902,11 @@ const ClientDashboardPage: React.FC = () => {
           <IonCardContent>
             {stripeLoading && <p className="cd-stripe-loading">Verificando...</p>}
             {!stripeLoading && showStripeOnboarding && clientId && companyId && (
-              <StripeAccountOnboarding
+              <NativeConnectOnboarding
                 clientId={clientId}
                 companyId={companyId}
-                onExit={handleStripeOnboardingExit}
+                email={`client${clientId}@posgmo.mx`}
+                onProgress={(done) => { fetchStripe(); if (done) setShowStripeOnboarding(false); }}
               />
             )}
             {!stripeLoading && !showStripeOnboarding && !stripeAccount && (

@@ -1,0 +1,261 @@
+import React, { useMemo, useState } from 'react';
+import {
+  IonButton, IonSpinner, IonInput, IonItem, IonLabel, IonList, IonSelect,
+  IonSelectOption, IonCheckbox, IonNote, IonIcon, IonSegment, IonSegmentButton,
+} from '@ionic/react';
+import { checkmarkCircleOutline } from 'ionicons/icons';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import {
+  createOrRefreshStripeAccount,
+  submitConnectedAccountKyc,
+  attachExternalBankAccount,
+  ConnectKycPayload,
+} from '../api/stripeApi';
+import './NativeConnectOnboarding.css';
+
+const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
+
+let stripePromise: Promise<Stripe | null> | null = null;
+function getStripe() {
+  if (!stripePromise) stripePromise = loadStripe(STRIPE_PK);
+  return stripePromise;
+}
+
+interface Props {
+  clientId: number;
+  companyId: number;
+  email: string;
+  // Called after each state-changing step; `done` is true once the payout
+  // destination is attached.
+  onProgress: (done: boolean) => void;
+}
+
+type Step = 'identity' | 'payout' | 'done';
+type PayoutMethod = 'bank' | 'debit_card';
+
+// Native, redirect-free Stripe Connect onboarding for the PAYOUT account (the
+// destination that receives the loan deposit). Identity is collected with Ionic
+// inputs; the payout destination is either a CLABE (tokenized as a bank_account)
+// or a debit card — the card path REUSES the same @stripe/react-stripe-js
+// CardElement pattern as SavedCardSetup. Everything is tokenized client-side and
+// submitted via the backend, so the user never leaves the app.
+const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgress }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const [step, setStep] = useState<Step>('identity');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  // Identity / tax
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [dob, setDob] = useState(''); // yyyy-mm-dd
+  const [phone, setPhone] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [line1, setLine1] = useState('');
+  const [city, setCity] = useState('');
+  const [stateProv, setStateProv] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [acceptedTos, setAcceptedTos] = useState(false);
+
+  // Payout destination
+  const [payoutMethod, setPayoutMethod] = useState<PayoutMethod>('bank');
+  const [holderName, setHolderName] = useState('');
+  const [holderType, setHolderType] = useState<'individual' | 'company'>('individual');
+  const [clabe, setClabe] = useState('');
+
+  const identityValid =
+    firstName.trim() && lastName.trim() && /^\d{4}-\d{2}-\d{2}$/.test(dob) &&
+    line1.trim() && city.trim() && stateProv.trim() && /^\d{5}$/.test(postalCode) &&
+    acceptedTos;
+
+  const clabeValid = /^\d{18}$/.test(clabe.replace(/\s/g, ''));
+
+  const submitIdentity = async () => {
+    if (!identityValid) { setError('Completa los campos obligatorios y acepta los términos.'); return; }
+    setBusy(true); setError('');
+    try {
+      await createOrRefreshStripeAccount(clientId, companyId, email);
+      const [year, month, day] = dob.split('-').map(Number);
+      const payload: ConnectKycPayload = {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        dobDay: day, dobMonth: month, dobYear: year,
+        email,
+        phone: phone.trim() || undefined,
+        taxId: taxId.trim() || undefined,
+        address: {
+          line1: line1.trim(), city: city.trim(), state: stateProv.trim(),
+          postalCode: postalCode.trim(), country: 'MX',
+        },
+        acceptedTos,
+      };
+      await submitConnectedAccountKyc(clientId, companyId, payload);
+      onProgress(false);
+      setStep('payout');
+    } catch (err) {
+      setError((err as Error).message ?? 'No se pudo guardar la información.');
+    } finally { setBusy(false); }
+  };
+
+  const submitPayout = async () => {
+    if (!stripe) { setError('No se pudo inicializar Stripe.'); return; }
+    if (!holderName.trim()) { setError('Ingresa el titular de la cuenta.'); return; }
+    setBusy(true); setError('');
+    try {
+      let token: string | undefined;
+      if (payoutMethod === 'bank') {
+        if (!clabeValid) { setError('Ingresa una CLABE de 18 dígitos.'); setBusy(false); return; }
+        // CLABE → bank_account token (raw number never hits our server).
+        const { token: bankTok, error: tokErr } = await stripe.createToken('bank_account', {
+          country: 'MX',
+          currency: 'mxn',
+          account_number: clabe.replace(/\s/g, ''),
+          account_holder_name: holderName.trim(),
+          account_holder_type: holderType,
+        });
+        if (tokErr || !bankTok) throw new Error(tokErr?.message ?? 'CLABE inválida.');
+        token = bankTok.id;
+      } else {
+        // Debit card → card token, reusing SavedCardSetup's CardElement.
+        const cardElement = elements?.getElement(CardElement);
+        if (!cardElement) throw new Error('No se encontró el formulario de tarjeta.');
+        const { token: cardTok, error: tokErr } = await stripe.createToken(cardElement, {
+          name: holderName.trim(),
+          currency: 'mxn',
+        });
+        if (tokErr || !cardTok) throw new Error(tokErr?.message ?? 'Tarjeta inválida.');
+        token = cardTok.id;
+      }
+      await attachExternalBankAccount(clientId, companyId, token);
+      onProgress(true);
+      setStep('done');
+    } catch (err) {
+      setError((err as Error).message ?? 'No se pudo registrar la cuenta de pago.');
+    } finally { setBusy(false); }
+  };
+
+  if (step === 'done') {
+    return (
+      <div className="nco-done">
+        <IonIcon icon={checkmarkCircleOutline} className="nco-done-icon" />
+        <p>Cuenta de pago registrada.</p>
+        <IonNote>La verificación puede tardar unos minutos en reflejarse.</IonNote>
+      </div>
+    );
+  }
+
+  return (
+    <div className="nco-wrap">
+      <div className="nco-steps">
+        <span className={step === 'identity' ? 'nco-step nco-step-active' : 'nco-step'}>1. Identidad</span>
+        <span className={step === 'payout' ? 'nco-step nco-step-active' : 'nco-step'}>2. Cuenta de pago</span>
+      </div>
+
+      {error && <p className="nco-error">{error}</p>}
+
+      {step === 'identity' && (
+        <>
+          <IonList lines="full" className="nco-list">
+            <IonItem>
+              <IonLabel position="stacked">Nombre(s) *</IonLabel>
+              <IonInput value={firstName} onIonInput={(e) => setFirstName(e.detail.value ?? '')} autocapitalize="words" />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Apellidos *</IonLabel>
+              <IonInput value={lastName} onIonInput={(e) => setLastName(e.detail.value ?? '')} autocapitalize="words" />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Fecha de nacimiento *</IonLabel>
+              <IonInput type="date" value={dob} onIonInput={(e) => setDob(e.detail.value ?? '')} />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Teléfono</IonLabel>
+              <IonInput type="tel" value={phone} onIonInput={(e) => setPhone(e.detail.value ?? '')} />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">RFC / CURP</IonLabel>
+              <IonInput value={taxId} onIonInput={(e) => setTaxId(e.detail.value ?? '')} autocapitalize="characters" />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Domicilio (calle y número) *</IonLabel>
+              <IonInput value={line1} onIonInput={(e) => setLine1(e.detail.value ?? '')} />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Ciudad *</IonLabel>
+              <IonInput value={city} onIonInput={(e) => setCity(e.detail.value ?? '')} />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Estado *</IonLabel>
+              <IonInput value={stateProv} onIonInput={(e) => setStateProv(e.detail.value ?? '')} />
+            </IonItem>
+            <IonItem>
+              <IonLabel position="stacked">Código postal *</IonLabel>
+              <IonInput type="tel" inputmode="numeric" maxlength={5} value={postalCode} onIonInput={(e) => setPostalCode(e.detail.value ?? '')} />
+            </IonItem>
+            <IonItem lines="none">
+              <IonCheckbox slot="start" checked={acceptedTos} onIonChange={(e) => setAcceptedTos(e.detail.checked)} />
+              <IonLabel className="nco-tos">Acepto el Acuerdo de Servicios de Stripe y los términos de SmartLoans.</IonLabel>
+            </IonItem>
+          </IonList>
+          <IonButton expand="block" shape="round" disabled={busy || !identityValid} onClick={submitIdentity}>
+            {busy ? <IonSpinner name="crescent" /> : 'Continuar'}
+          </IonButton>
+        </>
+      )}
+
+      {step === 'payout' && (
+        <>
+          <IonSegment value={payoutMethod} onIonChange={(e) => setPayoutMethod((e.detail.value as PayoutMethod) ?? 'bank')}>
+            <IonSegmentButton value="bank">Cuenta bancaria</IonSegmentButton>
+            <IonSegmentButton value="debit_card">Tarjeta de débito</IonSegmentButton>
+          </IonSegment>
+
+          <IonList lines="full" className="nco-list">
+            <IonItem>
+              <IonLabel position="stacked">Titular *</IonLabel>
+              <IonInput value={holderName} onIonInput={(e) => setHolderName(e.detail.value ?? '')} autocapitalize="words" />
+            </IonItem>
+            {payoutMethod === 'bank' && (
+              <>
+                <IonItem>
+                  <IonLabel position="stacked">Tipo de titular *</IonLabel>
+                  <IonSelect value={holderType} onIonChange={(e) => setHolderType(e.detail.value)} interface="popover">
+                    <IonSelectOption value="individual">Persona física</IonSelectOption>
+                    <IonSelectOption value="company">Empresa</IonSelectOption>
+                  </IonSelect>
+                </IonItem>
+                <IonItem>
+                  <IonLabel position="stacked">CLABE (18 dígitos) *</IonLabel>
+                  <IonInput type="tel" inputmode="numeric" maxlength={18} value={clabe} onIonInput={(e) => setClabe(e.detail.value ?? '')} />
+                  {clabe.length > 0 && !clabeValid && <IonNote color="danger">Debe tener 18 dígitos.</IonNote>}
+                </IonItem>
+              </>
+            )}
+          </IonList>
+
+          {payoutMethod === 'debit_card' && (
+            <div className="nco-card-wrap">
+              <CardElement options={{ style: { base: { fontSize: '16px' } }, hidePostalCode: true }} />
+            </div>
+          )}
+
+          <IonNote className="nco-hint">Tus datos se cifran y envían directamente a Stripe. SmartLoans nunca almacena el número completo.</IonNote>
+          <IonButton expand="block" shape="round" disabled={busy} onClick={submitPayout}>
+            {busy ? <IonSpinner name="crescent" /> : 'Registrar cuenta de pago'}
+          </IonButton>
+        </>
+      )}
+    </div>
+  );
+};
+
+const NativeConnectOnboarding: React.FC<Props> = (props) => (
+  <Elements stripe={getStripe()}>
+    <OnboardingForm {...props} />
+  </Elements>
+);
+
+export default NativeConnectOnboarding;
