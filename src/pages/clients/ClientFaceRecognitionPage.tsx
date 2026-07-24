@@ -33,6 +33,7 @@ import PresenceCapture, { PresenceCaptureResult } from '../../components/Presenc
 import SignaturePad from '../../components/SignaturePad';
 import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
 import { buildKycPrefill } from '../../utils/kycPrefill';
+import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../components/UserContext';
 import { Client, getOneClient } from '../../api/clientsApi';
 import {
@@ -210,6 +211,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [stripeAccountError, setStripeAccountError] = useState('');
   const ocrRanForRef = useRef('');
   const [presenceResult, setPresenceResult] = useState<PresenceCaptureResult | null>(null);
+  // Held in state (not just written straight to the upsert) because the face
+  // validation agent scores the presence video alongside the pose photos.
+  const [presenceVideoBlobUrl, setPresenceVideoBlobUrl] = useState<string>('');
+  // Null when the agent could not be reached — distinct from a real negative
+  // verdict, which arrives as { isValid: false }.
+  const [faceValidation, setFaceValidation] = useState<FaceValidationResult | null>(null);
   const [contractSignatureBase64, setContractSignatureBase64] = useState<string>('');
   // Tracks the ClientFaceRecognition row created on first capture, so later
   // captures/scores update that same row instead of creating duplicates.
@@ -427,6 +434,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         videoBase64: result.videoBase64.split(',')[1],
       });
       console.log('[Expediente] handlePresenceCapture: uploaded to blob →', blobUrl);
+      setPresenceVideoBlobUrl(blobUrl);
       const record = await upsertClientFaceRecognition(
         Number(companyId),
         selectedClient.clientId,
@@ -487,9 +495,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
         throw new Error('No se detectó un rostro en la identificación capturada. Vuelve a capturar el documento.');
       }
 
-      const { distance, isMatch } = compareFaceDescriptors(idDescriptor, result.descriptor);
-      const confidence = distanceToConfidence(distance);
-      console.log('[Expediente] handleLivenessComplete: match result — distance =', distance.toFixed(4), 'confidence =', confidence.toFixed(4), 'isMatch =', isMatch);
+      const { distance, isMatch: localMatch } = compareFaceDescriptors(idDescriptor, result.descriptor);
+      const localConfidence = distanceToConfidence(distance);
+      console.log('[Expediente] handleLivenessComplete: LOCAL match — distance =', distance.toFixed(4), 'confidence =', localConfidence.toFixed(4), 'isMatch =', localMatch);
 
       const selfieBlobUrl = await uploadCapturedImage('selfie', result.selfieBase64);
 
@@ -506,6 +514,32 @@ const ClientFaceRecognitionPage: React.FC = () => {
         if (url) poseBlobUrls[pose] = url;
       }
       console.log('[Expediente] handleLivenessComplete: pose uploads =', JSON.stringify(poseBlobUrls));
+
+      // The agent scores the whole evidence set — five head positions, the
+      // presence video and the INE — and its verdict supersedes the local
+      // descriptor comparison. face-api.js only answers "do these two faces
+      // look alike"; it cannot see that the camera was pointed at a phone, or
+      // that all five poses are the same frame because the challenge was never
+      // performed. Those are the failures that matter for KYC.
+      //
+      // Falling back to the local score when the agent is unreachable is
+      // deliberate: an outage must not read as a failed identity check, and it
+      // must not silently pass one either — the local comparison still ran.
+      const agentResult = await validateFaceSession({
+        front:    poseBlobUrls.front ? { url: poseBlobUrls.front } : undefined,
+        up:       poseBlobUrls.up    ? { url: poseBlobUrls.up }    : undefined,
+        down:     poseBlobUrls.down  ? { url: poseBlobUrls.down }  : undefined,
+        left:     poseBlobUrls.left  ? { url: poseBlobUrls.left }  : undefined,
+        right:    poseBlobUrls.right ? { url: poseBlobUrls.right } : undefined,
+        video:    presenceVideoBlobUrl ? { url: presenceVideoBlobUrl } : undefined,
+        ineFront: idFrontImageBlobUrl   ? { url: idFrontImageBlobUrl }   : undefined,
+      });
+
+      const confidence = agentResult ? agentResult.confidence : localConfidence;
+      const isMatch    = agentResult ? agentResult.isValid    : localMatch;
+      setFaceValidation(agentResult);
+      console.log('[Expediente] handleLivenessComplete: verdict source =', agentResult ? 'agent' : 'local fallback',
+        JSON.stringify({ confidence, isMatch, localConfidence, localMatch }));
 
       setConfidenceScore(confidence);
       setIsVerified(isMatch);
@@ -526,8 +560,15 @@ const ClientFaceRecognitionPage: React.FC = () => {
         console.log('[Expediente] handleLivenessComplete: WARNING — no clientFaceRecognitionId yet, score not persisted');
       }
 
+      // Prefer the agent's own reason over the generic message — it can say
+      // "the poses are all the same frame" or "the ID portrait is unreadable",
+      // which tells the client what to actually change.
       setToastMessage(
-        isMatch ? 'Validación facial completada correctamente.' : 'El rostro no coincide con la identificación. Vuelve a intentarlo.'
+        isMatch
+          ? 'Validación facial completada correctamente.'
+          : agentResult?.failureReasons?.length
+            ? agentResult.failureReasons[0]
+            : 'El rostro no coincide con la identificación. Vuelve a intentarlo.'
       );
       setShowToast(true);
       setStep(2);
@@ -579,6 +620,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
     setContractAcceptedAt('');
     setLivenessStatus('idle');
     setIdInfoConfirmed(false);
+    setPresenceVideoBlobUrl('');
+    setFaceValidation(null);
     setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS);
     setPresenceResult(null);
     setContractSignatureBase64('');
@@ -586,7 +629,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const handleSubmitContract = async () => {
-    console.log('[Expediente] handleSubmitContract: starting, contractAccepted =', contractAccepted, 'isVerified =', isVerified, 'confidenceScore =', confidenceScore);
+    // confidenceScore now comes from the validation agent's whole-session
+    // verdict, not the local two-descriptor comparison — 'scoreSource' makes
+    // clear which produced it, because a local-fallback score means the agent
+    // never ran and the anti-spoofing checks did not happen.
+    console.log('[Expediente] handleSubmitContract: starting,', JSON.stringify({
+      contractAccepted,
+      isVerified,
+      confidenceScore,
+      scoreSource: faceValidation ? 'agent' : 'local-fallback',
+      failedChecks: (faceValidation?.checks ?? []).filter((c) => !c.passed).map((c) => c.name),
+      assetsEvaluated: faceValidation?.assetsEvaluated ?? [],
+    }));
     if (!contractAccepted) {
       setError('Por favor acepta los términos del contrato para continuar.');
       setShowToast(true);
