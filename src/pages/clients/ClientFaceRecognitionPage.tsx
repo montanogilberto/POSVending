@@ -26,7 +26,7 @@ import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
 import ClientSelector from '../../components/ClientSelector';
 import GuidedDocumentCapture from '../../components/GuidedDocumentCapture';
-import FaceLivenessCapture, { FaceLivenessResult } from '../../components/FaceLivenessCapture';
+import FaceLivenessCapture, { FaceLivenessResult, FacePose } from '../../components/FaceLivenessCapture';
 import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary';
 import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
@@ -42,6 +42,7 @@ import {
   uploadPresenceCapture as uploadPresenceCaptureApi,
   reverseGeocode,
   ContractSubmissionRequest,
+  getAllClientFaceRecognitions,
 } from '../../api/clientFaceRecognitionApi';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
@@ -123,6 +124,69 @@ const ClientFaceRecognitionPage: React.FC = () => {
         if (clients[0]) setSelectedClient(clients[0]);
       })
       .catch((err) => console.warn('[Expediente] Failed to preselect client from dashboard link', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Resume an expediente already in progress instead of restarting it.
+  //
+  // Every step of this wizard already persists to ClientFaceRecognitions as it
+  // goes — the ID blobs on capture, isVerified after liveness, contractAccepted
+  // on submit — but the page never read that record back, so reopening the
+  // wizard always began at "Cliente y documento" and made the client
+  // re-photograph an INE the system already had. Nothing new needs storing;
+  // this just reads what is there and jumps to the first unfinished step.
+  useEffect(() => {
+    if (!deepLinkClientId || !companyId) return;
+    getAllClientFaceRecognitions(Number(companyId))
+      .then((records) => {
+        const record = records.find((r) => r.clientId === Number(deepLinkClientId));
+        if (!record) {
+          console.log('[Expediente] resume: no existing record — starting fresh');
+          return;
+        }
+        clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
+        if (record.documentType) setDocumentType(record.documentType as typeof documentType);
+        if (record.idFrontImageBlobUrl) setIdFrontImageBlobUrl(record.idFrontImageBlobUrl);
+        if (record.idBackImageBlobUrl) setIdBackImageBlobUrl(record.idBackImageBlobUrl);
+        if (record.clientSelfieBlobUrl) setClientSelfieBlobUrl(record.clientSelfieBlobUrl);
+        if (record.confidenceScore) setConfidenceScore(record.confidenceScore);
+        setIsVerified(!!record.isVerified);
+        setContractAccepted(!!record.contractAccepted);
+        setPagareAccepted(!!record.pagareAccepted);
+        setHasPhysicalPagare(!!record.hasPhysicalPagare);
+        if (record.contractAcceptedAt) setContractAcceptedAt(record.contractAcceptedAt);
+
+        // Identity read off the ID earlier — restoring it also means the
+        // review screen and the Stripe KYC prefill work on resume.
+        const extracted: ExtractedIdFields = {
+          nombre: record.nombre ?? '',
+          domicilio: record.domicilio ?? '',
+          curp: record.curp ?? '',
+          claveElector: record.claveElector ?? '',
+          fechaNacimiento: record.fechaNacimiento ?? '',
+        };
+        if (Object.values(extracted).some(Boolean)) setExtractedIdFields(extracted);
+
+        // First unfinished step wins. Contract done means the expediente is
+        // complete, so there is nothing to resume into.
+        const resumeStep = record.contractAccepted ? -1
+          : record.isVerified ? 3
+          : (record.idFrontImageBlobUrl && record.idBackImageBlobUrl) ? 2
+          : 0;
+        console.log('[Expediente] resume:', JSON.stringify({
+          clientFaceRecognitionId: record.clientFaceRecognitionId,
+          hasFront: !!record.idFrontImageBlobUrl,
+          hasBack: !!record.idBackImageBlobUrl,
+          isVerified: !!record.isVerified,
+          contractAccepted: !!record.contractAccepted,
+          resumeStep,
+        }));
+        if (resumeStep > 0) {
+          setStep(resumeStep);
+          if (resumeStep === 2) setCaptureSubStep('liveness-intro');
+        }
+      })
+      .catch((err) => console.warn('[Expediente] resume: lookup failed, starting fresh', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
@@ -303,7 +367,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // the user closes the wizard before finishing. Failures here are non-fatal:
   // the local base64 still lets the user continue, and the final verify step
   // remains a fallback.
-  const uploadCapturedImage = async (side: 'front' | 'back' | 'selfie', base64: string) => {
+  // 'selfie_*' sides are the five liveness poses (see FacePose). They land in
+  // the same per-client selfies/ folder as the main selfie; the backend routes
+  // on the prefix.
+  type UploadSide = 'front' | 'back' | 'selfie' | `selfie_${FacePose}`;
+
+  const uploadCapturedImage = async (side: UploadSide, base64: string) => {
     console.log(`[Expediente] uploadCapturedImage(${side}): starting, clientId =`, selectedClient?.clientId);
     if (!selectedClient) {
       console.log(`[Expediente] uploadCapturedImage(${side}): ABORT — no selectedClient`);
@@ -423,6 +492,20 @@ const ClientFaceRecognitionPage: React.FC = () => {
       console.log('[Expediente] handleLivenessComplete: match result — distance =', distance.toFixed(4), 'confidence =', confidence.toFixed(4), 'isMatch =', isMatch);
 
       const selfieBlobUrl = await uploadCapturedImage('selfie', result.selfieBase64);
+
+      // Upload the five head positions captured during the challenge. These
+      // are the evidence set the validation agent scores (front/up/down/
+      // left/right + the presence video + the INE), so they go up even when
+      // the local descriptor match failed — a failed match is exactly the
+      // case a human or the agent needs the images to adjudicate.
+      const poseEntries = Object.entries(result.posePhotos) as [FacePose, string][];
+      const poseBlobUrls: Partial<Record<FacePose, string>> = {};
+      for (const [pose, base64] of poseEntries) {
+        if (!base64) continue;
+        const url = await uploadCapturedImage(`selfie_${pose}`, base64);
+        if (url) poseBlobUrls[pose] = url;
+      }
+      console.log('[Expediente] handleLivenessComplete: pose uploads =', JSON.stringify(poseBlobUrls));
 
       setConfidenceScore(confidence);
       setIsVerified(isMatch);
@@ -598,8 +681,14 @@ const ClientFaceRecognitionPage: React.FC = () => {
           console.log('[Expediente] handleSubmitContract: SUCCESS — advancing to Cuenta de pago step');
           setStep(4);
         } else {
-          console.log('[Expediente] handleSubmitContract: SUCCESS — record persisted, resetting wizard');
+          // Hand back to whoever opened the wizard rather than resetWizard(),
+          // which sets step 0 and left the client staring at "Cliente y
+          // documento" again — indistinguishable from the submit having
+          // failed. There is no payout step for borrowers any more (that is
+          // deferred to disbursement), so the contract IS the last step.
+          console.log('[Expediente] handleSubmitContract: SUCCESS — expediente complete, returning to', returnTo);
           resetWizard();
+          history.push(returnTo);
         }
       }
     } catch (err) {

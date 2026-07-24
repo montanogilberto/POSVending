@@ -21,9 +21,16 @@
 .flc-ring {
   position: absolute;
   left: 50%;
-  top: 42%;
+  /* Centred rather than sitting high: the guide reads as "put your face
+     here", so a ring offset toward the top pulls people to lean up and out of
+     frame, which is the opposite of what the down challenge needs. */
+  top: 50%;
   transform: translate(-50%, -50%);
-  width: 78%;
+  /* Widened from 78%. The ring is the target the client fills with their
+     face, and a small one leaves the face occupying a fraction of the frame —
+     fewer pixels on the face for the descriptor, and more room to drift out
+     of view while turning. */
+  width: 94%;
   aspect-ratio: 1;
   pointer-events: none;
 }

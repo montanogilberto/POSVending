@@ -67,6 +67,7 @@ import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../.
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
 import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import { buildKycPrefill } from '../../utils/kycPrefill';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -917,6 +918,10 @@ const ClientDashboardPage: React.FC = () => {
                 companyId={companyId}
                 email={`client${clientId}@posgmo.mx`}
                 onProgress={(done) => { fetchStripe(); if (done) setShowStripeOnboarding(false); }}
+                // The Expediente already read name, DOB, CURP and address off
+                // this client's INE and they are sitting in faceRecord — seed
+                // the form instead of making them type it all again here.
+                prefill={buildKycPrefill(faceRecord ?? {}, clientRecord?.cellphone)}
               />
             )}
             {!stripeLoading && !showStripeOnboarding && !stripeAccount && (

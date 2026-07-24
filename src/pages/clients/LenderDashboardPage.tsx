@@ -19,6 +19,7 @@ import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/c
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../api/stripeApi';
 import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import { buildKycPrefill } from '../../utils/kycPrefill';
 import './LenderDashboardPage.css';
 
 const toDate = (utc: string | undefined) => {
@@ -285,6 +286,8 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
                 companyId={Number(companyId)}
                 email={`client${lenderClientId}@posgmo.mx`}
                 onProgress={(done) => { fetchStripeStatus(); if (done) setShowStripeOnboarding(false); }}
+                // Seeded from the lender's own captured INE (see kycPrefill).
+                prefill={buildKycPrefill(faceRecord ?? {})}
               />
             ) : !stripeAccount ? (
               <div style={{ textAlign: 'center', padding: '8px 0' }}>

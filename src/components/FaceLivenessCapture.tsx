@@ -22,9 +22,19 @@ import './FaceLivenessCapture.css';
 
 type CaptureState = 'loading-models' | 'starting-camera' | 'searching' | 'challenge' | 'awaiting-blink' | 'captured' | 'error';
 
+// The five head positions captured during the session. 'front' is the neutral
+// pose sampled the moment the face is first acquired; the other four are
+// grabbed at the instant each directional challenge is satisfied, so each one
+// is genuine evidence of that pose rather than a re-enactment afterwards.
+export type FacePose = 'front' | 'up' | 'down' | 'left' | 'right';
+
+export type PosePhotos = Partial<Record<FacePose, string>>;
+
 export interface FaceLivenessResult {
   selfieBase64: string;
   descriptor: Float32Array;
+  // Keyed by pose; a pose is absent only if its frame could not be grabbed.
+  posePhotos: PosePhotos;
 }
 
 interface FaceLivenessCaptureProps {
@@ -109,32 +119,64 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     streamRef.current = null;
   }, []);
 
+  // Grabs the current video frame as a JPEG data URL. Shared by the per-pose
+  // captures and the final selfie so they cannot drift in encoding/quality.
+  const grabFrame = useCallback((): string => {
+    const video = videoRef.current;
+    const canvas = captureCanvasRef.current;
+    if (!video || !canvas || !video.videoWidth) return '';
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.92);
+  }, []);
+
+  // Captured as each pose is actually achieved — see PosePhotos.
+  const posePhotosRef = useRef<PosePhotos>({});
+
+  const capturePose = useCallback((pose: FacePose) => {
+    if (posePhotosRef.current[pose]) return; // first good frame per pose wins
+    const frame = grabFrame();
+    if (!frame) {
+      console.log(`[FaceLivenessCapture] capturePose(${pose}): FAILED — no frame available`);
+      return;
+    }
+    posePhotosRef.current[pose] = frame;
+    console.log(`[FaceLivenessCapture] capturePose(${pose}): captured, length =`, frame.length);
+  }, [grabFrame]);
+
   const finish = useCallback(
     (descriptor: Float32Array) => {
       console.log('[FaceLivenessCapture] finish: all checks passed, capturing selfie frame');
-      const video = videoRef.current;
-      const canvas = captureCanvasRef.current;
-      if (!video || !canvas) {
-        console.log('[FaceLivenessCapture] finish: ABORT — missing video/canvas', { hasVideo: !!video, hasCanvas: !!canvas });
+      const selfieBase64 = grabFrame();
+      if (!selfieBase64) {
+        console.log('[FaceLivenessCapture] finish: ABORT — could not grab final frame');
         return;
       }
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const selfieBase64 = canvas.toDataURL('image/jpeg', 0.92);
       console.log('[FaceLivenessCapture] finish: selfie captured, base64 length =', selfieBase64.length);
+
+      // Fall back to the final frame for 'front' if the neutral capture never
+      // landed, so the pose set is never missing the one Stripe/ID matching
+      // and the validation agent care about most.
+      if (!posePhotosRef.current.front) posePhotosRef.current.front = selfieBase64;
+
+      const posePhotos = { ...posePhotosRef.current };
+      console.log('[FaceLivenessCapture] finish: pose photos =', JSON.stringify(
+        (Object.keys(posePhotos) as FacePose[]).reduce<Record<string, number>>(
+          (acc, k) => { acc[k] = posePhotos[k]?.length ?? 0; return acc; }, {}
+        )
+      ));
 
       stopStream();
       setState('captured');
       setTimeout(() => {
         console.log('[FaceLivenessCapture] finish: calling onComplete()');
-        onComplete({ selfieBase64, descriptor });
+        onComplete({ selfieBase64, descriptor, posePhotos });
       }, 500);
     },
-    [onComplete, stopStream]
+    [onComplete, stopStream, grabFrame]
   );
 
   const tick = useCallback(
@@ -176,6 +218,9 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       lastDetectionRef.current = detection;
       if (!neutralDescriptorRef.current) {
         neutralDescriptorRef.current = detection.descriptor;
+        // Same frame the neutral descriptor comes from: face acquired, no
+        // challenge presented yet, so the head is still square to the camera.
+        capturePose('front');
       }
       setState((prev) => {
         if (prev === 'loading-models' || prev === 'starting-camera' || prev === 'searching') {
@@ -230,6 +275,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       if (completed && !doneRef.current) {
         const nextIndex = challengeIndexRef.current + 1;
         console.log(`[FaceLivenessCapture] tick: move "${challenge}" satisfied (${nextIndex}/4)`);
+        // Grab the frame on the very tick the pose was satisfied — the head is
+        // at its furthest point now, and waiting even a few frames catches it
+        // already returning to neutral.
+        capturePose(challenge as FacePose);
         challengeDescriptorsRef.current.push(detection.descriptor);
         challengeIndexRef.current = nextIndex;
         challengeStateRef.current = newChallengeState();
@@ -238,7 +287,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
       rafRef.current = requestAnimationFrame(tick);
     },
-    [sequence, finish, stopStream]
+    [sequence, finish, stopStream, capturePose]
   );
 
   const startCameraAndLoop = useCallback(
@@ -314,6 +363,9 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     neutralDescriptorRef.current = null;
     lastDetectionRef.current = null;
     missedFramesRef.current = 0;
+    // Discard poses from the abandoned attempt — mixing them with a new run
+    // would defeat the point of capturing evidence of a single session.
+    posePhotosRef.current = {};
     doneRef.current = false;
     setSequence(newSequence);
     setChallengeIndex(0);

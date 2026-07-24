@@ -118,10 +118,16 @@ export interface ContractSubmissionResponse {
   error?: string;
 }
 
+// The five head positions captured during the liveness challenge. Uploaded as
+// side "selfie_<pose>"; the backend files them under the client's selfies/
+// folder alongside the main selfie.
+export type FacePoseSide =
+  | "selfie_front" | "selfie_up" | "selfie_down" | "selfie_left" | "selfie_right";
+
 export interface UploadDocumentImageRequest {
   companyId: number;
   clientId: number;
-  side: "front" | "back" | "selfie";
+  side: "front" | "back" | "selfie" | FacePoseSide;
   imageBase64: string; // raw base64, no "data:image/...;base64," prefix
 }
 
