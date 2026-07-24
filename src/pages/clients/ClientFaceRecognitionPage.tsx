@@ -119,13 +119,22 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const continueToPayments = !!location.state?.continueToPayments;
   const returnTo = location.state?.returnTo || `/client-dashboard/${deepLinkClientId}?tab=home`;
 
+  // When opened from a dashboard deep link the wizard fetches the client and
+  // the existing expediente before it knows which step to resume to. Until
+  // both land, the step content would flash the fresh step-0 form and then
+  // jump — so a "Cargando" placeholder is shown instead. Both init true for a
+  // staff-initiated fresh wizard (no deep link), which has nothing to load.
+  const [clientLoaded, setClientLoaded] = useState(!deepLinkClientId);
+  const [resumeLoaded, setResumeLoaded] = useState(!deepLinkClientId);
+
   useEffect(() => {
     if (!deepLinkClientId) return;
     getOneClient({ clients: [{ clientId: deepLinkClientId }] })
       .then((clients) => {
         if (clients[0]) setSelectedClient(clients[0]);
       })
-      .catch((err) => console.warn('[Expediente] Failed to preselect client from dashboard link', err));
+      .catch((err) => console.warn('[Expediente] Failed to preselect client from dashboard link', err))
+      .finally(() => setClientLoaded(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -138,7 +147,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // re-photograph an INE the system already had. Nothing new needs storing;
   // this just reads what is there and jumps to the first unfinished step.
   useEffect(() => {
-    if (!deepLinkClientId || !companyId) return;
+    if (!deepLinkClientId || !companyId) {
+      // No lookup to do (or companyId not ready) — release the spinner rather
+      // than leaving it stuck on "Cargando" forever.
+      setResumeLoaded(true);
+      return;
+    }
     getAllClientFaceRecognitions(Number(companyId))
       .then((records) => {
         const record = records.find((r) => r.clientId === Number(deepLinkClientId));
@@ -169,9 +183,23 @@ const ClientFaceRecognitionPage: React.FC = () => {
         };
         if (Object.values(extracted).some(Boolean)) setExtractedIdFields(extracted);
 
-        // First unfinished step wins. Contract done means the expediente is
-        // complete, so there is nothing to resume into.
-        const resumeStep = record.contractAccepted ? -1
+        // Land on the first UNFINISHED step, which also makes every completed
+        // step render green in the indicator (i < step). Previously a
+        // fully-contracted record mapped to -1 and fell through the `> 0`
+        // guard, so the wizard reopened at step 0 with nothing green even
+        // though the client had already done everything — exactly the "why
+        // aren't the circles green" case.
+        //
+        // Contract done → the remaining step is payment: the card/payout step
+        // when this launch includes it (continueToPayments), otherwise there
+        // is no further step and we clamp to the last one (Contrato) so the
+        // whole run shows complete.
+        const lastStepIndex = STEPS.length - 1;
+        // contractAccepted implies the signature was captured too (submission
+        // requires it), so the remaining step is payment when present,
+        // otherwise the run is complete and we clamp to the last step.
+        const resumeStep = record.contractAccepted
+          ? (continueToPayments ? 5 : lastStepIndex)
           : record.isVerified ? 3
           : (record.idFrontImageBlobUrl && record.idBackImageBlobUrl) ? 2
           : 0;
@@ -181,6 +209,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           hasBack: !!record.idBackImageBlobUrl,
           isVerified: !!record.isVerified,
           contractAccepted: !!record.contractAccepted,
+          continueToPayments,
           resumeStep,
         }));
         if (resumeStep > 0) {
@@ -188,7 +217,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
           if (resumeStep === 2) setCaptureSubStep('liveness-intro');
         }
       })
-      .catch((err) => console.warn('[Expediente] resume: lookup failed, starting fresh', err));
+      .catch((err) => console.warn('[Expediente] resume: lookup failed, starting fresh', err))
+      .finally(() => setResumeLoaded(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [documentType, setDocumentType] = useState<'INE' | 'Passport' | 'Driver License' | ''>('');
@@ -234,9 +264,27 @@ const ClientFaceRecognitionPage: React.FC = () => {
     selectedClient?.clientType === 'lender' || selectedClient?.clientType === 'both';
   const paymentStepLabel = isPayoutClient ? 'Cuenta de pago' : 'Tarjeta';
 
+  // Firma (signature) is its own step now, split out of Contrato: the client
+  // accepts the terms on step 3, then signs on step 4, then (if the launch
+  // includes it) the payment step is 5.
   const STEPS = continueToPayments
-    ? ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', paymentStepLabel]
-    : ['Cliente y documento', 'Captura', 'Verificación', 'Contrato'];
+    ? ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', 'Firma', paymentStepLabel]
+    : ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', 'Firma'];
+
+  // Single source of truth for step tracking: logs EVERY step / capture
+  // sub-step transition regardless of which handler (goNext, goBack, jump,
+  // footer buttons, resume, submit, …) triggered it. Cheaper and far more
+  // reliable than a console.log at each of the ~30 setStep/setCaptureSubStep
+  // call sites, and it can't drift out of sync with them.
+  useEffect(() => {
+    console.log('[Expediente] STEP →', JSON.stringify({
+      step,
+      stepLabel: STEPS[step] ?? '(out of range)',
+      captureSubStep: step === 1 ? captureSubStep : undefined,
+      totalSteps: STEPS.length,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, captureSubStep]);
 
   // Runs OCR against the front+back ID captures as soon as both are ready —
   // in the background, independent of which step/sub-step is on screen.
@@ -318,7 +366,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
     // (SavedCardSetup), which creates no connected account — calling
     // ensureStripeAccount for them would mint an unused payout account and
     // reintroduce the deferred KYC we removed.
-    if (step === 4 && isPayoutClient && !stripeAccountReady && !stripeAccountError) {
+    if (step === 5 && isPayoutClient && !stripeAccountReady && !stripeAccountError) {
       ensureStripeAccount();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -749,8 +797,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
         setToastMessage('¡Contrato aceptado y enviado exitosamente!');
         setShowToast(true);
         if (continueToPayments) {
-          console.log('[Expediente] handleSubmitContract: SUCCESS — advancing to Cuenta de pago step');
-          setStep(4);
+          console.log('[Expediente] handleSubmitContract: SUCCESS — advancing to payment step');
+          setStep(5);
         } else {
           // Hand back to whoever opened the wizard rather than resetWizard(),
           // which sets step 0 and left the client staring at "Cliente y
@@ -931,9 +979,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
       return null;
     }
 
-    if (step === 4) {
-      // Cuenta de pago — the embedded Stripe form drives its own completion
-      // (onExit below), there's nothing to submit/go-back to here.
+    if (step === 5) {
+      // Payment — the embedded Stripe form / card setup drives its own
+      // completion, there's nothing to submit/go-back to here.
       return null;
     }
 
@@ -959,6 +1007,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
           </button>
         )}
         {step === 3 && (
+          // Terms accepted here; signing happens on the next step (Firma).
+          <button className="wizard-footer-next" onClick={() => setStep(4)} disabled={!contractAccepted || !pagareAccepted}>
+            Continuar <IonIcon icon={chevronForward} />
+          </button>
+        )}
+        {step === 4 && (
+          // Firma — the actual submission, now that the signature exists.
           <button className="wizard-footer-submit" onClick={handleSubmitContract} disabled={!contractAccepted || !pagareAccepted || !contractSignatureBase64 || loading}>
             Enviar contrato
           </button>
@@ -1187,6 +1242,22 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // ── Main step renderers ─────────────────────────────────────────────────────
 
   const renderStepContent = () => {
+    // Deep-linked open still resolving the client + existing expediente — show
+    // a placeholder until we know which step to land on, so the step content
+    // doesn't flash the wrong state and then jump.
+    if (!clientLoaded || !resumeLoaded) {
+      return (
+        <IonCard className="client-face-recognition-step-card">
+          <IonCardContent>
+            <div className="cfr-step-loading">
+              <IonSpinner name="crescent" />
+              <p>Cargando...</p>
+            </div>
+          </IonCardContent>
+        </IonCard>
+      );
+    }
+
     if (step === 0) {
       return (
         <IonCard className="client-face-recognition-step-card">
@@ -1319,22 +1390,34 @@ const ClientFaceRecognitionPage: React.FC = () => {
             />
           </IonItem>
 
-          {contractAccepted && pagareAccepted && (
-            <div className="ion-margin-top">
-              <p><strong>Firma electrónica:</strong></p>
-              <SignaturePad
-                label="Firma aquí para validar tu identidad"
-                onSave={(dataUrl) => setContractSignatureBase64(dataUrl)}
-                onClear={() => setContractSignatureBase64('')}
-              />
-              {contractSignatureBase64 && <p style={{ color: '#059669', fontSize: 13 }}>Firma guardada ✓</p>}
-            </div>
-          )}
         </IonCardContent>
       </IonCard>
     );
 
-    // step === 4 — the payment step, reached after a successful contract
+    // step === 4 — Firma. Split out of the Contrato step so signing is its own
+    // deliberate action after the client has accepted the terms. This is where
+    // the contract is actually submitted, because the generated PDF embeds the
+    // signature drawn here.
+    if (step === 4) return (
+      <IonCard className="client-face-recognition-step-card">
+        <IonCardHeader>
+          <IonCardTitle>Paso 5: Firma</IonCardTitle>
+        </IonCardHeader>
+        <IonCardContent>
+          <p>Firma para validar tu identidad y enviar el contrato y el pagaré.</p>
+          <div className="ion-margin-top">
+            <SignaturePad
+              label="Firma aquí para validar tu identidad"
+              onSave={(dataUrl) => setContractSignatureBase64(dataUrl)}
+              onClear={() => setContractSignatureBase64('')}
+            />
+            {contractSignatureBase64 && <p style={{ color: '#059669', fontSize: 13 }}>Firma guardada ✓</p>}
+          </div>
+        </IonCardContent>
+      </IonCard>
+    );
+
+    // step === 5 — the payment step, reached after a successful contract
     // submission when the wizard was launched with continueToPayments.
     // Borrowers register a repayment card; lenders register a payout account.
     if (deepLinkClientId && companyId) {

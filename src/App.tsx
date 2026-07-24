@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -626,6 +626,15 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
   const { isAuthenticated, username, roleCode, clientId, logout } = useUser();
   const history = useHistory();
   const [isLocked, setIsLocked] = useState(false);
+  // Why the lock was raised, so unlock knows where to send the user:
+  //   'cold-start' — app launched fresh; there is no meaningful current screen,
+  //     so route to the post-login dashboard.
+  //   're-lock'    — app was backgrounded mid-session and came back; the user's
+  //     screen (e.g. a half-finished expediente wizard) is still mounted under
+  //     the lock overlay, so DON'T navigate — just dismiss and leave them
+  //     exactly where they were. Navigating here was throwing away in-progress
+  //     wizard state on every background/foreground.
+  const lockOriginRef = useRef<'cold-start' | 're-lock'>('cold-start');
 
   useEffect(() => {
     console.log('[BiometricLockGate] effect running. isNative =', Capacitor.isNativePlatform(), 'isAuthenticated =', isAuthenticated);
@@ -644,6 +653,7 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
       console.log('[BiometricLockGate] cold-start check: enabled =', enabled, 'cancelled =', cancelled);
       if (!cancelled && enabled) {
         console.log('[BiometricLockGate] cold-start: setIsLocked(true)');
+        lockOriginRef.current = 'cold-start';
         setIsLocked(true);
       }
 
@@ -656,7 +666,8 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
         const stillEnabled = await isBiometricLockEnabled();
         console.log('[BiometricLockGate] appStateChange: stillEnabled =', stillEnabled);
         if (stillEnabled) {
-          console.log('[BiometricLockGate] appStateChange: setIsLocked(true)');
+          console.log('[BiometricLockGate] appStateChange: setIsLocked(true) (re-lock)');
+          lockOriginRef.current = 're-lock';
           setIsLocked(true);
         }
       });
@@ -683,12 +694,19 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
     const ok = await authenticateBiometric('Desbloquea la app para continuar');
     console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
     if (ok) {
-      // Route by role, same as Login.tsx — this used to hardcode '/dashboard'
-      // (the POS dashboard) for everyone, which sent borrower/lender users to
-      // the wrong screen after unlocking instead of their own client dashboard.
-      const targetRoute = getPostLoginRoute(roleCode, clientId);
-      console.log('[BiometricLockGate] handleUnlock: SUCCESS, roleCode =', roleCode, 'clientId =', clientId, '→ navigating to', targetRoute);
       setIsLocked(false);
+      if (lockOriginRef.current === 're-lock') {
+        // Backgrounded mid-session — the screen the user was on is still
+        // mounted under this overlay. Dismiss and stay put; navigating would
+        // discard in-progress state (e.g. a half-finished wizard).
+        console.log('[BiometricLockGate] handleUnlock: SUCCESS (re-lock) — staying on current screen');
+        return;
+      }
+      // Cold start — route by role, same as Login.tsx. (Used to hardcode
+      // '/dashboard' for everyone, which sent borrower/lender users to the POS
+      // dashboard instead of their own client dashboard.)
+      const targetRoute = getPostLoginRoute(roleCode, clientId);
+      console.log('[BiometricLockGate] handleUnlock: SUCCESS (cold-start), roleCode =', roleCode, 'clientId =', clientId, '→ navigating to', targetRoute);
       history.push(targetRoute);
     } else {
       console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
