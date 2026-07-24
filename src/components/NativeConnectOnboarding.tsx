@@ -81,7 +81,19 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
   const clabeValid = /^\d{18}$/.test(clabe.replace(/\s/g, ''));
 
   const submitIdentity = async () => {
-    if (!identityValid) { setError('Completa los campos obligatorios y acepta los términos.'); return; }
+    if (!identityValid) {
+      // Which requirement blocked submission — otherwise "completa los campos"
+      // is all anyone sees, including in a bug report.
+      console.log('[NativeConnect] submitIdentity: BLOCKED by validation', JSON.stringify({
+        firstName: !!firstName.trim(), lastName: !!lastName.trim(),
+        dobWellFormed: /^\d{4}-\d{2}-\d{2}$/.test(dob),
+        line1: !!line1.trim(), city: !!city.trim(), state: !!stateProv.trim(),
+        postalCodeValid: /^\d{5}$/.test(postalCode), acceptedTos,
+      }));
+      setError('Completa los campos obligatorios y acepta los términos.');
+      return;
+    }
+    console.log('[NativeConnect] submitIdentity: START', JSON.stringify({ clientId, companyId }));
     setBusy(true); setError('');
     try {
       await createOrRefreshStripeAccount(clientId, companyId, email);
@@ -100,16 +112,27 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
         acceptedTos,
       };
       await submitConnectedAccountKyc(clientId, companyId, payload);
+      console.log('[NativeConnect] submitIdentity: SUCCESS — advancing to payout step');
       onProgress(false);
       setStep('payout');
     } catch (err) {
+      console.log('[NativeConnect] submitIdentity: FAILED —', String(err));
       setError((err as Error).message ?? 'No se pudo guardar la información.');
     } finally { setBusy(false); }
   };
 
   const submitPayout = async () => {
-    if (!stripe) { setError('No se pudo inicializar Stripe.'); return; }
-    if (!holderName.trim()) { setError('Ingresa el titular de la cuenta.'); return; }
+    if (!stripe) {
+      console.log('[NativeConnect] submitPayout: BLOCKED — Stripe.js not initialised');
+      setError('No se pudo inicializar Stripe.'); return;
+    }
+    if (!holderName.trim()) {
+      console.log('[NativeConnect] submitPayout: BLOCKED — no account holder name');
+      setError('Ingresa el titular de la cuenta.'); return;
+    }
+    console.log('[NativeConnect] submitPayout: START', JSON.stringify({
+      clientId, companyId, payoutMethod, clabeValid: payoutMethod === 'bank' ? clabeValid : undefined,
+    }));
     setBusy(true); setError('');
     try {
       let token: string | undefined;
@@ -123,7 +146,11 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
           account_holder_name: holderName.trim(),
           account_holder_type: holderType,
         });
-        if (tokErr || !bankTok) throw new Error(tokErr?.message ?? 'CLABE inválida.');
+        if (tokErr || !bankTok) {
+          console.log('[NativeConnect] submitPayout: CLABE tokenization FAILED —', tokErr?.message ?? 'no token returned');
+          throw new Error(tokErr?.message ?? 'CLABE inválida.');
+        }
+        console.log('[NativeConnect] submitPayout: CLABE tokenized OK');
         token = bankTok.id;
       } else {
         // Debit card → card token, reusing SavedCardSetup's CardElement.
@@ -133,13 +160,19 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
           name: holderName.trim(),
           currency: 'mxn',
         });
-        if (tokErr || !cardTok) throw new Error(tokErr?.message ?? 'Tarjeta inválida.');
+        if (tokErr || !cardTok) {
+          console.log('[NativeConnect] submitPayout: card tokenization FAILED —', tokErr?.message ?? 'no token returned');
+          throw new Error(tokErr?.message ?? 'Tarjeta inválida.');
+        }
+        console.log('[NativeConnect] submitPayout: card tokenized OK');
         token = cardTok.id;
       }
       await attachExternalBankAccount(clientId, companyId, token);
+      console.log('[NativeConnect] submitPayout: SUCCESS — payout destination attached');
       onProgress(true);
       setStep('done');
     } catch (err) {
+      console.log('[NativeConnect] submitPayout: FAILED —', String(err));
       setError((err as Error).message ?? 'No se pudo registrar la cuenta de pago.');
     } finally { setBusy(false); }
   };

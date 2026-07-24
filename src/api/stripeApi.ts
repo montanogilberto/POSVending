@@ -24,7 +24,17 @@ export async function getStripeAccountStatus(
     body: JSON.stringify({ clientId, companyId }),
   });
   if (!res.ok) throw new Error(await res.text());
-  return await res.json();
+  const data = await res.json();
+  // The four flags that decide whether this client can actually be paid.
+  console.log('[stripeApi] getStripeAccountStatus ←', JSON.stringify({
+    clientId, companyId,
+    connectedAccountId: data.account?.connectedAccountId ?? null,
+    chargesEnabled: data.account?.chargesEnabled ?? false,
+    payoutsEnabled: data.account?.payoutsEnabled ?? false,
+    detailsSubmitted: data.account?.detailsSubmitted ?? false,
+    hasExternalAccount: data.account?.hasExternalAccount ?? false,
+  }));
+  return data;
 }
 
 // CREATE OR REFRESH -- POST /stripe/connected-accounts
@@ -80,12 +90,29 @@ export async function submitConnectedAccountKyc(
   companyId: number,
   kyc: ConnectKycPayload
 ): Promise<{ account: StripeConnectedAccount }> {
+  // Field PRESENCE only, never the values — this payload is the client's legal
+  // name, date of birth, CURP and home address, and device logs get shared
+  // around. Presence is what actually debugs "Stripe rejected the submission".
+  console.log('[stripeApi] submitConnectedAccountKyc → POST /stripe/connected-accounts/kyc', JSON.stringify({
+    clientId, companyId,
+    provided: {
+      firstName: !!kyc.firstName, lastName: !!kyc.lastName,
+      dob: !!(kyc.dobYear && kyc.dobMonth && kyc.dobDay),
+      phone: !!kyc.phone, taxId: !!kyc.taxId,
+      line1: !!kyc.address?.line1, city: !!kyc.address?.city,
+      state: !!kyc.address?.state, postalCode: !!kyc.address?.postalCode,
+      acceptedTos: kyc.acceptedTos,
+    },
+  }));
+  const startedAt = Date.now();
   const res = await fetch(BASE_URL + "/stripe/connected-accounts/kyc", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ clientId, companyId, ...kyc }),
   });
   const data = await res.json();
+  console.log('[stripeApi] submitConnectedAccountKyc ←', res.status, `(${Date.now() - startedAt}ms)`,
+    data.error ? JSON.stringify({ error: data.error }) : 'OK');
   if (!res.ok || data.error) throw new Error(data.error || "No se pudo guardar la información de identidad.");
   return data;
 }
@@ -98,12 +125,23 @@ export async function attachExternalBankAccount(
   companyId: number,
   bankToken: string
 ): Promise<{ account: StripeConnectedAccount }> {
+  // Token prefix only — btok_ means a CLABE was tokenized, tok_ a debit card.
+  // Never the token itself.
+  console.log('[stripeApi] attachExternalBankAccount → POST /stripe/connected-accounts/bank', JSON.stringify({
+    clientId, companyId, tokenKind: bankToken.split('_')[0] || 'unknown',
+  }));
+  const startedAt = Date.now();
   const res = await fetch(BASE_URL + "/stripe/connected-accounts/bank", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ clientId, companyId, bankToken }),
   });
   const data = await res.json();
+  console.log('[stripeApi] attachExternalBankAccount ←', res.status, `(${Date.now() - startedAt}ms)`,
+    data.error ? JSON.stringify({ error: data.error }) : JSON.stringify({
+      hasExternalAccount: data.account?.hasExternalAccount,
+      payoutsEnabled: data.account?.payoutsEnabled,
+    }));
   if (!res.ok || data.error) throw new Error(data.error || "No se pudo registrar la cuenta bancaria.");
   return data;
 }

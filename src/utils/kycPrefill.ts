@@ -165,7 +165,7 @@ export function parseIneAddress(domicilio: string): {
 export function buildKycPrefill(fields: IneIdentityFields, cellphone?: string): KycPrefill {
   const { firstName, lastName } = splitMexicanName(fields.nombre ?? '', fields.curp);
   const address = parseIneAddress(fields.domicilio ?? '');
-  return {
+  const prefill: KycPrefill = {
     firstName,
     lastName,
     dob: ineDateToIso(fields.fechaNacimiento ?? ''),
@@ -176,4 +176,21 @@ export function buildKycPrefill(fields: IneIdentityFields, cellphone?: string): 
     stateProv: address.stateProv,
     postalCode: address.postalCode,
   };
+
+  // Which fields resolved, and whether the source data was even there — the
+  // difference between "parsing is broken" and "the INE extraction never ran,
+  // so there is nothing to prefill from". Logs presence, not values: this is
+  // the client's CURP, date of birth and home address.
+  console.log('[KycPrefill] buildKycPrefill', JSON.stringify({
+    source: {
+      nombre: !!fields.nombre,
+      domicilio: !!fields.domicilio,
+      curp: !!fields.curp,
+      fechaNacimiento: !!fields.fechaNacimiento,
+    },
+    resolved: (Object.keys(prefill) as (keyof KycPrefill)[]).filter((k) => prefill[k]),
+    empty: (Object.keys(prefill) as (keyof KycPrefill)[]).filter((k) => !prefill[k]),
+  }));
+
+  return prefill;
 }
