@@ -1092,16 +1092,6 @@ const ClientsPage: React.FC = () => {
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
           <h2 className="cfr-capture-title">Confirma que la información sea correcta</h2>
-          <p className="cfr-capture-desc">
-            Revisa los datos y las capturas de la identificación antes de continuar con la validación facial.
-          </p>
-
-          <div className="ion-margin-top">
-            <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
-            <p><strong>Teléfono:</strong> {newClient.cellphone || '—'}</p>
-            <p><strong>Email:</strong> {newClient.email || '—'}</p>
-            <p><strong>Documento:</strong> {documentType || '—'}</p>
-          </div>
 
           <div className="id-summary-images">
             <div className="id-summary-image-card">

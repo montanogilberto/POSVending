@@ -399,26 +399,22 @@ const ClientDashboardPage: React.FC = () => {
   };
 
   // Borrower onboarding — QR (silent, if missing) → document + biometric
-  // capture + contract. It deliberately STOPS there: no bank/KYC step.
+  // capture + contract → payment step.
   //
-  // A borrower only needs a Stripe payout account at the moment a lender
-  // actually funds their loan. Stripe requires identity verification from
-  // anyone who RECEIVES money, so chaining the bank step in here
-  // (continueToPayments) demanded legal name, date of birth, CURP and home
-  // address from every signup — including the majority who never end up with
-  // a funded loan. Deferring it to disbursement keeps signup short and means
-  // only borrowers who are actually receiving money are ever asked.
-  //
-  // The lender path is different and still chains straight through
-  // (see LenderDashboardPage): a lender's whole purpose is to receive
-  // repayments, so they cannot do anything useful without a payout account.
+  // continueToPayments is true so the wizard reaches the payment step, but for
+  // a borrower that step is the CARD for automatic repayment charges, NOT a
+  // payout account (the wizard picks the component by clientType). The payout
+  // account — which is what needs Stripe KYC — stays deferred to disbursement,
+  // when the borrower actually receives money. So the borrower registers the
+  // card their monthly cuotas run on here, and is never asked for payout
+  // identity at signup.
   const [wizardStarting, setWizardStarting] = useState(false);
   const handleStartWizard = async () => {
     if (wizardStarting || !clientId) return;
     setWizardStarting(true);
     try {
       await ensureQrGenerated();
-      history.push('/clientFaceRecognitions', { clientId, continueToPayments: false });
+      history.push('/clientFaceRecognitions', { clientId, continueToPayments: true });
     } finally {
       setWizardStarting(false);
     }

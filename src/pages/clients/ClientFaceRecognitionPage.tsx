@@ -32,6 +32,7 @@ import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
 import SignaturePad from '../../components/SignaturePad';
 import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import SavedCardSetup from '../../components/SavedCardSetup';
 import { buildKycPrefill } from '../../utils/kycPrefill';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../components/UserContext';
@@ -222,8 +223,19 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
 
+  // The payment step differs by role. Lenders (and 'both') RECEIVE money, so
+  // theirs is the payout account (identity + CLABE, NativeConnectOnboarding).
+  // Borrowers are CHARGED for repayments, so theirs is a card on file
+  // (SavedCardSetup); their payout account is deferred to disbursement, when
+  // they actually receive the loan principal. This is why the wizard needs
+  // both — gating the whole step off for borrowers (as it briefly did) left
+  // them with no way to register the card their monthly repayments run on.
+  const isPayoutClient =
+    selectedClient?.clientType === 'lender' || selectedClient?.clientType === 'both';
+  const paymentStepLabel = isPayoutClient ? 'Cuenta de pago' : 'Tarjeta';
+
   const STEPS = continueToPayments
-    ? ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', 'Cuenta de pago']
+    ? ['Cliente y documento', 'Captura', 'Verificación', 'Contrato', paymentStepLabel]
     : ['Cliente y documento', 'Captura', 'Verificación', 'Contrato'];
 
   // Runs OCR against the front+back ID captures as soon as both are ready —
@@ -301,11 +313,16 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (step === 4 && !stripeAccountReady && !stripeAccountError) {
+    // Only lenders need a Stripe connected account provisioned here. A
+    // borrower's card-on-file setup goes through the Customer/SetupIntent flow
+    // (SavedCardSetup), which creates no connected account — calling
+    // ensureStripeAccount for them would mint an unused payout account and
+    // reintroduce the deferred KYC we removed.
+    if (step === 4 && isPayoutClient && !stripeAccountReady && !stripeAccountError) {
       ensureStripeAccount();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, [step, isPayoutClient]);
 
   const validateStep = (): boolean => {
     if (step === 0) {
@@ -980,6 +997,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
           onHelp={showCaptureHelp}
           onCapture={(base64) => {
             setIdFrontImageBase64(base64);
+            // Drop the previous blob URL the moment a new photo is taken.
+            // The OCR effect prefers URLs and fires on the base64 change, so
+            // without this it races the upload and sends the PREVIOUS image —
+            // on a resumed expediente that is a capture from another session
+            // entirely. Clearing it makes the effect fall back to this
+            // base64 until the new upload lands.
+            setIdFrontImageBlobUrl('');
             setCaptureSubStep('front-review');
             uploadCapturedImage('front', base64);
           }}
@@ -1024,6 +1048,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
           onHelp={showCaptureHelp}
           onCapture={(base64) => {
             setIdBackImageBase64(base64);
+            // See the front capture — clears the stale URL so OCR can't run
+            // against the previous back image while this one uploads.
+            setIdBackImageBlobUrl('');
             setCaptureSubStep('back-review');
             uploadCapturedImage('back', base64);
           }}
@@ -1307,17 +1334,42 @@ const ClientFaceRecognitionPage: React.FC = () => {
       </IonCard>
     );
 
-    // step === 4 — Cuenta de pago, only reachable after a successful
-    // contract submission when this wizard was launched from the client
-    // dashboard's onboarding checklist (continueToPayments).
+    // step === 4 — the payment step, reached after a successful contract
+    // submission when the wizard was launched with continueToPayments.
+    // Borrowers register a repayment card; lenders register a payout account.
     if (deepLinkClientId && companyId) {
+      if (!isPayoutClient) {
+        // Borrower — card on file for automatic monthly repayment charges.
+        // No connected account / KYC here; that is deferred to disbursement.
+        return (
+          <IonCard className="client-face-recognition-step-card">
+            <IonCardHeader>
+              <IonCardTitle>Paso 5: Tarjeta para cobros automáticos</IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent>
+              <p>Registra la tarjeta con la que se cobrarán automáticamente las cuotas de tu préstamo cada mes.</p>
+              <SavedCardSetup
+                clientId={deepLinkClientId}
+                companyId={companyId}
+                onSaved={() => {
+                  console.log('[Expediente] step 4: repayment card saved, returning to', returnTo);
+                  setToastMessage('Tarjeta registrada correctamente.');
+                  setShowToast(true);
+                  history.push(returnTo);
+                }}
+              />
+            </IonCardContent>
+          </IonCard>
+        );
+      }
+      // Lender (or 'both') — payout account that receives repayments.
       return (
         <IonCard className="client-face-recognition-step-card">
           <IonCardHeader>
             <IonCardTitle>Paso 5: Cuenta de pago</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
-            <p>Registra tu tarjeta o CLABE para recibir y enviar pagos.</p>
+            <p>Registra tu cuenta bancaria o tarjeta de débito para recibir pagos.</p>
             {stripeAccountError && (
               <div className="stripe-onboarding-error">
                 <p>{stripeAccountError}</p>
