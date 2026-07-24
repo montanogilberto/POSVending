@@ -12,6 +12,7 @@ import {
   attachExternalBankAccount,
   ConnectKycPayload,
 } from '../api/stripeApi';
+import { KycPrefill } from '../utils/kycPrefill';
 import './NativeConnectOnboarding.css';
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
@@ -29,6 +30,12 @@ interface Props {
   // Called after each state-changing step; `done` is true once the payout
   // destination is attached.
   onProgress: (done: boolean) => void;
+  // Starting values derived from the client's already-captured INE (see
+  // utils/kycPrefill.ts). Stripe needs the same name/DOB/CURP/address the
+  // Expediente Digital already read off the card, so making the client retype
+  // it is friction plus a second opportunity for a typo that fails
+  // verification. Fields stay fully editable — this only seeds them.
+  prefill?: Partial<KycPrefill>;
 }
 
 type Step = 'identity' | 'payout' | 'done';
@@ -40,7 +47,7 @@ type PayoutMethod = 'bank' | 'debit_card';
 // or a debit card — the card path REUSES the same @stripe/react-stripe-js
 // CardElement pattern as SavedCardSetup. Everything is tokenized client-side and
 // submitted via the backend, so the user never leaves the app.
-const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgress }) => {
+const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgress, prefill }) => {
   const stripe = useStripe();
   const elements = useElements();
 
@@ -48,16 +55,16 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  // Identity / tax
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [dob, setDob] = useState(''); // yyyy-mm-dd
-  const [phone, setPhone] = useState('');
-  const [taxId, setTaxId] = useState('');
-  const [line1, setLine1] = useState('');
-  const [city, setCity] = useState('');
-  const [stateProv, setStateProv] = useState('');
-  const [postalCode, setPostalCode] = useState('');
+  // Identity / tax — seeded from the captured INE where available.
+  const [firstName, setFirstName] = useState(prefill?.firstName ?? '');
+  const [lastName, setLastName] = useState(prefill?.lastName ?? '');
+  const [dob, setDob] = useState(prefill?.dob ?? ''); // yyyy-mm-dd
+  const [phone, setPhone] = useState(prefill?.phone ?? '');
+  const [taxId, setTaxId] = useState(prefill?.taxId ?? '');
+  const [line1, setLine1] = useState(prefill?.line1 ?? '');
+  const [city, setCity] = useState(prefill?.city ?? '');
+  const [stateProv, setStateProv] = useState(prefill?.stateProv ?? '');
+  const [postalCode, setPostalCode] = useState(prefill?.postalCode ?? '');
   const [acceptedTos, setAcceptedTos] = useState(false);
 
   // Payout destination

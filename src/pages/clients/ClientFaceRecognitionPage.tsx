@@ -32,6 +32,7 @@ import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
 import SignaturePad from '../../components/SignaturePad';
 import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import { buildKycPrefill } from '../../utils/kycPrefill';
 import { useUser } from '../../components/UserContext';
 import { Client, getOneClient } from '../../api/clientsApi';
 import {
@@ -1192,6 +1193,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
                 companyId={companyId}
                 email={`client${deepLinkClientId}@posgmo.mx`}
                 onProgress={(done) => { if (done) history.push(returnTo); }}
+                // Stripe wants exactly the identity we just read off the INE a
+                // few steps ago — seed it rather than making the client type
+                // their CURP and address again.
+                prefill={buildKycPrefill(extractedIdFields, selectedClient?.cellphone)}
               />
             )}
           </IonCardContent>

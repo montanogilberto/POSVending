@@ -1360,6 +1360,14 @@ const ClientsPage: React.FC = () => {
     loadClients();
   };
 
+  // Lenders exist to receive repayments, so they cannot function without a
+  // payout account and are asked here. Borrowers are charged, not paid — the
+  // one time they receive money is the loan principal, and that account is
+  // provisioned then rather than at signup (see ClientDashboardPage's wizard
+  // handoff). 'both' covers clients acting in either role.
+  const needsPayoutAccount =
+    newClient.clientType === 'lender' || newClient.clientType === 'both';
+
   const renderStep6 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
@@ -1368,10 +1376,21 @@ const ClientsPage: React.FC = () => {
         </div>
         <h2 className="wizard-step-title">Cuenta de Pagos</h2>
         <p className="wizard-step-desc">
-          El cliente registra su información bancaria para recibir y realizar pagos de forma segura.
+          {needsPayoutAccount
+            ? 'El cliente registra su información bancaria para recibir y realizar pagos de forma segura.'
+            : 'El cliente registra la tarjeta con la que se cobrarán automáticamente las cuotas del préstamo.'}
         </p>
       </div>
 
+      {/* Payout account — only for clients who actually RECEIVE money.
+          Stripe requires identity verification (legal name, DOB, CURP, home
+          address) from payout recipients, so a borrower who only ever pays
+          installments should never be asked for it here; their card below is
+          the whole mechanism. Borrowers do need a payout account eventually,
+          to receive loan principal, but that is deferred to the point a lender
+          actually funds a loan rather than demanded from every signup. */}
+      {needsPayoutAccount && (
+      <>
       {/* Client + KYC status summary */}
       <div className="wizard-stripe-status-card">
         <div className={`wizard-stripe-status-icon-wrap${stripeKycDone ? ' done' : ''}`}>
@@ -1415,6 +1434,8 @@ const ClientsPage: React.FC = () => {
             </span>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {createdClientId && (

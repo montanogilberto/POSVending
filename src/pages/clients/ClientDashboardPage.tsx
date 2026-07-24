@@ -397,17 +397,27 @@ const ClientDashboardPage: React.FC = () => {
     }
   };
 
-  // Single continuous onboarding flow — QR (silent, if missing) → document +
-  // biometric capture + contract (ClientFaceRecognitionPage) → bank account
-  // (Stripe), chained via continueToPayments instead of dropping the client
-  // back on this dashboard between each step.
+  // Borrower onboarding — QR (silent, if missing) → document + biometric
+  // capture + contract. It deliberately STOPS there: no bank/KYC step.
+  //
+  // A borrower only needs a Stripe payout account at the moment a lender
+  // actually funds their loan. Stripe requires identity verification from
+  // anyone who RECEIVES money, so chaining the bank step in here
+  // (continueToPayments) demanded legal name, date of birth, CURP and home
+  // address from every signup — including the majority who never end up with
+  // a funded loan. Deferring it to disbursement keeps signup short and means
+  // only borrowers who are actually receiving money are ever asked.
+  //
+  // The lender path is different and still chains straight through
+  // (see LenderDashboardPage): a lender's whole purpose is to receive
+  // repayments, so they cannot do anything useful without a payout account.
   const [wizardStarting, setWizardStarting] = useState(false);
   const handleStartWizard = async () => {
     if (wizardStarting || !clientId) return;
     setWizardStarting(true);
     try {
       await ensureQrGenerated();
-      history.push('/clientFaceRecognitions', { clientId, continueToPayments: true });
+      history.push('/clientFaceRecognitions', { clientId, continueToPayments: false });
     } finally {
       setWizardStarting(false);
     }
