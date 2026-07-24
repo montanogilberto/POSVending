@@ -1171,37 +1171,33 @@ const ClientDashboardPage: React.FC = () => {
           ) : (
             <div className="cd-loan-form">
               <div className="cd-form-group">
-                <label>Nombre</label>
                 <IonInput
+                  label="Nombre" labelPlacement="floating" fill="outline"
                   value={profileForm.first_name}
                   onIonInput={e => setProfileForm(p => ({ ...p, first_name: e.detail.value || '' }))}
-                  className="cd-form-input"
                 />
               </div>
               <div className="cd-form-group">
-                <label>Apellido</label>
                 <IonInput
+                  label="Apellido" labelPlacement="floating" fill="outline"
                   value={profileForm.last_name}
                   onIonInput={e => setProfileForm(p => ({ ...p, last_name: e.detail.value || '' }))}
-                  className="cd-form-input"
                 />
               </div>
               <div className="cd-form-group">
-                <label>Email</label>
                 <IonInput
+                  label="Email" labelPlacement="floating" fill="outline"
                   type="email"
                   value={profileForm.email}
                   onIonInput={e => setProfileForm(p => ({ ...p, email: e.detail.value || '' }))}
-                  className="cd-form-input"
                 />
               </div>
               <div className="cd-form-group">
-                <label>Teléfono</label>
                 <IonInput
+                  label="Teléfono" labelPlacement="floating" fill="outline"
                   type="tel"
                   value={profileForm.cellphone}
                   onIonInput={e => setProfileForm(p => ({ ...p, cellphone: e.detail.value || '' }))}
-                  className="cd-form-input"
                 />
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
@@ -1346,35 +1342,31 @@ const ClientDashboardPage: React.FC = () => {
       <IonContent className="ion-padding">
         <div className="cd-loan-form">
           <div className="cd-form-group">
-            <label>Monto solicitado ($)</label>
             <IonInput
+              label="Monto solicitado ($)" labelPlacement="floating" fill="outline"
               type="number" value={newLoan.principalAmount} min={0}
               onIonInput={e => setNewLoan(p => ({ ...p, principalAmount: Number(e.detail.value) }))}
-              className="cd-form-input"
             />
           </div>
           <div className="cd-form-group">
-            <label>Tasa de interés (%)</label>
             <IonInput
+              label="Tasa de interés (%)" labelPlacement="floating" fill="outline"
               type="number" value={newLoan.interestRate} min={0}
               onIonInput={e => setNewLoan(p => ({ ...p, interestRate: Number(e.detail.value) }))}
-              className="cd-form-input"
             />
           </div>
           <div className="cd-form-group">
-            <label>Plazo (meses)</label>
             <IonInput
+              label="Plazo (meses)" labelPlacement="floating" fill="outline"
               type="number" value={newLoan.termMonths} min={1}
               onIonInput={e => setNewLoan(p => ({ ...p, termMonths: Number(e.detail.value) }))}
-              className="cd-form-input"
             />
           </div>
           <div className="cd-form-group">
-            <label>Frecuencia de pago</label>
             <IonSelect
+              label="Frecuencia de pago" labelPlacement="floating" fill="outline"
               value={newLoan.paymentFrequency}
               onIonChange={e => setNewLoan(p => ({ ...p, paymentFrequency: e.detail.value }))}
-              className="cd-form-input"
             >
               <IonSelectOption value="Weekly">Semanal</IonSelectOption>
               <IonSelectOption value="Biweekly">Quincenal</IonSelectOption>
@@ -1382,11 +1374,10 @@ const ClientDashboardPage: React.FC = () => {
             </IonSelect>
           </div>
           <div className="cd-form-group">
-            <label>Notas (opcional)</label>
             <IonInput
+              label="Notas (opcional)" labelPlacement="floating" fill="outline"
               value={newLoan.notes}
               onIonInput={e => setNewLoan(p => ({ ...p, notes: e.detail.value! }))}
-              className="cd-form-input"
               placeholder="Motivo del préstamo..."
             />
           </div>
@@ -1444,11 +1435,10 @@ const ClientDashboardPage: React.FC = () => {
           ) : (
             <>
               <div className="cd-form-group">
-                <label>Monto a pagar ($MXN)</label>
                 <IonInput
                   type="number" value={payAmount} placeholder="Ej: 500.00"
                   onIonInput={e => setPayAmount(e.detail.value!)}
-                  fill="outline" labelPlacement="floating" label="Monto"
+                  fill="outline" labelPlacement="floating" label="Monto a pagar ($MXN)"
                 />
               </div>
               {parseFloat(payAmount) > 0 && (

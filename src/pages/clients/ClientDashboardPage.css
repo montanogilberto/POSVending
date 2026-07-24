@@ -512,21 +512,9 @@
   margin-bottom: 16px;
 }
 
-.cd-form-group label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 6px;
-}
-
-.cd-form-input {
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  background: #f9fafb;
-  --padding-start: 12px;
-  --padding-end: 12px;
-}
+/* Native Ionic form controls (IonInput/IonSelect with fill="outline" +
+   floating labels) draw their own border, background and label — the old
+   raw <label> + .cd-form-input styling is no longer needed. */
 
 .cd-loan-preview {
   background: #eff6ff;

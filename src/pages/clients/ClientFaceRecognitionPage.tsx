@@ -423,6 +423,17 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const jump = (targetStep: number) => {
+    // Once the contract is submitted the earlier steps are finished and locked.
+    // Their in-memory capture data (base64 ID images, signature) is NOT
+    // restored on a resumed session — only the blob URLs are — so letting a
+    // completed client tap an earlier circle drops them on step 0 with no way
+    // forward without re-capturing everything, which reads as "it erased all my
+    // progress". Keep the circles as status indicators but block navigating
+    // back out of a completed expediente.
+    if (contractAccepted) {
+      console.log('[Expediente] jump: ignored — expediente already submitted, steps locked');
+      return;
+    }
     if (targetStep < step) {
       setStep(targetStep);
       setCaptureSubStep('doc-intro');
@@ -827,7 +838,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <button
               className={`wizard-step-circle${i === step ? ' active' : ''}${i < step ? ' completed' : ''}`}
               onClick={() => jump(i)}
-              style={{ cursor: i < step ? 'pointer' : 'default', border: 'none' }}
+              style={{ cursor: (!contractAccepted && i < step) ? 'pointer' : 'default', border: 'none' }}
             >
               {i < step ? <IonIcon icon={checkmark} /> : i + 1}
             </button>

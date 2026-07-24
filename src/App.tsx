@@ -720,11 +720,9 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
     history.push('/login');
   };
 
-  const handleClose = () => {
-    console.log('[BiometricLockGate] handleClose: called, setIsLocked(false) + navigating to /dashboard');
-    setIsLocked(false);
-    history.push('/dashboard');
-  };
+  // handleClose removed: the lock screen no longer has a close/dismiss button.
+  // Bypassing biometric auth by closing the screen defeated the lock, and the
+  // only ways off it now are a successful unlock or an explicit logout.
 
   console.log('[BiometricLockGate] render. isLocked =', isLocked, 'isAuthenticated =', isAuthenticated);
 
@@ -736,7 +734,6 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
           username={username}
           onUnlock={handleUnlock}
           onLogout={handleLogout}
-          onClose={handleClose}
         />
       )}
     </>
