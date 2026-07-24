@@ -21,6 +21,11 @@ export interface SavedCardInfo {
   expiryYear?: number;
 }
 
+// Marks an error whose message was authored for the cardholder and is safe to
+// display. Any other thrown value is treated as technical and shown as a
+// generic message instead, so an internal backend string never reaches the UI.
+class CardError extends Error {}
+
 interface SavedCardSetupProps {
   clientId: number;
   companyId: number;
@@ -50,15 +55,26 @@ const CardForm: React.FC<{ clientId: number; companyId: number; onSaved?: (card:
         body: JSON.stringify({ clientId, companyId }),
       });
       const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'No se pudo iniciar el registro de tarjeta.');
+      if (!res.ok || data.error) {
+        // Technical failure from our backend — log the real reason, show the
+        // client a plain message. The raw error (e.g. "KeyError: ...") is
+        // meaningless and alarming to them.
+        console.log('[SavedCardSetup] setup-intent FAILED', res.status, JSON.stringify(data));
+        throw new CardError('No pudimos iniciar el registro de tu tarjeta. Inténtalo de nuevo en unos momentos.');
+      }
 
       const cardElement = elements.getElement(CardElement);
-      if (!cardElement) throw new Error('No se encontró el formulario de tarjeta.');
+      if (!cardElement) throw new CardError('No se encontró el formulario de tarjeta. Recarga la pantalla e inténtalo de nuevo.');
 
       const { error: confirmError, setupIntent } = await stripe.confirmCardSetup(data.clientSecret, {
         payment_method: { card: cardElement },
       });
-      if (confirmError) throw new Error(confirmError.message || 'No se pudo validar la tarjeta.');
+      if (confirmError) {
+        // Stripe's own card messages ARE meant for the cardholder ("Tu tarjeta
+        // fue rechazada", "El número es incorrecto", …) — surface them as-is.
+        console.log('[SavedCardSetup] card confirmation declined', confirmError.code, confirmError.message);
+        throw new CardError(confirmError.message || 'No se pudo validar la tarjeta. Revisa los datos e inténtalo de nuevo.');
+      }
 
       console.log('[SavedCardSetup] setup confirmed, persisting payment method', setupIntent?.id);
       const saveRes = await fetch(`${API_BASE}/automated-payments/save-method`, {
@@ -67,12 +83,21 @@ const CardForm: React.FC<{ clientId: number; companyId: number; onSaved?: (card:
         body: JSON.stringify({ clientId, companyId, setupIntentId: setupIntent?.id }),
       });
       const saveData = await saveRes.json();
-      if (!saveRes.ok || saveData.error) throw new Error(saveData.error || 'No se pudo guardar la tarjeta.');
+      if (!saveRes.ok || saveData.error) {
+        // The card WAS validated with Stripe; only our persistence failed. Say
+        // exactly that — it's honest and tells the client to just retry, not
+        // to re-enter a card they already know is fine.
+        console.log('[SavedCardSetup] save-method FAILED', saveRes.status, JSON.stringify(saveData));
+        throw new CardError('Tu tarjeta se validó, pero no pudimos guardarla. Inténtalo de nuevo en unos momentos.');
+      }
 
       onSaved?.(saveData.paymentMethod);
     } catch (err) {
       console.log('[SavedCardSetup] FAILED', err);
-      setError(err instanceof Error ? err.message : 'Ocurrió un error al registrar la tarjeta.');
+      // Only messages we authored (CardError) are safe to show. Anything else
+      // (a raw network/JS error, an unexpected backend string) gets a generic
+      // fallback so the client never sees an internal message.
+      setError(err instanceof CardError ? err.message : 'Ocurrió un error al registrar la tarjeta. Inténtalo de nuevo.');
     } finally {
       setSubmitting(false);
     }

@@ -703,7 +703,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       isVerified,
       confidenceScore,
       scoreSource: faceValidation ? 'agent' : 'local-fallback',
-      failedChecks: (faceValidation?.checks ?? []).filter((c) => !c.passed).map((c) => c.name),
+      failedChecks: (faceValidation?.checks ?? []).filter((c) => c.status === 'FAIL').map((c) => c.name),
       assetsEvaluated: faceValidation?.assetsEvaluated ?? [],
     }));
     if (!contractAccepted) {

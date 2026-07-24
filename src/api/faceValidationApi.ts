@@ -28,9 +28,13 @@ export interface FaceValidationRequest {
   ineFront?: FaceAssetRef;
 }
 
+export type CheckStatus = 'PASS' | 'FAIL' | 'CANNOT_ASSESS';
+
 export interface FaceValidationCheck {
   name: string;
-  passed: boolean;
+  // Tri-state: FAIL (judged wrong) is distinct from CANNOT_ASSESS (evidence
+  // too poor to judge — re-capture, don't reject).
+  status: CheckStatus;
   detail: string;
 }
 
@@ -42,6 +46,16 @@ export interface FaceValidationResult {
   // Which assets actually reached the model — distinguishes "failed
   // validation" from "we only had two of the five poses to send".
   assetsEvaluated: string[];
+  // Richer auditing signals from the agent (all optional — an older/degraded
+  // response may omit them).
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | '';
+  recommendedAction?: 'APPROVE' | 'REVIEW_MANUALLY' | 'REJECT';
+  overallAssessment?: string;
+  observedFeatures?: Record<string, string>;
+  presentationAttackDetected?: boolean;
+  ineSimilarityScore?: number;
+  identityConsistencyScore?: number;
+  livenessScore?: number;
 }
 
 // Returns null when the agent could not be reached or gave an unusable
@@ -84,8 +98,17 @@ export async function validateFaceSession(
       elapsedMs,
       isValid: data.isValid,
       confidence: data.confidence,
+      riskLevel: data.riskLevel,
+      recommendedAction: data.recommendedAction,
+      presentationAttackDetected: data.presentationAttackDetected,
+      identityConsistencyScore: data.identityConsistencyScore,
+      ineSimilarityScore: data.ineSimilarityScore,
+      livenessScore: data.livenessScore,
       assetsEvaluated: data.assetsEvaluated,
-      failedChecks: (data.checks ?? []).filter((c) => !c.passed).map((c) => c.name),
+      // FAIL and CANNOT_ASSESS are both non-passing but mean different things,
+      // so log them separately.
+      failedChecks: (data.checks ?? []).filter((c) => c.status === 'FAIL').map((c) => c.name),
+      cannotAssessChecks: (data.checks ?? []).filter((c) => c.status === 'CANNOT_ASSESS').map((c) => c.name),
       failureReasons: data.failureReasons,
     }));
     return data;
