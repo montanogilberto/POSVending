@@ -4,10 +4,9 @@ import {
   IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonGrid, IonRow, IonCol, IonButton, IonLoading, IonToast, IonIcon,
   IonAvatar, IonBadge, IonList, IonItem, IonLabel, IonNote, IonProgressBar,
-  IonHeader, IonToolbar, IonTitle, IonButtons,
 } from '@ionic/react';
 import {
-  arrowBack, cashOutline, trendingUpOutline, peopleOutline, walletOutline,
+  cashOutline, trendingUpOutline, peopleOutline, walletOutline,
   checkmarkCircleOutline, alertCircleOutline, ellipseOutline, refreshOutline,
   personCircleOutline, timeOutline, cardOutline, barChartOutline, addCircleOutline,
   documentTextOutline,
@@ -20,6 +19,9 @@ import { listContractsForClient } from '../../api/digitalContractsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../api/stripeApi';
 import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
 import { buildKycPrefill } from '../../utils/kycPrefill';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
 import './LenderDashboardPage.css';
 
 const toDate = (utc: string | undefined) => {
@@ -162,6 +164,23 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, lenderClientId]);
 
+  // Shared Header (menu + notifications + mail + help) — same component and
+  // popoverState shape the borrower dashboard uses, so both roles get the same
+  // top bar instead of the plain title toolbar this page had before.
+  const [popoverState, setPopoverState] = useState<{
+    showAlertPopover: boolean;
+    showMailPopover: boolean;
+    event?: Event;
+  }>({ showAlertPopover: false, showMailPopover: false });
+  const presentAlertPopover = (e: React.MouseEvent) =>
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  const dismissAlertPopover = () =>
+    setPopoverState({ ...popoverState, showAlertPopover: false });
+  const presentMailPopover = (e: React.MouseEvent) =>
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  const dismissMailPopover = () =>
+    setPopoverState({ ...popoverState, showMailPopover: false });
+
   // ── KPIs ──────────────────────────────────────────────────────────────────
   const activeLoans   = loans.filter(l => l.loanStatus === 'Active');
   const paidLoans     = loans.filter(l => l.loanStatus === 'PaidOff' || l.loanStatus === 'Closed');
@@ -181,21 +200,21 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
-              <IonIcon icon={arrowBack} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-          <IonTitle>Portfolio — Prestamista</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={fetchAll}>
-              <IonIcon icon={refreshOutline} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
+      <Header
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle="Portfolio — Prestamista"
+      />
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
 
       <IonContent className="lender-dashboard-content ion-padding">
         <IonLoading isOpen={loading} message="Cargando portfolio..." />
