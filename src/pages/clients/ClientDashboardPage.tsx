@@ -159,7 +159,11 @@ const ClientDashboardPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
   const location = useLocation();
-  const { companyId, clientId: contextClientId, username, avatarUrl } = useUser();
+  const { companyId, clientId: contextClientId, username, avatarUrl, roleCode, clientType } = useUser();
+  // A lender/payout client's payment step IS a Stripe payout account (needs an
+  // external bank). A borrower's is the repayment CARD — they are never asked
+  // for a payout account, so the checklist must not gate them on one.
+  const isPayoutClient = clientType === 'lender' || clientType === 'both' || roleCode === 'lender';
   const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
 
   console.log('[ClientDashboard] render. clientId =', clientId, 'companyId =', companyId, 'tab query =', location.search);
@@ -405,7 +409,14 @@ const ClientDashboardPage: React.FC = () => {
     try {
       const qrValue = buildClientQrValue(clientRecord.clientId, clientRecord.first_name, clientRecord.last_name);
       const dataUrl = await QRCode.toDataURL(qrValue, { width: 512, errorCorrectionLevel: 'H' });
-      const { qrBlobUrl } = await uploadClientQr(clientRecord.clientId, companyId, dataUrl);
+      // Persist under the CLIENT's own companyId, not the session's. Legacy
+      // borrower rows live under company 1 while the session runs as 1008
+      // (the companyId split); the upload SP scopes its UPDATE by
+      // clientId AND companyId, so using the session value matches 0 rows and
+      // the QR silently never persists. Fall back to the session value only if
+      // the client row somehow lacks one.
+      const qrCompanyId = clientRecord.companyId ?? companyId;
+      const { qrBlobUrl } = await uploadClientQr(clientRecord.clientId, qrCompanyId, dataUrl);
       setClientRecord(prev => (prev ? { ...prev, qrBlobUrl } : prev));
       return true;
     } catch (err) {
@@ -673,8 +684,11 @@ const ClientDashboardPage: React.FC = () => {
       onClick: handleGenerateQr,
     },
     {
-      label: 'Cuenta de pago',
-      done: !!stripeAccount?.hasExternalAccount,
+      // Borrower: the repayment card (savedCard). Lender/payout client: the
+      // Stripe payout account's external bank. Mirrors the wizard, which labels
+      // step 5 "Tarjeta" for borrowers and "Cuenta de pago" for payout clients.
+      label: isPayoutClient ? 'Cuenta de pago' : 'Tarjeta',
+      done: isPayoutClient ? !!stripeAccount?.hasExternalAccount : !!savedCard,
       onClick: handleStartWizard,
     },
     {
