@@ -39,6 +39,8 @@ import {
   walletOutline,
   checkmarkCircle,
   cardOutline,
+  add,
+  mailOutline,
   pulseOutline,
   personCircleOutline,
   timeOutline,
@@ -237,6 +239,30 @@ const ClientDashboardPage: React.FC = () => {
   const [stripeTransactions, setStripeTransactions] = useState<any[]>([]);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  // The repayment card on file (savedPaymentMethods) — shown as a tile in the
+  // credit card below. A client has at most one (UNIQUE clientId+companyId).
+  const [savedCard, setSavedCard] = useState<{ last4?: string; brand?: string } | null>(null);
+
+  // "Tu Agente" — the client's assigned advisor.
+  //
+  // ⚠️ PLACEHOLDER identity, no real assignment source yet. There is no
+  // agents/advisors table or client→agent assignment in the backend; building
+  // it (and an endpoint to read it) is DB work for the posgmo-factory pipeline.
+  // Until then the card shows the assigned name/ID but the contact fields are
+  // empty on purpose, so each button stays DISABLED rather than dialing a fake
+  // number. Populate phone/whatsapp/email from the real endpoint to activate
+  // them. Set to null to hide the card entirely.
+  const [assignedAgent] = useState<{
+    name: string; agentId: string; avatarUrl?: string;
+    phone?: string; whatsapp?: string; email?: string; lastContact?: string;
+  } | null>({
+    name: 'Ana Gómez',
+    agentId: 'AGT-1024',
+    phone: '',
+    whatsapp: '',
+    email: '',
+    lastContact: '',
+  });
   const [showWithdrawAlert, setShowWithdrawAlert] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [showStripeOnboarding, setShowStripeOnboarding] = useState(false);
@@ -514,6 +540,23 @@ const ClientDashboardPage: React.FC = () => {
         })
         .catch(() => {});
       refreshClientRecord();
+      // Repayment card on file — feeds the payment-method tiles in the credit
+      // card. Best-effort: no card just shows the "add" tile.
+      fetch(`${API_BASE_URL}/automated-payments/saved-method`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, companyId }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d?.paymentMethod?.stripePaymentMethodId) {
+            console.log('[ClientDashboard] saved card:', d.paymentMethod.brand, d.paymentMethod.last4);
+            setSavedCard({ last4: d.paymentMethod.last4, brand: d.paymentMethod.brand });
+          } else {
+            setSavedCard(null);
+          }
+        })
+        .catch(() => setSavedCard(null));
     }
   }, [companyId, clientId]);
 
@@ -530,8 +573,15 @@ const ClientDashboardPage: React.FC = () => {
     });
   }, [clientRecord, editingProfile]);
 
+  // Available credit computed live by the credit engine (see
+  // /credit-score/available-credit). Preferred over the clientDashboards row,
+  // which is often missing (this client has 0 rows) and never gets the amount
+  // written to it. null until the call returns.
+  const [computedCredit, setComputedCredit] = useState<number | null>(null);
+
   // ── Derived values ────────────────────────────────────────────────────────
-  const availableCredit   = financialSummary?.availableCredit   ?? 0;
+  // Live engine value wins; fall back to any stored dashboard value; else 0.
+  const availableCredit   = computedCredit ?? financialSummary?.availableCredit ?? 0;
   const activeLoanBalance = financialSummary?.activeLoanBalance  ?? 0;
   const nextPaymentAmount = financialSummary?.nextPaymentAmount  ?? 0;
 
@@ -539,6 +589,21 @@ const ClientDashboardPage: React.FC = () => {
     if (availableCredit <= 0) return 0;
     return Math.min(100, Math.max(0, (activeLoanBalance / availableCredit) * 100));
   }, [availableCredit, activeLoanBalance]);
+
+  // Shows exactly WHICH source drives the displayed "Crédito disponible", so a
+  // $0 is traceable: engine value (computedCredit) vs. the stored dashboard row
+  // vs. the 0 fallback when both are absent.
+  useEffect(() => {
+    console.log('[ClientDashboard] availableCredit resolved =', JSON.stringify({
+      shown: availableCredit,
+      source: computedCredit != null ? 'engine'
+        : financialSummary?.availableCredit != null ? 'dashboardRow'
+        : 'fallback-0',
+      computedCredit,
+      dashboardRowValue: financialSummary?.availableCredit ?? null,
+      hasDashboardRow: financialSummary != null,
+    }));
+  }, [availableCredit, computedCredit, financialSummary]);
 
   const [creditScore, setCreditScore] = useState<number | null>(null);
   const [creditScoreLabel, setCreditScoreLabel] = useState('');
@@ -554,12 +619,44 @@ const ClientDashboardPage: React.FC = () => {
       .then(r => r.json())
       .then(d => {
         console.log('[ClientDashboard] fetchCreditScore ✅', d);
-        if (d.score) {
-          setCreditScore(d.score);
-          setCreditScoreLabel(d.label ?? '');
+        // The backend nests the score under `creditScore` (see
+        // creditScore.py). Reading d.score directly left it null → the card
+        // showed "—" even though the fetch succeeded.
+        const cs = d.creditScore ?? d;
+        if (cs.score) {
+          setCreditScore(cs.score);
+          setCreditScoreLabel(cs.label ?? '');
         }
       })
       .catch(() => {});
+
+    // Available credit amount (Crédito disponible) — the deterministic engine
+    // (score + KYC + income + Buró + first-time promo). This is what fills the
+    // hero number instead of the empty clientDashboards row.
+    console.log('[ClientDashboard] fetchAvailableCredit → /credit-score/available-credit', { clientId, companyId });
+    fetch(`${API_BASE_URL}/credit-score/available-credit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, companyId }),
+    })
+      .then(async r => {
+        // Log status + raw body so the real cause is visible: 404 = endpoint
+        // not deployed; 200 with availableCredit:0 = engine gated it (KYC /
+        // income / Buró / score). Without this we can't tell which.
+        const raw = await r.text();
+        console.log('[ClientDashboard] fetchAvailableCredit ← HTTP', r.status, 'body:', raw.slice(0, 500));
+        let d: any = null;
+        try { d = JSON.parse(raw); } catch { /* not JSON (e.g. 404 HTML) */ }
+        if (d && typeof d.availableCredit === 'number') {
+          console.log('[ClientDashboard] fetchAvailableCredit ✅ amount =', d.availableCredit,
+            'tier =', d.breakdown?.tier, 'reason =', d.breakdown?.reason);
+          setComputedCredit(d.availableCredit);
+        } else {
+          console.log('[ClientDashboard] fetchAvailableCredit: no usable availableCredit —',
+            r.status === 404 ? 'endpoint NOT deployed (404)' : `unexpected response (status ${r.status})`);
+        }
+      })
+      .catch((e) => console.log('[ClientDashboard] fetchAvailableCredit ❌ network/CORS', String(e)));
   }, [companyId, clientId]);
 
   // Biométrico/Contrato/Pagaré/Cuenta de pago are one continuous process
@@ -660,6 +757,9 @@ const ClientDashboardPage: React.FC = () => {
             <div>
               <span>Crédito disponible</span>
               <h1>${availableCredit.toFixed(2)}</h1>
+              {financialSummary?.nextPaymentDate && (
+                <span className="hero-due">Paga antes del {toDate(financialSummary.nextPaymentDate)}</span>
+              )}
             </div>
             {loanCompletionPct < 100 && (
               <div className="hero-progress-pill">
@@ -668,39 +768,81 @@ const ClientDashboardPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Payment methods on file — merged in from the separate credit card
+              so "Crédito disponible" isn't shown twice on Home. */}
+          <div className="cd-pay-methods">
+            {savedCard && (
+              <div className="cd-pay-tile">
+                <span className="cd-pay-last4">{savedCard.last4 || '····'}</span>
+                <span className="cd-pay-brand">{savedCard.brand?.toUpperCase() || 'TARJETA'}</span>
+              </div>
+            )}
+            {stripeAccount?.hasExternalAccount && (
+              <div className="cd-pay-tile cd-pay-tile-payout">
+                <IonIcon icon={checkmarkCircleOutline} className="cd-pay-payout-icon" />
+                <span className="cd-pay-last4">•••• {stripeAccount.externalAccountLast4 || '····'}</span>
+              </div>
+            )}
+            <button className="cd-pay-tile cd-pay-add" onClick={() => goTab('payments')} aria-label="Agregar método de pago">
+              <IonIcon icon={add} />
+            </button>
+          </div>
+
+          {/* Loan KPIs, moved in from the old summary-card grid so this panel
+              carries the numbers instead of a separate 4-card block. */}
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <span>Saldo actual</span>
+              <strong>${activeLoanBalance.toFixed(2)}</strong>
+            </div>
+            <div className="hero-stat">
+              <span>Próximo pago</span>
+              <strong>${nextPaymentAmount.toFixed(2)}</strong>
+            </div>
+            <div className="hero-stat">
+              <span>Préstamos activos</span>
+              <strong>{activeLoans.length}</strong>
+            </div>
+          </div>
         </IonCardContent>
       </IonCard>
 
-      {/* Summary cards */}
-      <IonGrid className="summary-grid">
-        <IonRow>
-          {[
-            // "Disponible" used to duplicate the hero's "Crédito disponible"
-            // (same availableCredit value shown twice) — swapped for the
-            // active loans' rate, which isn't shown anywhere else on Home.
-            // Weighted average across ALL active loans, not just the first.
-            {
-              icon: barChartOutline, label: 'Tasa de interés',
-              value: avgInterestRate !== null ? `${avgInterestRate.toFixed(1)}%` : '—',
-              hint: activeLoans.length > 1 ? `promedio de ${activeLoans.length} préstamos` : undefined,
-            },
-            { icon: cashOutline,    label: 'Saldo actual',     value: `$${activeLoanBalance.toFixed(2)}` },
-            { icon: receiptOutline, label: 'Próximo pago',     value: `$${nextPaymentAmount.toFixed(2)}` },
-            { icon: walletOutline,  label: 'Préstamos activos',value: String(activeLoans.length) },
-          ].map(c => (
-            <IonCol size="6" key={c.label}>
-              <IonCard className="client-dashboard-card mini-summary-card">
-                <IonCardContent>
-                  <IonIcon icon={c.icon} className="summary-icon" />
-                  <p>{c.label}</p>
-                  <h3>{c.value}</h3>
-                  {c.hint && <small style={{ color: '#9ca3af' }}>{c.hint}</small>}
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          ))}
-        </IonRow>
-      </IonGrid>
+      {/* Tu Agente — assigned advisor contact card (replaces the KPI grid). */}
+      {assignedAgent && (
+        <IonCard className="client-dashboard-card cd-agent-card">
+          <IonCardContent>
+            <div className="cd-agent-top">
+              <IonAvatar className="cd-agent-avatar">
+                <img src={assignedAgent.avatarUrl || avatarUrl} alt={assignedAgent.name} />
+              </IonAvatar>
+              <div className="cd-agent-info">
+                <span className="cd-agent-heading">Tu Agente</span>
+                <h3 className="cd-agent-name">{assignedAgent.name}</h3>
+                <span className="cd-agent-id">ID {assignedAgent.agentId}</span>
+                <IonBadge className="cd-agent-status">Disponible</IonBadge>
+              </div>
+            </div>
+            <div className="cd-agent-actions">
+              {/* In-app chat (loanChat), not WhatsApp; the Llamar button is
+                  skipped for now. */}
+              <IonButton className="cd-agent-btn" shape="round"
+                onClick={() => history.push('/loan-chat/new')}>
+                <IonIcon icon={chatbubbleOutline} slot="start" /> Chat
+              </IonButton>
+              <IonButton className="cd-agent-btn" fill="outline" shape="round" disabled={!assignedAgent.email}
+                href={assignedAgent.email ? `mailto:${assignedAgent.email}` : undefined}>
+                <IonIcon icon={mailOutline} slot="start" /> Email
+              </IonButton>
+            </div>
+            {assignedAgent.lastContact && (
+              <p className="cd-agent-last">
+                <IonIcon icon={timeOutline} /> Último contacto: {assignedAgent.lastContact}
+              </p>
+            )}
+          </IonCardContent>
+        </IonCard>
+      )}
 
       {/* Credit status */}
       <IonCard className="client-dashboard-card credit-status-card">
@@ -721,36 +863,6 @@ const ClientDashboardPage: React.FC = () => {
               be listed here are the same four booleans "Progreso para
               Préstamo" already tracks below (as Biométrico/Contrato/Pagaré/
               Cuenta de pago) — kept in one place instead of repeating it. */}
-        </IonCardContent>
-      </IonCard>
-
-      {/* Registered account — nowhere else on Home shows which account/card
-          will actually receive funds. Reuses stripeAccount, already fetched
-          on mount for the wizard checklist below. */}
-      <IonCard className="client-dashboard-card">
-        <IonCardHeader><IonCardTitle>Cuenta de pago</IonCardTitle></IonCardHeader>
-        <IonCardContent>
-          {stripeAccount?.hasExternalAccount ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <IonIcon icon={checkmarkCircleOutline} style={{ color: '#059669', fontSize: 26 }} />
-              <div>
-                <strong>
-                  {stripeAccount.externalAccountBankName || (stripeAccount.externalAccountType === 'card' ? 'Tarjeta' : 'Cuenta bancaria')}
-                </strong>
-                <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
-                  {stripeAccount.externalAccountType === 'card' ? 'Tarjeta' : 'CLABE'} terminada en {stripeAccount.externalAccountLast4 || '····'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <div>
-                <strong>Sin cuenta registrada</strong>
-                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>Necesaria para recibir tu préstamo.</p>
-              </div>
-              <IonButton size="small" fill="outline" onClick={() => goTab('payments')}>Agregar</IonButton>
-            </div>
-          )}
         </IonCardContent>
       </IonCard>
 

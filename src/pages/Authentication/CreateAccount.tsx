@@ -12,7 +12,7 @@ import {
   buildOutline, walletOutline, cartOutline,
 } from 'ionicons/icons';
 import { getAllCompanies, getBranchesByCompany, Company, CompanyBranch } from '../../api/companiesApi';
-import { RoleCode, ROLE_GROUPS } from '../../config/rolePermissions';
+import { RoleCode, ROLE_GROUPS, ROLE_LABELS } from '../../config/rolePermissions';
 import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, checkUsername, ContactCheckResult } from '../../api/usersApi';
 import { createOrUpdateClient, getAllClients, ClientType } from '../../api/clientsApi';
 import { useUser } from '../../components/UserContext';
@@ -84,6 +84,19 @@ const CLIENT_TYPES: { id: ClientType; icon: string; label: string; desc: string;
 ];
 
 const DEFAULT_ROLE_BY_PROFILE: Record<string, RoleCode> = { pos: 'employee', loans: 'borrower', custom: 'employee' };
+
+// For SmartLoans the access role is fully determined by the loan client type
+// chosen in step "Perfil" — asking "Rol de acceso" again in step "Acceso" just
+// duplicates the same borrower/lender choice (Acreditado≙Prestatario,
+// Prestamista≙Prestamista) and lets the two fields drift out of sync (client
+// record says one thing, user role another). Derive it instead. POS/custom
+// keep their independent role picker, where roles genuinely differ from type.
+const ROLE_BY_CLIENT_TYPE: Record<ClientType, RoleCode> = {
+  borrower: 'borrower',
+  lender:   'lender',
+  both:     'borrower', // primary role; the lender view is a toggle inside the app
+  lawyer:   'viewer',   // legal advisor — read-only, no dedicated role code
+};
 
 const ROLE_COLOR: Record<string, string> = {
   admin: '#dc2626', manager: '#d97706', employee: '#2563eb',
@@ -201,6 +214,14 @@ const CreateAccount: React.FC = () => {
       })
       .catch(() => setBranches([]));
   }, [selectedProfile, companies, selectedCompany]);
+
+  // SmartLoans: keep the access role locked to the chosen client type so step
+  // "Acceso" confirms the role instead of asking the borrower/lender question a
+  // second time. This is what handleStep3Submit persists as roleCode.
+  useEffect(() => {
+    if (selectedProfile !== 'loans') return;
+    setUserRole(ROLE_BY_CLIENT_TYPE[clientType]);
+  }, [selectedProfile, clientType]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -1151,33 +1172,49 @@ const CreateAccount: React.FC = () => {
           <p className="ca-step-desc">Define el rol y vincula la empresa.</p>
         </div>
 
-        {/* Role selector */}
+        {/* Role — SmartLoans derives it from the client type picked in step
+            "Perfil" (see ROLE_BY_CLIENT_TYPE), so here we only CONFIRM it
+            instead of asking the borrower/lender question again. POS/custom
+            still choose their role freely, where role ≠ client type. */}
         <p className="ca-section-label">Rol de acceso:</p>
-        <div className="ca-profile-list" style={{ marginBottom: 20 }}>
-          {roleGroup.map(r => {
-            const selected = userRole === r.id;
-            const color = ROLE_COLOR[r.id] ?? '#6b7280';
-            return (
-              <button
-                key={r.id}
-                type="button"
-                className={`ca-profile-btn${selected ? ' selected' : ''}`}
-                style={selected ? { borderColor: color, background: `${color}0f` } : undefined}
-                onClick={() => setUserRole(r.id)}
-              >
-                <div className="ca-profile-icon-wrap" style={selected ? { background: `${color}20`, color } : undefined}>
-                  <span style={{ fontSize: 20 }}>{r.emoji}</span>
-                </div>
-                <div className="ca-profile-text">
-                  <span className="ca-profile-name" style={selected ? { color } : undefined}>{r.label}</span>
-                  <span className="ca-profile-desc">{r.desc}</span>
-                </div>
-                <div className={`ca-radio-dot${selected ? ' selected' : ''}`}
-                  style={selected ? { borderColor: color, background: color } : undefined} />
-              </button>
-            );
-          })}
-        </div>
+        {selectedProfile === 'loans' ? (
+          <div className="ca-summary-box" style={{ marginBottom: 20 }}>
+            <div className="ca-summary-row">
+              <span>Rol</span>
+              <strong>{ROLE_LABELS[userRole] ?? userRole}</strong>
+            </div>
+            <div className="ca-summary-row">
+              <span>Según tu tipo de cliente</span>
+              <strong>{CLIENT_TYPES.find(t => t.id === clientType)?.label ?? '—'}</strong>
+            </div>
+          </div>
+        ) : (
+          <div className="ca-profile-list" style={{ marginBottom: 20 }}>
+            {roleGroup.map(r => {
+              const selected = userRole === r.id;
+              const color = ROLE_COLOR[r.id] ?? '#6b7280';
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  className={`ca-profile-btn${selected ? ' selected' : ''}`}
+                  style={selected ? { borderColor: color, background: `${color}0f` } : undefined}
+                  onClick={() => setUserRole(r.id)}
+                >
+                  <div className="ca-profile-icon-wrap" style={selected ? { background: `${color}20`, color } : undefined}>
+                    <span style={{ fontSize: 20 }}>{r.emoji}</span>
+                  </div>
+                  <div className="ca-profile-text">
+                    <span className="ca-profile-name" style={selected ? { color } : undefined}>{r.label}</span>
+                    <span className="ca-profile-desc">{r.desc}</span>
+                  </div>
+                  <div className={`ca-radio-dot${selected ? ' selected' : ''}`}
+                    style={selected ? { borderColor: color, background: color } : undefined} />
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Company / branch — the SmartLoans profile is scoped to SmartLoans only,
             auto-selected above, so there's nothing to pick here. */}
