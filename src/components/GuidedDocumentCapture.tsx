@@ -64,7 +64,11 @@ const POSITION_HINT_LABEL: Record<PositionHint, string> = {
 interface GuidedDocumentCaptureProps {
   title: string;
   instructions: string;
-  onCapture: (base64: string) => void;
+  // base64 = the ~1100px OCR/display/quality-gate image (unchanged).
+  // highResBase64 = a full-detail crop of the same card, for biometric use
+  // (the INE-portrait comparison needs more pixels than text OCR). Caller may
+  // ignore it (e.g. the back side doesn't need it).
+  onCapture: (base64: string, highResBase64?: string) => void;
   onHelp?: () => void;
 }
 
@@ -363,9 +367,29 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     }
 
     const base64 = canvas.toDataURL('image/jpeg', 0.92);
+
+    // Additionally emit a full-detail crop of the SAME card region. The 1100px
+    // `base64` above stays the OCR/display image and its quality gate is
+    // calibrated for that size — this larger crop is only sent to the face
+    // agent, whose INE-portrait comparison needs more pixels than text OCR.
+    // No quality gate runs on it (it shares the gated crop's coordinates).
+    const HI_RES_WIDTH = 2400;
+    let highResBase64: string | undefined;
+    const hiScale = Math.min(1, HI_RES_WIDTH / cropW);
+    const hiW = Math.round(cropW * hiScale);
+    const hiH = Math.round(cropH * hiScale);
+    const hiCanvas = document.createElement('canvas');
+    hiCanvas.width = hiW;
+    hiCanvas.height = hiH;
+    const hiCtx = hiCanvas.getContext('2d');
+    if (hiCtx) {
+      hiCtx.drawImage(drawSource, cropX, cropY, cropW, cropH, 0, 0, hiW, hiH);
+      highResBase64 = hiCanvas.toDataURL('image/jpeg', 0.95);
+    }
+
     stopStream();
     setState('captured');
-    setTimeout(() => onCapture(base64), 350);
+    setTimeout(() => onCapture(base64, highResBase64), 350);
   }, [onCapture, stopStream]);
 
   // Lets the client force a photo instead of waiting on the auto-stability

@@ -127,7 +127,10 @@ export type FacePoseSide =
 export interface UploadDocumentImageRequest {
   companyId: number;
   clientId: number;
-  side: "front" | "back" | "selfie" | FacePoseSide;
+  // "front_hires" is a full-resolution copy of the front used ONLY for the
+  // face-validation agent's INE-portrait comparison; the standard "front" stays
+  // the ~1100px OCR/display image. See GuidedDocumentCapture + validateFaceSession.
+  side: "front" | "front_hires" | "back" | "selfie" | FacePoseSide;
   imageBase64: string; // raw base64, no "data:image/...;base64," prefix
 }
 

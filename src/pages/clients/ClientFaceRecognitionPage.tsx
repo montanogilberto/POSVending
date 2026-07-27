@@ -226,6 +226,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [idFrontImageBase64, setIdFrontImageBase64] = useState<string>('');
   const [idBackImageBase64, setIdBackImageBase64] = useState<string>('');
   const [idFrontImageBlobUrl, setIdFrontImageBlobUrl] = useState<string>('');
+  // Full-resolution front, sent to the face-validation agent for the INE-portrait
+  // comparison. The standard idFrontImageBlobUrl stays the ~1100px OCR image.
+  const [idFrontHiResBlobUrl, setIdFrontHiResBlobUrl] = useState<string>('');
   const [idBackImageBlobUrl, setIdBackImageBlobUrl] = useState<string>('');
   const [clientSelfieBlobUrl, setClientSelfieBlobUrl] = useState<string>('');
   const [confidenceScore, setConfidenceScore] = useState<number>(0);
@@ -609,7 +612,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
         left:     poseBlobUrls.left  ? { url: poseBlobUrls.left }  : undefined,
         right:    poseBlobUrls.right ? { url: poseBlobUrls.right } : undefined,
         video:    presenceVideoBlobUrl ? { url: presenceVideoBlobUrl } : undefined,
-        ineFront: idFrontImageBlobUrl   ? { url: idFrontImageBlobUrl }   : undefined,
+        // Prefer the full-res front for the INE-portrait comparison; fall back
+        // to the ~1100px OCR image if the hi-res upload didn't land.
+        ineFront: (idFrontHiResBlobUrl || idFrontImageBlobUrl)
+          ? { url: idFrontHiResBlobUrl || idFrontImageBlobUrl }
+          : undefined,
       });
 
       const confidence = agentResult ? agentResult.confidence : localConfidence;
@@ -1079,7 +1086,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           title="Parte delantera"
           instructions="Muestre la parte delantera del documento a cámara."
           onHelp={showCaptureHelp}
-          onCapture={(base64) => {
+          onCapture={(base64, highResBase64) => {
             setIdFrontImageBase64(base64);
             // Drop the previous blob URL the moment a new photo is taken.
             // The OCR effect prefers URLs and fires on the base64 change, so
@@ -1088,8 +1095,24 @@ const ClientFaceRecognitionPage: React.FC = () => {
             // entirely. Clearing it makes the effect fall back to this
             // base64 until the new upload lands.
             setIdFrontImageBlobUrl('');
+            setIdFrontHiResBlobUrl('');
             setCaptureSubStep('front-review');
             uploadCapturedImage('front', base64);
+            // Upload the full-res front separately (does NOT touch the record's
+            // idFrontImageBlobUrl / OCR image) and keep its URL for the agent.
+            if (highResBase64 && selectedClient) {
+              uploadClientFaceRecognitionImage({
+                companyId: Number(companyId),
+                clientId: selectedClient.clientId,
+                side: 'front_hires',
+                imageBase64: highResBase64.split(',')[1],
+              })
+                .then(({ blobUrl }) => {
+                  console.log('[Expediente] front_hires uploaded to blob →', blobUrl);
+                  setIdFrontHiResBlobUrl(blobUrl);
+                })
+                .catch((err) => console.warn('[Expediente] front_hires upload failed:', err));
+            }
           }}
         />
       );
