@@ -27,6 +27,7 @@ import {
   IonImg,
   IonButton,
   IonButtons,
+  useIonAlert,
   setupIonicReact,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
@@ -258,9 +259,23 @@ const AppShell: React.FC = () => {
     };
   }, [userId]);
 
-  const handleLogout = () => {
+  const [presentLogoutAlert] = useIonAlert();
+
+  const doLogout = () => {
     logout();
     history.push('/login');
+  };
+
+  // Ask before ending the session: close it, or keep continuing (stay logged in).
+  const handleLogout = () => {
+    presentLogoutAlert({
+      header: 'Cerrar sesión',
+      message: '¿Deseas cerrar la sesión o continuar?',
+      buttons: [
+        { text: 'Continuar', role: 'cancel' },
+        { text: 'Cerrar sesión', role: 'destructive', handler: doLogout },
+      ],
+    });
   };
 
   return (

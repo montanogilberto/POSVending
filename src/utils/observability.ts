@@ -18,6 +18,22 @@ const BACKEND_HOST = 'smartloansbackend.azurewebsites.net';
 let cachedDevice = Capacitor.getPlatform();
 let cachedAppVersion = 'web';
 
+// Opt-in debug logging — silent unless localStorage.obs_debug === '1' (any build)
+// or a Vite dev build. Lets you watch trace ids being injected before the DB
+// side is deployed. Off in production → no console noise.
+function obsDebug(): boolean {
+  try {
+    if (localStorage.getItem('obs_debug') === '1') return true;
+  } catch {
+    /* ignore */
+  }
+  try {
+    return Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV);
+  } catch {
+    return false;
+  }
+}
+
 export function uuid(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -46,6 +62,7 @@ export function startWorkflow(name: string): string {
   } catch {
     /* ignore storage errors */
   }
+  if (obsDebug()) console.debug('[obs] workflow START', name, workflowId);
   return workflowId;
 }
 
@@ -60,6 +77,7 @@ export function getCurrentWorkflowId(): string | null {
 }
 
 export function endWorkflow(): void {
+  if (obsDebug()) console.debug('[obs] workflow END', getCurrentWorkflowId());
   try {
     localStorage.removeItem(WORKFLOW_STORAGE_KEY);
   } catch {
@@ -138,6 +156,14 @@ export function installObservabilityFetch(): void {
 
       if (!headers.has('X-App-Version')) headers.set('X-App-Version', cachedAppVersion);
       if (!headers.has('X-Device')) headers.set('X-Device', cachedDevice);
+
+      if (obsDebug()) {
+        console.debug('[obs] →', urlOf(input), {
+          correlationId: headers.get('X-Correlation-Id'),
+          workflowId: headers.get('X-Workflow-Id'),
+          userId: headers.get('X-User-Id'),
+        });
+      }
 
       return originalFetch(input, { ...init, headers });
     } catch {
