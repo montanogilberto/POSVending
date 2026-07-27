@@ -240,6 +240,27 @@ export const sendVerificationCode = async (
 };
 
 /**
+ * POST /send_account_created — notifies a newly-registered user of their login
+ * username via email / SMS / WhatsApp. The username is the key detail (login
+ * requires it). Best-effort: callers should not block registration on failure.
+ */
+export const sendAccountCreated = async (
+  target: string,
+  username: string,
+  method: 'email' | 'sms' | 'whatsapp' = 'email',
+): Promise<void> => {
+  console.log('[sendAccountCreated] method=%s target=%s username=%s', method, target, username);
+  const res = await fetch(`${API_BASE_URL}/send_account_created`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target, username, method }),
+  });
+  const data = await res.json();
+  console.log('[sendAccountCreated] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+};
+
+/**
  * POST /verify_code — validates OTP, returns { valid: boolean }.
  * userId, when passed, lets the backend persist identityVerified=1 on
  * dbo.users (registration wizard step "Verificar") so a returning contact

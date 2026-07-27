@@ -135,17 +135,76 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
   // Captured as each pose is actually achieved — see PosePhotos.
   const posePhotosRef = useRef<PosePhotos>({});
+  // Guards against launching a second sharpest-frame burst for the same pose.
+  const poseBurstRef = useRef<Partial<Record<FacePose, boolean>>>({});
+  // Small offscreen canvas reused for the per-frame sharpness metric.
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const capturePose = useCallback((pose: FacePose) => {
-    if (posePhotosRef.current[pose]) return; // first good frame per pose wins
-    const frame = grabFrame();
-    if (!frame) {
-      console.log(`[FaceLivenessCapture] capturePose(${pose}): FAILED — no frame available`);
-      return;
+  // Cheap focus metric: mean squared horizontal luminance gradient of a
+  // downscaled frame. Higher = sharper. Used to reject motion-blurred poses.
+  const measureSharpness = useCallback((): number => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return 0;
+    let canvas = analysisCanvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 120;
+      analysisCanvasRef.current = canvas;
     }
-    posePhotosRef.current[pose] = frame;
-    console.log(`[FaceLivenessCapture] capturePose(${pose}): captured, length =`, frame.length);
-  }, [grabFrame]);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return 0;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let sum = 0;
+    let count = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 1; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const j = (y * width + (x - 1)) * 4;
+        const g1 = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        const g0 = 0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2];
+        const d = g1 - g0;
+        sum += d * d;
+        count++;
+      }
+    }
+    return count ? sum / count : 0;
+  }, []);
+
+  // Grab a short burst of frames around the moment a pose is achieved and keep
+  // the SHARPEST one. The head momentarily stops at the furthest point, so its
+  // clearest frame is right here — the old single grab often landed mid-motion
+  // and came out motion-blurred, which the validation agent then rejected.
+  const capturePose = useCallback(
+    async (pose: FacePose) => {
+      if (poseBurstRef.current[pose]) return; // burst already ran for this pose
+      poseBurstRef.current[pose] = true;
+
+      let bestFrame = grabFrame();
+      let bestSharp = bestFrame ? measureSharpness() : -1;
+      if (bestFrame) posePhotosRef.current[pose] = bestFrame;
+
+      // ~4 more frames over ~160ms — long enough to catch the turnaround's
+      // low-velocity (sharp) frame, short enough that the head is still on-pose.
+      for (let i = 0; i < 4; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        if (doneRef.current) break;
+        const frame = grabFrame();
+        if (!frame) continue;
+        const sharp = measureSharpness();
+        if (sharp > bestSharp) {
+          bestSharp = sharp;
+          bestFrame = frame;
+          posePhotosRef.current[pose] = frame;
+        }
+      }
+      console.log(
+        `[FaceLivenessCapture] capturePose(${pose}): sharpest of burst, sharpness=${bestSharp.toFixed(0)}, length=${bestFrame?.length ?? 0}`,
+      );
+    },
+    [grabFrame, measureSharpness],
+  );
 
   const finish = useCallback(
     (descriptor: Float32Array) => {
@@ -310,8 +369,16 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
         }
 
         console.log('[FaceLivenessCapture] startCameraAndLoop: calling getUserMedia (front camera)');
+        // Request 720p: 640x480 (VGA) left the pose/selfie frames too low-detail
+        // for the validation agent to match reliably. `ideal` lets the WebView
+        // fall back to the nearest supported size if 720p isn't available, so it
+        // stays safe across devices. face-api detection handles 720p comfortably.
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         });
         if (doneRef.current) {
@@ -366,6 +433,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     // Discard poses from the abandoned attempt — mixing them with a new run
     // would defeat the point of capturing evidence of a single session.
     posePhotosRef.current = {};
+    poseBurstRef.current = {};
     doneRef.current = false;
     setSequence(newSequence);
     setChallengeIndex(0);

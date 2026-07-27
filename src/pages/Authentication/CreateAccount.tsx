@@ -13,7 +13,7 @@ import {
 } from 'ionicons/icons';
 import { getAllCompanies, getBranchesByCompany, Company, CompanyBranch } from '../../api/companiesApi';
 import { RoleCode, ROLE_GROUPS, ROLE_LABELS } from '../../config/rolePermissions';
-import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, checkUsername, ContactCheckResult } from '../../api/usersApi';
+import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, checkUsername, sendAccountCreated, ContactCheckResult } from '../../api/usersApi';
 import { createOrUpdateClient, getAllClients, ClientType } from '../../api/clientsApi';
 import { useUser } from '../../components/UserContext';
 import { useObservability } from '../../contexts/ObservabilityContext';
@@ -466,6 +466,7 @@ const CreateAccount: React.FC = () => {
     console.log('[handleStep0Next] contact=%s type=%s existing=%o', contact, contactType, existingRecord);
     try {
       let uid: number | null = null;
+      let isNewAccount = false; // true only when a brand-new user row is created
       // Which step to land on next — only existing accounts with an
       // incomplete registration resume anywhere but "Perfil" (step 1).
       let resumeAtStep = 1;
@@ -509,6 +510,7 @@ const CreateAccount: React.FC = () => {
         console.log('[handleStep0Next] createUser (linked) response', data);
         const rawUid = data.userId ?? data.id ?? (data as any).users?.[0]?.userId;
         uid = rawUid ? Number(rawUid) : null;
+        isNewAccount = true;
         setCreatedClientId(existingRecord.clientId);
 
         // Client matched via phone and had no email on file — complete it.
@@ -579,10 +581,20 @@ const CreateAccount: React.FC = () => {
         const rawUid = data.userId ?? data.id ?? (data as any).users?.[0]?.userId;
         console.log('[handleStep0Next] extracted uid=', rawUid);
         uid = rawUid ? Number(rawUid) : null;
+        isNewAccount = true;
         if (newClientId) setCreatedClientId(newClientId);
       }
 
       if (uid) setCreatedUserId(uid);
+
+      // Send the new user their login username via their registration channel
+      // (email or SMS). Best-effort — a messaging failure must not block signup.
+      if (isNewAccount && uid) {
+        const channel: 'email' | 'sms' = contactType === 'phone' ? 'sms' : 'email';
+        sendAccountCreated(verifyTarget, username, channel).catch((e) =>
+          console.warn('[handleStep0Next] account-created notice failed:', e));
+      }
+
       setVerifyChannel(contactType === 'phone' ? 'sms' : 'email');
       markSaved(0);
       setStep(resumeAtStep);
