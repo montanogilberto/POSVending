@@ -178,7 +178,18 @@ const SavedCardSetup: React.FC<SavedCardSetupProps> = ({ clientId, companyId, on
 
   return (
     <Elements stripe={getStripe()}>
-      <CardForm clientId={clientId} companyId={companyId} onSaved={setSavedCard} />
+      <CardForm
+        clientId={clientId}
+        companyId={companyId}
+        onSaved={(card) => {
+          // Show the "Tarjeta guardada" success state AND notify the parent so
+          // callers (e.g. the onboarding wizard) can advance / navigate. Before,
+          // only setSavedCard ran here, so a freshly-saved card left the wizard
+          // stuck on the payment step instead of returning to the dashboard.
+          setSavedCard(card);
+          onSaved?.(card);
+        }}
+      />
     </Elements>
   );
 };

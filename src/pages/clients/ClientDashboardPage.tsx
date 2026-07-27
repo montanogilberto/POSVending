@@ -262,6 +262,10 @@ const ClientDashboardPage: React.FC = () => {
   } | null>({
     name: 'Ana Gómez',
     agentId: 'AGT-1024',
+    // Placeholder portrait so the avatar matches the (female) agent name until
+    // real agent profiles/photos are wired up. Was falling back to the logged-in
+    // user's avatar, which showed a man for "Ana Gómez".
+    avatarUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
     phone: '',
     whatsapp: '',
     email: '',

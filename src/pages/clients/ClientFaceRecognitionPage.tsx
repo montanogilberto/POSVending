@@ -79,7 +79,7 @@ type CaptureSubStep =
   | 'processing';     // "Cargando..."
 
 const ClientFaceRecognitionPage: React.FC = () => {
-  const { companyId, clientId: contextClientId, setAvatarUrl } = useUser();
+  const { companyId, clientId: contextClientId, roleCode, setAvatarUrl } = useUser();
 
   const [step, setStep] = useState(0);
   const [captureSubStep, setCaptureSubStep] = useState<CaptureSubStep>('doc-intro');
@@ -118,7 +118,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // that predate this (e.g. old deep links) that don't pass it.
   const deepLinkClientId = location.state?.clientId;
   const continueToPayments = !!location.state?.continueToPayments;
-  const returnTo = location.state?.returnTo || `/client-dashboard/${deepLinkClientId}?tab=home`;
+  // Default "done" destination is role-aware: a lender must return to the LENDER
+  // dashboard, not the borrower one. Only used when the caller didn't pass an
+  // explicit returnTo (the lender/borrower dashboards do pass it).
+  const returnTo = location.state?.returnTo
+    || (roleCode === 'lender'
+          ? `/lender-dashboard/${deepLinkClientId ?? contextClientId}`
+          : `/client-dashboard/${deepLinkClientId}?tab=home`);
 
   // When opened from a dashboard deep link the wizard fetches the client and
   // the existing expediente before it knows which step to resume to. Until
