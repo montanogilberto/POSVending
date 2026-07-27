@@ -36,6 +36,7 @@ import SavedCardSetup from '../../components/SavedCardSetup';
 import { buildKycPrefill } from '../../utils/kycPrefill';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../components/UserContext';
+import { saveProfileImage } from '../../api/usersApi';
 import { Client, getOneClient } from '../../api/clientsApi';
 import {
   submitContractClientFaceRecognition,
@@ -78,7 +79,7 @@ type CaptureSubStep =
   | 'processing';     // "Cargando..."
 
 const ClientFaceRecognitionPage: React.FC = () => {
-  const { companyId } = useUser();
+  const { companyId, clientId: contextClientId, setAvatarUrl } = useUser();
 
   const [step, setStep] = useState(0);
   const [captureSubStep, setCaptureSubStep] = useState<CaptureSubStep>('doc-intro');
@@ -621,6 +622,23 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setIsVerified(isMatch);
       setClientSelfieBlobUrl(selfieBlobUrl);
       setLivenessStatus(isMatch ? 'completed' : 'failed');
+
+      // Promote the verified 'front' capture to the client's profile avatar.
+      // Persist to dbo.users.imageUrl (survives logout) targeting the KYC
+      // subject by clientId — this works for both self-serve and agent-assisted
+      // flows. Only refresh the in-session avatar when the subject IS the
+      // logged-in user (self-serve), so an agent's own avatar is never changed.
+      if (isMatch && poseBlobUrls.front && selectedClient?.clientId) {
+        try {
+          await saveProfileImage({ clientId: Number(selectedClient.clientId) }, poseBlobUrls.front);
+          if (contextClientId && Number(selectedClient.clientId) === contextClientId) {
+            setAvatarUrl(poseBlobUrls.front);
+          }
+          console.log('[Expediente] handleLivenessComplete: saved front capture as profile avatar');
+        } catch (avatarErr) {
+          console.warn('[Expediente] handleLivenessComplete: could not save front photo as avatar:', avatarErr);
+        }
+      }
 
       if (clientFaceRecognitionIdRef.current) {
         console.log('[Expediente] handleLivenessComplete: persisting confidenceScore/isVerified onto record', clientFaceRecognitionIdRef.current);

@@ -16,6 +16,7 @@ import { RoleCode, ROLE_GROUPS, ROLE_LABELS } from '../../config/rolePermissions
 import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, checkUsername, ContactCheckResult } from '../../api/usersApi';
 import { createOrUpdateClient, getAllClients, ClientType } from '../../api/clientsApi';
 import { useUser } from '../../components/UserContext';
+import { useObservability } from '../../contexts/ObservabilityContext';
 import { getPostLoginRoute } from '../../utils/postLoginRoute';
 
 // ── Application profiles ────────────────────────────────────────────────────
@@ -110,6 +111,7 @@ const STEPS = ['Cuenta', 'Perfil', 'Verificar', 'Acceso'];
 const CreateAccount: React.FC = () => {
   const history = useHistory();
   const { isAuthenticated, roleCode: sessionRoleCode, clientId: sessionClientId } = useUser();
+  const { startWorkflow, endWorkflow } = useObservability();
 
   // An already-authenticated visitor (e.g. still logged in from a previous
   // session) shouldn't see the signup form or the app's tab bar bleeding
@@ -458,6 +460,9 @@ const CreateAccount: React.FC = () => {
   const handleStep0Next = async () => {
     if (!step0Valid) { setMessage('Completa todos los campos correctamente.'); return; }
     setLoading(true);
+    // Begin the registration trace — every backend call from here until
+    // completion carries this X-Workflow-Id (see ObservabilityContext).
+    startWorkflow('client_registration');
     console.log('[handleStep0Next] contact=%s type=%s existing=%o', contact, contactType, existingRecord);
     try {
       let uid: number | null = null;
@@ -702,6 +707,7 @@ const CreateAccount: React.FC = () => {
       }
 
       markSaved(3);
+      endWorkflow(); // Registration Completed — close the trace.
       setMessage('¡Cuenta creada exitosamente!');
       setTimeout(() => history.push('/login'), 1400);
     } catch (err) {
