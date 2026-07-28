@@ -667,19 +667,31 @@ const ClientFaceRecognitionPage: React.FC = () => {
         console.log('[Expediente] handleLivenessComplete: WARNING — no clientFaceRecognitionId yet, score not persisted');
       }
 
-      // Prefer the agent's own reason over the generic message — it can say
-      // "the poses are all the same frame" or "the ID portrait is unreadable",
-      // which tells the client what to actually change.
-      setToastMessage(
-        isMatch
-          ? 'Validación facial completada correctamente.'
-          : agentResult?.failureReasons?.length
-            ? agentResult.failureReasons[0]
-            : 'El rostro no coincide con la identificación. Vuelve a intentarlo.'
-      );
-      setShowToast(true);
-      setStep(2);
-      setCaptureSubStep('doc-intro');
+      if (isMatch) {
+        setToastMessage('Validación facial completada correctamente.');
+        setShowToast(true);
+        setStep(2);
+        setCaptureSubStep('doc-intro');
+      } else {
+        // Catch the failed / REVIEW_MANUALLY verdict here instead of advancing to
+        // the Verificación step as if it passed. Surface the agent's own reason(s)
+        // — they say what to actually change ("INE portrait too blurry", "poses
+        // are all the same frame") — and route the client straight back to the
+        // capture that needs redoing: a blurry/low-res INE means re-shoot the ID
+        // front; anything else means redo the liveness challenge.
+        const reasons = agentResult?.failureReasons ?? [];
+        const reasonText = reasons.length
+          ? reasons.join(' ')
+          : 'El rostro no coincide con la identificación. Vuelve a intentarlo.';
+        const ineProblem = /\bine\b|portrait|identificaci|low[-\s]?res|blurr|borros/i.test(reasonText);
+        // setError (not setToastMessage) so the toast renders red (danger) and
+        // the reason persists for handleContinueToContract's guard.
+        setToastMessage('');
+        setError(reasonText);
+        setShowToast(true);
+        setStep(1);
+        setCaptureSubStep(ineProblem ? 'front-capture' : 'liveness-intro');
+      }
     } catch (err) {
       console.log('[Expediente] handleLivenessComplete: FAILED', err);
       setLivenessStatus('failed');
@@ -1571,7 +1583,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
       <IonToast
         isOpen={showToast}
         message={toastMessage || error}
-        duration={3000}
+        duration={error ? 6000 : 3000}
         onDidDismiss={() => {
           setShowToast(false);
           setToastMessage('');

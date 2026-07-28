@@ -62,11 +62,17 @@ const BLINK_TIMEOUT_MS = 7000;
 // device during the down challenge — without masking a real loss of the face.
 const FACE_LOST_GRACE_FRAMES = 4;
 
-// A pose's sharpest burst frame must clear this to be accepted without extra
-// sampling. On-device: good poses measure ~150-170; a motion-blurred one (a
-// fast RIGHT turn the validation agent then rejects) ~90. 110 discriminates the
-// heavily-blurred outlier without over-sampling borderline-but-fine poses.
-const POSE_SHARPNESS_FLOOR = 110;
+// The burst stops early as soon as one frame clears this floor; otherwise it
+// samples the whole window and keeps the sharpest. 110 was far too low — device
+// logs showed poses exiting on the FIRST frame at 120-165 (front 126, up 165),
+// which the validation agent still rejected as "significantly motion-blurred".
+// The early exit was grabbing the frame the instant the turn angle was hit —
+// i.e. mid-motion — instead of the stiller, sharper frame a moment later. Set
+// high enough that most poses no longer exit early and instead run the full
+// window to hunt for that still frame (the best-of fallback still guarantees a
+// frame, so it can never stall). Watch the logged per-pose sharpness on device
+// and lower toward the real still-pose ceiling once there's a distribution.
+const POSE_SHARPNESS_FLOOR = 220;
 
 // Fixed compass position per direction (SVG angle: 0deg = 3 o'clock, clockwise).
 const RING_TARGET_DEG: Record<LivenessChallenge, number> = {
@@ -209,12 +215,14 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       if (bestFrame) posePhotosRef.current[pose] = bestFrame;
 
       // Keep sampling until the sharpest frame clears POSE_SHARPNESS_FLOOR, or a
-      // bounded window (~480ms at 40ms/frame) elapses — whichever first. Sharp
-      // poses exit on the first frame; blur-prone ones (a fast RIGHT turn) get
-      // more tries to catch the low-velocity turnaround frame. A blurry
-      // candidate never beats the best, so this only ever improves the result,
-      // and the fallback keeps the sharpest frame so the pose can never stall.
-      const MAX_ATTEMPTS = 12;
+      // bounded window (~720ms at 40ms/frame) elapses — whichever first. With the
+      // raised floor most poses now sample the whole window, which is the point:
+      // the user holds the pose for a beat, so the still (sharpest) frame lands a
+      // few hundred ms after the turn angle is first hit — the early single grab
+      // missed it. A blurry candidate never beats the best, so this only ever
+      // improves the result, and the fallback keeps the sharpest frame so the
+      // pose can never stall.
+      const MAX_ATTEMPTS = 18;
       for (let i = 0; i < MAX_ATTEMPTS && bestSharp < POSE_SHARPNESS_FLOOR; i++) {
         await new Promise((resolve) => setTimeout(resolve, 40));
         if (doneRef.current) break;
