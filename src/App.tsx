@@ -9,8 +9,6 @@ import {
   IonIcon,
   IonLabel,
   IonRouterOutlet,
-  IonTabBar,
-  IonTabButton,
   IonTabs,
   IonMenu,
   IonList,
@@ -170,6 +168,24 @@ const AppShell: React.FC = () => {
   // navigate. Push manually and track the active one from the URL instead.
   const activeClientDashboardTab = new URLSearchParams(location.search).get('tab') || 'home';
   const goClientDashboardTab = (tab: string) => history.push(`/client-dashboard/${clientId}?tab=${tab}`);
+
+  // Lenders get their OWN bottom nav (Inicio/Pagos/Invertir/Invitar) — the
+  // borrower ?tab= tabs above are sections of the borrower dashboard and would
+  // send a lender to the wrong page. Pagos scrolls to a section on the lender
+  // dashboard; Invertir/Invitar are real routes.
+  const isLender = roleCode === 'lender';
+  const lenderSection = new URLSearchParams(location.search).get('section');
+  const activeLenderTab =
+    location.pathname.startsWith('/p2p-lending') ? 'invertir'
+      : location.pathname.startsWith('/rewards') ? 'invitar'
+      : lenderSection === 'pagos' ? 'pagos'
+      : 'inicio';
+  const goLenderTab = (tab: string) => {
+    if (tab === 'invertir') return history.push('/p2p-lending');
+    if (tab === 'invitar') return history.push('/rewards');
+    if (tab === 'pagos') return history.push(`/lender-dashboard/${clientId}?section=pagos`);
+    return history.push(`/lender-dashboard/${clientId}`); // inicio
+  };
   const [profileImageSrc, setProfileImageSrc] = useState(() =>
     resolveAvatarUrl(avatarUrl)
   );
@@ -589,36 +605,62 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
           </IonRouterOutlet>
 
-          <IonTabBar slot="bottom" className="custom-tabbar">
-            {isSmartLoansRole ? [
-              <IonTabButton key="cd-home" tab="cd-home" selected={activeClientDashboardTab === 'home'} onClick={() => goClientDashboardTab('home')}>
-                <IonIcon aria-hidden="true" icon={homeOutline} />
-                <IonLabel>Home</IonLabel>
-              </IonTabButton>,
-              <IonTabButton key="cd-loans" tab="cd-loans" selected={activeClientDashboardTab === 'loans'} onClick={() => goClientDashboardTab('loans')}>
-                <IonIcon aria-hidden="true" icon={walletOutline} />
-                <IonLabel>Préstamos</IonLabel>
-              </IonTabButton>,
-              <IonTabButton key="cd-payments" tab="cd-payments" selected={activeClientDashboardTab === 'payments'} onClick={() => goClientDashboardTab('payments')}>
-                <IonIcon aria-hidden="true" icon={cardOutline} />
-                <IonLabel>Pagos</IonLabel>
-              </IonTabButton>,
-              <IonTabButton key="cd-activity" tab="cd-activity" selected={activeClientDashboardTab === 'activity'} onClick={() => goClientDashboardTab('activity')}>
-                <IonIcon aria-hidden="true" icon={pulseOutline} />
-                <IonLabel>Actividad</IonLabel>
-              </IonTabButton>,
-              <IonTabButton key="cd-profile" tab="cd-profile" selected={activeClientDashboardTab === 'profile'} onClick={() => goClientDashboardTab('profile')}>
-                <IonIcon aria-hidden="true" icon={personCircleOutline} />
-                <IonLabel>Perfil</IonLabel>
-              </IonTabButton>,
-            ] : (
-              <IonTabButton tab="dashboard" href="/dashboard">
+          {/* Custom bottom nav (was IonTabBar/IonTabButton). The SmartLoans
+              "tabs" are ?tab= query-param views on ONE route, not real Ionic tab
+              routes, so IonTabs' tab-select fired on every tap and logged
+              "[ion-tabs] Tab with id 'undefined' does not exist". A plain nav in
+              the same slot="bottom" keeps IonTabs' layout + the look without
+              that machinery. Navigation is the same onClick as before. */}
+          <div slot="bottom" className="cd-tabbar">
+            {isLender ? (
+              <>
+                <button type="button" className={`cd-tab${activeLenderTab === 'inicio' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('inicio')}>
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Inicio</span>
+                </button>
+                <button type="button" className={`cd-tab${activeLenderTab === 'pagos' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('pagos')}>
+                  <IonIcon aria-hidden="true" icon={cardOutline} />
+                  <span>Pagos</span>
+                </button>
+                <button type="button" className={`cd-tab${activeLenderTab === 'invertir' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('invertir')}>
+                  <IonIcon aria-hidden="true" icon={barChart} />
+                  <span>Invertir</span>
+                </button>
+                <button type="button" className={`cd-tab${activeLenderTab === 'invitar' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('invitar')}>
+                  <IonIcon aria-hidden="true" icon={peopleOutline} />
+                  <span>Invitar</span>
+                </button>
+              </>
+            ) : isSmartLoansRole ? (
+              <>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'home' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('home')}>
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Home</span>
+                </button>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'loans' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('loans')}>
+                  <IonIcon aria-hidden="true" icon={walletOutline} />
+                  <span>Préstamos</span>
+                </button>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'payments' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('payments')}>
+                  <IonIcon aria-hidden="true" icon={cardOutline} />
+                  <span>Pagos</span>
+                </button>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'activity' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('activity')}>
+                  <IonIcon aria-hidden="true" icon={pulseOutline} />
+                  <span>Actividad</span>
+                </button>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'profile' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('profile')}>
+                  <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                  <span>Perfil</span>
+                </button>
+              </>
+            ) : (
+              <button type="button" className="cd-tab" onClick={() => history.push('/dashboard')}>
                 <IonIcon aria-hidden="true" icon={home} />
-                <IonLabel>Dashboard</IonLabel>
-              </IonTabButton>
+                <span>Dashboard</span>
+              </button>
             )}
-
-          </IonTabBar>
+          </div>
         </IonTabs>
       </IonPage>
     </IonSplitPane>

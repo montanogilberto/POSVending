@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonGrid, IonRow, IonCol, IonButton, IonLoading, IonToast, IonIcon,
@@ -52,6 +52,17 @@ interface LenderDashboardPageProps {}
 const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
+  const location = useLocation();
+
+  // Bottom-nav "Pagos" tab deep-links here with ?section=pagos — scroll the
+  // "Cuenta de pago" card into view once the page has rendered.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('section') !== 'pagos') return;
+    const t = setTimeout(() => {
+      document.getElementById('ld-pagos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [location.search]);
   const { companyId } = useUser();
 
   const lenderClientId = Number(clientIdParam);
@@ -108,7 +119,18 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
       setShowStripeOnboarding(true);
     } catch (err) {
       console.log('[LenderDashboard] handleStripeKyc ❌', err);
-      setStripeError((err as Error).message ?? 'Error al iniciar registro bancario');
+      const raw = (err as Error).message ?? '';
+      // Raw Stripe errors are English, technical, and can even leak a
+      // dashboard.stripe.com link + request id (e.g. the platform-profile /
+      // "responsibilities of collecting requirements" config error). None of
+      // these are actionable by a lender, so show a friendly Spanish message
+      // and keep the real error in the console/logs for debugging.
+      const isPlatformOrInternal = /stripe\.com|platform-profile|responsibilities|req_[A-Za-z0-9]+/i.test(raw);
+      setStripeError(
+        isPlatformOrInternal
+          ? 'El registro de la cuenta de pago aún no está habilitado. Estamos configurándolo — inténtalo más tarde o contacta al administrador.'
+          : 'No se pudo iniciar el registro de la cuenta de pago. Inténtalo de nuevo.',
+      );
     } finally {
       setStripeLoading(false);
     }
@@ -284,8 +306,9 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
           </IonCardContent>
         </IonCard>
 
-        {/* Cuenta de pago — funds loan disbursements and receives repayments */}
-        <IonCard className="ld-card">
+        {/* Cuenta de pago — funds loan disbursements and receives repayments.
+            id is the scroll target for the bottom-nav "Pagos" tab (?section=pagos). */}
+        <IonCard className="ld-card" id="ld-pagos">
           <IonCardHeader>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <IonCardTitle>Cuenta de pago</IonCardTitle>

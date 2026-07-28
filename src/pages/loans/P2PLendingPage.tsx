@@ -606,7 +606,7 @@ const P2PLendingPage: React.FC = () => {
               <IonIcon icon={arrowBackOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>
-          <IonTitle>Plataforma P2P</IonTitle>
+          <IonTitle>Plataforma SmartLoans</IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={() => load()}>
               <IonIcon icon={refreshOutline} slot="icon-only" />

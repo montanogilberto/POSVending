@@ -78,10 +78,11 @@ const ALL_MODULES = [
 // hardcoded to 'borrower' for every phone-based registration) — mirrors
 // the selector in ClientsPage.tsx's client wizard.
 const CLIENT_TYPES: { id: ClientType; icon: string; label: string; desc: string; color: string }[] = [
-  { id: 'borrower', icon: '📋', label: 'Acreditado',            desc: 'Solicita préstamo',          color: '#2563eb' },
-  { id: 'lender',   icon: '💼', label: 'Prestamista',           desc: 'Financia préstamos',         color: '#15803d' },
-  { id: 'both',     icon: '🔄', label: 'Ambos',                 desc: 'Acreditado y prestamista',   color: '#7c3aed' },
-  { id: 'lawyer',   icon: '⚖️', label: 'Licenciado en derecho', desc: 'Asesoría legal',             color: '#b45309' },
+  // One capability per account — no "Ambos" (both). A customer is a borrower,
+  // a lender, OR a legal advisor (jurídico).
+  { id: 'borrower', icon: '📋', label: 'Acreditado',            desc: 'Solicita préstamo',   color: '#2563eb' },
+  { id: 'lender',   icon: '💼', label: 'Prestamista',           desc: 'Financia préstamos',  color: '#15803d' },
+  { id: 'lawyer',   icon: '⚖️', label: 'Jurídico',              desc: 'Asesoría legal',      color: '#b45309' },
 ];
 
 const DEFAULT_ROLE_BY_PROFILE: Record<string, RoleCode> = { pos: 'employee', loans: 'borrower', custom: 'employee' };
