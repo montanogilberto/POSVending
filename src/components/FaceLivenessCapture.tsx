@@ -49,6 +49,12 @@ const ANALYSIS_INTERVAL_MS = 150;
 // device during the down challenge — without masking a real loss of the face.
 const FACE_LOST_GRACE_FRAMES = 4;
 
+// A pose's sharpest burst frame must clear this to be accepted without extra
+// sampling. On-device: good poses measure ~150-170; a motion-blurred one (a
+// fast RIGHT turn the validation agent then rejects) ~90. 110 discriminates the
+// heavily-blurred outlier without over-sampling borderline-but-fine poses.
+const POSE_SHARPNESS_FLOOR = 110;
+
 // Fixed compass position per direction (SVG angle: 0deg = 3 o'clock, clockwise).
 const RING_TARGET_DEG: Record<LivenessChallenge, number> = {
   right: 0,
@@ -185,9 +191,14 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       let bestSharp = bestFrame ? measureSharpness() : -1;
       if (bestFrame) posePhotosRef.current[pose] = bestFrame;
 
-      // ~4 more frames over ~160ms — long enough to catch the turnaround's
-      // low-velocity (sharp) frame, short enough that the head is still on-pose.
-      for (let i = 0; i < 4; i++) {
+      // Keep sampling until the sharpest frame clears POSE_SHARPNESS_FLOOR, or a
+      // bounded window (~480ms at 40ms/frame) elapses — whichever first. Sharp
+      // poses exit on the first frame; blur-prone ones (a fast RIGHT turn) get
+      // more tries to catch the low-velocity turnaround frame. A blurry
+      // candidate never beats the best, so this only ever improves the result,
+      // and the fallback keeps the sharpest frame so the pose can never stall.
+      const MAX_ATTEMPTS = 12;
+      for (let i = 0; i < MAX_ATTEMPTS && bestSharp < POSE_SHARPNESS_FLOOR; i++) {
         await new Promise((resolve) => setTimeout(resolve, 40));
         if (doneRef.current) break;
         const frame = grabFrame();
@@ -200,7 +211,8 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
         }
       }
       console.log(
-        `[FaceLivenessCapture] capturePose(${pose}): sharpest of burst, sharpness=${bestSharp.toFixed(0)}, length=${bestFrame?.length ?? 0}`,
+        `[FaceLivenessCapture] capturePose(${pose}): sharpest of burst, sharpness=${bestSharp.toFixed(0)}` +
+        `${bestSharp < POSE_SHARPNESS_FLOOR ? ' (below floor — kept best)' : ''}, length=${bestFrame?.length ?? 0}`,
       );
     },
     [grabFrame, measureSharpness],
