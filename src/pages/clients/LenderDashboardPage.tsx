@@ -89,6 +89,27 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
     });
   };
 
+  // Break the KYC/verification into visible steps so the card reflects the
+  // real progress already captured (INE, liveness, presence, biometrics,
+  // contract, pagaré) instead of a flat "pendiente". `done` = evidence exists;
+  // `review` = captured but the biometric verdict isn't confirmed yet.
+  const verificationSteps = useMemo(() => {
+    const f = faceRecord;
+    const hasRecord = !!f;
+    const biometricDone = !!f?.isVerified;
+    const biometricReview = hasRecord && !biometricDone && (f?.confidenceScore ?? 0) > 0;
+    return [
+      { label: 'Documento de identidad (INE)', done: !!f?.idFrontImageBlobUrl },
+      { label: 'Prueba de vida (selfie)', done: !!f?.clientSelfieBlobUrl },
+      { label: 'Comprobante de presencia', done: !!f?.presenceVideoBlobUrl },
+      { label: 'Verificación biométrica', done: biometricDone, review: biometricReview },
+      { label: 'Contrato firmado', done: !!f?.contractAccepted },
+      { label: 'Pagaré aceptado', done: !!f?.pagareAccepted },
+    ];
+  }, [faceRecord]);
+  const verificationDone = verificationSteps.filter(s => s.done).length;
+  const verificationInReview = verificationSteps.some(s => (s as any).review);
+
   // Stripe — lets the lender fund loan disbursements (money out to
   // borrowers) and receive repayments (money back in). Same pattern as
   // ClientDashboardPage.tsx's Payments tab.
@@ -289,6 +310,34 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: 26, color: '#059669' }} />
                 <strong>Identidad verificada</strong>
+              </div>
+            ) : verificationDone > 0 ? (
+              <div style={{ padding: '4px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <strong style={{ color: '#374151' }}>
+                    {verificationInReview ? 'Verificación en revisión' : 'Verificación en proceso'}
+                  </strong>
+                  <IonNote>{verificationDone} de {verificationSteps.length}</IonNote>
+                </div>
+                <IonProgressBar value={verificationDone / verificationSteps.length} style={{ marginBottom: 8 }} />
+                <IonList lines="none">
+                  {verificationSteps.map((s) => (
+                    <IonItem key={s.label} style={{ '--min-height': '30px', '--padding-start': '0' } as any}>
+                      <IonIcon
+                        slot="start"
+                        icon={s.done ? checkmarkCircleOutline : (s as any).review ? timeOutline : ellipseOutline}
+                        style={{ fontSize: 20, marginRight: 8, color: s.done ? '#059669' : (s as any).review ? '#d97706' : '#cbd5e1' }}
+                      />
+                      <IonLabel style={{ fontSize: 13, color: s.done ? '#374151' : '#6b7280' }}>
+                        {s.label}{(s as any).review ? ' — en revisión' : ''}
+                      </IonLabel>
+                    </IonItem>
+                  ))}
+                </IonList>
+                <IonButton shape="round" expand="block" disabled={wizardStarting} onClick={handleStartVerification} style={{ marginTop: 6 }}>
+                  <IonIcon icon={addCircleOutline} slot="start" />
+                  {wizardStarting ? 'Cargando...' : 'Continuar verificación'}
+                </IonButton>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '8px 0' }}>

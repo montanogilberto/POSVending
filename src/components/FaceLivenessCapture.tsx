@@ -43,6 +43,19 @@ interface FaceLivenessCaptureProps {
 }
 
 const ANALYSIS_INTERVAL_MS = 150;
+// Passive-blink gate disabled by request — the session completes right after the
+// 4 randomized head-turn challenges. Anti-spoofing still relies on those moves,
+// the descriptor-consistency check and the ID-photo match. Flip back to true to
+// re-enable the blink requirement (all the blink code below stays wired up).
+const REQUIRE_BLINK = false;
+// A blink's closed phase is ~100ms, so during the passive-blink gate we sample
+// faster to actually catch it (the head is already still, so the extra CPU is fine).
+const BLINK_ANALYSIS_INTERVAL_MS = 70;
+// Hard ceiling on the passive-blink wait. If no blink is sampled in this window
+// the session proceeds anyway — blink is a secondary anti-spoof layer behind the
+// ID-photo match, the 4-direction challenge and the descriptor-consistency check,
+// none of which a hang should be allowed to block. Prevents the "workflow stopped".
+const BLINK_TIMEOUT_MS = 7000;
 // Consecutive undetected frames tolerated before the UI falls back to
 // "searching" and re-presents the instruction. At 150ms/frame this rides out
 // roughly half a second of dropout — matching the 2-4 frame gaps observed on
@@ -105,6 +118,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   const missedFramesRef = useRef(0);
   const challengeIndexRef = useRef(0);
   const blinkStateRef = useRef<BlinkTrackerState>(newBlinkTrackerState());
+  // Timestamp (performance.now) when the passive-blink gate began, so it can
+  // fall through after BLINK_TIMEOUT_MS instead of hanging forever if the blink
+  // is never sampled (blink ~100ms can fall between frames). 0 = not waiting.
+  const awaitingBlinkSinceRef = useRef(0);
   const challengeDescriptorsRef = useRef<Float32Array[]>([]);
   // Roughly-frontal descriptor from the very first detected frame, before
   // any directional challenge starts — used as the consistency-check
@@ -254,7 +271,11 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     async (timestamp: number) => {
       if (doneRef.current) return;
 
-      if (timestamp - lastTickRef.current < ANALYSIS_INTERVAL_MS) {
+      // Sample faster once we're on the passive-blink gate so a ~100ms blink lands.
+      const interval = challengeIndexRef.current >= sequence.length
+        ? BLINK_ANALYSIS_INTERVAL_MS
+        : ANALYSIS_INTERVAL_MS;
+      if (timestamp - lastTickRef.current < interval) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -313,10 +334,16 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       if (challengeIndexRef.current >= sequence.length) {
         // All 4 directions satisfied — now waiting on the passive blink
         // check before accepting the session.
-        if (!blinked) {
-          setState('awaiting-blink');
-          rafRef.current = requestAnimationFrame(tick);
-          return;
+        if (REQUIRE_BLINK && !blinked) {
+          if (awaitingBlinkSinceRef.current === 0) awaitingBlinkSinceRef.current = timestamp;
+          // Don't hang forever if the blink is never sampled — fall through after
+          // the timeout so the session still completes (see BLINK_TIMEOUT_MS).
+          if (timestamp - awaitingBlinkSinceRef.current < BLINK_TIMEOUT_MS) {
+            setState('awaiting-blink');
+            rafRef.current = requestAnimationFrame(tick);
+            return;
+          }
+          console.log('[FaceLivenessCapture] tick: blink not sampled within timeout — proceeding on the other liveness checks');
         }
 
         const { consistent } = checkDescriptorConsistency(
@@ -438,6 +465,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     challengeIndexRef.current = 0;
     challengeStateRef.current = newChallengeState();
     blinkStateRef.current = newBlinkTrackerState();
+    awaitingBlinkSinceRef.current = 0;
     challengeDescriptorsRef.current = [];
     neutralDescriptorRef.current = null;
     lastDetectionRef.current = null;

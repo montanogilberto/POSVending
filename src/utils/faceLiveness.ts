@@ -327,15 +327,24 @@ function eyeAspectRatio(eye: faceapi.Point[]): number {
   return (vertical1 + vertical2) / (2 * horizontal);
 }
 
-const EAR_CLOSED_THRESHOLD = 0.21;
+// 0.21 is the canonical dlib EAR-closed value, but face-api's 68-point
+// landmark net at inputSize 224 reads noisier/higher — a real full blink on a
+// phone often only dips to ~0.24-0.27 and never crosses 0.21, so that absolute
+// cutoff made blinks structurally undetectable (the session hung on the passive
+// blink gate). We now use a higher absolute floor AND a per-person relative
+// drop learned from that user's own open-eye EAR, which adapts to face/device.
+const EAR_CLOSED_ABS = 0.24;   // absolute "eyes closed" cutoff
+const EAR_CLOSED_REL = 0.78;   // …or a 22% drop below this person's open baseline
+const EAR_NOISE_FLOOR = 0.10;  // below this the landmarks are garbage — ignore
 
 export interface BlinkTrackerState {
   earWasClosed: boolean;
   blinkDetected: boolean;
+  openBaseline: number; // running estimate of this person's eyes-open EAR
 }
 
 export function newBlinkTrackerState(): BlinkTrackerState {
-  return { earWasClosed: false, blinkDetected: false };
+  return { earWasClosed: false, blinkDetected: false, openBaseline: 0 };
 }
 
 // Called every frame regardless of which directional challenge is active.
@@ -344,10 +353,15 @@ export function newBlinkTrackerState(): BlinkTrackerState {
 // moves — kills the simplest, most common spoofing attempt.
 export function trackBlink(detection: FaceDetectionResult, state: BlinkTrackerState): boolean {
   const ear = (eyeAspectRatio(detection.landmarks.getLeftEye()) + eyeAspectRatio(detection.landmarks.getRightEye())) / 2;
-  if (ear < EAR_CLOSED_THRESHOLD) {
+  if (ear < EAR_NOISE_FLOOR) return state.blinkDetected; // implausible reading — skip
+  // Learn the open-eye EAR from the highest values seen (eyes are open the vast
+  // majority of frames), so the closed cutoff scales to wide- vs narrow-eyed users.
+  if (ear > state.openBaseline) state.openBaseline = ear;
+  const closedCutoff = Math.max(EAR_CLOSED_ABS, state.openBaseline * EAR_CLOSED_REL);
+  if (ear < closedCutoff) {
     state.earWasClosed = true;
   } else if (state.earWasClosed && !state.blinkDetected) {
-    console.log('[FaceLiveness] trackBlink: blink detected, EAR =', ear.toFixed(3));
+    console.log('[FaceLiveness] trackBlink: blink detected, EAR =', ear.toFixed(3), '| cutoff =', closedCutoff.toFixed(3), '| baseline =', state.openBaseline.toFixed(3));
     state.blinkDetected = true;
   }
   return state.blinkDetected;

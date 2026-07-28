@@ -112,14 +112,21 @@ const STABILITY_FRAMES_REQUIRED = 14;
 // extraction — see computeCaptureSharpness for why the previous
 // Laplacian-variance metric ranked good and bad captures backwards.
 //
-// Calibrated against two captures of the same INE: the wizard's own blurry
-// one scored 370 sharpness / 0.42 coverage and was misread by the extraction
-// agent (wrong surname, street and date of birth, reported at full
-// confidence); a sharp phone photo of the same card scored ~1080 / 0.79 and
-// extracted every field correctly. Thresholds sit between the two with margin,
-// but this is a two-sample calibration — watch the logged values on real
-// devices and tighten once there's a real distribution.
-const MIN_CAPTURE_SHARPNESS = 600;
+// Originally 600, a two-sample guess between a blurry INE (370, misread by the
+// extraction agent) and a sharp reference phone photo (~1080). Real-device logs
+// then showed that guess was UNREACHABLE on an actual handheld capture: across
+// ~120 capture attempts on one device the sharpest frames the camera ever
+// produced topped out at 571-573, with the genuinely-sharp cluster sitting at
+// ~480-573 and blurry/soft frames at ~140-350. With the gate at 600 it never
+// fired, so every capture ground through the rejection budget and then
+// force-accepted whatever frame happened to be on screen (often 220-430) —
+// blurrier than frames it had just rejected. The agent then flagged that
+// force-accepted image as "too blurry". 480 sits above the soft cluster with
+// margin and below the achievable sharp cluster, so a real sharp frame now
+// passes on its own within a second or two instead of force-accepting a worse
+// one. Still above the known-bad 370. Tighten toward ~520 only if better-
+// focusing devices show a higher achievable ceiling in the logs.
+const MIN_CAPTURE_SHARPNESS = 480;
 // The blurry capture filled only 42% of its 1100px crop, so the card resolved
 // at ~208 DPI against the ~300 DPI MAX_OUTPUT_WIDTH is sized for. Under-filling
 // costs resolution before blur is even a factor.
@@ -187,6 +194,13 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   // Breaks the captureFrame <-> tick useCallback cycle (see captureFrame).
   const tickRef = useRef<((timestamp: number) => void) | null>(null);
   const rejectionCountRef = useRef(0);
+  // Sharpest frame seen during the current capture attempt, retained so that if
+  // the quality gate is ever force-overridden we upload the best frame we
+  // actually saw — not whichever (often blurrier) frame happened to be on
+  // screen at the moment the rejection budget ran out. Reset per attempt.
+  const bestSharpnessRef = useRef(0);
+  const bestBase64Ref = useRef<string | null>(null);
+  const bestHiResRef = useRef<string | undefined>(undefined);
 
   const [state, setState] = useState<CaptureState>('initializing');
   const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
@@ -290,6 +304,29 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     if (!ctx) return;
     ctx.drawImage(drawSource, cropX, cropY, cropW, cropH, 0, 0, outputW, outputH);
 
+    // Builds the two JPEGs emitted for a capture from the CURRENT crop: the
+    // 1100px OCR/display image (gated) and a 2400px crop of the same region for
+    // the face agent (needs more pixels than text OCR; shares the gated crop's
+    // coordinates, so no separate gate). Shared by the accept path and the
+    // best-frame snapshot below so they can't drift apart.
+    const HI_RES_WIDTH = 2400;
+    const buildOutputs = (): { base64: string; highResBase64?: string } => {
+      const base64 = canvas.toDataURL('image/jpeg', 0.92);
+      let highResBase64: string | undefined;
+      const hiScale = Math.min(1, HI_RES_WIDTH / cropW);
+      const hiW = Math.round(cropW * hiScale);
+      const hiH = Math.round(cropH * hiScale);
+      const hiCanvas = document.createElement('canvas');
+      hiCanvas.width = hiW;
+      hiCanvas.height = hiH;
+      const hiCtx = hiCanvas.getContext('2d');
+      if (hiCtx) {
+        hiCtx.drawImage(drawSource, cropX, cropY, cropW, cropH, 0, 0, hiW, hiH);
+        highResBase64 = hiCanvas.toDataURL('image/jpeg', 0.95);
+      }
+      return { base64, highResBase64 };
+    };
+
     // Real quality gate, measured on the final crop rather than the 240px
     // live-analysis canvas that smooths blur away. Both checks are calibrated
     // against two captures of the same INE: the wizard's own blurry one, which
@@ -314,6 +351,16 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       effectiveCardDpi: Math.round((outputW * Math.sqrt(geometry.coverage)) / 85.6 * 25.4),
     }));
 
+    // Retain the sharpest not-too-small frame of this attempt, so if the gate
+    // is force-overridden below we can upload it rather than the current frame,
+    // which is often blurrier than frames rejected seconds earlier.
+    if (sharpness > bestSharpnessRef.current && (!geometry.detected || geometry.coverage >= MIN_CARD_COVERAGE)) {
+      bestSharpnessRef.current = sharpness;
+      const best = buildOutputs();
+      bestBase64Ref.current = best.base64;
+      bestHiResRef.current = best.highResBase64;
+    }
+
     // Reject rather than accept a capture the agent would silently misread.
     // Only sharpness and coverage gate — the tilt/keystone numbers are not
     // calibrated yet and ranked the two known captures backwards, so they
@@ -335,6 +382,23 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
         JSON.stringify({ sharpness: Math.round(sharpness), coverage: Number(geometry.coverage.toFixed(3)) }),
         'extraction on this image may be unreliable; expect manual correction.'
       );
+      // Upload the sharpest frame we saw this attempt, not the current one —
+      // it's frequently blurrier than frames rejected earlier in the streak.
+      if (bestBase64Ref.current && bestSharpnessRef.current > sharpness) {
+        console.warn(
+          '[GuidedDocumentCapture] captureFrame: emitting sharpest retained frame instead of current —',
+          JSON.stringify({ retained: Math.round(bestSharpnessRef.current), current: Math.round(sharpness) })
+        );
+        const retainedBase64 = bestBase64Ref.current;
+        const retainedHiRes = bestHiResRef.current;
+        bestSharpnessRef.current = 0;
+        bestBase64Ref.current = null;
+        bestHiResRef.current = undefined;
+        stopStream();
+        setState('captured');
+        setTimeout(() => onCapture(retainedBase64, retainedHiRes), 350);
+        return;
+      }
     } else if (tooBlurry || tooSmall) {
       rejectionCountRef.current += 1;
       const reason = tooBlurry
@@ -366,26 +430,12 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       console.log('[GuidedDocumentCapture] captureFrame: accepted but not face-on (advisory)');
     }
 
-    const base64 = canvas.toDataURL('image/jpeg', 0.92);
-
-    // Additionally emit a full-detail crop of the SAME card region. The 1100px
-    // `base64` above stays the OCR/display image and its quality gate is
-    // calibrated for that size — this larger crop is only sent to the face
-    // agent, whose INE-portrait comparison needs more pixels than text OCR.
-    // No quality gate runs on it (it shares the gated crop's coordinates).
-    const HI_RES_WIDTH = 2400;
-    let highResBase64: string | undefined;
-    const hiScale = Math.min(1, HI_RES_WIDTH / cropW);
-    const hiW = Math.round(cropW * hiScale);
-    const hiH = Math.round(cropH * hiScale);
-    const hiCanvas = document.createElement('canvas');
-    hiCanvas.width = hiW;
-    hiCanvas.height = hiH;
-    const hiCtx = hiCanvas.getContext('2d');
-    if (hiCtx) {
-      hiCtx.drawImage(drawSource, cropX, cropY, cropW, cropH, 0, 0, hiW, hiH);
-      highResBase64 = hiCanvas.toDataURL('image/jpeg', 0.95);
-    }
+    // Passed the gate (or forced with no sharper frame retained): emit the
+    // current frame. See buildOutputs above for the OCR vs. hi-res split.
+    const { base64, highResBase64 } = buildOutputs();
+    bestSharpnessRef.current = 0;
+    bestBase64Ref.current = null;
+    bestHiResRef.current = undefined;
 
     stopStream();
     setState('captured');

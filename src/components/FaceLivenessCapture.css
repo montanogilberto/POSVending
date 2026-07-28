@@ -26,11 +26,12 @@
      frame, which is the opposite of what the down challenge needs. */
   top: 50%;
   transform: translate(-50%, -50%);
-  /* Widened from 78%. The ring is the target the client fills with their
-     face, and a small one leaves the face occupying a fraction of the frame —
-     fewer pixels on the face for the descriptor, and more room to drift out
-     of view while turning. */
-  width: 94%;
+  /* Sized so the face sits back from the camera with margin around it, not
+     filling the frame. A near-full-width ring (was 94%) pulled people right up
+     to the lens — the face looked "too close", cropped tight, and drifted out
+     of view while turning. Smaller ring = more working distance + headroom, so
+     the whole head stays in frame through the head-turn challenges. */
+  width: 70%;
   aspect-ratio: 1;
   pointer-events: none;
 }
