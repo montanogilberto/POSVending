@@ -127,10 +127,13 @@ const STABILITY_FRAMES_REQUIRED = 14;
 // one. Still above the known-bad 370. Tighten toward ~520 only if better-
 // focusing devices show a higher achievable ceiling in the logs.
 const MIN_CAPTURE_SHARPNESS = 480;
-// The blurry capture filled only 42% of its 1100px crop, so the card resolved
-// at ~208 DPI against the ~300 DPI MAX_OUTPUT_WIDTH is sized for. Under-filling
-// costs resolution before blur is even a factor.
-const MIN_CARD_COVERAGE = 0.55;
+// Lowered 0.55 → 0.45. Device logs showed sharp, readable frames (sharpness
+// 700-1200) getting rejected purely for coverage 0.32-0.5, which stalled the
+// capture. Since the goal is OCR-extracting the INE fields — which succeeds well
+// below full-frame coverage — 0.45 accepts a card that's clearly in-frame and
+// legible without demanding it fill the guide edge-to-edge. (Very low coverage
+// does degrade OCR, so this isn't dropped further.)
+const MIN_CARD_COVERAGE = 0.45;
 // How many rejected attempts before the manual shutter is allowed to override
 // the quality gate — see the escape hatch in captureFrame.
 const FORCE_AFTER_REJECTIONS = 3;

@@ -156,7 +156,11 @@ export function pickChallengeSequence(): LivenessChallenge[] {
   return sequence;
 }
 
-const YAW_OFFSET_RATIO = 0.18; // left/right — confirmed against real device logs (0.34 / -0.187 observed)
+// Kept permissive on purpose. This flow's goal is extracting the INE data, not
+// a forensic face-match, so liveness only needs to prove a live person is
+// present — not to satisfy a strict biometric-distinctness bar. 0.18 completes
+// a left/right turn with an easy, comfortable movement.
+const YAW_OFFSET_RATIO = 0.18; // left/right
 const PITCH_UP_OFFSET_RATIO = 0.15; // up — confirmed reliable against real device logs (-0.208 observed)
 // "down" needs a lower bar than "up": confirmed via device logs that tilting
 // the head down destabilizes face-api.js's landmark detection much more than
@@ -185,6 +189,8 @@ const PITCH_DOWN_OFFSET_RATIO = 0.10;
 // The deltas are set from the one device log available (down moved ~0.10 from
 // a near-zero baseline), so treat them as a starting point: the logged
 // baseline/delta values are what to calibrate against once there are more runs.
+// Kept permissive (goal is data extraction, not a strict biometric challenge):
+// a small, comfortable head tilt is enough to prove liveness.
 const PITCH_DOWN_DELTA = 0.09;
 const PITCH_UP_DELTA = 0.13;
 

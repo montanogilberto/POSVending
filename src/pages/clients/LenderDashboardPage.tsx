@@ -14,11 +14,11 @@ import {
 import { useUser } from '../../components/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
 import { getAllClients, Client } from '../../api/clientsApi';
-import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
+import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../api/stripeApi';
 import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
-import { buildKycPrefill } from '../../utils/kycPrefill';
+import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -109,6 +109,11 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   }, [faceRecord]);
   const verificationDone = verificationSteps.filter(s => s.done).length;
   const verificationInReview = verificationSteps.some(s => (s as any).review);
+
+  // The lender's own client record (real email + phone captured at signup),
+  // used to seed the Stripe onboarding instead of the synthetic placeholder.
+  const lenderClient = clients.find(c => Number(c.clientId) === lenderClientId);
+  const lenderEmail = lenderClient?.email?.trim() || `client${lenderClientId}@posgmo.mx`;
 
   // Stripe — lets the lender fund loan disbursements (money out to
   // borrowers) and receive repayments (money back in). Same pattern as
@@ -375,10 +380,31 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
               <NativeConnectOnboarding
                 clientId={lenderClientId}
                 companyId={Number(companyId)}
-                email={`client${lenderClientId}@posgmo.mx`}
+                email={lenderEmail}
+                // Identity already accepted by Stripe → skip step 1 on reload.
+                startAtPayout={!!stripeAccount?.identitySubmitted && !stripeAccount?.hasExternalAccount}
                 onProgress={(done) => { fetchStripeStatus(); if (done) setShowStripeOnboarding(false); }}
-                // Seeded from the lender's own captured INE (see kycPrefill).
-                prefill={buildKycPrefill(faceRecord ?? {})}
+                // Persist the lender's edited identity so their corrections
+                // survive and re-seed the form next time (not the raw OCR).
+                onIdentitySaved={async (f) => {
+                  const ine = kycFieldsToIne(f);
+                  try {
+                    if (faceRecord?.clientFaceRecognitionId) {
+                      await upsertClientFaceRecognition(
+                        Number(companyId), lenderClientId, faceRecord.documentType,
+                        { nombre: ine.nombre, domicilio: ine.domicilio, fechaNacimiento: ine.fechaNacimiento, rfc: ine.rfc },
+                        faceRecord.clientFaceRecognitionId,
+                      );
+                      setFaceRecord((prev) => (prev ? { ...prev, ...ine } : prev));
+                    }
+                  } catch (e) { console.warn('[LenderDashboard] could not persist KYC identity edits:', e); }
+                }}
+                // Seeded from the lender's captured INE + their real account
+                // email/phone (see kycPrefill).
+                prefill={buildKycPrefill(faceRecord ?? {}, {
+                  email: lenderClient?.email,
+                  cellphone: lenderClient?.cellphone,
+                })}
               />
             ) : !stripeAccount ? (
               <div style={{ textAlign: 'center', padding: '8px 0' }}>

@@ -62,17 +62,11 @@ const BLINK_TIMEOUT_MS = 7000;
 // device during the down challenge — without masking a real loss of the face.
 const FACE_LOST_GRACE_FRAMES = 4;
 
-// The burst stops early as soon as one frame clears this floor; otherwise it
-// samples the whole window and keeps the sharpest. 110 was far too low — device
-// logs showed poses exiting on the FIRST frame at 120-165 (front 126, up 165),
-// which the validation agent still rejected as "significantly motion-blurred".
-// The early exit was grabbing the frame the instant the turn angle was hit —
-// i.e. mid-motion — instead of the stiller, sharper frame a moment later. Set
-// high enough that most poses no longer exit early and instead run the full
-// window to hunt for that still frame (the best-of fallback still guarantees a
-// frame, so it can never stall). Watch the logged per-pose sharpness on device
-// and lower toward the real still-pose ceiling once there's a distribution.
-const POSE_SHARPNESS_FLOOR = 220;
+// Low on purpose: this flow's goal is extracting the INE data, not a strict
+// biometric face-match, so a lightly-soft pose frame is fine and capturing fast
+// matters more than chasing a pristine still frame. The burst exits as soon as
+// one frame clears this; the best-of fallback still applies if none do.
+const POSE_SHARPNESS_FLOOR = 130;
 
 // Fixed compass position per direction (SVG angle: 0deg = 3 o'clock, clockwise).
 const RING_TARGET_DEG: Record<LivenessChallenge, number> = {

@@ -11,8 +11,9 @@ export interface KycPrefill {
   firstName: string;
   lastName: string;
   dob: string; // yyyy-mm-dd, the format the form's date input expects
+  email: string;
   phone: string;
-  taxId: string;
+  taxId: string; // Mexico: RFC (13 chars). NOT the CURP — see buildKycPrefill.
   line1: string;
   city: string;
   stateProv: string;
@@ -23,6 +24,7 @@ export interface IneIdentityFields {
   nombre?: string;
   domicilio?: string;
   curp?: string;
+  rfc?: string; // Mexico tax ID (Stripe id_number) — persisted separately from CURP
   fechaNacimiento?: string;
 }
 
@@ -116,6 +118,24 @@ export function parseIneAddress(domicilio: string): {
   const empty = { line1: '', city: '', stateProv: '', postalCode: '' };
   if (!text) return empty;
 
+  // Reverse-geocoded addresses (the presence-GPS capture, and what
+  // kycFieldsToIne writes back) arrive comma-separated as
+  // "street, [colonia,] city, State, 83296[, México]". A BARE 5-digit postal
+  // segment is the tell — the INE-OCR branch below assumes the INE's run-together
+  // single line (postal inline, never its own segment) and would otherwise dump
+  // the whole address into line1 and leave the state empty. Parse positionally
+  // off the postal segment: street first, state just before it, city before that.
+  const segs = text.split(',').map((s) => s.trim().replace(/\.$/, '')).filter(Boolean);
+  const pIdx = segs.findIndex((s) => /^\d{5}$/.test(s));
+  if (pIdx >= 2) {
+    return {
+      line1: segs[0],
+      city: pIdx - 2 >= 1 ? segs[pIdx - 2] : '',
+      stateProv: segs[pIdx - 1] ?? '',
+      postalCode: segs[pIdx],
+    };
+  }
+
   const cpMatch = text.match(/\b(\d{5})\b/);
   const postalCode = cpMatch ? cpMatch[1] : '';
 
@@ -162,15 +182,47 @@ export function parseIneAddress(domicilio: string): {
   return { line1: line1.replace(/[,\s]+$/, ''), city, stateProv, postalCode };
 }
 
-export function buildKycPrefill(fields: IneIdentityFields, cellphone?: string): KycPrefill {
+// Inverse of the prefill: fold the edited KYC form fields back into the
+// flattened ClientFaceRecognitions shape so a client's manual corrections
+// (name split fixed, address cleaned, DOB corrected) survive and re-seed the
+// form next time instead of reverting to the raw INE OCR. Address is stored as
+// one string the way the INE extraction produces it; parseIneAddress reads it
+// back. taxId/RFC and phone have no column here — persisted to Stripe only.
+export function kycFieldsToIne(p: {
+  firstName: string; lastName: string; dob: string; taxId: string;
+  line1: string; city: string; stateProv: string; postalCode: string;
+}): IneIdentityFields {
+  const nombre = `${p.lastName} ${p.firstName}`.replace(/\s+/g, ' ').trim();
+  // Store as "street, city, state, postal" so parseIneAddress's geocoded branch
+  // re-splits it back into the same fields on the next visit (round-trips
+  // cleanly instead of collapsing into line1 with an empty state).
+  const domicilio = [p.line1, p.city, p.stateProv, p.postalCode]
+    .map((s) => s.trim()).filter(Boolean).join(', ');
+  // dob is yyyy-mm-dd from the form's date input; the INE store uses DD/MM/YYYY.
+  const iso = /^\d{4}-\d{2}-\d{2}$/.exec(p.dob);
+  const fechaNacimiento = iso ? `${p.dob.slice(8, 10)}/${p.dob.slice(5, 7)}/${p.dob.slice(0, 4)}` : '';
+  return { nombre, domicilio, fechaNacimiento, rfc: p.taxId.trim() };
+}
+
+export function buildKycPrefill(
+  fields: IneIdentityFields,
+  contact?: { email?: string; cellphone?: string },
+): KycPrefill {
   const { firstName, lastName } = splitMexicanName(fields.nombre ?? '', fields.curp);
   const address = parseIneAddress(fields.domicilio ?? '');
   const prefill: KycPrefill = {
     firstName,
     lastName,
     dob: ineDateToIso(fields.fechaNacimiento ?? ''),
-    phone: (cellphone ?? '').trim(),
-    taxId: (fields.curp ?? '').trim(),
+    // Real contact captured at account creation — not the synthetic
+    // client<id>@posgmo.mx placeholder.
+    email: (contact?.email ?? '').trim(),
+    phone: (contact?.cellphone ?? '').trim(),
+    // Stripe's individual.id_number for Mexico is the RFC (13 chars) — NOT the
+    // CURP (18 chars), which Stripe rejects as "not a valid ID number". Seed
+    // only from a persisted rfc (never curp): once the client types it once, it
+    // was saved back to the record and re-fills here on the next visit.
+    taxId: (fields.rfc ?? '').trim(),
     line1: address.line1,
     city: address.city,
     stateProv: address.stateProv,

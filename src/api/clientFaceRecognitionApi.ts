@@ -18,6 +18,7 @@ export interface ClientFaceRecognition {
   domicilio?: string;
   curp?: string;
   claveElector?: string;
+  rfc?: string; // Mexico tax ID (Stripe individual.id_number) — NOT the CURP
   fechaNacimiento?: string;
 
   // Legal Contract Data
@@ -78,6 +79,7 @@ export interface ContractSubmissionRequest {
   domicilio?: string;
   curp?: string;
   claveElector?: string;
+  rfc?: string; // Mexico tax ID (Stripe individual.id_number) — NOT the CURP
   fechaNacimiento?: string;
 
   // Contract

@@ -64,12 +64,12 @@ import QRCode from 'qrcode';
 import { useUser } from '../../components/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
-import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
+import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
 import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
-import { buildKycPrefill } from '../../utils/kycPrefill';
+import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -1042,12 +1042,33 @@ const ClientDashboardPage: React.FC = () => {
               <NativeConnectOnboarding
                 clientId={clientId}
                 companyId={companyId}
-                email={`client${clientId}@posgmo.mx`}
+                email={clientRecord?.email?.trim() || `client${clientId}@posgmo.mx`}
+                // Identity already accepted by Stripe → skip step 1 on reload.
+                startAtPayout={!!stripeAccount?.identitySubmitted && !stripeAccount?.hasExternalAccount}
                 onProgress={(done) => { fetchStripe(); if (done) setShowStripeOnboarding(false); }}
+                // Persist the client's edited identity so their corrections
+                // survive and re-seed the form next time (not the raw OCR).
+                onIdentitySaved={async (f) => {
+                  const ine = kycFieldsToIne(f);
+                  try {
+                    if (faceRecord?.clientFaceRecognitionId) {
+                      await upsertClientFaceRecognition(
+                        Number(companyId), Number(clientId), faceRecord.documentType,
+                        { nombre: ine.nombre, domicilio: ine.domicilio, fechaNacimiento: ine.fechaNacimiento, rfc: ine.rfc },
+                        faceRecord.clientFaceRecognitionId,
+                      );
+                      setFaceRecord((prev) => (prev ? { ...prev, ...ine } : prev));
+                    }
+                  } catch (e) { console.warn('[ClientDashboard] could not persist KYC identity edits:', e); }
+                }}
                 // The Expediente already read name, DOB, CURP and address off
                 // this client's INE and they are sitting in faceRecord — seed
-                // the form instead of making them type it all again here.
-                prefill={buildKycPrefill(faceRecord ?? {}, clientRecord?.cellphone)}
+                // the form (plus their real account email/phone) instead of
+                // making them type it all again here.
+                prefill={buildKycPrefill(faceRecord ?? {}, {
+                  email: clientRecord?.email,
+                  cellphone: clientRecord?.cellphone,
+                })}
               />
             )}
             {!stripeLoading && !showStripeOnboarding && !stripeAccount && (

@@ -7,6 +7,9 @@ export interface StripeConnectedAccount {
   chargesEnabled?: boolean;
   payoutsEnabled?: boolean;
   detailsSubmitted?: boolean;
+  // KYC identity step already submitted to the connected account — lets the UI
+  // skip re-asking for name/DOB/address on reload and jump to the payout step.
+  identitySubmitted?: boolean;
   hasExternalAccount?: boolean;
   externalAccountLast4?: string | null;
   externalAccountType?: string | null;

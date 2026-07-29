@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   IonButton, IonSpinner, IonInput, IonItem, IonLabel, IonList, IonSelect,
   IonSelectOption, IonCheckbox, IonNote, IonIcon, IonSegment, IonSegmentButton,
@@ -30,12 +30,25 @@ interface Props {
   // Called after each state-changing step; `done` is true once the payout
   // destination is attached.
   onProgress: (done: boolean) => void;
+  // Fired once the identity step is accepted by Stripe, with the exact (edited)
+  // field values the client submitted — so the caller can persist the manual
+  // corrections back to the client's record instead of losing them to the next
+  // INE-OCR re-prefill. Optional: callers that don't persist just omit it.
+  onIdentitySaved?: (fields: {
+    firstName: string; lastName: string; dob: string;
+    email: string; phone: string; taxId: string;
+    line1: string; city: string; stateProv: string; postalCode: string;
+  }) => void;
   // Starting values derived from the client's already-captured INE (see
   // utils/kycPrefill.ts). Stripe needs the same name/DOB/CURP/address the
   // Expediente Digital already read off the card, so making the client retype
   // it is friction plus a second opportunity for a typo that fails
   // verification. Fields stay fully editable — this only seeds them.
   prefill?: Partial<KycPrefill>;
+  // When the connected account already has its identity submitted (queried from
+  // Stripe via the status endpoint), open straight on the payout step instead of
+  // re-asking the client for name/DOB/address they already completed.
+  startAtPayout?: boolean;
 }
 
 type Step = 'identity' | 'payout' | 'done';
@@ -47,11 +60,15 @@ type PayoutMethod = 'bank' | 'debit_card';
 // or a debit card — the card path REUSES the same @stripe/react-stripe-js
 // CardElement pattern as SavedCardSetup. Everything is tokenized client-side and
 // submitted via the backend, so the user never leaves the app.
-const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgress, prefill }) => {
+const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgress, onIdentitySaved, prefill, startAtPayout }) => {
   const stripe = useStripe();
   const elements = useElements();
 
-  const [step, setStep] = useState<Step>('identity');
+  // Prefer the real email captured at account creation (carried in the prefill)
+  // over the synthetic client<id>@posgmo.mx placeholder passed as a prop.
+  const effectiveEmail = (prefill?.email ?? '').trim() || email;
+
+  const [step, setStep] = useState<Step>(startAtPayout ? 'payout' : 'identity');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -80,6 +97,23 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
 
   const clabeValid = /^\d{18}$/.test(clabe.replace(/\s/g, ''));
 
+  // Mexican RFC: 12 chars (empresa) / 13 (persona física) — 3-4 letters, 6-digit
+  // birth/incorporation date, 3-char homoclave. Optional field; used to decide
+  // whether it's safe to forward to Stripe (which rejects malformed ones) and to
+  // show an inline hint. Empty is fine — the field is optional.
+  const rfcTyped = taxId.trim() !== '';
+  const rfcValid = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(taxId.trim().toUpperCase());
+
+  // Pre-fill the payout account holder (Titular) with the identity name just
+  // entered on step 1 — the client rarely has a bank account under a different
+  // name, and retyping it is pure friction. Stays editable for the cases where
+  // it does differ. Only seeds when empty so it never clobbers a manual edit.
+  useEffect(() => {
+    if (step === 'payout' && !holderName.trim()) {
+      setHolderName(`${firstName} ${lastName}`.replace(/\s+/g, ' ').trim());
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const submitIdentity = async () => {
     if (!identityValid) {
       // Which requirement blocked submission — otherwise "completa los campos"
@@ -96,15 +130,20 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
     console.log('[NativeConnect] submitIdentity: START', JSON.stringify({ clientId, companyId }));
     setBusy(true); setError('');
     try {
-      await createOrRefreshStripeAccount(clientId, companyId, email);
+      await createOrRefreshStripeAccount(clientId, companyId, effectiveEmail);
       const [year, month, day] = dob.split('-').map(Number);
       const payload: ConnectKycPayload = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         dobDay: day, dobMonth: month, dobYear: year,
-        email,
+        email: effectiveEmail,
         phone: phone.trim() || undefined,
-        taxId: taxId.trim() || undefined,
+        // RFC is optional AND format-validated by Stripe: sending a partial or
+        // malformed one 400s with the cryptic "That ID number does not appear
+        // to be valid". Only forward it when it matches the Mexican RFC shape
+        // (12 chars empresa / 13 persona física); otherwise omit it so a rough
+        // entry never blocks onboarding (Stripe lists it as a later requirement).
+        taxId: rfcValid ? taxId.trim().toUpperCase() : undefined,
         address: {
           line1: line1.trim(), city: city.trim(), state: stateProv.trim(),
           postalCode: postalCode.trim(), country: 'MX',
@@ -113,6 +152,12 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
       };
       await submitConnectedAccountKyc(clientId, companyId, payload);
       console.log('[NativeConnect] submitIdentity: SUCCESS — advancing to payout step');
+      // Hand the edited values to the caller so the corrections persist.
+      onIdentitySaved?.({
+        firstName: firstName.trim(), lastName: lastName.trim(), dob,
+        email: effectiveEmail, phone: phone.trim(), taxId: taxId.trim(),
+        line1: line1.trim(), city: city.trim(), stateProv: stateProv.trim(), postalCode: postalCode.trim(),
+      });
       onProgress(false);
       setStep('payout');
     } catch (err) {
@@ -216,8 +261,11 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
               <IonInput type="tel" value={phone} onIonInput={(e) => setPhone(e.detail.value ?? '')} />
             </IonItem>
             <IonItem>
-              <IonLabel position="stacked">RFC / CURP</IonLabel>
-              <IonInput value={taxId} onIonInput={(e) => setTaxId(e.detail.value ?? '')} autocapitalize="characters" />
+              <IonLabel position="stacked">RFC (opcional)</IonLabel>
+              <IonInput value={taxId} onIonInput={(e) => setTaxId(e.detail.value ?? '')} autocapitalize="characters" maxlength={13} placeholder="13 caracteres — no la CURP" />
+              {rfcTyped && !rfcValid && (
+                <IonNote color="warning">RFC incompleto — se omitirá (13 caracteres, no la CURP).</IonNote>
+              )}
             </IonItem>
             <IonItem>
               <IonLabel position="stacked">Domicilio (calle y número) *</IonLabel>

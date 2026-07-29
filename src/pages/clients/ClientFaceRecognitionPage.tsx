@@ -31,9 +31,9 @@ import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary'
 import ZoomableImage from '../../components/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
 import SignaturePad from '../../components/SignaturePad';
-import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
 import SavedCardSetup from '../../components/SavedCardSetup';
-import { buildKycPrefill } from '../../utils/kycPrefill';
+import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../components/UserContext';
 import { saveProfileImage } from '../../api/usersApi';
@@ -51,7 +51,6 @@ import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidenc
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
-import { createOrRefreshStripeAccount } from '../../api/stripeApi';
 
 import './ClientFaceRecognitionPage.css';
 
@@ -248,8 +247,6 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState('');
-  const [stripeAccountReady, setStripeAccountReady] = useState(false);
-  const [stripeAccountError, setStripeAccountError] = useState('');
   const ocrRanForRef = useRef('');
   const [presenceResult, setPresenceResult] = useState<PresenceCaptureResult | null>(null);
   // Held in state (not just written straight to the upsert) because the face
@@ -264,12 +261,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
 
   // The payment step differs by role. Lenders (and 'both') RECEIVE money, so
-  // theirs is the payout account (identity + CLABE, NativeConnectOnboarding).
-  // Borrowers are CHARGED for repayments, so theirs is a card on file
-  // (SavedCardSetup); their payout account is deferred to disbursement, when
-  // they actually receive the loan principal. This is why the wizard needs
-  // both — gating the whole step off for borrowers (as it briefly did) left
-  // them with no way to register the card their monthly repayments run on.
+  // theirs is a payout account — a Custom connected account onboarded natively
+  // (NativeConnectOnboarding), which lets them receive repayments and withdraw
+  // to their CLABE. Borrowers are CHARGED for repayments, so theirs is a card
+  // on file (SavedCardSetup) on the platform account. Both run on the single
+  // POS GMO platform account; the one-time Connect platform-profile must be
+  // configured in the Stripe Dashboard for the lender path to create accounts.
   const isPayoutClient =
     selectedClient?.clientType === 'lender' || selectedClient?.clientType === 'both';
   const paymentStepLabel = isPayoutClient ? 'Cuenta de pago' : 'Tarjeta';
@@ -333,7 +330,19 @@ const ClientFaceRecognitionPage: React.FC = () => {
       .then(({ fields, lowConfidenceFields }) => {
         if (cancelled) return;
         console.log('[Expediente] OCR effect: result', JSON.stringify(fields), 'lowConfidence:', lowConfidenceFields);
-        setExtractedIdFields(fields);
+        // Merge, don't overwrite: a later/softer re-capture often reads small
+        // fields (CURP, claveElector) as empty, and a blind overwrite would wipe
+        // a value a sharper earlier capture already read correctly. Only replace
+        // a field when the new pass actually has a value for it; empty results
+        // keep whatever we already have. Fields stay manually editable downstream.
+        setExtractedIdFields((prev) => {
+          const merged = { ...prev };
+          (Object.keys(fields) as (keyof ExtractedIdFields)[]).forEach((k) => {
+            const v = fields[k];
+            if (typeof v === 'string' ? v.trim() : v) merged[k] = v;
+          });
+          return merged;
+        });
       })
       .catch((err) => {
         console.log('[Expediente] OCR effect: FAILED', String(err));
@@ -351,36 +360,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idFrontImageBase64, idBackImageBase64]);
 
-  // Ensures a Stripe connected account exists before mounting the embedded
-  // onboarding form at step 4 — the backend's create-or-refresh endpoint is
-  // safe to call even if one already exists. Without this, StripeAccountOnboarding
-  // called /stripe/account-session directly against a client who never had an
-  // account, which always 404s with "No connected account found. Create one
-  // first." (confirmed via device logs).
-  const ensureStripeAccount = async () => {
-    if (!deepLinkClientId || !companyId) return;
-    setStripeAccountError('');
-    try {
-      await createOrRefreshStripeAccount(deepLinkClientId, companyId, `client${deepLinkClientId}@posgmo.mx`);
-      console.log('[Expediente] ensureStripeAccount: ready');
-      setStripeAccountReady(true);
-    } catch (err) {
-      console.log('[Expediente] ensureStripeAccount: FAILED', String(err));
-      setStripeAccountError((err as Error).message ?? 'No se pudo preparar la cuenta bancaria.');
-    }
-  };
-
-  useEffect(() => {
-    // Only lenders need a Stripe connected account provisioned here. A
-    // borrower's card-on-file setup goes through the Customer/SetupIntent flow
-    // (SavedCardSetup), which creates no connected account — calling
-    // ensureStripeAccount for them would mint an unused payout account and
-    // reintroduce the deferred KYC we removed.
-    if (step === 5 && isPayoutClient && !stripeAccountReady && !stripeAccountError) {
-      ensureStripeAccount();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, isPayoutClient]);
+  // No pre-provision step here anymore: NativeConnectOnboarding creates the
+  // Custom connected account itself on identity submit (create-or-refresh is
+  // idempotent), so gating the form behind a separate create call only hid the
+  // form whenever that call failed (e.g. the Connect platform-profile 400).
 
   const validateStep = (): boolean => {
     if (step === 0) {
@@ -625,23 +608,30 @@ const ClientFaceRecognitionPage: React.FC = () => {
           : undefined,
       });
 
-      const confidence = agentResult ? agentResult.confidence : localConfidence;
-      const isMatch    = agentResult ? agentResult.isValid    : localMatch;
+      // This flow's goal is extracting verified INE data, not a forensic
+      // biometric clone-check, so the ON-DEVICE selfie↔INE face match is the
+      // practical gate. The remote agent's stricter verdict is ADVISORY: its
+      // reasons are recorded and surfaced, but a biometric-only rejection no
+      // longer hard-blocks. Proceed when either the local match OR the agent
+      // passes; only a double-negative (both fail) routes back to re-capture.
+      const agentPassed = agentResult?.isValid ?? false;
+      const canProceed  = localMatch || agentPassed;
+      const confidence  = agentResult ? agentResult.confidence : localConfidence;
       setFaceValidation(agentResult);
-      console.log('[Expediente] handleLivenessComplete: verdict source =', agentResult ? 'agent' : 'local fallback',
-        JSON.stringify({ confidence, isMatch, localConfidence, localMatch }));
+      console.log('[Expediente] handleLivenessComplete: verdict',
+        JSON.stringify({ agentPassed, localMatch, localConfidence, canProceed, confidence }));
 
       setConfidenceScore(confidence);
-      setIsVerified(isMatch);
+      setIsVerified(canProceed);
       setClientSelfieBlobUrl(selfieBlobUrl);
-      setLivenessStatus(isMatch ? 'completed' : 'failed');
+      setLivenessStatus(canProceed ? 'completed' : 'failed');
 
       // Promote the verified 'front' capture to the client's profile avatar.
       // Persist to dbo.users.imageUrl (survives logout) targeting the KYC
       // subject by clientId — this works for both self-serve and agent-assisted
       // flows. Only refresh the in-session avatar when the subject IS the
       // logged-in user (self-serve), so an agent's own avatar is never changed.
-      if (isMatch && poseBlobUrls.front && selectedClient?.clientId) {
+      if (canProceed && poseBlobUrls.front && selectedClient?.clientId) {
         try {
           await saveProfileImage({ clientId: Number(selectedClient.clientId) }, poseBlobUrls.front);
           if (contextClientId && Number(selectedClient.clientId) === contextClientId) {
@@ -659,7 +649,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
           Number(companyId),
           Number(selectedClient?.clientId),
           documentType,
-          { confidenceScore: confidence, isVerified: isMatch },
+          { confidenceScore: confidence, isVerified: canProceed },
           clientFaceRecognitionIdRef.current
         );
         console.log('[Expediente] handleLivenessComplete: persisted successfully');
@@ -667,18 +657,26 @@ const ClientFaceRecognitionPage: React.FC = () => {
         console.log('[Expediente] handleLivenessComplete: WARNING — no clientFaceRecognitionId yet, score not persisted');
       }
 
-      if (isMatch) {
-        setToastMessage('Validación facial completada correctamente.');
+      if (canProceed) {
+        // Advance. If the agent flagged issues but we're proceeding on the local
+        // match, surface its reason(s) as a NON-blocking advisory note (green
+        // toast) rather than a success message — the data is captured, the agent
+        // just wants a human to double-check.
+        const advisory = (agentResult && !agentResult.isValid && agentResult.failureReasons?.length)
+          ? agentResult.failureReasons.join(' ')
+          : '';
+        setError('');
+        setToastMessage(advisory
+          ? `Datos extraídos. Nota (revisión sugerida): ${advisory}`
+          : 'Validación facial completada correctamente.');
         setShowToast(true);
         setStep(2);
         setCaptureSubStep('doc-intro');
       } else {
-        // Catch the failed / REVIEW_MANUALLY verdict here instead of advancing to
-        // the Verificación step as if it passed. Surface the agent's own reason(s)
-        // — they say what to actually change ("INE portrait too blurry", "poses
-        // are all the same frame") — and route the client straight back to the
-        // capture that needs redoing: a blurry/low-res INE means re-shoot the ID
-        // front; anything else means redo the liveness challenge.
+        // Both the local match AND the agent failed — genuinely couldn't confirm
+        // a live person matching the ID. Surface the agent's reason(s) and route
+        // back to the capture that needs redoing (blurry/low-res INE → re-shoot
+        // the ID front; anything else → redo the liveness challenge).
         const reasons = agentResult?.failureReasons ?? [];
         const reasonText = reasons.length
           ? reasons.join(' ')
@@ -791,13 +789,30 @@ const ClientFaceRecognitionPage: React.FC = () => {
         }
       }
 
+      // Cap OCR'd identity fields to their DB column widths before they leave
+      // the client. On a blurry INE the extraction agent can return strings
+      // longer than the valid field length (a 19+ char CURP/clave was observed),
+      // and sp_clientFaceRecognition inserts them straight into curp NVARCHAR(18)
+      // / clave_elector NVARCHAR(20) / fecha_nacimiento NVARCHAR(10), which fails
+      // the whole submit with SQL 8152 "String or binary data would be
+      // truncated". These are unreliable, human-editable fields, so trimming the
+      // overflow here is safe and unblocks submission.
+      const cap = (s: string | undefined, n: number) => (s ?? '').slice(0, n);
+      const idf = {
+        nombre: cap(extractedIdFields.nombre, 255),
+        domicilio: cap(extractedIdFields.domicilio, 500),
+        curp: cap(extractedIdFields.curp, 18),
+        claveElector: cap(extractedIdFields.claveElector, 20),
+        fechaNacimiento: cap(extractedIdFields.fechaNacimiento, 10),
+      };
+
       const pdfParams = {
         clientId: Number(selectedClient?.clientId),
-        nombre: extractedIdFields.nombre,
-        domicilio: extractedIdFields.domicilio,
-        curp: extractedIdFields.curp,
-        claveElector: extractedIdFields.claveElector,
-        fechaNacimiento: extractedIdFields.fechaNacimiento,
+        nombre: idf.nombre,
+        domicilio: idf.domicilio,
+        curp: idf.curp,
+        claveElector: idf.claveElector,
+        fechaNacimiento: idf.fechaNacimiento,
         documentType,
         isVerified,
         confidenceScore,
@@ -815,11 +830,11 @@ const ClientFaceRecognitionPage: React.FC = () => {
         clientSelfieBlobUrl,
         confidenceScore,
         isVerified,
-        nombre: extractedIdFields.nombre,
-        domicilio: extractedIdFields.domicilio,
-        curp: extractedIdFields.curp,
-        claveElector: extractedIdFields.claveElector,
-        fechaNacimiento: extractedIdFields.fechaNacimiento,
+        nombre: idf.nombre,
+        domicilio: idf.domicilio,
+        curp: idf.curp,
+        claveElector: idf.claveElector,
+        fechaNacimiento: idf.fechaNacimiento,
         contractAccepted: true,
         contractPdfBase64: generateContractPdfBase64(pdfParams),
         contractAcceptedAt: now,
@@ -1488,12 +1503,13 @@ const ClientFaceRecognitionPage: React.FC = () => {
     );
 
     // step === 5 — the payment step, reached after a successful contract
-    // submission when the wizard was launched with continueToPayments.
-    // Borrowers register a repayment card; lenders register a payout account.
+    // submission. Borrowers register a repayment card; lenders onboard a native
+    // Custom connected account (payout destination). Both on the single POS GMO
+    // platform account — the lender path needs the one-time Connect
+    // platform-profile configured in the Stripe Dashboard.
     if (deepLinkClientId && companyId) {
       if (!isPayoutClient) {
         // Borrower — card on file for automatic monthly repayment charges.
-        // No connected account / KYC here; that is deferred to disbursement.
         return (
           <IonCard className="client-face-recognition-step-card">
             <IonCardHeader>
@@ -1505,7 +1521,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
                 clientId={deepLinkClientId}
                 companyId={companyId}
                 onSaved={() => {
-                  console.log('[Expediente] step 4: repayment card saved, returning to', returnTo);
+                  console.log('[Expediente] step 5: repayment card saved, returning to', returnTo);
                   setToastMessage('Tarjeta registrada correctamente.');
                   setShowToast(true);
                   history.push(returnTo);
@@ -1515,7 +1531,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
           </IonCard>
         );
       }
-      // Lender (or 'both') — payout account that receives repayments.
+      // Lender (or 'both') — native payout onboarding, rendered DIRECTLY (the
+      // form self-creates the Custom connected account on identity submit and
+      // surfaces its own errors inline, so it is no longer gated behind a
+      // separate pre-provision call that hid it whenever that call failed).
       return (
         <IonCard className="client-face-recognition-step-card">
           <IonCardHeader>
@@ -1523,30 +1542,36 @@ const ClientFaceRecognitionPage: React.FC = () => {
           </IonCardHeader>
           <IonCardContent>
             <p>Registra tu cuenta bancaria o tarjeta de débito para recibir pagos.</p>
-            {stripeAccountError && (
-              <div className="stripe-onboarding-error">
-                <p>{stripeAccountError}</p>
-                <IonButton size="small" fill="outline" onClick={ensureStripeAccount}>Reintentar</IonButton>
-              </div>
-            )}
-            {!stripeAccountError && !stripeAccountReady && (
-              <div className="stripe-onboarding-loading">
-                <IonSpinner name="crescent" />
-                <p>Preparando tu cuenta...</p>
-              </div>
-            )}
-            {stripeAccountReady && (
-              <NativeConnectOnboarding
-                clientId={deepLinkClientId}
-                companyId={companyId}
-                email={`client${deepLinkClientId}@posgmo.mx`}
-                onProgress={(done) => { if (done) history.push(returnTo); }}
-                // Stripe wants exactly the identity we just read off the INE a
-                // few steps ago — seed it rather than making the client type
-                // their CURP and address again.
-                prefill={buildKycPrefill(extractedIdFields, selectedClient?.cellphone)}
-              />
-            )}
+            <NativeConnectOnboarding
+              clientId={deepLinkClientId}
+              companyId={companyId}
+              email={selectedClient?.email?.trim() || `client${deepLinkClientId}@posgmo.mx`}
+              onProgress={(done) => { if (done) history.push(returnTo); }}
+              // Persist the client's edited identity back onto their record so
+              // the corrections (name split, cleaned address, DOB) survive and
+              // re-seed the form next time instead of reverting to the raw OCR.
+              onIdentitySaved={async (f) => {
+                const ine = kycFieldsToIne(f);
+                setExtractedIdFields((prev) => ({ ...prev, ...ine }));
+                try {
+                  if (clientFaceRecognitionIdRef.current) {
+                    await upsertClientFaceRecognition(
+                      Number(companyId), Number(selectedClient?.clientId), documentType,
+                      { nombre: ine.nombre, domicilio: ine.domicilio, fechaNacimiento: ine.fechaNacimiento, rfc: ine.rfc },
+                      clientFaceRecognitionIdRef.current,
+                    );
+                    console.log('[Expediente] persisted edited KYC identity onto record', clientFaceRecognitionIdRef.current);
+                  }
+                } catch (e) { console.warn('[Expediente] could not persist KYC identity edits:', e); }
+              }}
+              // Seed Stripe's identity fields from the INE we just captured
+              // plus the client's real email/phone from their account, rather
+              // than making them retype it.
+              prefill={buildKycPrefill(extractedIdFields, {
+                email: selectedClient?.email,
+                cellphone: selectedClient?.cellphone,
+              })}
+            />
           </IonCardContent>
         </IonCard>
       );
