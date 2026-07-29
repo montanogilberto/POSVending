@@ -1656,7 +1656,9 @@ const ClientDashboardPage: React.FC = () => {
           {activeTab === 'profile'  && renderProfile()}
         </section>
 
-        <div style={{ height: 110 }} />
+        {/* Small breathing gap above the in-flow bottom nav (was 110px to
+            clear the old floating pill nav that overlaid the content). */}
+        <div style={{ height: 16 }} />
 
         {renderLoanModal()}
         {renderPayModal()}

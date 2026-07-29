@@ -20,7 +20,7 @@ import {
   refreshOutline, addOutline, arrowBackOutline, checkmarkCircle, closeCircle,
   walletOutline, personOutline, timeOutline, alertCircleOutline,
   cashOutline, trendingUpOutline, documentTextOutline, notificationsOutline,
-  sendOutline, handLeftOutline, ribbonOutline,
+  sendOutline, handLeftOutline, ribbonOutline, trashOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../components/UserContext';
@@ -97,6 +97,11 @@ async function createLoanOffer(payload: Omit<LoanOffer, 'offerId' | 'created_At'
   const res = await fetch(`${API_BASE_URL}/loanOffers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanOffers: [{ action: 1, ...payload }] }) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+async function deleteLoanOffer(offerId: number, companyId: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/loanOffers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanOffers: [{ action: 3, offerId, companyId }] }) });
+  if (!res.ok) throw new Error(await res.text());
 }
 
 // ── Wallet / Stripe disbursement helpers (single-use, kept inline to match
@@ -218,11 +223,15 @@ const P2PLendingPage: React.FC = () => {
   const [selectedProposal,  setSelectedProposal]  = useState<LoanProposal | null>(null);
   const [showAcceptAlert,   setShowAcceptAlert]   = useState(false);
   const [showRejectAlert,   setShowRejectAlert]   = useState(false);
+  const [offerToDelete,     setOfferToDelete]     = useState<LoanOffer | null>(null);
 
   // ── offer form ─────────────────────────────────────────────────────────
+  // Rates default to real values (not just placeholders) — gray placeholder
+  // text reads as filled-in, so lenders submitted empty rates and the
+  // validation toast was the only feedback.
   const [offerCapital,  setOfferCapital]  = useState('');
-  const [offerMinRate,  setOfferMinRate]  = useState('');
-  const [offerMaxRate,  setOfferMaxRate]  = useState('');
+  const [offerMinRate,  setOfferMinRate]  = useState('12');
+  const [offerMaxRate,  setOfferMaxRate]  = useState('36');
   const [offerMinTerm,  setOfferMinTerm]  = useState('3');
   const [offerMaxTerm,  setOfferMaxTerm]  = useState('24');
   const [offerDesc,     setOfferDesc]     = useState('');
@@ -294,7 +303,9 @@ const P2PLendingPage: React.FC = () => {
       const expires = new Date();
       expires.setDate(expires.getDate() + 30);
 
-      // 1. Persist offer
+      // 1. Persist offer — must succeed before notifying anyone. This used to
+      // be .catch(() => {}) ("backend may not have endpoint yet"), which hid a
+      // month of 500s (dbo.loanOffers table missing) behind a success toast.
       await createLoanOffer({
         companyId, lenderId: clientId,
         availableCapital: capital,
@@ -304,7 +315,7 @@ const P2PLendingPage: React.FC = () => {
         description: offerDesc,
         isActive: true,
         expiresAt: expires.toISOString(),
-      }).catch(() => {}); // silent — backend may not have endpoint yet
+      });
 
       // 2. Send push notification to ALL borrowers
       const borrowers = clients.filter(c => c.clientType === 'borrower' || c.clientType === 'both');
@@ -332,11 +343,26 @@ const P2PLendingPage: React.FC = () => {
 
       setToast(`✓ Oferta publicada y notificación enviada a ${borrowers.length} prestatarios`);
       setShowOfferModal(false);
-      setOfferCapital(''); setOfferMinRate(''); setOfferMaxRate(''); setOfferDesc('');
+      setOfferCapital(''); setOfferMinRate('12'); setOfferMaxRate('36'); setOfferDesc('');
       load();
     } catch (e: any) {
       setToast(e?.message ?? 'Error al publicar oferta');
     }
+    setSaving(false);
+  };
+
+  // ── Delete one of my offers (lender) ────────────────────────────────────
+  const removeOffer = async () => {
+    if (!offerToDelete) return;
+    setSaving(true);
+    try {
+      await deleteLoanOffer(offerToDelete.offerId, companyId);
+      setToast('✓ Oferta eliminada');
+      load();
+    } catch (e: any) {
+      setToast(e?.message ?? 'Error al eliminar la oferta');
+    }
+    setOfferToDelete(null);
     setSaving(false);
   };
 
@@ -843,9 +869,15 @@ const P2PLendingPage: React.FC = () => {
                           <p className="p2p-my-offer-amount">{fmt(offer.availableCapital)}</p>
                           <p className="p2p-my-offer-rate">{offer.minRate}% – {offer.maxRate}% anual · {offer.minTermMonths}–{offer.maxTermMonths} meses</p>
                         </div>
-                        <span className={`p2p-my-offer-status ${offer.isActive ? 'active' : 'closed'}`}>
-                          {offer.isActive ? 'Activa' : 'Cerrada'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span className={`p2p-my-offer-status ${offer.isActive ? 'active' : 'closed'}`}>
+                            {offer.isActive ? 'Activa' : 'Cerrada'}
+                          </span>
+                          <IonButton size="small" fill="clear" color="danger" disabled={saving}
+                            onClick={() => setOfferToDelete(offer)} aria-label="Eliminar oferta">
+                            <IonIcon icon={trashOutline} slot="icon-only" />
+                          </IonButton>
+                        </div>
                       </div>
                       {offer.description && <p className="p2p-offer-desc">"{offer.description}"</p>}
                       <p className="p2p-my-offer-proposals">
@@ -996,6 +1028,20 @@ const P2PLendingPage: React.FC = () => {
         buttons={[
           { text: 'Cancelar', role: 'cancel' },
           { text: 'Rechazar', handler: rejectProposal, cssClass: 'alert-button-danger' },
+        ]}
+      />
+
+      {/* ── Delete offer alert ── */}
+      <IonAlert
+        isOpen={!!offerToDelete}
+        onDidDismiss={() => setOfferToDelete(null)}
+        header="Eliminar oferta"
+        message={offerToDelete
+          ? `¿Eliminar tu oferta de ${fmt(offerToDelete.availableCapital)}? Los prestatarios dejarán de verla.`
+          : ''}
+        buttons={[
+          { text: 'Cancelar', role: 'cancel' },
+          { text: 'Eliminar', handler: removeOffer, cssClass: 'alert-button-danger' },
         ]}
       />
 

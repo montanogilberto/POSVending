@@ -9,7 +9,7 @@ import {
   cashOutline, trendingUpOutline, peopleOutline, walletOutline,
   checkmarkCircleOutline, alertCircleOutline, ellipseOutline, refreshOutline,
   personCircleOutline, timeOutline, cardOutline, barChartOutline, addCircleOutline,
-  documentTextOutline,
+  documentTextOutline, megaphoneOutline,
 } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
@@ -73,6 +73,9 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selfieMap, setSelfieMap] = useState<Record<number, string>>({});
   const [lender, setLender] = useState<Client | null>(null);
+  // Sum of this lender's ACTIVE published offers (loanOffers) — announced
+  // capital, distinct from Capital total (disbursed loans) and the wallet.
+  const [publishedCapital, setPublishedCapital] = useState(0);
 
   // The lender's own identity verification — digital contracts (loanContracts,
   // signed via the same ClientFaceRecognitionPage wizard borrowers use)
@@ -181,6 +184,22 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
         getAllClientFaceRecognitions(companyId),
         listContractsForClient(companyId, lenderClientId),
       ]);
+
+      // Published (announced) capital: my active loanOffers. Failure keeps 0 —
+      // the card just shows $0 rather than blocking the dashboard.
+      fetch('https://smartloansbackend.azurewebsites.net/all_loanOffers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loanOffers: [{ companyId, isActive: true }] }),
+      })
+        .then(r => (r.ok ? r.json() : { loanOffers: [] }))
+        .then(d => {
+          const mine = (d.loanOffers ?? []).filter((o: { lenderId: number }) => o.lenderId === lenderClientId);
+          const sum = mine.reduce((s: number, o: { availableCapital?: number }) => s + (o.availableCapital ?? 0), 0);
+          console.log('[LenderDashboard] published offers:', mine.length, '→ Capital publicado:', sum);
+          setPublishedCapital(sum);
+        })
+        .catch(() => setPublishedCapital(0));
       // loans has no lenderId column at all — the only place that link
       // exists is loanContracts (borrowerClientId/lenderClientId), so we
       // scope to this lender's actual portfolio by joining through the
@@ -240,6 +259,15 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const collectionRate = totalDeployed > 0 ? Math.min(1, totalRepaid / totalDeployed) : 0;
   const avgInterest   = loans.length > 0 ? loans.reduce((s, l) => s + l.interestRate, 0) / loans.length : 0;
 
+  useEffect(() => {
+    // Capital prestado counts DISBURSED loans only; Capital publicado is the
+    // sum of active loanOffers (announced money, nothing moved yet).
+    console.log('[LenderDashboard] KPIs → Capital publicado (offers):', publishedCapital,
+      '| Capital prestado (loans deployed):', totalDeployed,
+      '| Activo:', totalActive, '| Recuperado:', totalRepaid,
+      '| loans:', loans.length);
+  }, [publishedCapital, totalDeployed, totalActive, totalRepaid, loans.length]);
+
   const clientById = useMemo(() => {
     const map: Record<number, Client> = {};
     clients.forEach(c => { map[c.clientId] = c; });
@@ -287,7 +315,8 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
         <IonGrid className="ld-kpi-grid">
           <IonRow>
             {[
-              { icon: cashOutline,       label: 'Capital total',   value: `$${totalDeployed.toLocaleString()}`,        color: '#2563eb' },
+              { icon: megaphoneOutline,  label: 'Capital publicado', value: `$${publishedCapital.toLocaleString()}`,   color: '#0e7490' },
+              { icon: cashOutline,       label: 'Capital prestado',  value: `$${totalDeployed.toLocaleString()}`,      color: '#2563eb' },
               { icon: walletOutline,     label: 'Activo',          value: `$${totalActive.toLocaleString()}`,          color: '#15803d' },
               { icon: trendingUpOutline, label: 'Recuperado',      value: `$${totalRepaid.toLocaleString()}`,          color: '#7c3aed' },
               { icon: barChartOutline,   label: 'Tasa promedio',   value: `${avgInterest.toFixed(1)}%`,                color: '#b45309' },

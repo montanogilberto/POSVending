@@ -231,7 +231,14 @@ http://ionicframework.com/docs/theming/ */
     background: var(--ion-tabbar-background, #fff);
     border-top: 1px solid var(--ion-tabbar-border-color, var(--divider, #e5e5e5));
     box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
-    padding-bottom: env(safe-area-inset-bottom);
+    /* Same contract as the real ion-tab-bar: it sets z-index 10 because
+       ion-tabs' .tabs-inner (the page area) is positioned and would
+       otherwise paint on top of a static bottom bar; safe-area comes from
+       Ionic's --ion-safe-area-bottom, since env() reports 0 on Android
+       WebView even with viewport-fit=cover. */
+    z-index: 10;
+    contain: paint;
+    padding-bottom: max(env(safe-area-inset-bottom), var(--ion-safe-area-bottom, 0px));
   }
   .cd-tab {
     flex: 1 1 0;
