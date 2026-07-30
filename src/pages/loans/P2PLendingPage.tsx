@@ -352,6 +352,15 @@ const P2PLendingPage: React.FC = () => {
     if (!capital || !minRate || !maxRate) {
       setToast('Completa todos los campos requeridos'); return;
     }
+    // Published capital must be backed by wallet funds (either rail) — an
+    // unfunded offer dies at accept time when the SPEI debit hits insufficient
+    // funds, after the borrower already negotiated in good faith.
+    const totalBalance = speiBalance + stripeBalance;
+    if (capital > totalBalance) {
+      console.log('[P2P] publishOffer: BLOCKED — insufficient funds', JSON.stringify({ capital, speiBalance, stripeBalance }));
+      setToast(`Saldo insuficiente: tienes ${fmt(totalBalance)} en tu billetera y quieres publicar ${fmt(capital)}. Deposita primero.`);
+      return;
+    }
     setSaving(true);
     console.log('[P2P] publishOffer: START', JSON.stringify({ clientId, capital, minRate, maxRate }));
     try {
