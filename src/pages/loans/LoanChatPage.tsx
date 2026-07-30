@@ -109,6 +109,17 @@ const LoanChatPage: React.FC = () => {
     setLoading(true);
     try {
       if (isNew) {
+        // Guard: a conversation needs BOTH parties. The menu used to land here
+        // with lenderId=0, minting garbage conversations whose pushes targeted
+        // userId 0 (nobody). Send the user to the conversations list instead.
+        if (!initLenderId || !initBorrowerId || initLenderId === initBorrowerId) {
+          console.log('[ChatUI] init: INVALID parties — redirecting to /loan-chats', JSON.stringify({
+            borrowerId: initBorrowerId, lenderId: initLenderId,
+          }));
+          showToast('Elige una conversación o inicia el chat desde una oferta.', 'danger');
+          history.replace('/loan-chats');
+          return;
+        }
         console.log('[ChatUI] init: starting NEW conversation', JSON.stringify({
           borrowerId: initBorrowerId, lenderId: initLenderId, amount: initAmount,
         }));

@@ -108,6 +108,7 @@ import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
 import RewardsPage from './pages/finance/RewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
+import LoanChatListPage from './pages/loans/LoanChatListPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -498,10 +499,12 @@ const AppShell: React.FC = () => {
               {canAccess(roleCode, 'loanChat') && (
               <IonItem
                 button
-                // Borrowers land in a chat with the SmartLoans virtual agent
-                // (clientId must match LOANCHAT_AGENT_CLIENT_ID in the backend .env)
-                // by default, since there's no conversation-list view yet.
-                routerLink={roleCode === 'borrower' ? '/loan-chat/new?lenderId=2127' : '/loan-chat/new'}
+                // Both roles land on the conversations LIST. New chats start
+                // from an offer (P2P) or, for borrowers, from the AI-assistant
+                // button inside the list — never a bare /loan-chat/new, which
+                // used to mint lenderId=0 conversations whose pushes targeted
+                // nobody.
+                routerLink="/loan-chats"
                 title="Chat de Préstamo"
               >
                 <IonIcon icon={chatbubblesOutline} slot="start" />
@@ -603,6 +606,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
+            <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
           </IonRouterOutlet>

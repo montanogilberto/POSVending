@@ -1,4 +1,4 @@
-// Per-user notification inbox (bell icon) — the persistent, trackable history
+ // Per-user notification inbox (bell icon) — the persistent, trackable history
 // of pushes. Backed by NotificationDeliveries + PushNotifications.
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "https://smartloansbackend.azurewebsites.net";
