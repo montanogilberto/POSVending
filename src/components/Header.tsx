@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBackButton, IonBadge, IonMenuButton } from '@ionic/react';
-import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline } from 'ionicons/icons';
+import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline } from 'ionicons/icons';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
@@ -92,6 +92,16 @@ const Header: React.FC<HeaderProps> = ({
                   </IonBadge>
                 )}
               </span>
+            </IonButton>
+          )}
+          {isSmartLoansRole && (
+            <IonButton
+              onClick={() => { console.log('[Header] chat icon → /loan-chats'); history.push('/loan-chats'); }}
+              title="Chats"
+              className="header-action-button"
+              style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
+            >
+              <IonIcon icon={chatbubblesOutline} style={{ fontSize: '28px' }} />
             </IonButton>
           )}
           <IonButton onClick={handleNotificationsClick} title="Notifications" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>

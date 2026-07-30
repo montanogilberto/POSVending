@@ -16,7 +16,7 @@ import {
 import { useHistory, useParams, useLocation } from 'react-router-dom';
 import { useUser } from '../../components/UserContext';
 import {
-  loanChatApi, LoanMessage, LoanConversation, MsgType,
+  loanChatApi, getChatConfig, LoanMessage, LoanConversation, MsgType,
 } from '../../api/loanChatApi';
 import { disbursePayment } from '../../api/bankingApi';
 import './LoanChatPage.css';
@@ -85,6 +85,11 @@ const LoanChatPage: React.FC = () => {
 
   const myRole = (roleCode === 'lender') ? 'lender' : 'borrower';
   const mySenderId = clientId ?? 0;
+
+  // Agent clientId comes from backend config (LOANCHAT_AGENT_CLIENT_ID) — the
+  // frontend never hardcodes it. 0 while loading / when not configured.
+  const [agentClientId, setAgentClientId] = useState(0);
+  useEffect(() => { getChatConfig().then(c => setAgentClientId(c.agentClientId)); }, []);
 
   const [conv, setConv]         = useState<LoanConversation | null>(null);
   const [messages, setMessages] = useState<LoanMessage[]>([]);
@@ -327,6 +332,11 @@ const LoanChatPage: React.FC = () => {
     );
   };
 
+  // Prefer the server-computed tag; fall back to comparing against the
+  // config-provided agentClientId (covers the brief window before `conv` loads).
+  const isAssistantChat = conv?.isAssistant
+    ?? (agentClientId > 0 && (conv?.lenderId === agentClientId || (isNew && initLenderId === agentClientId)));
+
   const statusColor = conv?.status === 'accepted' ? 'success' : conv?.status === 'rejected' ? 'danger' : 'primary';
   const statusLabel = { open: 'Abierta', accepted: 'Aceptada', rejected: 'Rechazada', closed: 'Cerrada' }[conv?.status ?? 'open'];
 
@@ -341,8 +351,8 @@ const LoanChatPage: React.FC = () => {
           </IonButtons>
           <IonTitle>
             <div className="lc-title">
-              <span>{conv?.title ?? 'Préstamo'}</span>
-              {conv && (
+              <span>{isAssistantChat ? '🤖 Asistente SmartLoans' : (conv?.title ?? 'Préstamo')}</span>
+              {conv && !isAssistantChat && (
                 <IonBadge color={statusColor} className="lc-status-badge">{statusLabel}</IonBadge>
               )}
             </div>
@@ -353,6 +363,12 @@ const LoanChatPage: React.FC = () => {
             </IonButton>
           </IonButtons>
         </IonToolbar>
+        {isAssistantChat && (
+          <div style={{ padding: '6px 14px', fontSize: 12, background: '#eef2ff', color: '#3730a3' }}>
+            Chat informativo con el asistente. Para negociar un préstamo real,
+            ve al marketplace y chatea desde una oferta.
+          </div>
+        )}
         {conv?.status === 'accepted' && (
           <div className="lc-agreed-bar">
             <IonIcon icon={checkmarkCircle} color="success" />
@@ -369,8 +385,8 @@ const LoanChatPage: React.FC = () => {
         {messages.length === 0 && !loading && (
           <div className="lc-empty">
             <IonIcon icon={documentTextOutline} />
-            <p>Sin mensajes aún.</p>
-            {conv?.status === 'open' && myRole === 'borrower' && (
+            <p>{isAssistantChat ? 'Pregúntame sobre préstamos, requisitos o tu cuenta.' : 'Sin mensajes aún.'}</p>
+            {conv?.status === 'open' && myRole === 'borrower' && !isAssistantChat && (
               <IonButton size="small" onClick={() => { setPropType('proposal'); setShowProposalModal(true); }}>
                 Enviar solicitud de préstamo
               </IonButton>
@@ -421,10 +437,12 @@ const LoanChatPage: React.FC = () => {
       {conv?.status === 'open' && (
         <IonFooter className="lc-footer">
           <div className="lc-toolbar">
-            <IonButton fill="clear" size="small"
-              onClick={() => { setPropType(myRole === 'lender' ? 'counter' : 'proposal'); setShowProposalModal(true); }}>
-              <IonIcon icon={cashOutline} slot="icon-only" />
-            </IonButton>
+            {!isAssistantChat && (
+              <IonButton fill="clear" size="small"
+                onClick={() => { setPropType(myRole === 'lender' ? 'counter' : 'proposal'); setShowProposalModal(true); }}>
+                <IonIcon icon={cashOutline} slot="icon-only" />
+              </IonButton>
+            )}
             <input
               className="lc-input"
               placeholder="Escribe un mensaje..."

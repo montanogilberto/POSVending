@@ -15,7 +15,7 @@ import { useUser } from '../../components/UserContext';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
-import { loanChatApi, LoanConversation } from '../../api/loanChatApi';
+import { loanChatApi, getChatConfig, LoanConversation } from '../../api/loanChatApi';
 import { getAllClients, Client } from '../../api/clientsApi';
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -31,6 +31,8 @@ const LoanChatListPage: React.FC = () => {
   const [convs, setConvs] = useState<LoanConversation[]>([]);
   const [clientMap, setClientMap] = useState<Record<number, Client>>({});
   const [loading, setLoading] = useState(false);
+  // Agent identity from backend config — button hidden when not configured.
+  const [agentClientId, setAgentClientId] = useState(0);
 
   const [showAlert, setShowAlert] = useState(false);
   const [showMail, setShowMail] = useState(false);
@@ -54,7 +56,10 @@ const LoanChatListPage: React.FC = () => {
     setLoading(false);
   }, [companyId, clientId]);
 
-  useIonViewWillEnter(() => { load(); }, [load]);
+  useIonViewWillEnter(() => {
+    load();
+    getChatConfig().then(c => setAgentClientId(c.agentEnabled ? c.agentClientId : 0));
+  }, [load]);
 
   const counterpartName = (c: LoanConversation) => {
     const otherId = c.borrowerId === clientId ? c.lenderId : c.borrowerId;
@@ -118,10 +123,11 @@ const LoanChatListPage: React.FC = () => {
           );
         })}
 
-        {/* Asistente IA de SmartLoans (clientId del agente = LOANCHAT_AGENT_CLIENT_ID) */}
-        {roleCode === 'borrower' && (
+        {/* Asistente IA — identidad desde GET /loanChat/config (LOANCHAT_AGENT_CLIENT_ID);
+            oculto si el backend no lo tiene configurado. */}
+        {roleCode === 'borrower' && agentClientId > 0 && (
           <IonButton expand="block" fill="outline" style={{ marginTop: 16 }}
-            onClick={() => history.push('/loan-chat/new?lenderId=2127')}>
+            onClick={() => history.push(`/loan-chat/new?lenderId=${agentClientId}`)}>
             <IonIcon icon={sparklesOutline} slot="start" />
             Chatear con el asistente SmartLoans
           </IonButton>

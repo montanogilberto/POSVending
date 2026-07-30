@@ -39,11 +39,18 @@ export interface LoanMessage {
   created_At: string;
 }
 
+export interface LoanChatConfig {
+  agentClientId: number;      // 0 = assistant not configured
+  agentEnabled: boolean;
+  agentReplyEnabled: boolean; // real ADK replies vs fallback message
+}
+
 export interface LoanConversation {
   conversationId: number;
   companyId: number;
   borrowerId: number;
   lenderId: number;
+  isAssistant?: boolean;      // server-tagged: lender is the reserved agent
   borrowerUserId?: number;
   lenderUserId?: number;
   loanProposalId?: number;
@@ -55,6 +62,27 @@ export interface LoanConversation {
   title?: string;
   lastMessageAt?: string;
   created_At: string;
+}
+
+// The agent identity is backend config (LOANCHAT_AGENT_CLIENT_ID) — never
+// hardcode it here. Cached for the session; safe fallback disables the
+// assistant UI when the endpoint is missing or errors.
+let chatConfigCache: LoanChatConfig | null = null;
+export async function getChatConfig(): Promise<LoanChatConfig> {
+  if (chatConfigCache) return chatConfigCache;
+  try {
+    const r = await fetch(`${BASE}/loanChat/config`);
+    const data = await r.json();
+    chatConfigCache = {
+      agentClientId: data?.agentClientId ?? 0,
+      agentEnabled: !!data?.agentEnabled,
+      agentReplyEnabled: !!data?.agentReplyEnabled,
+    };
+  } catch {
+    chatConfigCache = { agentClientId: 0, agentEnabled: false, agentReplyEnabled: false };
+  }
+  console.log('[Chat] config ←', JSON.stringify(chatConfigCache));
+  return chatConfigCache;
 }
 
 export const loanChatApi = {
