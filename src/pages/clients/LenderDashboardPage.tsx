@@ -459,6 +459,15 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
                     <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{stripeAccount.connectedAccountId}</p>
                   </div>
                 </div>
+                {/* Destination on file — bank name + last4 come from the DB
+                    snapshot; the full CLABE lives only inside Stripe. */}
+                {stripeAccount.hasExternalAccount && stripeAccount.externalAccountLast4 && (
+                  <p style={{ margin: '0 0 10px', fontSize: 14, color: '#374151' }}>
+                    <IonIcon icon={cardOutline} style={{ verticalAlign: -2, marginRight: 6, color: '#2563eb' }} />
+                    {stripeAccount.externalAccountType === 'card' ? 'Tarjeta de débito' : 'Cuenta bancaria'}
+                    {stripeAccount.externalAccountBankName ? ` ${stripeAccount.externalAccountBankName}` : ''} ····{stripeAccount.externalAccountLast4}
+                  </p>
+                )}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                   <IonBadge color={stripeAccount.hasExternalAccount ? 'success' : 'medium'}>
                     Cuenta bancaria {stripeAccount.hasExternalAccount ? '✓' : '✗'}
