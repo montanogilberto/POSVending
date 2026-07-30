@@ -341,9 +341,18 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
           <IonCardHeader><IonCardTitle>Verificación de identidad</IonCardTitle></IonCardHeader>
           <IonCardContent>
             {faceRecord?.isVerified && faceRecord?.contractAccepted && faceRecord?.pagareAccepted ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: 26, color: '#059669' }} />
-                <strong>Identidad verificada</strong>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: 26, color: '#059669' }} />
+                  <strong>Identidad verificada</strong>
+                </div>
+                {/* Read-only view of the full expediente (datos + documentos) —
+                    the borrower already had this link; the lender did not. */}
+                <IonButton size="small" fill="outline" style={{ marginTop: 8 }}
+                  onClick={() => { console.log('[LenderDashboard] → expediente', lenderClientId); history.push(`/client-expediente/${lenderClientId}`); }}>
+                  <IonIcon icon={documentTextOutline} slot="start" />
+                  Ver mi expediente y datos
+                </IonButton>
               </div>
             ) : verificationDone > 0 ? (
               <div style={{ padding: '4px 0' }}>

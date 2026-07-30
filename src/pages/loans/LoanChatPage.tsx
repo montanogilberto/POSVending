@@ -18,6 +18,7 @@ import { useUser } from '../../components/UserContext';
 import {
   loanChatApi, LoanMessage, LoanConversation, MsgType,
 } from '../../api/loanChatApi';
+import { disbursePayment } from '../../api/bankingApi';
 import './LoanChatPage.css';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
@@ -108,12 +109,16 @@ const LoanChatPage: React.FC = () => {
     setLoading(true);
     try {
       if (isNew) {
+        console.log('[ChatUI] init: starting NEW conversation', JSON.stringify({
+          borrowerId: initBorrowerId, lenderId: initLenderId, amount: initAmount,
+        }));
         const res = await loanChatApi.startConversation({
           companyId, borrowerId: initBorrowerId, lenderId: initLenderId,
           borrowerUserId: initBorrowerUserId, lenderUserId: initLenderUserId,
           requestedAmount: initAmount, title: initTitle,
         });
         if (res?.error) { showToast(res.error, 'danger'); return; }
+        console.log('[ChatUI] init: conversation ready —', res.conversationId, '(push al lender via targetUserId del SP)');
         setConv(res);
         // Replace URL so refresh doesn't start a new conversation
         history.replace(`/loan-chat/${res.conversationId}`);
@@ -219,20 +224,45 @@ const LoanChatPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
+  // Dual-rail disbursement, same policy as P2PLendingPage.acceptProposal:
+  // SPEI orchestrator first (debits the lender's ledger, sends to the
+  // borrower's verified CLABE, auto-reverses on failure — mock STP for now),
+  // Stripe Connect transfer as the 2nd option.
   const triggerDisbursement = async (msg: LoanMessage) => {
     if (!conv) return;
+    const amount = msg.amount ?? 0;
+    console.log('[ChatUI] disburse: START', JSON.stringify({
+      conversationId: conv.conversationId, lenderId: conv.lenderId, borrowerId: conv.borrowerId, amount,
+    }));
     try {
-      const amountCentavos = Math.round((msg.amount ?? 0) * 100);
-      await fetch(`${API_BASE}/stripe/disburse`, {
+      const spei = await disbursePayment({
+        companyId: companyId!, lenderId: conv.lenderId, borrowerId: conv.borrowerId,
+        amountMXN: amount, purpose: 'loan_disbursement',
+        loanId: conv.loanProposalId ?? conv.conversationId,
+        idempotencyKey: `chat:${conv.conversationId}:disburse:${Date.now()}`,
+      });
+      if (!spei.error && spei.status !== 'failed') {
+        console.log('[ChatUI] disburse: SPEI SUCCESS — transferId', spei.transferId, 'CEP', spei.cepUrl);
+        showToast(`💸 Desembolso enviado por SPEI${spei.mock ? ' (modo prueba)' : ''}`);
+        return;
+      }
+      console.log('[ChatUI] disburse: SPEI FAILED — trying Stripe as 2nd option:', spei.error);
+      const res = await fetch(`${API_BASE}/stripe/disburse`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId, lenderId: conv.lenderId, borrowerId: conv.borrowerId,
-          amount: msg.amount, loanId: conv.loanProposalId ?? conv.conversationId,
+          amount, loanId: conv.loanProposalId ?? conv.conversationId,
         }),
       });
-      showToast('💸 Desembolso Stripe iniciado');
-    } catch {
-      showToast('Propuesta aceptada. Inicia desembolso manualmente.', 'danger');
+      const stripeResult = await res.json().catch(() => ({}));
+      console.log('[ChatUI] disburse: /stripe/disburse ←', JSON.stringify(stripeResult));
+      if (stripeResult.error || stripeResult.status !== 'succeeded') {
+        throw new Error(stripeResult.error || spei.error || 'Desembolso rechazado en ambos rieles');
+      }
+      showToast('💸 Desembolso enviado vía Stripe (2ª opción)');
+    } catch (e) {
+      console.log('[ChatUI] disburse: FAILED on both rails —', e instanceof Error ? e.message : String(e));
+      showToast('Propuesta aceptada, pero el desembolso falló. Revisa saldo/cuenta e intenta desde la plataforma.', 'danger');
     }
   };
 

@@ -22,7 +22,7 @@ import {
   walletOutline, personOutline, timeOutline, alertCircleOutline,
   cashOutline, trendingUpOutline, documentTextOutline, notificationsOutline,
   cardOutline,
-  sendOutline, handLeftOutline, ribbonOutline, trashOutline,
+  sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../components/UserContext';
@@ -443,17 +443,24 @@ const P2PLendingPage: React.FC = () => {
     }
 
     setSaving(true);
+    console.log('[P2P] submitProposal: START', JSON.stringify({
+      borrowerId: clientId, lenderId: selectedOffer.lenderId, amount, rate, term,
+    }));
     try {
       const lenderClient = clientMap[selectedOffer.lenderId];
       const borrowerName = myClient ? `${myClient.first_name} ${myClient.last_name}` : 'Prestatario';
 
-      // 1. Persist proposal
+      // 1. Persist proposal — MUST succeed before notifying the lender.
+      // Previously .catch(() => {}) swallowed failures here, so a lender could
+      // get a push for a proposal that never existed (same bug publishOffer
+      // had: a success toast hiding persistent 500s).
       await createLoanProposal({
         companyId, lenderId: selectedOffer.lenderId, borrowerId: clientId,
         requestedAmount: amount, proposedRate: rate, termMonths: term,
         status: 'pending',
         borrowerNote: propNote,
-      }).catch(() => {});
+      });
+      console.log('[P2P] submitProposal: proposal persisted — notifying lender');
 
       // 2. Push notification to the lender
       await createPushNotification({
@@ -473,11 +480,13 @@ const P2PLendingPage: React.FC = () => {
         }),
       });
 
+      console.log('[P2P] submitProposal: SUCCESS — push sent to lender', selectedOffer.lenderId);
       setToast(`✓ Solicitud enviada a ${lenderClient?.first_name ?? 'prestamista'}`);
       setShowProposalModal(false);
       setPropAmount(''); setPropRate(''); setPropTerm('12'); setPropNote('');
       load();
     } catch (e: any) {
+      console.log('[P2P] submitProposal: FAILED —', String(e?.message ?? e));
       setToast(e?.message ?? 'Error al enviar solicitud');
     }
     setSaving(false);
@@ -618,10 +627,11 @@ const P2PLendingPage: React.FC = () => {
   const rejectProposal = async () => {
     if (!selectedProposal) return;
     setSaving(true);
+    console.log('[P2P] rejectProposal: START', JSON.stringify({ proposalId: selectedProposal.proposalId, borrowerId: selectedProposal.borrowerId }));
     try {
       await updateLoanProposal(selectedProposal.proposalId, {
         status: 'rejected', respondedAt: new Date().toISOString(),
-      }).catch(() => {});
+      }).catch((e) => console.log('[P2P] rejectProposal: status update FAILED —', String(e)));
 
       await createPushNotification({
         companyId,
@@ -635,11 +645,13 @@ const P2PLendingPage: React.FC = () => {
         payloadJson: JSON.stringify({ type: 'ProposalRejected', proposalId: selectedProposal.proposalId }),
       });
 
+      console.log('[P2P] rejectProposal: SUCCESS — borrower notified');
       setToast('Solicitud rechazada y notificación enviada');
       setShowRejectAlert(false);
       setSelectedProposal(null);
       load();
     } catch (e: any) {
+      console.log('[P2P] rejectProposal: FAILED —', String(e?.message ?? e));
       setToast(e?.message ?? 'Error');
     }
     setSaving(false);
@@ -849,6 +861,28 @@ const P2PLendingPage: React.FC = () => {
           </div>
         )}
 
+        {/* ── Borrower: CLABE destino del préstamo — sin esto acceptProposal
+            no puede depositarles por SPEI (solo quedaría el riel Stripe). ── */}
+        {isBorrower && !isLender && (
+          <div className="p2p-wallet-actions">
+            <IonButton expand="block" fill="outline" className="p2p-topup-btn" onClick={() => setShowBankModal(true)}>
+              <IonIcon icon={cardOutline} slot="start" />
+              {hasVerifiedAccount
+                ? `Cuenta para recibir tu préstamo: ${bankAccounts.find(a => a.isVerified && a.isDefault)?.bankName ?? ''} ····${bankAccounts.find(a => a.isVerified && a.isDefault)?.clabeLast4 ?? ''}`
+                : 'Vincular cuenta para recibir tu préstamo (CLABE)'}
+            </IonButton>
+            {/* Saldo + movimientos también para el borrower (antes lender-only):
+                aquí verá reembolsos, ajustes y cualquier crédito a su ledger. */}
+            <div className="p2p-kpi-row">
+              <div className="p2p-kpi" onClick={openMovements} style={{ cursor: 'pointer' }}>
+                <IonIcon icon={walletOutline} />
+                <span className="p2p-kpi-val">{walletBalance !== null ? fmt(walletBalance) : fmt(0)}</span>
+                <span className="p2p-kpi-label">Saldo en cartera · ver movimientos</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── KPI row (lender) ── */}
         {isLender && (
           <div className="p2p-kpi-row">
@@ -954,22 +988,39 @@ const P2PLendingPage: React.FC = () => {
                     </div>
                     {offer.description && <p className="p2p-offer-desc">"{offer.description}"</p>}
                     {isBorrower && offer.lenderId !== clientId && (
-                      <IonButton
-                        expand="block"
-                        className="p2p-propose-btn"
-                        disabled={!profileComplete}
-                        onClick={() => {
-                          if (!profileComplete) { history.push('/borrower-onboarding'); return; }
-                          setSelectedOffer(offer);
-                          setPropAmount('');
-                          setPropRate(String(offer.minRate));
-                          setPropTerm(String(offer.minTermMonths));
-                          setShowProposalModal(true);
-                        }}
-                      >
-                        <IonIcon icon={handLeftOutline} slot="start" />
-                        {profileComplete ? 'Enviar solicitud' : 'Completa tu perfil para solicitar'}
-                      </IonButton>
+                      <>
+                        <IonButton
+                          expand="block"
+                          className="p2p-propose-btn"
+                          disabled={!profileComplete}
+                          onClick={() => {
+                            if (!profileComplete) { history.push('/borrower-onboarding'); return; }
+                            setSelectedOffer(offer);
+                            setPropAmount('');
+                            setPropRate(String(offer.minRate));
+                            setPropTerm(String(offer.minTermMonths));
+                            setShowProposalModal(true);
+                          }}
+                        >
+                          <IonIcon icon={handLeftOutline} slot="start" />
+                          {profileComplete ? 'Enviar solicitud' : 'Completa tu perfil para solicitar'}
+                        </IonButton>
+                        {/* Direct chat with THIS lender — the conversation start
+                            fires a push to the lender (sp_loanChat resolves their
+                            userId from lenderId server-side). */}
+                        <IonButton
+                          expand="block"
+                          fill="outline"
+                          size="small"
+                          onClick={() => {
+                            console.log('[P2P] chat with lender →', offer.lenderId);
+                            history.push(`/loan-chat/new?lenderId=${offer.lenderId}&borrowerId=${clientId}&amount=${offer.availableCapital}&title=${encodeURIComponent(`Oferta de ${lender ? lender.first_name : `#${offer.lenderId}`} — ${fmt(offer.availableCapital)}`)}`);
+                          }}
+                        >
+                          <IonIcon icon={chatbubblesOutline} slot="start" />
+                          Chatear con el prestamista
+                        </IonButton>
+                      </>
                     )}
                   </div>
                 );

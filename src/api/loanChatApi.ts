@@ -1,12 +1,25 @@
 const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
 
+// Every chat action funnels through here, so this one pair of logs tracks the
+// whole negotiation flow (start/send/accept/reject → push server-side). Bodies
+// are user content — log metadata only, never the message text.
 async function sp(payload: Record<string, unknown>) {
+  const { action, conversationId, senderId, msgType, amount, rate, termMonths } = payload as any;
+  console.log('[Chat] →', JSON.stringify({ action, conversationId, senderId, msgType, amount, rate, termMonths }));
   const r = await fetch(`${BASE}/loanChat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat: [payload] }),
   });
-  return r.json();
+  const data = await r.json();
+  console.log('[Chat] ←', JSON.stringify({
+    action, http: r.status,
+    conversationId: data?.conversationId ?? conversationId,
+    messageId: data?.messageId, status: data?.status,
+    targetUserId: data?.targetUserId, // who the push went to (server resolves it)
+    error: data?.error,
+  }));
+  return data;
 }
 
 export type MsgType = 'text' | 'proposal' | 'counter' | 'accept' | 'reject' | 'system';
