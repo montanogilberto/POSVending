@@ -21,9 +21,17 @@
 .flc-ring {
   position: absolute;
   left: 50%;
-  top: 42%;
+  /* Centred rather than sitting high: the guide reads as "put your face
+     here", so a ring offset toward the top pulls people to lean up and out of
+     frame, which is the opposite of what the down challenge needs. */
+  top: 50%;
   transform: translate(-50%, -50%);
-  width: 78%;
+  /* Sized so the face sits back from the camera with margin around it, not
+     filling the frame. A near-full-width ring (was 94%) pulled people right up
+     to the lens — the face looked "too close", cropped tight, and drifted out
+     of view while turning. Smaller ring = more working distance + headroom, so
+     the whole head stays in frame through the head-turn challenges. */
+  width: 70%;
   aspect-ratio: 1;
   pointer-events: none;
 }

@@ -223,6 +223,46 @@ http://ionicframework.com/docs/theming/ */
     border-top: 1px solid var(--ion-tabbar-border-color);
   }
 
+  /* Custom bottom nav — replaces IonTabBar for the ?tab= dashboard views.
+     Kept visually identical to the old IonTabButton bar. */
+  .cd-tabbar {
+    display: flex;
+    align-items: stretch;
+    background: var(--ion-tabbar-background, #fff);
+    border-top: 1px solid var(--ion-tabbar-border-color, var(--divider, #e5e5e5));
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
+    /* Same contract as the real ion-tab-bar: it sets z-index 10 because
+       ion-tabs' .tabs-inner (the page area) is positioned and would
+       otherwise paint on top of a static bottom bar; safe-area comes from
+       Ionic's --ion-safe-area-bottom, since env() reports 0 on Android
+       WebView even with viewport-fit=cover. */
+    z-index: 10;
+    contain: paint;
+    padding-bottom: max(env(safe-area-inset-bottom), var(--ion-safe-area-bottom, 0px));
+  }
+  .cd-tab {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    padding: 6px 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary, #666);
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+  .cd-tab ion-icon {
+    font-size: 1.5rem;
+  }
+  .cd-tab--active {
+    color: var(--dashboard-blue, #007bff);
+  }
+
   /* ===== Buttons ===== */
   ion-button.button-primary,
   ion-button.button-primary::part(native) {

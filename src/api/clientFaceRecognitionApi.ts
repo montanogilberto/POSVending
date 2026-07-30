@@ -18,6 +18,7 @@ export interface ClientFaceRecognition {
   domicilio?: string;
   curp?: string;
   claveElector?: string;
+  rfc?: string; // Mexico tax ID (Stripe individual.id_number) — NOT the CURP
   fechaNacimiento?: string;
 
   // Legal Contract Data
@@ -78,6 +79,7 @@ export interface ContractSubmissionRequest {
   domicilio?: string;
   curp?: string;
   claveElector?: string;
+  rfc?: string; // Mexico tax ID (Stripe individual.id_number) — NOT the CURP
   fechaNacimiento?: string;
 
   // Contract
@@ -118,10 +120,19 @@ export interface ContractSubmissionResponse {
   error?: string;
 }
 
+// The five head positions captured during the liveness challenge. Uploaded as
+// side "selfie_<pose>"; the backend files them under the client's selfies/
+// folder alongside the main selfie.
+export type FacePoseSide =
+  | "selfie_front" | "selfie_up" | "selfie_down" | "selfie_left" | "selfie_right";
+
 export interface UploadDocumentImageRequest {
   companyId: number;
   clientId: number;
-  side: "front" | "back" | "selfie";
+  // "front_hires" is a full-resolution copy of the front used ONLY for the
+  // face-validation agent's INE-portrait comparison; the standard "front" stays
+  // the ~1100px OCR/display image. See GuidedDocumentCapture + validateFaceSession.
+  side: "front" | "front_hires" | "back" | "selfie" | FacePoseSide;
   imageBase64: string; // raw base64, no "data:image/...;base64," prefix
 }
 

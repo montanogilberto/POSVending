@@ -1,24 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonGrid, IonRow, IonCol, IonButton, IonLoading, IonToast, IonIcon,
   IonAvatar, IonBadge, IonList, IonItem, IonLabel, IonNote, IonProgressBar,
-  IonHeader, IonToolbar, IonTitle, IonButtons,
 } from '@ionic/react';
 import {
-  arrowBack, cashOutline, trendingUpOutline, peopleOutline, walletOutline,
+  cashOutline, trendingUpOutline, peopleOutline, walletOutline,
   checkmarkCircleOutline, alertCircleOutline, ellipseOutline, refreshOutline,
   personCircleOutline, timeOutline, cardOutline, barChartOutline, addCircleOutline,
-  documentTextOutline,
+  documentTextOutline, megaphoneOutline,
 } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
 import { getAllClients, Client } from '../../api/clientsApi';
-import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
+import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../api/stripeApi';
-import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
+import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
+import Header from '../../components/Header';
+import AlertPopover from '../../components/PopOver/AlertPopover';
+import MailPopover from '../../components/PopOver/MailPopover';
 import './LenderDashboardPage.css';
 
 const toDate = (utc: string | undefined) => {
@@ -49,6 +52,17 @@ interface LenderDashboardPageProps {}
 const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
+  const location = useLocation();
+
+  // Bottom-nav "Pagos" tab deep-links here with ?section=pagos — scroll the
+  // "Cuenta de pago" card into view once the page has rendered.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('section') !== 'pagos') return;
+    const t = setTimeout(() => {
+      document.getElementById('ld-pagos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [location.search]);
   const { companyId } = useUser();
 
   const lenderClientId = Number(clientIdParam);
@@ -59,6 +73,9 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [selfieMap, setSelfieMap] = useState<Record<number, string>>({});
   const [lender, setLender] = useState<Client | null>(null);
+  // Sum of this lender's ACTIVE published offers (loanOffers) — announced
+  // capital, distinct from Capital total (disbursed loans) and the wallet.
+  const [publishedCapital, setPublishedCapital] = useState(0);
 
   // The lender's own identity verification — digital contracts (loanContracts,
   // signed via the same ClientFaceRecognitionPage wizard borrowers use)
@@ -74,6 +91,32 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
       returnTo: `/lender-dashboard/${lenderClientId}`,
     });
   };
+
+  // Break the KYC/verification into visible steps so the card reflects the
+  // real progress already captured (INE, liveness, presence, biometrics,
+  // contract, pagaré) instead of a flat "pendiente". `done` = evidence exists;
+  // `review` = captured but the biometric verdict isn't confirmed yet.
+  const verificationSteps = useMemo(() => {
+    const f = faceRecord;
+    const hasRecord = !!f;
+    const biometricDone = !!f?.isVerified;
+    const biometricReview = hasRecord && !biometricDone && (f?.confidenceScore ?? 0) > 0;
+    return [
+      { label: 'Documento de identidad (INE)', done: !!f?.idFrontImageBlobUrl },
+      { label: 'Prueba de vida (selfie)', done: !!f?.clientSelfieBlobUrl },
+      { label: 'Comprobante de presencia', done: !!f?.presenceVideoBlobUrl },
+      { label: 'Verificación biométrica', done: biometricDone, review: biometricReview },
+      { label: 'Contrato firmado', done: !!f?.contractAccepted },
+      { label: 'Pagaré aceptado', done: !!f?.pagareAccepted },
+    ];
+  }, [faceRecord]);
+  const verificationDone = verificationSteps.filter(s => s.done).length;
+  const verificationInReview = verificationSteps.some(s => (s as any).review);
+
+  // The lender's own client record (real email + phone captured at signup),
+  // used to seed the Stripe onboarding instead of the synthetic placeholder.
+  const lenderClient = clients.find(c => Number(c.clientId) === lenderClientId);
+  const lenderEmail = lenderClient?.email?.trim() || `client${lenderClientId}@posgmo.mx`;
 
   // Stripe — lets the lender fund loan disbursements (money out to
   // borrowers) and receive repayments (money back in). Same pattern as
@@ -105,7 +148,18 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
       setShowStripeOnboarding(true);
     } catch (err) {
       console.log('[LenderDashboard] handleStripeKyc ❌', err);
-      setStripeError((err as Error).message ?? 'Error al iniciar registro bancario');
+      const raw = (err as Error).message ?? '';
+      // Raw Stripe errors are English, technical, and can even leak a
+      // dashboard.stripe.com link + request id (e.g. the platform-profile /
+      // "responsibilities of collecting requirements" config error). None of
+      // these are actionable by a lender, so show a friendly Spanish message
+      // and keep the real error in the console/logs for debugging.
+      const isPlatformOrInternal = /stripe\.com|platform-profile|responsibilities|req_[A-Za-z0-9]+/i.test(raw);
+      setStripeError(
+        isPlatformOrInternal
+          ? 'El registro de la cuenta de pago aún no está habilitado. Estamos configurándolo — inténtalo más tarde o contacta al administrador.'
+          : 'No se pudo iniciar el registro de la cuenta de pago. Inténtalo de nuevo.',
+      );
     } finally {
       setStripeLoading(false);
     }
@@ -130,6 +184,22 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
         getAllClientFaceRecognitions(companyId),
         listContractsForClient(companyId, lenderClientId),
       ]);
+
+      // Published (announced) capital: my active loanOffers. Failure keeps 0 —
+      // the card just shows $0 rather than blocking the dashboard.
+      fetch('https://smartloansbackend.azurewebsites.net/all_loanOffers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loanOffers: [{ companyId, isActive: true }] }),
+      })
+        .then(r => (r.ok ? r.json() : { loanOffers: [] }))
+        .then(d => {
+          const mine = (d.loanOffers ?? []).filter((o: { lenderId: number }) => o.lenderId === lenderClientId);
+          const sum = mine.reduce((s: number, o: { availableCapital?: number }) => s + (o.availableCapital ?? 0), 0);
+          console.log('[LenderDashboard] published offers:', mine.length, '→ Capital publicado:', sum);
+          setPublishedCapital(sum);
+        })
+        .catch(() => setPublishedCapital(0));
       // loans has no lenderId column at all — the only place that link
       // exists is loanContracts (borrowerClientId/lenderClientId), so we
       // scope to this lender's actual portfolio by joining through the
@@ -161,6 +231,23 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, lenderClientId]);
 
+  // Shared Header (menu + notifications + mail + help) — same component and
+  // popoverState shape the borrower dashboard uses, so both roles get the same
+  // top bar instead of the plain title toolbar this page had before.
+  const [popoverState, setPopoverState] = useState<{
+    showAlertPopover: boolean;
+    showMailPopover: boolean;
+    event?: Event;
+  }>({ showAlertPopover: false, showMailPopover: false });
+  const presentAlertPopover = (e: React.MouseEvent) =>
+    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
+  const dismissAlertPopover = () =>
+    setPopoverState({ ...popoverState, showAlertPopover: false });
+  const presentMailPopover = (e: React.MouseEvent) =>
+    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
+  const dismissMailPopover = () =>
+    setPopoverState({ ...popoverState, showMailPopover: false });
+
   // ── KPIs ──────────────────────────────────────────────────────────────────
   const activeLoans   = loans.filter(l => l.loanStatus === 'Active');
   const paidLoans     = loans.filter(l => l.loanStatus === 'PaidOff' || l.loanStatus === 'Closed');
@@ -172,6 +259,15 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const collectionRate = totalDeployed > 0 ? Math.min(1, totalRepaid / totalDeployed) : 0;
   const avgInterest   = loans.length > 0 ? loans.reduce((s, l) => s + l.interestRate, 0) / loans.length : 0;
 
+  useEffect(() => {
+    // Capital prestado counts DISBURSED loans only; Capital publicado is the
+    // sum of active loanOffers (announced money, nothing moved yet).
+    console.log('[LenderDashboard] KPIs → Capital publicado (offers):', publishedCapital,
+      '| Capital prestado (loans deployed):', totalDeployed,
+      '| Activo:', totalActive, '| Recuperado:', totalRepaid,
+      '| loans:', loans.length);
+  }, [publishedCapital, totalDeployed, totalActive, totalRepaid, loans.length]);
+
   const clientById = useMemo(() => {
     const map: Record<number, Client> = {};
     clients.forEach(c => { map[c.clientId] = c; });
@@ -180,21 +276,21 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
 
   return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
-              <IonIcon icon={arrowBack} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-          <IonTitle>Portfolio — Prestamista</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={fetchAll}>
-              <IonIcon icon={refreshOutline} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
+      <Header
+        presentAlertPopover={presentAlertPopover}
+        presentMailPopover={presentMailPopover}
+        screenTitle="Portfolio — Prestamista"
+      />
+      <AlertPopover
+        isOpen={popoverState.showAlertPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissAlertPopover}
+      />
+      <MailPopover
+        isOpen={popoverState.showMailPopover}
+        event={popoverState.event}
+        onDidDismiss={dismissMailPopover}
+      />
 
       <IonContent className="lender-dashboard-content ion-padding">
         <IonLoading isOpen={loading} message="Cargando portfolio..." />
@@ -219,7 +315,8 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
         <IonGrid className="ld-kpi-grid">
           <IonRow>
             {[
-              { icon: cashOutline,       label: 'Capital total',   value: `$${totalDeployed.toLocaleString()}`,        color: '#2563eb' },
+              { icon: megaphoneOutline,  label: 'Capital publicado', value: `$${publishedCapital.toLocaleString()}`,   color: '#0e7490' },
+              { icon: cashOutline,       label: 'Capital prestado',  value: `$${totalDeployed.toLocaleString()}`,      color: '#2563eb' },
               { icon: walletOutline,     label: 'Activo',          value: `$${totalActive.toLocaleString()}`,          color: '#15803d' },
               { icon: trendingUpOutline, label: 'Recuperado',      value: `$${totalRepaid.toLocaleString()}`,          color: '#7c3aed' },
               { icon: barChartOutline,   label: 'Tasa promedio',   value: `${avgInterest.toFixed(1)}%`,                color: '#b45309' },
@@ -248,6 +345,34 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
                 <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: 26, color: '#059669' }} />
                 <strong>Identidad verificada</strong>
               </div>
+            ) : verificationDone > 0 ? (
+              <div style={{ padding: '4px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <strong style={{ color: '#374151' }}>
+                    {verificationInReview ? 'Verificación en revisión' : 'Verificación en proceso'}
+                  </strong>
+                  <IonNote>{verificationDone} de {verificationSteps.length}</IonNote>
+                </div>
+                <IonProgressBar value={verificationDone / verificationSteps.length} style={{ marginBottom: 8 }} />
+                <IonList lines="none">
+                  {verificationSteps.map((s) => (
+                    <IonItem key={s.label} style={{ '--min-height': '30px', '--padding-start': '0' } as any}>
+                      <IonIcon
+                        slot="start"
+                        icon={s.done ? checkmarkCircleOutline : (s as any).review ? timeOutline : ellipseOutline}
+                        style={{ fontSize: 20, marginRight: 8, color: s.done ? '#059669' : (s as any).review ? '#d97706' : '#cbd5e1' }}
+                      />
+                      <IonLabel style={{ fontSize: 13, color: s.done ? '#374151' : '#6b7280' }}>
+                        {s.label}{(s as any).review ? ' — en revisión' : ''}
+                      </IonLabel>
+                    </IonItem>
+                  ))}
+                </IonList>
+                <IonButton shape="round" expand="block" disabled={wizardStarting} onClick={handleStartVerification} style={{ marginTop: 6 }}>
+                  <IonIcon icon={addCircleOutline} slot="start" />
+                  {wizardStarting ? 'Cargando...' : 'Continuar verificación'}
+                </IonButton>
+              </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '8px 0' }}>
                 <IonIcon icon={personCircleOutline} style={{ fontSize: 40, color: '#9ca3af' }} />
@@ -264,8 +389,9 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
           </IonCardContent>
         </IonCard>
 
-        {/* Cuenta de pago — funds loan disbursements and receives repayments */}
-        <IonCard className="ld-card">
+        {/* Cuenta de pago — funds loan disbursements and receives repayments.
+            id is the scroll target for the bottom-nav "Pagos" tab (?section=pagos). */}
+        <IonCard className="ld-card" id="ld-pagos">
           <IonCardHeader>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <IonCardTitle>Cuenta de pago</IonCardTitle>
@@ -280,10 +406,34 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
             )}
 
             {showStripeOnboarding ? (
-              <StripeAccountOnboarding
+              <NativeConnectOnboarding
                 clientId={lenderClientId}
                 companyId={Number(companyId)}
-                onExit={handleStripeOnboardingExit}
+                email={lenderEmail}
+                // Identity already accepted by Stripe → skip step 1 on reload.
+                startAtPayout={!!stripeAccount?.identitySubmitted && !stripeAccount?.hasExternalAccount}
+                onProgress={(done) => { fetchStripeStatus(); if (done) setShowStripeOnboarding(false); }}
+                // Persist the lender's edited identity so their corrections
+                // survive and re-seed the form next time (not the raw OCR).
+                onIdentitySaved={async (f) => {
+                  const ine = kycFieldsToIne(f);
+                  try {
+                    if (faceRecord?.clientFaceRecognitionId) {
+                      await upsertClientFaceRecognition(
+                        Number(companyId), lenderClientId, faceRecord.documentType,
+                        { nombre: ine.nombre, domicilio: ine.domicilio, fechaNacimiento: ine.fechaNacimiento, rfc: ine.rfc },
+                        faceRecord.clientFaceRecognitionId,
+                      );
+                      setFaceRecord((prev) => (prev ? { ...prev, ...ine } : prev));
+                    }
+                  } catch (e) { console.warn('[LenderDashboard] could not persist KYC identity edits:', e); }
+                }}
+                // Seeded from the lender's captured INE + their real account
+                // email/phone (see kycPrefill).
+                prefill={buildKycPrefill(faceRecord ?? {}, {
+                  email: lenderClient?.email,
+                  cellphone: lenderClient?.cellphone,
+                })}
               />
             ) : !stripeAccount ? (
               <div style={{ textAlign: 'center', padding: '8px 0' }}>

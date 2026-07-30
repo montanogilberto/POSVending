@@ -4,7 +4,13 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { UserProvider } from './components/UserContext';
 import { CartProvider } from './context/CartContext';
+import { ObservabilityProvider } from './contexts/ObservabilityContext';
+import { installObservabilityFetch } from './utils/observability';
 import { defineCustomElements } from '@ionic/pwa-elements/loader';
+
+// Install the global fetch interceptor before anything makes a request, so every
+// backend call carries trace/identity headers (X-Correlation-Id / X-Workflow-Id / …).
+installObservabilityFetch();
 
 // NOTE:
 // Removed manual chrome.runtime listener/lastError polling.
@@ -25,8 +31,10 @@ const root = createRoot(container!);
 // in production builds, so this only affects local dev, not what ships.
 root.render(
   <UserProvider>
-    <CartProvider>
-      <App />
-    </CartProvider>
+    <ObservabilityProvider>
+      <CartProvider>
+        <App />
+      </CartProvider>
+    </ObservabilityProvider>
   </UserProvider>
 );

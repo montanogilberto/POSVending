@@ -39,6 +39,8 @@ import {
   walletOutline,
   checkmarkCircle,
   cardOutline,
+  add,
+  mailOutline,
   pulseOutline,
   personCircleOutline,
   timeOutline,
@@ -62,11 +64,12 @@ import QRCode from 'qrcode';
 import { useUser } from '../../components/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
-import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
+import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
-import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
+import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import Header from '../../components/Header';
 import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
@@ -156,7 +159,11 @@ const ClientDashboardPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
   const location = useLocation();
-  const { companyId, clientId: contextClientId, username, avatarUrl } = useUser();
+  const { companyId, clientId: contextClientId, username, avatarUrl, roleCode, clientType } = useUser();
+  // A lender/payout client's payment step IS a Stripe payout account (needs an
+  // external bank). A borrower's is the repayment CARD — they are never asked
+  // for a payout account, so the checklist must not gate them on one.
+  const isPayoutClient = clientType === 'lender' || clientType === 'both' || roleCode === 'lender';
   const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
 
   console.log('[ClientDashboard] render. clientId =', clientId, 'companyId =', companyId, 'tab query =', location.search);
@@ -236,6 +243,34 @@ const ClientDashboardPage: React.FC = () => {
   const [stripeTransactions, setStripeTransactions] = useState<any[]>([]);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  // The repayment card on file (savedPaymentMethods) — shown as a tile in the
+  // credit card below. A client has at most one (UNIQUE clientId+companyId).
+  const [savedCard, setSavedCard] = useState<{ last4?: string; brand?: string } | null>(null);
+
+  // "Tu Agente" — the client's assigned advisor.
+  //
+  // ⚠️ PLACEHOLDER identity, no real assignment source yet. There is no
+  // agents/advisors table or client→agent assignment in the backend; building
+  // it (and an endpoint to read it) is DB work for the posgmo-factory pipeline.
+  // Until then the card shows the assigned name/ID but the contact fields are
+  // empty on purpose, so each button stays DISABLED rather than dialing a fake
+  // number. Populate phone/whatsapp/email from the real endpoint to activate
+  // them. Set to null to hide the card entirely.
+  const [assignedAgent] = useState<{
+    name: string; agentId: string; avatarUrl?: string;
+    phone?: string; whatsapp?: string; email?: string; lastContact?: string;
+  } | null>({
+    name: 'Ana Gómez',
+    agentId: 'AGT-1024',
+    // Placeholder portrait so the avatar matches the (female) agent name until
+    // real agent profiles/photos are wired up. Was falling back to the logged-in
+    // user's avatar, which showed a man for "Ana Gómez".
+    avatarUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
+    phone: '',
+    whatsapp: '',
+    email: '',
+    lastContact: '',
+  });
   const [showWithdrawAlert, setShowWithdrawAlert] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [showStripeOnboarding, setShowStripeOnboarding] = useState(false);
@@ -378,7 +413,14 @@ const ClientDashboardPage: React.FC = () => {
     try {
       const qrValue = buildClientQrValue(clientRecord.clientId, clientRecord.first_name, clientRecord.last_name);
       const dataUrl = await QRCode.toDataURL(qrValue, { width: 512, errorCorrectionLevel: 'H' });
-      const { qrBlobUrl } = await uploadClientQr(clientRecord.clientId, companyId, dataUrl);
+      // Persist under the CLIENT's own companyId, not the session's. Legacy
+      // borrower rows live under company 1 while the session runs as 1008
+      // (the companyId split); the upload SP scopes its UPDATE by
+      // clientId AND companyId, so using the session value matches 0 rows and
+      // the QR silently never persists. Fall back to the session value only if
+      // the client row somehow lacks one.
+      const qrCompanyId = clientRecord.companyId ?? companyId;
+      const { qrBlobUrl } = await uploadClientQr(clientRecord.clientId, qrCompanyId, dataUrl);
       setClientRecord(prev => (prev ? { ...prev, qrBlobUrl } : prev));
       return true;
     } catch (err) {
@@ -397,10 +439,16 @@ const ClientDashboardPage: React.FC = () => {
     }
   };
 
-  // Single continuous onboarding flow — QR (silent, if missing) → document +
-  // biometric capture + contract (ClientFaceRecognitionPage) → bank account
-  // (Stripe), chained via continueToPayments instead of dropping the client
-  // back on this dashboard between each step.
+  // Borrower onboarding — QR (silent, if missing) → document + biometric
+  // capture + contract → payment step.
+  //
+  // continueToPayments is true so the wizard reaches the payment step, but for
+  // a borrower that step is the CARD for automatic repayment charges, NOT a
+  // payout account (the wizard picks the component by clientType). The payout
+  // account — which is what needs Stripe KYC — stays deferred to disbursement,
+  // when the borrower actually receives money. So the borrower registers the
+  // card their monthly cuotas run on here, and is never asked for payout
+  // identity at signup.
   const [wizardStarting, setWizardStarting] = useState(false);
   const handleStartWizard = async () => {
     if (wizardStarting || !clientId) return;
@@ -507,6 +555,23 @@ const ClientDashboardPage: React.FC = () => {
         })
         .catch(() => {});
       refreshClientRecord();
+      // Repayment card on file — feeds the payment-method tiles in the credit
+      // card. Best-effort: no card just shows the "add" tile.
+      fetch(`${API_BASE_URL}/automated-payments/saved-method`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, companyId }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d?.paymentMethod?.stripePaymentMethodId) {
+            console.log('[ClientDashboard] saved card:', d.paymentMethod.brand, d.paymentMethod.last4);
+            setSavedCard({ last4: d.paymentMethod.last4, brand: d.paymentMethod.brand });
+          } else {
+            setSavedCard(null);
+          }
+        })
+        .catch(() => setSavedCard(null));
     }
   }, [companyId, clientId]);
 
@@ -523,8 +588,15 @@ const ClientDashboardPage: React.FC = () => {
     });
   }, [clientRecord, editingProfile]);
 
+  // Available credit computed live by the credit engine (see
+  // /credit-score/available-credit). Preferred over the clientDashboards row,
+  // which is often missing (this client has 0 rows) and never gets the amount
+  // written to it. null until the call returns.
+  const [computedCredit, setComputedCredit] = useState<number | null>(null);
+
   // ── Derived values ────────────────────────────────────────────────────────
-  const availableCredit   = financialSummary?.availableCredit   ?? 0;
+  // Live engine value wins; fall back to any stored dashboard value; else 0.
+  const availableCredit   = computedCredit ?? financialSummary?.availableCredit ?? 0;
   const activeLoanBalance = financialSummary?.activeLoanBalance  ?? 0;
   const nextPaymentAmount = financialSummary?.nextPaymentAmount  ?? 0;
 
@@ -532,6 +604,21 @@ const ClientDashboardPage: React.FC = () => {
     if (availableCredit <= 0) return 0;
     return Math.min(100, Math.max(0, (activeLoanBalance / availableCredit) * 100));
   }, [availableCredit, activeLoanBalance]);
+
+  // Shows exactly WHICH source drives the displayed "Crédito disponible", so a
+  // $0 is traceable: engine value (computedCredit) vs. the stored dashboard row
+  // vs. the 0 fallback when both are absent.
+  useEffect(() => {
+    console.log('[ClientDashboard] availableCredit resolved =', JSON.stringify({
+      shown: availableCredit,
+      source: computedCredit != null ? 'engine'
+        : financialSummary?.availableCredit != null ? 'dashboardRow'
+        : 'fallback-0',
+      computedCredit,
+      dashboardRowValue: financialSummary?.availableCredit ?? null,
+      hasDashboardRow: financialSummary != null,
+    }));
+  }, [availableCredit, computedCredit, financialSummary]);
 
   const [creditScore, setCreditScore] = useState<number | null>(null);
   const [creditScoreLabel, setCreditScoreLabel] = useState('');
@@ -547,12 +634,44 @@ const ClientDashboardPage: React.FC = () => {
       .then(r => r.json())
       .then(d => {
         console.log('[ClientDashboard] fetchCreditScore ✅', d);
-        if (d.score) {
-          setCreditScore(d.score);
-          setCreditScoreLabel(d.label ?? '');
+        // The backend nests the score under `creditScore` (see
+        // creditScore.py). Reading d.score directly left it null → the card
+        // showed "—" even though the fetch succeeded.
+        const cs = d.creditScore ?? d;
+        if (cs.score) {
+          setCreditScore(cs.score);
+          setCreditScoreLabel(cs.label ?? '');
         }
       })
       .catch(() => {});
+
+    // Available credit amount (Crédito disponible) — the deterministic engine
+    // (score + KYC + income + Buró + first-time promo). This is what fills the
+    // hero number instead of the empty clientDashboards row.
+    console.log('[ClientDashboard] fetchAvailableCredit → /credit-score/available-credit', { clientId, companyId });
+    fetch(`${API_BASE_URL}/credit-score/available-credit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, companyId }),
+    })
+      .then(async r => {
+        // Log status + raw body so the real cause is visible: 404 = endpoint
+        // not deployed; 200 with availableCredit:0 = engine gated it (KYC /
+        // income / Buró / score). Without this we can't tell which.
+        const raw = await r.text();
+        console.log('[ClientDashboard] fetchAvailableCredit ← HTTP', r.status, 'body:', raw.slice(0, 500));
+        let d: any = null;
+        try { d = JSON.parse(raw); } catch { /* not JSON (e.g. 404 HTML) */ }
+        if (d && typeof d.availableCredit === 'number') {
+          console.log('[ClientDashboard] fetchAvailableCredit ✅ amount =', d.availableCredit,
+            'tier =', d.breakdown?.tier, 'reason =', d.breakdown?.reason);
+          setComputedCredit(d.availableCredit);
+        } else {
+          console.log('[ClientDashboard] fetchAvailableCredit: no usable availableCredit —',
+            r.status === 404 ? 'endpoint NOT deployed (404)' : `unexpected response (status ${r.status})`);
+        }
+      })
+      .catch((e) => console.log('[ClientDashboard] fetchAvailableCredit ❌ network/CORS', String(e)));
   }, [companyId, clientId]);
 
   // Biométrico/Contrato/Pagaré/Cuenta de pago are one continuous process
@@ -569,8 +688,11 @@ const ClientDashboardPage: React.FC = () => {
       onClick: handleGenerateQr,
     },
     {
-      label: 'Cuenta de pago',
-      done: !!stripeAccount?.hasExternalAccount,
+      // Borrower: the repayment card (savedCard). Lender/payout client: the
+      // Stripe payout account's external bank. Mirrors the wizard, which labels
+      // step 5 "Tarjeta" for borrowers and "Cuenta de pago" for payout clients.
+      label: isPayoutClient ? 'Cuenta de pago' : 'Tarjeta',
+      done: isPayoutClient ? !!stripeAccount?.hasExternalAccount : !!savedCard,
       onClick: handleStartWizard,
     },
     {
@@ -653,6 +775,9 @@ const ClientDashboardPage: React.FC = () => {
             <div>
               <span>Crédito disponible</span>
               <h1>${availableCredit.toFixed(2)}</h1>
+              {financialSummary?.nextPaymentDate && (
+                <span className="hero-due">Paga antes del {toDate(financialSummary.nextPaymentDate)}</span>
+              )}
             </div>
             {loanCompletionPct < 100 && (
               <div className="hero-progress-pill">
@@ -661,39 +786,81 @@ const ClientDashboardPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Payment methods on file — merged in from the separate credit card
+              so "Crédito disponible" isn't shown twice on Home. */}
+          <div className="cd-pay-methods">
+            {savedCard && (
+              <div className="cd-pay-tile">
+                <span className="cd-pay-last4">{savedCard.last4 || '····'}</span>
+                <span className="cd-pay-brand">{savedCard.brand?.toUpperCase() || 'TARJETA'}</span>
+              </div>
+            )}
+            {stripeAccount?.hasExternalAccount && (
+              <div className="cd-pay-tile cd-pay-tile-payout">
+                <IonIcon icon={checkmarkCircleOutline} className="cd-pay-payout-icon" />
+                <span className="cd-pay-last4">•••• {stripeAccount.externalAccountLast4 || '····'}</span>
+              </div>
+            )}
+            <button className="cd-pay-tile cd-pay-add" onClick={() => goTab('payments')} aria-label="Agregar método de pago">
+              <IonIcon icon={add} />
+            </button>
+          </div>
+
+          {/* Loan KPIs, moved in from the old summary-card grid so this panel
+              carries the numbers instead of a separate 4-card block. */}
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <span>Saldo actual</span>
+              <strong>${activeLoanBalance.toFixed(2)}</strong>
+            </div>
+            <div className="hero-stat">
+              <span>Próximo pago</span>
+              <strong>${nextPaymentAmount.toFixed(2)}</strong>
+            </div>
+            <div className="hero-stat">
+              <span>Préstamos activos</span>
+              <strong>{activeLoans.length}</strong>
+            </div>
+          </div>
         </IonCardContent>
       </IonCard>
 
-      {/* Summary cards */}
-      <IonGrid className="summary-grid">
-        <IonRow>
-          {[
-            // "Disponible" used to duplicate the hero's "Crédito disponible"
-            // (same availableCredit value shown twice) — swapped for the
-            // active loans' rate, which isn't shown anywhere else on Home.
-            // Weighted average across ALL active loans, not just the first.
-            {
-              icon: barChartOutline, label: 'Tasa de interés',
-              value: avgInterestRate !== null ? `${avgInterestRate.toFixed(1)}%` : '—',
-              hint: activeLoans.length > 1 ? `promedio de ${activeLoans.length} préstamos` : undefined,
-            },
-            { icon: cashOutline,    label: 'Saldo actual',     value: `$${activeLoanBalance.toFixed(2)}` },
-            { icon: receiptOutline, label: 'Próximo pago',     value: `$${nextPaymentAmount.toFixed(2)}` },
-            { icon: walletOutline,  label: 'Préstamos activos',value: String(activeLoans.length) },
-          ].map(c => (
-            <IonCol size="6" key={c.label}>
-              <IonCard className="client-dashboard-card mini-summary-card">
-                <IonCardContent>
-                  <IonIcon icon={c.icon} className="summary-icon" />
-                  <p>{c.label}</p>
-                  <h3>{c.value}</h3>
-                  {c.hint && <small style={{ color: '#9ca3af' }}>{c.hint}</small>}
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          ))}
-        </IonRow>
-      </IonGrid>
+      {/* Tu Agente — assigned advisor contact card (replaces the KPI grid). */}
+      {assignedAgent && (
+        <IonCard className="client-dashboard-card cd-agent-card">
+          <IonCardContent>
+            <div className="cd-agent-top">
+              <IonAvatar className="cd-agent-avatar">
+                <img src={assignedAgent.avatarUrl || avatarUrl} alt={assignedAgent.name} />
+              </IonAvatar>
+              <div className="cd-agent-info">
+                <span className="cd-agent-heading">Tu Agente</span>
+                <h3 className="cd-agent-name">{assignedAgent.name}</h3>
+                <span className="cd-agent-id">ID {assignedAgent.agentId}</span>
+                <IonBadge className="cd-agent-status">Disponible</IonBadge>
+              </div>
+            </div>
+            <div className="cd-agent-actions">
+              {/* In-app chat (loanChat), not WhatsApp; the Llamar button is
+                  skipped for now. */}
+              <IonButton className="cd-agent-btn" shape="round"
+                onClick={() => history.push('/loan-chat/new')}>
+                <IonIcon icon={chatbubbleOutline} slot="start" /> Chat
+              </IonButton>
+              <IonButton className="cd-agent-btn" fill="outline" shape="round" disabled={!assignedAgent.email}
+                href={assignedAgent.email ? `mailto:${assignedAgent.email}` : undefined}>
+                <IonIcon icon={mailOutline} slot="start" /> Email
+              </IonButton>
+            </div>
+            {assignedAgent.lastContact && (
+              <p className="cd-agent-last">
+                <IonIcon icon={timeOutline} /> Último contacto: {assignedAgent.lastContact}
+              </p>
+            )}
+          </IonCardContent>
+        </IonCard>
+      )}
 
       {/* Credit status */}
       <IonCard className="client-dashboard-card credit-status-card">
@@ -714,36 +881,6 @@ const ClientDashboardPage: React.FC = () => {
               be listed here are the same four booleans "Progreso para
               Préstamo" already tracks below (as Biométrico/Contrato/Pagaré/
               Cuenta de pago) — kept in one place instead of repeating it. */}
-        </IonCardContent>
-      </IonCard>
-
-      {/* Registered account — nowhere else on Home shows which account/card
-          will actually receive funds. Reuses stripeAccount, already fetched
-          on mount for the wizard checklist below. */}
-      <IonCard className="client-dashboard-card">
-        <IonCardHeader><IonCardTitle>Cuenta de pago</IonCardTitle></IonCardHeader>
-        <IonCardContent>
-          {stripeAccount?.hasExternalAccount ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <IonIcon icon={checkmarkCircleOutline} style={{ color: '#059669', fontSize: 26 }} />
-              <div>
-                <strong>
-                  {stripeAccount.externalAccountBankName || (stripeAccount.externalAccountType === 'card' ? 'Tarjeta' : 'Cuenta bancaria')}
-                </strong>
-                <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
-                  {stripeAccount.externalAccountType === 'card' ? 'Tarjeta' : 'CLABE'} terminada en {stripeAccount.externalAccountLast4 || '····'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <div>
-                <strong>Sin cuenta registrada</strong>
-                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>Necesaria para recibir tu préstamo.</p>
-              </div>
-              <IonButton size="small" fill="outline" onClick={() => goTab('payments')}>Agregar</IonButton>
-            </div>
-          )}
         </IonCardContent>
       </IonCard>
 
@@ -902,10 +1039,36 @@ const ClientDashboardPage: React.FC = () => {
           <IonCardContent>
             {stripeLoading && <p className="cd-stripe-loading">Verificando...</p>}
             {!stripeLoading && showStripeOnboarding && clientId && companyId && (
-              <StripeAccountOnboarding
+              <NativeConnectOnboarding
                 clientId={clientId}
                 companyId={companyId}
-                onExit={handleStripeOnboardingExit}
+                email={clientRecord?.email?.trim() || `client${clientId}@posgmo.mx`}
+                // Identity already accepted by Stripe → skip step 1 on reload.
+                startAtPayout={!!stripeAccount?.identitySubmitted && !stripeAccount?.hasExternalAccount}
+                onProgress={(done) => { fetchStripe(); if (done) setShowStripeOnboarding(false); }}
+                // Persist the client's edited identity so their corrections
+                // survive and re-seed the form next time (not the raw OCR).
+                onIdentitySaved={async (f) => {
+                  const ine = kycFieldsToIne(f);
+                  try {
+                    if (faceRecord?.clientFaceRecognitionId) {
+                      await upsertClientFaceRecognition(
+                        Number(companyId), Number(clientId), faceRecord.documentType,
+                        { nombre: ine.nombre, domicilio: ine.domicilio, fechaNacimiento: ine.fechaNacimiento, rfc: ine.rfc },
+                        faceRecord.clientFaceRecognitionId,
+                      );
+                      setFaceRecord((prev) => (prev ? { ...prev, ...ine } : prev));
+                    }
+                  } catch (e) { console.warn('[ClientDashboard] could not persist KYC identity edits:', e); }
+                }}
+                // The Expediente already read name, DOB, CURP and address off
+                // this client's INE and they are sitting in faceRecord — seed
+                // the form (plus their real account email/phone) instead of
+                // making them type it all again here.
+                prefill={buildKycPrefill(faceRecord ?? {}, {
+                  email: clientRecord?.email,
+                  cellphone: clientRecord?.cellphone,
+                })}
               />
             )}
             {!stripeLoading && !showStripeOnboarding && !stripeAccount && (
@@ -1159,37 +1322,33 @@ const ClientDashboardPage: React.FC = () => {
           ) : (
             <div className="cd-loan-form">
               <div className="cd-form-group">
-                <label>Nombre</label>
                 <IonInput
+                  label="Nombre" labelPlacement="floating" fill="outline"
                   value={profileForm.first_name}
                   onIonInput={e => setProfileForm(p => ({ ...p, first_name: e.detail.value || '' }))}
-                  className="cd-form-input"
                 />
               </div>
               <div className="cd-form-group">
-                <label>Apellido</label>
                 <IonInput
+                  label="Apellido" labelPlacement="floating" fill="outline"
                   value={profileForm.last_name}
                   onIonInput={e => setProfileForm(p => ({ ...p, last_name: e.detail.value || '' }))}
-                  className="cd-form-input"
                 />
               </div>
               <div className="cd-form-group">
-                <label>Email</label>
                 <IonInput
+                  label="Email" labelPlacement="floating" fill="outline"
                   type="email"
                   value={profileForm.email}
                   onIonInput={e => setProfileForm(p => ({ ...p, email: e.detail.value || '' }))}
-                  className="cd-form-input"
                 />
               </div>
               <div className="cd-form-group">
-                <label>Teléfono</label>
                 <IonInput
+                  label="Teléfono" labelPlacement="floating" fill="outline"
                   type="tel"
                   value={profileForm.cellphone}
                   onIonInput={e => setProfileForm(p => ({ ...p, cellphone: e.detail.value || '' }))}
-                  className="cd-form-input"
                 />
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
@@ -1334,35 +1493,31 @@ const ClientDashboardPage: React.FC = () => {
       <IonContent className="ion-padding">
         <div className="cd-loan-form">
           <div className="cd-form-group">
-            <label>Monto solicitado ($)</label>
             <IonInput
+              label="Monto solicitado ($)" labelPlacement="floating" fill="outline"
               type="number" value={newLoan.principalAmount} min={0}
               onIonInput={e => setNewLoan(p => ({ ...p, principalAmount: Number(e.detail.value) }))}
-              className="cd-form-input"
             />
           </div>
           <div className="cd-form-group">
-            <label>Tasa de interés (%)</label>
             <IonInput
+              label="Tasa de interés (%)" labelPlacement="floating" fill="outline"
               type="number" value={newLoan.interestRate} min={0}
               onIonInput={e => setNewLoan(p => ({ ...p, interestRate: Number(e.detail.value) }))}
-              className="cd-form-input"
             />
           </div>
           <div className="cd-form-group">
-            <label>Plazo (meses)</label>
             <IonInput
+              label="Plazo (meses)" labelPlacement="floating" fill="outline"
               type="number" value={newLoan.termMonths} min={1}
               onIonInput={e => setNewLoan(p => ({ ...p, termMonths: Number(e.detail.value) }))}
-              className="cd-form-input"
             />
           </div>
           <div className="cd-form-group">
-            <label>Frecuencia de pago</label>
             <IonSelect
+              label="Frecuencia de pago" labelPlacement="floating" fill="outline"
               value={newLoan.paymentFrequency}
               onIonChange={e => setNewLoan(p => ({ ...p, paymentFrequency: e.detail.value }))}
-              className="cd-form-input"
             >
               <IonSelectOption value="Weekly">Semanal</IonSelectOption>
               <IonSelectOption value="Biweekly">Quincenal</IonSelectOption>
@@ -1370,11 +1525,10 @@ const ClientDashboardPage: React.FC = () => {
             </IonSelect>
           </div>
           <div className="cd-form-group">
-            <label>Notas (opcional)</label>
             <IonInput
+              label="Notas (opcional)" labelPlacement="floating" fill="outline"
               value={newLoan.notes}
               onIonInput={e => setNewLoan(p => ({ ...p, notes: e.detail.value! }))}
-              className="cd-form-input"
               placeholder="Motivo del préstamo..."
             />
           </div>
@@ -1432,11 +1586,10 @@ const ClientDashboardPage: React.FC = () => {
           ) : (
             <>
               <div className="cd-form-group">
-                <label>Monto a pagar ($MXN)</label>
                 <IonInput
                   type="number" value={payAmount} placeholder="Ej: 500.00"
                   onIonInput={e => setPayAmount(e.detail.value!)}
-                  fill="outline" labelPlacement="floating" label="Monto"
+                  fill="outline" labelPlacement="floating" label="Monto a pagar ($MXN)"
                 />
               </div>
               {parseFloat(payAmount) > 0 && (
@@ -1503,7 +1656,9 @@ const ClientDashboardPage: React.FC = () => {
           {activeTab === 'profile'  && renderProfile()}
         </section>
 
-        <div style={{ height: 110 }} />
+        {/* Small breathing gap above the in-flow bottom nav (was 110px to
+            clear the old floating pill nav that overlaid the content). */}
+        <div style={{ height: 16 }} />
 
         {renderLoanModal()}
         {renderPayModal()}

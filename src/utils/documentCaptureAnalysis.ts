@@ -93,39 +93,205 @@ function computeBlurScore(laplacian: Float32Array, rect: OverlayRect, width: num
   return clampScore((variance / 150) * 100);
 }
 
-// Same Laplacian-variance measure as computeBlurScore, but run over the
-// WHOLE image at its native resolution instead of the live-gating pipeline's
-// heavily downsampled (240px-wide) analysis canvas. Downsampling smooths
-// away real blur — confirmed on-device: computeBlurScore reported its
-// maximum 100/100 on a capture that was still too blurry for OCR to read.
-// This has no calibrated 0-100 scale yet (variance scales with resolution,
-// so the 150/40 reference above doesn't transfer) — it returns the raw
-// variance for logging until a real full-resolution threshold is derived
-// from actual device data.
-export function computeFullResBlurVariance(imageData: ImageData): number {
+// Full-resolution sharpness, measured on the final captured crop rather than
+// the live-gating pipeline's downsampled (240px-wide) analysis canvas.
+//
+// This replaces an earlier Laplacian-variance version of the same idea, which
+// was measured against two real captures of the same INE — one the wizard
+// produced (visibly blurred, and which the extraction agent misread badly:
+// wrong surname, wrong street, wrong date of birth) and one sharp phone photo
+// that extracted perfectly. Laplacian variance ranked them BACKWARDS: 370 for
+// the blurry capture vs. 1080-equivalent for the sharp one, i.e. it would have
+// accepted the bad frame and rejected the good one.
+//
+// The reason is that the bad captures are noise-dominated, not smooth: they're
+// shot in poor light at high ISO, and sensor noise is high-frequency, so it
+// inflates Laplacian variance exactly when the image is worst. Normalizing by
+// image variance and an FFT high-frequency ratio were both tried and invert
+// the same way, for the same reason.
+//
+// Tenengrad — mean squared gradient magnitude counting only pixels above a
+// gradient floor — ignores the low-amplitude noise and measures real edge
+// structure. It ranks the same pair correctly by ~2.9x, and the ranking holds
+// across every gradient floor from 10 to 200, so it isn't an artifact of the
+// constant. Returns a raw score (higher = sharper); see MIN_CAPTURE_SHARPNESS
+// in GuidedDocumentCapture for the gate, which still needs field calibration.
+const GRADIENT_FLOOR = 50;
+
+export function computeCaptureSharpness(imageData: ImageData): number {
   const { data, width, height } = imageData;
   const gray = toGrayscale(data, width, height);
-  const laplacian = laplacianMap(gray, width, height);
 
   let sum = 0;
   let count = 0;
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
-      sum += laplacian[y * width + x];
-      count++;
+      const i = y * width + x;
+      const gx = gray[i + 1] - gray[i - 1];
+      const gy = gray[i + width] - gray[i - width];
+      const magnitude = gx * gx + gy * gy;
+      if (magnitude > GRADIENT_FLOOR) {
+        sum += magnitude;
+        count++;
+      }
     }
   }
-  if (count === 0) return 0;
-  const mean = sum / count;
+  return count === 0 ? 0 : sum / count;
+}
 
-  let variance = 0;
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const d = laplacian[y * width + x] - mean;
-      variance += d * d;
+export interface CardGeometry {
+  detected: boolean;
+  // Fraction of the analysed frame the card actually occupies. The blurry
+  // capture that triggered all this filled only ~40% of its 1100px crop, so
+  // the card resolved at ~208 DPI against the ~300 DPI the output width was
+  // sized for — under-filling costs real resolution before blur even applies.
+  coverage: number;
+  // In-plane rotation of the card's left edge, degrees.
+  //
+  // ADVISORY ONLY — do not gate on this yet. Checked against the two real
+  // captures available and it ranked them backwards: 2.6 deg / 0.06 keystone
+  // for the blurry wizard capture vs. 9.5 deg / 0.15 for the sharp phone photo
+  // that extracted perfectly. The projection-based mask picks up background
+  // glare and mis-locates the edge when the guide clips the card, so a hard
+  // "not frontal" gate built on these numbers would reject good captures.
+  // Surfaced as guidance text and logged so real device data can calibrate a
+  // threshold; coverage and sharpness are the checks that actually gate.
+  tiltDegrees: number;
+  keystoneRatio: number;
+  // Advisory, from the uncalibrated thresholds below. Not a capture gate.
+  isFrontal: boolean;
+}
+
+const ADVISORY_TILT_DEGREES = 7;
+const ADVISORY_KEYSTONE_RATIO = 0.12;
+
+// Otsu's method — splits the histogram into card vs. background without
+// assuming a fixed brightness, since these are shot on everything from a
+// dark desk to a lit countertop.
+function otsuThreshold(gray: Uint8ClampedArray): number {
+  const histogram = new Array(256).fill(0);
+  for (let i = 0; i < gray.length; i++) histogram[gray[i]]++;
+
+  const total = gray.length;
+  let sum = 0;
+  for (let t = 0; t < 256; t++) sum += t * histogram[t];
+
+  let sumBackground = 0;
+  let weightBackground = 0;
+  let maxVariance = -1;
+  let threshold = 128;
+
+  for (let t = 0; t < 256; t++) {
+    weightBackground += histogram[t];
+    if (weightBackground === 0) continue;
+    const weightForeground = total - weightBackground;
+    if (weightForeground === 0) break;
+
+    sumBackground += t * histogram[t];
+    const meanBackground = sumBackground / weightBackground;
+    const meanForeground = (sum - sumBackground) / weightForeground;
+    const between =
+      weightBackground * weightForeground * (meanBackground - meanForeground) ** 2;
+    if (between > maxVariance) {
+      maxVariance = between;
+      threshold = t;
     }
   }
-  return variance / count;
+  return threshold;
+}
+
+// Least-squares slope of the points, in degrees. Returns 0 for degenerate input.
+function slopeDegrees(points: Array<{ x: number; y: number }>): number {
+  const n = points.length;
+  if (n < 2) return 0;
+  let sumX = 0;
+  let sumY = 0;
+  for (const p of points) {
+    sumX += p.x;
+    sumY += p.y;
+  }
+  const meanX = sumX / n;
+  const meanY = sumY / n;
+
+  let numerator = 0;
+  let denominator = 0;
+  for (const p of points) {
+    numerator += (p.x - meanX) * (p.y - meanY);
+    denominator += (p.x - meanX) ** 2;
+  }
+  if (denominator === 0) return 0;
+  return (Math.atan(numerator / denominator) * 180) / Math.PI;
+}
+
+// Locates the card as the bright region against its background and reports how
+// well it's framed: filling the guide, square-on, and not rotated. This is a
+// projection-based estimate, not true corner detection — enough to tell a user
+// "hold it flat and fill the frame", not enough to rectify perspective.
+export function detectCardGeometry(imageData: ImageData): CardGeometry {
+  const { data, width, height } = imageData;
+  const gray = toGrayscale(data, width, height);
+  const threshold = otsuThreshold(gray);
+
+  const notDetected: CardGeometry = {
+    detected: false,
+    coverage: 0,
+    tiltDegrees: 0,
+    keystoneRatio: 0,
+    isFrontal: false,
+  };
+
+  // Per-row horizontal extent of the bright region. A row counts as part of
+  // the card only if enough of it is bright, which rejects specular glints and
+  // stray highlights in the background.
+  const minRunForCardRow = width * 0.25;
+  const rows: Array<{ y: number; left: number; right: number }> = [];
+  let brightPixels = 0;
+
+  for (let y = 0; y < height; y++) {
+    let left = -1;
+    let right = -1;
+    let count = 0;
+    for (let x = 0; x < width; x++) {
+      if (gray[y * width + x] > threshold) {
+        if (left === -1) left = x;
+        right = x;
+        count++;
+      }
+    }
+    brightPixels += count;
+    if (count >= minRunForCardRow && left !== -1) rows.push({ y, left, right });
+  }
+
+  if (rows.length < height * 0.2) return notDetected;
+
+  const top = rows[0];
+  const bottom = rows[rows.length - 1];
+  const cardHeight = bottom.y - top.y + 1;
+  if (cardHeight < 2) return notDetected;
+
+  // Average the extreme 10% of rows at each end rather than trusting a single
+  // row, so one ragged edge row can't drive the keystone estimate.
+  const band = Math.max(1, Math.round(rows.length * 0.1));
+  const meanWidth = (slice: typeof rows) =>
+    slice.reduce((acc, r) => acc + (r.right - r.left + 1), 0) / slice.length;
+  const topWidth = meanWidth(rows.slice(0, band));
+  const bottomWidth = meanWidth(rows.slice(-band));
+
+  const keystoneRatio =
+    Math.abs(topWidth - bottomWidth) / Math.max(topWidth, bottomWidth, 1);
+
+  // Rotation from the left-hand edge: its x drifts with in-plane rotation,
+  // and unlike the top edge it stays measurable when the card is cropped
+  // top/bottom by the guide.
+  const tiltDegrees = Math.abs(
+    slopeDegrees(rows.map((r) => ({ x: r.y, y: r.left })))
+  );
+
+  const coverage = brightPixels / (width * height);
+  const isFrontal =
+    tiltDegrees <= ADVISORY_TILT_DEGREES && keystoneRatio <= ADVISORY_KEYSTONE_RATIO;
+
+  return { detected: true, coverage, tiltDegrees, keystoneRatio, isFrontal };
 }
 
 // Scoped to the guide interior — a dark background around a well-lit

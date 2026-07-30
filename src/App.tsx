@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -9,8 +9,6 @@ import {
   IonIcon,
   IonLabel,
   IonRouterOutlet,
-  IonTabBar,
-  IonTabButton,
   IonTabs,
   IonMenu,
   IonList,
@@ -27,6 +25,7 @@ import {
   IonImg,
   IonButton,
   IonButtons,
+  useIonAlert,
   setupIonicReact,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
@@ -169,6 +168,24 @@ const AppShell: React.FC = () => {
   // navigate. Push manually and track the active one from the URL instead.
   const activeClientDashboardTab = new URLSearchParams(location.search).get('tab') || 'home';
   const goClientDashboardTab = (tab: string) => history.push(`/client-dashboard/${clientId}?tab=${tab}`);
+
+  // Lenders get their OWN bottom nav (Inicio/Pagos/Invertir/Invitar) — the
+  // borrower ?tab= tabs above are sections of the borrower dashboard and would
+  // send a lender to the wrong page. Pagos scrolls to a section on the lender
+  // dashboard; Invertir/Invitar are real routes.
+  const isLender = roleCode === 'lender';
+  const lenderSection = new URLSearchParams(location.search).get('section');
+  const activeLenderTab =
+    location.pathname.startsWith('/p2p-lending') ? 'invertir'
+      : location.pathname.startsWith('/rewards') ? 'invitar'
+      : lenderSection === 'pagos' ? 'pagos'
+      : 'inicio';
+  const goLenderTab = (tab: string) => {
+    if (tab === 'invertir') return history.push('/p2p-lending');
+    if (tab === 'invitar') return history.push('/rewards');
+    if (tab === 'pagos') return history.push(`/lender-dashboard/${clientId}?section=pagos`);
+    return history.push(`/lender-dashboard/${clientId}`); // inicio
+  };
   const [profileImageSrc, setProfileImageSrc] = useState(() =>
     resolveAvatarUrl(avatarUrl)
   );
@@ -258,9 +275,23 @@ const AppShell: React.FC = () => {
     };
   }, [userId]);
 
-  const handleLogout = () => {
+  const [presentLogoutAlert] = useIonAlert();
+
+  const doLogout = () => {
     logout();
     history.push('/login');
+  };
+
+  // Ask before ending the session: close it, or keep continuing (stay logged in).
+  const handleLogout = () => {
+    presentLogoutAlert({
+      header: 'Cerrar sesión',
+      message: '¿Deseas cerrar la sesión o continuar?',
+      buttons: [
+        { text: 'Continuar', role: 'cancel' },
+        { text: 'Cerrar sesión', role: 'destructive', handler: doLogout },
+      ],
+    });
   };
 
   return (
@@ -574,36 +605,62 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
           </IonRouterOutlet>
 
-          <IonTabBar slot="bottom" className="custom-tabbar">
-            {isSmartLoansRole ? [
-              <IonTabButton key="cd-home" tab="cd-home" selected={activeClientDashboardTab === 'home'} onClick={() => goClientDashboardTab('home')}>
-                <IonIcon aria-hidden="true" icon={homeOutline} />
-                <IonLabel>Home</IonLabel>
-              </IonTabButton>,
-              <IonTabButton key="cd-loans" tab="cd-loans" selected={activeClientDashboardTab === 'loans'} onClick={() => goClientDashboardTab('loans')}>
-                <IonIcon aria-hidden="true" icon={walletOutline} />
-                <IonLabel>Préstamos</IonLabel>
-              </IonTabButton>,
-              <IonTabButton key="cd-payments" tab="cd-payments" selected={activeClientDashboardTab === 'payments'} onClick={() => goClientDashboardTab('payments')}>
-                <IonIcon aria-hidden="true" icon={cardOutline} />
-                <IonLabel>Pagos</IonLabel>
-              </IonTabButton>,
-              <IonTabButton key="cd-activity" tab="cd-activity" selected={activeClientDashboardTab === 'activity'} onClick={() => goClientDashboardTab('activity')}>
-                <IonIcon aria-hidden="true" icon={pulseOutline} />
-                <IonLabel>Actividad</IonLabel>
-              </IonTabButton>,
-              <IonTabButton key="cd-profile" tab="cd-profile" selected={activeClientDashboardTab === 'profile'} onClick={() => goClientDashboardTab('profile')}>
-                <IonIcon aria-hidden="true" icon={personCircleOutline} />
-                <IonLabel>Perfil</IonLabel>
-              </IonTabButton>,
-            ] : (
-              <IonTabButton tab="dashboard" href="/dashboard">
+          {/* Custom bottom nav (was IonTabBar/IonTabButton). The SmartLoans
+              "tabs" are ?tab= query-param views on ONE route, not real Ionic tab
+              routes, so IonTabs' tab-select fired on every tap and logged
+              "[ion-tabs] Tab with id 'undefined' does not exist". A plain nav in
+              the same slot="bottom" keeps IonTabs' layout + the look without
+              that machinery. Navigation is the same onClick as before. */}
+          <div slot="bottom" className="cd-tabbar">
+            {isLender ? (
+              <>
+                <button type="button" className={`cd-tab${activeLenderTab === 'inicio' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('inicio')}>
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Inicio</span>
+                </button>
+                <button type="button" className={`cd-tab${activeLenderTab === 'pagos' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('pagos')}>
+                  <IonIcon aria-hidden="true" icon={cardOutline} />
+                  <span>Pagos</span>
+                </button>
+                <button type="button" className={`cd-tab${activeLenderTab === 'invertir' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('invertir')}>
+                  <IonIcon aria-hidden="true" icon={barChart} />
+                  <span>Invertir</span>
+                </button>
+                <button type="button" className={`cd-tab${activeLenderTab === 'invitar' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('invitar')}>
+                  <IonIcon aria-hidden="true" icon={peopleOutline} />
+                  <span>Invitar</span>
+                </button>
+              </>
+            ) : isSmartLoansRole ? (
+              <>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'home' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('home')}>
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Home</span>
+                </button>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'loans' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('loans')}>
+                  <IonIcon aria-hidden="true" icon={walletOutline} />
+                  <span>Préstamos</span>
+                </button>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'payments' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('payments')}>
+                  <IonIcon aria-hidden="true" icon={cardOutline} />
+                  <span>Pagos</span>
+                </button>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'activity' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('activity')}>
+                  <IonIcon aria-hidden="true" icon={pulseOutline} />
+                  <span>Actividad</span>
+                </button>
+                <button type="button" className={`cd-tab${activeClientDashboardTab === 'profile' ? ' cd-tab--active' : ''}`} onClick={() => goClientDashboardTab('profile')}>
+                  <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                  <span>Perfil</span>
+                </button>
+              </>
+            ) : (
+              <button type="button" className="cd-tab" onClick={() => history.push('/dashboard')}>
                 <IonIcon aria-hidden="true" icon={home} />
-                <IonLabel>Dashboard</IonLabel>
-              </IonTabButton>
+                <span>Dashboard</span>
+              </button>
             )}
-
-          </IonTabBar>
+          </div>
         </IonTabs>
       </IonPage>
     </IonSplitPane>
@@ -626,6 +683,15 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
   const { isAuthenticated, username, roleCode, clientId, logout } = useUser();
   const history = useHistory();
   const [isLocked, setIsLocked] = useState(false);
+  // Why the lock was raised, so unlock knows where to send the user:
+  //   'cold-start' — app launched fresh; there is no meaningful current screen,
+  //     so route to the post-login dashboard.
+  //   're-lock'    — app was backgrounded mid-session and came back; the user's
+  //     screen (e.g. a half-finished expediente wizard) is still mounted under
+  //     the lock overlay, so DON'T navigate — just dismiss and leave them
+  //     exactly where they were. Navigating here was throwing away in-progress
+  //     wizard state on every background/foreground.
+  const lockOriginRef = useRef<'cold-start' | 're-lock'>('cold-start');
 
   useEffect(() => {
     console.log('[BiometricLockGate] effect running. isNative =', Capacitor.isNativePlatform(), 'isAuthenticated =', isAuthenticated);
@@ -644,6 +710,7 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
       console.log('[BiometricLockGate] cold-start check: enabled =', enabled, 'cancelled =', cancelled);
       if (!cancelled && enabled) {
         console.log('[BiometricLockGate] cold-start: setIsLocked(true)');
+        lockOriginRef.current = 'cold-start';
         setIsLocked(true);
       }
 
@@ -656,7 +723,8 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
         const stillEnabled = await isBiometricLockEnabled();
         console.log('[BiometricLockGate] appStateChange: stillEnabled =', stillEnabled);
         if (stillEnabled) {
-          console.log('[BiometricLockGate] appStateChange: setIsLocked(true)');
+          console.log('[BiometricLockGate] appStateChange: setIsLocked(true) (re-lock)');
+          lockOriginRef.current = 're-lock';
           setIsLocked(true);
         }
       });
@@ -683,12 +751,19 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
     const ok = await authenticateBiometric('Desbloquea la app para continuar');
     console.log('[BiometricLockGate] handleUnlock: authenticateBiometric result =', ok);
     if (ok) {
-      // Route by role, same as Login.tsx — this used to hardcode '/dashboard'
-      // (the POS dashboard) for everyone, which sent borrower/lender users to
-      // the wrong screen after unlocking instead of their own client dashboard.
-      const targetRoute = getPostLoginRoute(roleCode, clientId);
-      console.log('[BiometricLockGate] handleUnlock: SUCCESS, roleCode =', roleCode, 'clientId =', clientId, '→ navigating to', targetRoute);
       setIsLocked(false);
+      if (lockOriginRef.current === 're-lock') {
+        // Backgrounded mid-session — the screen the user was on is still
+        // mounted under this overlay. Dismiss and stay put; navigating would
+        // discard in-progress state (e.g. a half-finished wizard).
+        console.log('[BiometricLockGate] handleUnlock: SUCCESS (re-lock) — staying on current screen');
+        return;
+      }
+      // Cold start — route by role, same as Login.tsx. (Used to hardcode
+      // '/dashboard' for everyone, which sent borrower/lender users to the POS
+      // dashboard instead of their own client dashboard.)
+      const targetRoute = getPostLoginRoute(roleCode, clientId);
+      console.log('[BiometricLockGate] handleUnlock: SUCCESS (cold-start), roleCode =', roleCode, 'clientId =', clientId, '→ navigating to', targetRoute);
       history.push(targetRoute);
     } else {
       console.log('[BiometricLockGate] handleUnlock: FAILED/CANCELLED, staying locked');
@@ -702,11 +777,9 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
     history.push('/login');
   };
 
-  const handleClose = () => {
-    console.log('[BiometricLockGate] handleClose: called, setIsLocked(false) + navigating to /dashboard');
-    setIsLocked(false);
-    history.push('/dashboard');
-  };
+  // handleClose removed: the lock screen no longer has a close/dismiss button.
+  // Bypassing biometric auth by closing the screen defeated the lock, and the
+  // only ways off it now are a successful unlock or an explicit logout.
 
   console.log('[BiometricLockGate] render. isLocked =', isLocked, 'isAuthenticated =', isAuthenticated);
 
@@ -718,7 +791,6 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
           username={username}
           onUnlock={handleUnlock}
           onLogout={handleLogout}
-          onClose={handleClose}
         />
       )}
     </>

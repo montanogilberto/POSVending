@@ -512,21 +512,9 @@
   margin-bottom: 16px;
 }
 
-.cd-form-group label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 6px;
-}
-
-.cd-form-input {
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  background: #f9fafb;
-  --padding-start: 12px;
-  --padding-end: 12px;
-}
+/* Native Ionic form controls (IonInput/IonSelect with fill="outline" +
+   floating labels) draw their own border, background and label — the old
+   raw <label> + .cd-form-input styling is no longer needed. */
 
 .cd-loan-preview {
   background: #eff6ff;
@@ -580,3 +568,139 @@
   gap: 10px; padding: 32px 16px; text-align: center;
 }
 .cd-pay-success-icon { font-size: 3.5rem; color: #148742; }
+
+/* ── Credit + payment-methods card (replaces the payout-account nag) ── */
+.cd-credit-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+.cd-credit-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cd-credit-amount {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.1;
+}
+.cd-credit-label {
+  font-size: 0.95rem;
+  color: #374151;
+}
+.cd-credit-due {
+  font-size: 0.85rem;
+  color: #6b7280;
+  text-align: right;
+  max-width: 45%;
+}
+
+.cd-pay-methods {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.cd-pay-tile {
+  width: 78px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 8px 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.cd-pay-last4 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #111827;
+}
+.cd-pay-brand {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.03em;
+}
+.cd-pay-tile-payout {
+  background: linear-gradient(135deg, #d1fae5 0%, #e0f2fe 100%);
+}
+.cd-pay-payout-icon {
+  font-size: 1.1rem;
+  color: #059669;
+}
+.cd-pay-add {
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  box-shadow: none;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  cursor: pointer;
+}
+.cd-pay-add ion-icon {
+  font-size: 1.4rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cd-credit-amount { color: #f9fafb; }
+  .cd-credit-label { color: #d1d5db; }
+  .cd-pay-tile { background: #1f2937; }
+  .cd-pay-last4 { color: #f9fafb; }
+  .cd-pay-add { background: #111827; border-color: #374151; }
+}
+
+/* Next-payment due date under the hero balance (merged credit card) */
+.hero-balance .hero-due {
+  font-size: 0.78rem;
+  color: #72809a;
+  margin: 4px 0 0;
+}
+
+/* ── Hero KPI strip (moved in from the old summary grid) ── */
+.hero-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.hero-stat { display: flex; flex-direction: column; gap: 2px; }
+.hero-stat span { font-size: 0.72rem; color: #72809a; }
+.hero-stat strong { font-size: 0.98rem; color: #0a1630; font-weight: 700; }
+
+/* ── Tu Agente card ── */
+.cd-agent-top { display: flex; align-items: center; gap: 14px; }
+.cd-agent-avatar { width: 60px; height: 60px; }
+.cd-agent-info { display: flex; flex-direction: column; gap: 2px; }
+.cd-agent-heading { font-size: 0.72rem; color: #72809a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.cd-agent-name { margin: 0; font-size: 1.05rem; font-weight: 700; color: #0a1630; }
+.cd-agent-id { font-size: 0.78rem; color: #6b7280; }
+.cd-agent-status {
+  align-self: flex-start;
+  margin-top: 4px;
+  --background: #dcfce7;
+  --color: #15803d;
+  font-size: 0.72rem;
+  border-radius: 999px;
+}
+.cd-agent-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.cd-agent-btn { flex: 1; min-width: 92px; --border-radius: 999px; font-size: 0.8rem; }
+.cd-agent-last {
+  margin: 14px 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero-stat strong, .cd-agent-name { color: #f9fafb; }
+  .hero-stats { border-top-color: rgba(255, 255, 255, 0.08); }
+}

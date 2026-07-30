@@ -40,6 +40,8 @@ interface ConnectedAccount {
   chargesEnabled: boolean;
   payoutsEnabled: boolean;
   detailsSubmitted: boolean;
+  identitySubmitted?: boolean;
+  hasExternalAccount?: boolean;
   onboardingUrl?: string;
 }
 
@@ -65,13 +67,6 @@ interface PaymentIntentResponse {
   currency: string;
 }
 
-async function createConnectedAccount(clientId: number, companyId: number, email: string): Promise<ConnectedAccount> {
-  const res = await fetch(`${_api}/stripe/connected-accounts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, email }) });
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.account;
-}
-
 async function getConnectedAccount(clientId: number, companyId: number): Promise<ConnectedAccount | null> {
   try {
     const res = await fetch(`${_api}/stripe/connected-accounts/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId }) });
@@ -79,12 +74,6 @@ async function getConnectedAccount(clientId: number, companyId: number): Promise
     const data = await res.json();
     return data.account;
   } catch { return null; }
-}
-
-async function getOnboardingLink(clientId: number, companyId: number, returnUrl: string, refreshUrl: string): Promise<{ url: string }> {
-  const res = await fetch(`${_api}/stripe/onboarding-link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, returnUrl, refreshUrl }) });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
 }
 
 async function _createPaymentIntent(payload: object): Promise<PaymentIntentResponse> {
@@ -108,6 +97,7 @@ function createRepaymentIntent(payload: { companyId: number; loanId: number; bor
 }
 import { createPushNotification } from '../../api/pushNotificationsApi';
 import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biometricAuth';
+import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
 import './LoanPaymentPage.css';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────
@@ -240,25 +230,16 @@ const LoanPaymentPage: React.FC = () => {
     };
   }, [step]);
 
-  // ── KYC: initiate Stripe Connect onboarding ───────────────────────────
-  const startOnboarding = async () => {
-    setLoading(true);
-    try {
-      // Create connected account if it doesn't exist
-      if (!connAccount) {
-        await createConnectedAccount(clientId, companyId, `client${clientId}@posgmo.mx`);
-      }
-      const { url } = await getOnboardingLink(
-        clientId, companyId,
-        `${window.location.origin}/p2p-lending`,
-        `${window.location.origin}/payment?mode=${mode}&amount=${amountQP}&loanId=${loanId}&lenderId=${lenderId}`,
-      );
-      window.open(url, '_blank');
-      showToast('Completa tu verificación en la ventana que se abrió y regresa aquí', 'primary');
-    } catch (e: any) {
-      showToast(e?.message ?? 'Error al iniciar verificación', 'danger');
+  // ── KYC: refresh account after a native-onboarding step completes ──────
+  // (the hosted onboarding-link redirect this page used to open is gone —
+  // NativeConnectOnboarding collects identity + payout in-app, same as the
+  // lender/borrower dashboards)
+  const refreshAccount = async (advanceIfEnabled: boolean) => {
+    const acct = await getConnectedAccount(clientId, companyId);
+    setConnAccount(acct);
+    if (advanceIfEnabled && acct?.chargesEnabled) {
+      setStep(amountQP > 0 ? 'card' : 'amount');
     }
-    setLoading(false);
   };
 
   // ── Confirm payment ────────────────────────────────────────────────────
@@ -353,7 +334,7 @@ const LoanPaymentPage: React.FC = () => {
           onDidDismiss={() => setToast(null)} color={toastColor} position="top"
         />
 
-        {/* ════ STEP: KYC ════ */}
+        {/* ════ STEP: KYC (native, in-app — no Stripe redirect) ════ */}
         {step === 'kyc' && (
           <div className="lpp-panel">
             <div className="lpp-step-icon lpp-step-icon--kyc">
@@ -361,37 +342,17 @@ const LoanPaymentPage: React.FC = () => {
             </div>
             <h2 className="lpp-panel-title">Verificación de identidad requerida</h2>
             <p className="lpp-panel-desc">
-              Para cumplir con la normativa financiera en México y habilitar pagos con tarjeta, necesitas completar la verificación KYC (Know Your Customer) a través de Stripe.
+              Para cumplir con la normativa financiera en México y habilitar pagos con tarjeta, completa tu verificación sin salir de la app.
             </p>
 
-            <div className="lpp-kyc-list">
-              {[
-                { icon: '🪪', label: 'INE / Pasaporte', desc: 'Documento de identidad oficial vigente' },
-                { icon: '🤳', label: 'Selfie en vivo', desc: 'Foto en tiempo real para verificación biométrica' },
-                { icon: '🏦', label: 'CLABE bancaria', desc: 'Para recibir/enviar transferencias' },
-                { icon: '📋', label: 'RFC', desc: 'Registro Federal de Contribuyentes (opcional)' },
-              ].map((item, i) => (
-                <div key={i} className="lpp-kyc-item">
-                  <span className="lpp-kyc-emoji">{item.icon}</span>
-                  <div>
-                    <p className="lpp-kyc-label">{item.label}</p>
-                    <p className="lpp-kyc-desc">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {connAccount && !connAccount.chargesEnabled && (
-              <div className="lpp-info-box lpp-info-box--warn">
-                <IonIcon icon={alertCircleOutline} />
-                <p>Tu cuenta está pendiente de verificación. Completa el proceso en Stripe para activar pagos.</p>
-              </div>
-            )}
-
-            <IonButton expand="block" onClick={startOnboarding} disabled={loading}>
-              <IonIcon icon={shieldCheckmarkOutline} slot="start" />
-              {connAccount ? 'Continuar verificación en Stripe' : 'Iniciar verificación'}
-            </IonButton>
+            <NativeConnectOnboarding
+              clientId={clientId}
+              companyId={companyId}
+              email={`client${clientId}@posgmo.mx`}
+              // Identity already accepted by Stripe → open on the payout step.
+              startAtPayout={!!connAccount?.identitySubmitted && !connAccount?.hasExternalAccount}
+              onProgress={(done) => { refreshAccount(done); }}
+            />
 
             {connAccount?.chargesEnabled && (
               <IonButton expand="block" fill="outline" onClick={() => setStep(amountQP > 0 ? 'card' : 'amount')} className="ion-margin-top">
@@ -415,7 +376,7 @@ const LoanPaymentPage: React.FC = () => {
             <h2 className="lpp-panel-title">{isTopUp ? '¿Cuánto quieres agregar?' : '¿Cuánto quieres pagar?'}</h2>
             <p className="lpp-panel-desc">
               {isTopUp
-                ? 'El capital que ingreses estará disponible de inmediato para que lo prestes a través de la plataforma P2P.'
+                ? 'El capital que ingreses estará disponible de inmediato para que lo prestes a través de la plataforma smartLoans.'
                 : `Ingresa el monto del pago para el préstamo #${loanId}.`}
             </p>
 
@@ -544,7 +505,7 @@ const LoanPaymentPage: React.FC = () => {
               </div>
             )}
             <IonButton expand="block" onClick={() => history.replace(isTopUp ? '/p2p-lending' : '/loans')}>
-              {isTopUp ? 'Ir a plataforma P2P' : 'Ver mis préstamos'}
+              {isTopUp ? 'Ir a plataforma SmartLoans' : 'Ver mis préstamos'}
             </IonButton>
             <IonButton expand="block" fill="outline" onClick={() => history.replace('/dashboard')}>
               Ir al inicio

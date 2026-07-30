@@ -129,6 +129,36 @@ export const updateUser = async (userId: number, payload: Partial<CreateUserPayl
   return data;
 };
 
+/**
+ * Persist a profile avatar to dbo.users.imageUrl via POST /users action=2.
+ * Target by `userId` when the caller holds it (self-serve), or by `clientId`
+ * (agent-assisted KYC only knows the subject's client) — sp_users resolves the
+ * clientId to the linked login. /one_users reads imageUrl back as the avatar.
+ */
+export const saveProfileImage = async (
+  target: { userId?: number; clientId?: number },
+  imageUrl: string,
+): Promise<UserSaveResponse> => {
+  const body = {
+    users: [{
+      action: 2,
+      user_id: target.userId ?? 0,
+      ...(target.clientId ? { clientId: target.clientId } : {}),
+      imageUrl,
+    }],
+  };
+  console.log('[saveProfileImage] REQUEST →', body);
+  const res = await fetch(`${API_BASE_URL}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  console.log('[saveProfileImage] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.msg || data.error || `Error ${res.status}`);
+  return data;
+};
+
 export interface ContactCheckResult {
   found: boolean;
   clientId?: number;
@@ -206,6 +236,27 @@ export const sendVerificationCode = async (
   });
   const data = await res.json();
   console.log('[sendVerificationCode] RESPONSE status=%d', res.status, data);
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+};
+
+/**
+ * POST /send_account_created — notifies a newly-registered user of their login
+ * username via email / SMS / WhatsApp. The username is the key detail (login
+ * requires it). Best-effort: callers should not block registration on failure.
+ */
+export const sendAccountCreated = async (
+  target: string,
+  username: string,
+  method: 'email' | 'sms' | 'whatsapp' = 'email',
+): Promise<void> => {
+  console.log('[sendAccountCreated] method=%s target=%s username=%s', method, target, username);
+  const res = await fetch(`${API_BASE_URL}/send_account_created`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target, username, method }),
+  });
+  const data = await res.json();
+  console.log('[sendAccountCreated] RESPONSE status=%d', res.status, data);
   if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
 };
 

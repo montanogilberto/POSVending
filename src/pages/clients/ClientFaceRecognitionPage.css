@@ -323,6 +323,29 @@
   color: var(--ion-color-primary);
 }
 
+/* Initial deep-link load: fetching the client + existing expediente before we
+   know which step to resume to. */
+.cfr-step-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 16px;
+}
+
+.cfr-step-loading ion-spinner {
+  width: 44px;
+  height: 44px;
+  color: var(--ion-color-primary);
+}
+
+.cfr-step-loading p {
+  margin: 0;
+  font-size: 15px;
+  color: #6b7280;
+}
+
 .cfr-processing-title {
   font-size: 22px;
   font-weight: 700;

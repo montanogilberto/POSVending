@@ -232,19 +232,33 @@ const ClientsPage: React.FC = () => {
     ocrRanForRef.current = key;
 
     let cancelled = false;
+    console.log('[ClientsPage] OCR effect: running OCR on front+back captures', JSON.stringify({
+      frontSource: idFrontBlobUrl ? 'blobUrl' : 'base64',
+      backSource: idBackBlobUrl ? 'blobUrl' : 'base64',
+      idFrontBlobUrl: idFrontBlobUrl || '(not uploaded yet)',
+      idBackBlobUrl: idBackBlobUrl || '(not uploaded yet)',
+    }));
     setOcrLoading(true);
     setOcrError('');
 
-    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
-      .then(([front, back]) => {
+    // Single call for both sides — see idOcr.ts. Blob URLs when the early
+    // upload has landed, base64 otherwise.
+    extractIneFields({
+      frontUrl: idFrontBlobUrl || undefined,
+      backUrl: idBackBlobUrl || undefined,
+      frontBase64: idFrontImageBase64,
+      backBase64: idBackImageBase64,
+    })
+      .then(({ fields, lowConfidenceFields }) => {
         if (cancelled) return;
+        console.log('[ClientsPage] OCR effect: result', JSON.stringify(fields), 'lowConfidence:', lowConfidenceFields);
         setExtractedIdFields((prev) => ({
           ...prev,
-          nombre: front.nombre || back.nombre || prev.nombre,
-          domicilio: front.domicilio || back.domicilio || prev.domicilio,
-          curp: front.curp || back.curp || prev.curp,
-          claveElector: front.claveElector || back.claveElector || prev.claveElector,
-          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento || prev.fechaNacimiento,
+          nombre: fields.nombre || prev.nombre,
+          domicilio: fields.domicilio || prev.domicilio,
+          curp: fields.curp || prev.curp,
+          claveElector: fields.claveElector || prev.claveElector,
+          fechaNacimiento: fields.fechaNacimiento || prev.fechaNacimiento,
         }));
       })
       .catch((err) => {
@@ -1087,9 +1101,6 @@ const ClientsPage: React.FC = () => {
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
           <h2 className="cfr-capture-title">Confirma que la información sea correcta</h2>
-          <p className="cfr-capture-desc">
-            Revisa los datos y las capturas de la identificación antes de continuar con la validación facial.
-          </p>
 
           <div className="ion-margin-top">
             <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
@@ -1346,6 +1357,14 @@ const ClientsPage: React.FC = () => {
     loadClients();
   };
 
+  // Lenders exist to receive repayments, so they cannot function without a
+  // payout account and are asked here. Borrowers are charged, not paid — the
+  // one time they receive money is the loan principal, and that account is
+  // provisioned then rather than at signup (see ClientDashboardPage's wizard
+  // handoff). 'both' covers clients acting in either role.
+  const needsPayoutAccount =
+    newClient.clientType === 'lender' || newClient.clientType === 'both';
+
   const renderStep6 = () => (
     <div className="wizard-step-body">
       <div className="wizard-step-header">
@@ -1354,10 +1373,21 @@ const ClientsPage: React.FC = () => {
         </div>
         <h2 className="wizard-step-title">Cuenta de Pagos</h2>
         <p className="wizard-step-desc">
-          El cliente registra su información bancaria para recibir y realizar pagos de forma segura.
+          {needsPayoutAccount
+            ? 'El cliente registra su información bancaria para recibir y realizar pagos de forma segura.'
+            : 'El cliente registra la tarjeta con la que se cobrarán automáticamente las cuotas del préstamo.'}
         </p>
       </div>
 
+      {/* Payout account — only for clients who actually RECEIVE money.
+          Stripe requires identity verification (legal name, DOB, CURP, home
+          address) from payout recipients, so a borrower who only ever pays
+          installments should never be asked for it here; their card below is
+          the whole mechanism. Borrowers do need a payout account eventually,
+          to receive loan principal, but that is deferred to the point a lender
+          actually funds a loan rather than demanded from every signup. */}
+      {needsPayoutAccount && (
+      <>
       {/* Client + KYC status summary */}
       <div className="wizard-stripe-status-card">
         <div className={`wizard-stripe-status-icon-wrap${stripeKycDone ? ' done' : ''}`}>
@@ -1401,6 +1431,8 @@ const ClientsPage: React.FC = () => {
             </span>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {createdClientId && (

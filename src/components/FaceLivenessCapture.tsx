@@ -22,9 +22,19 @@ import './FaceLivenessCapture.css';
 
 type CaptureState = 'loading-models' | 'starting-camera' | 'searching' | 'challenge' | 'awaiting-blink' | 'captured' | 'error';
 
+// The five head positions captured during the session. 'front' is the neutral
+// pose sampled the moment the face is first acquired; the other four are
+// grabbed at the instant each directional challenge is satisfied, so each one
+// is genuine evidence of that pose rather than a re-enactment afterwards.
+export type FacePose = 'front' | 'up' | 'down' | 'left' | 'right';
+
+export type PosePhotos = Partial<Record<FacePose, string>>;
+
 export interface FaceLivenessResult {
   selfieBase64: string;
   descriptor: Float32Array;
+  // Keyed by pose; a pose is absent only if its frame could not be grabbed.
+  posePhotos: PosePhotos;
 }
 
 interface FaceLivenessCaptureProps {
@@ -33,6 +43,30 @@ interface FaceLivenessCaptureProps {
 }
 
 const ANALYSIS_INTERVAL_MS = 150;
+// Passive-blink gate disabled by request — the session completes right after the
+// 4 randomized head-turn challenges. Anti-spoofing still relies on those moves,
+// the descriptor-consistency check and the ID-photo match. Flip back to true to
+// re-enable the blink requirement (all the blink code below stays wired up).
+const REQUIRE_BLINK = false;
+// A blink's closed phase is ~100ms, so during the passive-blink gate we sample
+// faster to actually catch it (the head is already still, so the extra CPU is fine).
+const BLINK_ANALYSIS_INTERVAL_MS = 70;
+// Hard ceiling on the passive-blink wait. If no blink is sampled in this window
+// the session proceeds anyway — blink is a secondary anti-spoof layer behind the
+// ID-photo match, the 4-direction challenge and the descriptor-consistency check,
+// none of which a hang should be allowed to block. Prevents the "workflow stopped".
+const BLINK_TIMEOUT_MS = 7000;
+// Consecutive undetected frames tolerated before the UI falls back to
+// "searching" and re-presents the instruction. At 150ms/frame this rides out
+// roughly half a second of dropout — matching the 2-4 frame gaps observed on
+// device during the down challenge — without masking a real loss of the face.
+const FACE_LOST_GRACE_FRAMES = 4;
+
+// Low on purpose: this flow's goal is extracting the INE data, not a strict
+// biometric face-match, so a lightly-soft pose frame is fine and capturing fast
+// matters more than chasing a pristine still frame. The burst exits as soon as
+// one frame clears this; the best-of fallback still applies if none do.
+const POSE_SHARPNESS_FLOOR = 130;
 
 // Fixed compass position per direction (SVG angle: 0deg = 3 o'clock, clockwise).
 const RING_TARGET_DEG: Record<LivenessChallenge, number> = {
@@ -81,8 +115,13 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   const doneRef = useRef(false);
   const challengeStateRef = useRef<ChallengeFrameState>(newChallengeState());
   const lastDetectionRef = useRef<FaceDetectionResult | null>(null);
+  const missedFramesRef = useRef(0);
   const challengeIndexRef = useRef(0);
   const blinkStateRef = useRef<BlinkTrackerState>(newBlinkTrackerState());
+  // Timestamp (performance.now) when the passive-blink gate began, so it can
+  // fall through after BLINK_TIMEOUT_MS instead of hanging forever if the blink
+  // is never sampled (blink ~100ms can fall between frames). 0 = not waiting.
+  const awaitingBlinkSinceRef = useRef(0);
   const challengeDescriptorsRef = useRef<Float32Array[]>([]);
   // Roughly-frontal descriptor from the very first detected frame, before
   // any directional challenge starts — used as the consistency-check
@@ -103,39 +142,142 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     streamRef.current = null;
   }, []);
 
+  // Grabs the current video frame as a JPEG data URL. Shared by the per-pose
+  // captures and the final selfie so they cannot drift in encoding/quality.
+  const grabFrame = useCallback((): string => {
+    const video = videoRef.current;
+    const canvas = captureCanvasRef.current;
+    if (!video || !canvas || !video.videoWidth) return '';
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.92);
+  }, []);
+
+  // Captured as each pose is actually achieved — see PosePhotos.
+  const posePhotosRef = useRef<PosePhotos>({});
+  // Guards against launching a second sharpest-frame burst for the same pose.
+  const poseBurstRef = useRef<Partial<Record<FacePose, boolean>>>({});
+  // Small offscreen canvas reused for the per-frame sharpness metric.
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Cheap focus metric: mean squared horizontal luminance gradient of a
+  // downscaled frame. Higher = sharper. Used to reject motion-blurred poses.
+  const measureSharpness = useCallback((): number => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return 0;
+    let canvas = analysisCanvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 120;
+      analysisCanvasRef.current = canvas;
+    }
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return 0;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let sum = 0;
+    let count = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 1; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const j = (y * width + (x - 1)) * 4;
+        const g1 = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        const g0 = 0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2];
+        const d = g1 - g0;
+        sum += d * d;
+        count++;
+      }
+    }
+    return count ? sum / count : 0;
+  }, []);
+
+  // Grab a short burst of frames around the moment a pose is achieved and keep
+  // the SHARPEST one. The head momentarily stops at the furthest point, so its
+  // clearest frame is right here — the old single grab often landed mid-motion
+  // and came out motion-blurred, which the validation agent then rejected.
+  const capturePose = useCallback(
+    async (pose: FacePose) => {
+      if (poseBurstRef.current[pose]) return; // burst already ran for this pose
+      poseBurstRef.current[pose] = true;
+
+      let bestFrame = grabFrame();
+      let bestSharp = bestFrame ? measureSharpness() : -1;
+      if (bestFrame) posePhotosRef.current[pose] = bestFrame;
+
+      // Keep sampling until the sharpest frame clears POSE_SHARPNESS_FLOOR, or a
+      // bounded window (~720ms at 40ms/frame) elapses — whichever first. With the
+      // raised floor most poses now sample the whole window, which is the point:
+      // the user holds the pose for a beat, so the still (sharpest) frame lands a
+      // few hundred ms after the turn angle is first hit — the early single grab
+      // missed it. A blurry candidate never beats the best, so this only ever
+      // improves the result, and the fallback keeps the sharpest frame so the
+      // pose can never stall.
+      const MAX_ATTEMPTS = 18;
+      for (let i = 0; i < MAX_ATTEMPTS && bestSharp < POSE_SHARPNESS_FLOOR; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        if (doneRef.current) break;
+        const frame = grabFrame();
+        if (!frame) continue;
+        const sharp = measureSharpness();
+        if (sharp > bestSharp) {
+          bestSharp = sharp;
+          bestFrame = frame;
+          posePhotosRef.current[pose] = frame;
+        }
+      }
+      console.log(
+        `[FaceLivenessCapture] capturePose(${pose}): sharpest of burst, sharpness=${bestSharp.toFixed(0)}` +
+        `${bestSharp < POSE_SHARPNESS_FLOOR ? ' (below floor — kept best)' : ''}, length=${bestFrame?.length ?? 0}`,
+      );
+    },
+    [grabFrame, measureSharpness],
+  );
+
   const finish = useCallback(
     (descriptor: Float32Array) => {
       console.log('[FaceLivenessCapture] finish: all checks passed, capturing selfie frame');
-      const video = videoRef.current;
-      const canvas = captureCanvasRef.current;
-      if (!video || !canvas) {
-        console.log('[FaceLivenessCapture] finish: ABORT — missing video/canvas', { hasVideo: !!video, hasCanvas: !!canvas });
+      const selfieBase64 = grabFrame();
+      if (!selfieBase64) {
+        console.log('[FaceLivenessCapture] finish: ABORT — could not grab final frame');
         return;
       }
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const selfieBase64 = canvas.toDataURL('image/jpeg', 0.92);
       console.log('[FaceLivenessCapture] finish: selfie captured, base64 length =', selfieBase64.length);
+
+      // Fall back to the final frame for 'front' if the neutral capture never
+      // landed, so the pose set is never missing the one Stripe/ID matching
+      // and the validation agent care about most.
+      if (!posePhotosRef.current.front) posePhotosRef.current.front = selfieBase64;
+
+      const posePhotos = { ...posePhotosRef.current };
+      console.log('[FaceLivenessCapture] finish: pose photos =', JSON.stringify(
+        (Object.keys(posePhotos) as FacePose[]).reduce<Record<string, number>>(
+          (acc, k) => { acc[k] = posePhotos[k]?.length ?? 0; return acc; }, {}
+        )
+      ));
 
       stopStream();
       setState('captured');
       setTimeout(() => {
         console.log('[FaceLivenessCapture] finish: calling onComplete()');
-        onComplete({ selfieBase64, descriptor });
+        onComplete({ selfieBase64, descriptor, posePhotos });
       }, 500);
     },
-    [onComplete, stopStream]
+    [onComplete, stopStream, grabFrame]
   );
 
   const tick = useCallback(
     async (timestamp: number) => {
       if (doneRef.current) return;
 
-      if (timestamp - lastTickRef.current < ANALYSIS_INTERVAL_MS) {
+      // Sample faster once we're on the passive-blink gate so a ~100ms blink lands.
+      const interval = challengeIndexRef.current >= sequence.length
+        ? BLINK_ANALYSIS_INTERVAL_MS
+        : ANALYSIS_INTERVAL_MS;
+      if (timestamp - lastTickRef.current < interval) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -151,15 +293,28 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       if (doneRef.current) return;
 
       if (!detection) {
-        lastDetectionRef.current = null;
-        setState((prev) => (prev === 'captured' ? prev : 'searching'));
+        // Tolerate brief dropouts instead of falling back to "searching" on a
+        // single missed frame. Device logs show the down challenge losing the
+        // face for 2-4 consecutive frames at a time while the user is holding
+        // the pose correctly — each of those reset the UI and re-presented the
+        // same instruction, so the prompt visibly flickered and the challenge
+        // looked broken even though the head position was fine.
+        missedFramesRef.current += 1;
+        if (missedFramesRef.current >= FACE_LOST_GRACE_FRAMES) {
+          lastDetectionRef.current = null;
+          setState((prev) => (prev === 'captured' ? prev : 'searching'));
+        }
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
 
+      missedFramesRef.current = 0;
       lastDetectionRef.current = detection;
       if (!neutralDescriptorRef.current) {
         neutralDescriptorRef.current = detection.descriptor;
+        // Same frame the neutral descriptor comes from: face acquired, no
+        // challenge presented yet, so the head is still square to the camera.
+        capturePose('front');
       }
       setState((prev) => {
         if (prev === 'loading-models' || prev === 'starting-camera' || prev === 'searching') {
@@ -181,10 +336,16 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       if (challengeIndexRef.current >= sequence.length) {
         // All 4 directions satisfied — now waiting on the passive blink
         // check before accepting the session.
-        if (!blinked) {
-          setState('awaiting-blink');
-          rafRef.current = requestAnimationFrame(tick);
-          return;
+        if (REQUIRE_BLINK && !blinked) {
+          if (awaitingBlinkSinceRef.current === 0) awaitingBlinkSinceRef.current = timestamp;
+          // Don't hang forever if the blink is never sampled — fall through after
+          // the timeout so the session still completes (see BLINK_TIMEOUT_MS).
+          if (timestamp - awaitingBlinkSinceRef.current < BLINK_TIMEOUT_MS) {
+            setState('awaiting-blink');
+            rafRef.current = requestAnimationFrame(tick);
+            return;
+          }
+          console.log('[FaceLivenessCapture] tick: blink not sampled within timeout — proceeding on the other liveness checks');
         }
 
         const { consistent } = checkDescriptorConsistency(
@@ -214,6 +375,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       if (completed && !doneRef.current) {
         const nextIndex = challengeIndexRef.current + 1;
         console.log(`[FaceLivenessCapture] tick: move "${challenge}" satisfied (${nextIndex}/4)`);
+        // Grab the frame on the very tick the pose was satisfied — the head is
+        // at its furthest point now, and waiting even a few frames catches it
+        // already returning to neutral.
+        capturePose(challenge as FacePose);
         challengeDescriptorsRef.current.push(detection.descriptor);
         challengeIndexRef.current = nextIndex;
         challengeStateRef.current = newChallengeState();
@@ -222,7 +387,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
       rafRef.current = requestAnimationFrame(tick);
     },
-    [sequence, finish, stopStream]
+    [sequence, finish, stopStream, capturePose]
   );
 
   const startCameraAndLoop = useCallback(
@@ -245,8 +410,16 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
         }
 
         console.log('[FaceLivenessCapture] startCameraAndLoop: calling getUserMedia (front camera)');
+        // Request 720p: 640x480 (VGA) left the pose/selfie frames too low-detail
+        // for the validation agent to match reliably. `ideal` lets the WebView
+        // fall back to the nearest supported size if 720p isn't available, so it
+        // stays safe across devices. face-api detection handles 720p comfortably.
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         });
         if (doneRef.current) {
@@ -294,9 +467,15 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     challengeIndexRef.current = 0;
     challengeStateRef.current = newChallengeState();
     blinkStateRef.current = newBlinkTrackerState();
+    awaitingBlinkSinceRef.current = 0;
     challengeDescriptorsRef.current = [];
     neutralDescriptorRef.current = null;
     lastDetectionRef.current = null;
+    missedFramesRef.current = 0;
+    // Discard poses from the abandoned attempt — mixing them with a new run
+    // would defeat the point of capturing evidence of a single session.
+    posePhotosRef.current = {};
+    poseBurstRef.current = {};
     doneRef.current = false;
     setSequence(newSequence);
     setChallengeIndex(0);

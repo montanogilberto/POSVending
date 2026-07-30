@@ -3,7 +3,13 @@ import { IonIcon } from '@ionic/react';
 import { apertureOutline, cameraOutline, helpCircleOutline, personOutline, warningOutline } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { Camera } from '@capacitor/camera';
-import { analyzeFrame, computeFullResBlurVariance, OverlayRect, PositionHint } from '../utils/documentCaptureAnalysis';
+import {
+  analyzeFrame,
+  computeCaptureSharpness,
+  detectCardGeometry,
+  OverlayRect,
+  PositionHint,
+} from '../utils/documentCaptureAnalysis';
 import './GuidedDocumentCapture.css';
 
 type CaptureState = 'initializing' | 'searching' | 'aligning' | 'stable' | 'captured' | 'error';
@@ -58,7 +64,11 @@ const POSITION_HINT_LABEL: Record<PositionHint, string> = {
 interface GuidedDocumentCaptureProps {
   title: string;
   instructions: string;
-  onCapture: (base64: string) => void;
+  // base64 = the ~1100px OCR/display/quality-gate image (unchanged).
+  // highResBase64 = a full-detail crop of the same card, for biometric use
+  // (the INE-portrait comparison needs more pixels than text OCR). Caller may
+  // ignore it (e.g. the back side doesn't need it).
+  onCapture: (base64: string, highResBase64?: string) => void;
   onHelp?: () => void;
 }
 
@@ -96,6 +106,37 @@ const MIN_BLUR_SCORE = 70;
 // state from getUserMedia, so a longer required steady streak is the
 // practical proxy.
 const STABILITY_FRAMES_REQUIRED = 14;
+
+// Full-resolution capture gates. Both are measured on the final crop, where
+// the live 240px analysis canvas can't see the blur that actually breaks
+// extraction — see computeCaptureSharpness for why the previous
+// Laplacian-variance metric ranked good and bad captures backwards.
+//
+// Originally 600, a two-sample guess between a blurry INE (370, misread by the
+// extraction agent) and a sharp reference phone photo (~1080). Real-device logs
+// then showed that guess was UNREACHABLE on an actual handheld capture: across
+// ~120 capture attempts on one device the sharpest frames the camera ever
+// produced topped out at 571-573, with the genuinely-sharp cluster sitting at
+// ~480-573 and blurry/soft frames at ~140-350. With the gate at 600 it never
+// fired, so every capture ground through the rejection budget and then
+// force-accepted whatever frame happened to be on screen (often 220-430) —
+// blurrier than frames it had just rejected. The agent then flagged that
+// force-accepted image as "too blurry". 480 sits above the soft cluster with
+// margin and below the achievable sharp cluster, so a real sharp frame now
+// passes on its own within a second or two instead of force-accepting a worse
+// one. Still above the known-bad 370. Tighten toward ~520 only if better-
+// focusing devices show a higher achievable ceiling in the logs.
+const MIN_CAPTURE_SHARPNESS = 480;
+// Lowered 0.55 → 0.45. Device logs showed sharp, readable frames (sharpness
+// 700-1200) getting rejected purely for coverage 0.32-0.5, which stalled the
+// capture. Since the goal is OCR-extracting the INE fields — which succeeds well
+// below full-frame coverage — 0.45 accepts a card that's clearly in-frame and
+// legible without demanding it fill the guide edge-to-edge. (Very low coverage
+// does degrade OCR, so this isn't dropped further.)
+const MIN_CARD_COVERAGE = 0.45;
+// How many rejected attempts before the manual shutter is allowed to override
+// the quality gate — see the escape hatch in captureFrame.
+const FORCE_AFTER_REJECTIONS = 3;
 const ANALYSIS_INTERVAL_MS = 100; // ~10 fps
 const ANALYSIS_CANVAS_WIDTH = 240;
 
@@ -153,12 +194,23 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const previousGrayRef = useRef<Uint8ClampedArray | null>(null);
   const consecutiveGoodRef = useRef(0);
   const capturedRef = useRef(false);
+  // Breaks the captureFrame <-> tick useCallback cycle (see captureFrame).
+  const tickRef = useRef<((timestamp: number) => void) | null>(null);
+  const rejectionCountRef = useRef(0);
+  // Sharpest frame seen during the current capture attempt, retained so that if
+  // the quality gate is ever force-overridden we upload the best frame we
+  // actually saw — not whichever (often blurrier) frame happened to be on
+  // screen at the moment the rejection budget ran out. Reset per attempt.
+  const bestSharpnessRef = useRef(0);
+  const bestBase64Ref = useRef<string | null>(null);
+  const bestHiResRef = useRef<string | undefined>(undefined);
 
   const [state, setState] = useState<CaptureState>('initializing');
   const [overlayRect, setOverlayRect] = useState<OverlayRect | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [positionHint, setPositionHint] = useState<PositionHint>('move-closer');
   const [focusMessage, setFocusMessage] = useState('');
+  const [rejectionMessage, setRejectionMessage] = useState('');
 
   const stopStream = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -166,7 +218,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     streamRef.current = null;
   }, []);
 
-  const captureFrame = useCallback(async () => {
+  const captureFrame = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     const container = containerRef.current;
@@ -255,17 +307,142 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     if (!ctx) return;
     ctx.drawImage(drawSource, cropX, cropY, cropW, cropH, 0, 0, outputW, outputH);
 
-    // Logged (not gated on yet) to calibrate a real full-resolution
-    // sharpness threshold — the live-gating blurScore is measured on a
-    // heavily downsampled 240px analysis canvas, which smooths away blur
-    // that's still present at this capture's native resolution.
-    const fullResVariance = computeFullResBlurVariance(ctx.getImageData(0, 0, outputW, outputH));
-    console.log('[GuidedDocumentCapture] captureFrame: fullResBlurVariance =', fullResVariance);
+    // Builds the two JPEGs emitted for a capture from the CURRENT crop: the
+    // 1100px OCR/display image (gated) and a 2400px crop of the same region for
+    // the face agent (needs more pixels than text OCR; shares the gated crop's
+    // coordinates, so no separate gate). Shared by the accept path and the
+    // best-frame snapshot below so they can't drift apart.
+    const HI_RES_WIDTH = 2400;
+    const buildOutputs = (): { base64: string; highResBase64?: string } => {
+      const base64 = canvas.toDataURL('image/jpeg', 0.92);
+      let highResBase64: string | undefined;
+      const hiScale = Math.min(1, HI_RES_WIDTH / cropW);
+      const hiW = Math.round(cropW * hiScale);
+      const hiH = Math.round(cropH * hiScale);
+      const hiCanvas = document.createElement('canvas');
+      hiCanvas.width = hiW;
+      hiCanvas.height = hiH;
+      const hiCtx = hiCanvas.getContext('2d');
+      if (hiCtx) {
+        hiCtx.drawImage(drawSource, cropX, cropY, cropW, cropH, 0, 0, hiW, hiH);
+        highResBase64 = hiCanvas.toDataURL('image/jpeg', 0.95);
+      }
+      return { base64, highResBase64 };
+    };
 
-    const base64 = canvas.toDataURL('image/jpeg', 0.92);
+    // Real quality gate, measured on the final crop rather than the 240px
+    // live-analysis canvas that smooths blur away. Both checks are calibrated
+    // against two captures of the same INE: the wizard's own blurry one, which
+    // the extraction agent read as the wrong surname, wrong street and wrong
+    // date of birth while still reporting full confidence, and a sharp phone
+    // photo of the same card that extracted perfectly.
+    const captureImageData = ctx.getImageData(0, 0, outputW, outputH);
+    const sharpness = computeCaptureSharpness(captureImageData);
+    const geometry = detectCardGeometry(captureImageData);
+
+    // JSON.stringify, not a bare object: Capacitor's Android console bridge
+    // renders objects as "[object Object]", which made the first round of
+    // these logs useless for calibrating the thresholds below.
+    console.log('[GuidedDocumentCapture] captureFrame: quality =', JSON.stringify({
+      sharpness: Math.round(sharpness),
+      minRequired: MIN_CAPTURE_SHARPNESS,
+      coverage: Number(geometry.coverage.toFixed(3)),
+      minCoverage: MIN_CARD_COVERAGE,
+      tiltDegrees: Number(geometry.tiltDegrees.toFixed(1)),
+      keystoneRatio: Number(geometry.keystoneRatio.toFixed(3)),
+      isFrontalAdvisory: geometry.isFrontal,
+      effectiveCardDpi: Math.round((outputW * Math.sqrt(geometry.coverage)) / 85.6 * 25.4),
+    }));
+
+    // Retain the sharpest not-too-small frame of this attempt, so if the gate
+    // is force-overridden below we can upload it rather than the current frame,
+    // which is often blurrier than frames rejected seconds earlier.
+    if (sharpness > bestSharpnessRef.current && (!geometry.detected || geometry.coverage >= MIN_CARD_COVERAGE)) {
+      bestSharpnessRef.current = sharpness;
+      const best = buildOutputs();
+      bestBase64Ref.current = best.base64;
+      bestHiResRef.current = best.highResBase64;
+    }
+
+    // Reject rather than accept a capture the agent would silently misread.
+    // Only sharpness and coverage gate — the tilt/keystone numbers are not
+    // calibrated yet and ranked the two known captures backwards, so they
+    // only drive guidance text (see detectCardGeometry).
+    const tooBlurry = sharpness < MIN_CAPTURE_SHARPNESS;
+    const tooSmall = geometry.detected && geometry.coverage < MIN_CARD_COVERAGE;
+
+    // Escape hatch. Some cameras will never clear these thresholds — the
+    // manual shutter exists precisely because a stuck autofocus or bad light
+    // can keep the automatic gate from ever firing, and gating it too would
+    // turn "blurry photo" into "cannot onboard at all", which is worse. After
+    // FORCE_AFTER_REJECTIONS rejections the client's next manual press goes
+    // through regardless, logged loudly so these show up in device logs.
+    const exhaustedRetries = rejectionCountRef.current >= FORCE_AFTER_REJECTIONS;
+    if ((tooBlurry || tooSmall) && force && exhaustedRetries) {
+      console.warn(
+        '[GuidedDocumentCapture] captureFrame: FORCED past quality gate after',
+        rejectionCountRef.current, 'rejections —',
+        JSON.stringify({ sharpness: Math.round(sharpness), coverage: Number(geometry.coverage.toFixed(3)) }),
+        'extraction on this image may be unreliable; expect manual correction.'
+      );
+      // Upload the sharpest frame we saw this attempt, not the current one —
+      // it's frequently blurrier than frames rejected earlier in the streak.
+      if (bestBase64Ref.current && bestSharpnessRef.current > sharpness) {
+        console.warn(
+          '[GuidedDocumentCapture] captureFrame: emitting sharpest retained frame instead of current —',
+          JSON.stringify({ retained: Math.round(bestSharpnessRef.current), current: Math.round(sharpness) })
+        );
+        const retainedBase64 = bestBase64Ref.current;
+        const retainedHiRes = bestHiResRef.current;
+        bestSharpnessRef.current = 0;
+        bestBase64Ref.current = null;
+        bestHiResRef.current = undefined;
+        stopStream();
+        setState('captured');
+        setTimeout(() => onCapture(retainedBase64, retainedHiRes), 350);
+        return;
+      }
+    } else if (tooBlurry || tooSmall) {
+      rejectionCountRef.current += 1;
+      const reason = tooBlurry
+        ? 'La foto salió borrosa. Mantén el teléfono quieto y espera a que enfoque.'
+        : 'Acerca más la credencial para que llene el recuadro.';
+      console.log(
+        '[GuidedDocumentCapture] captureFrame: REJECTED —',
+        tooBlurry ? 'sharpness' : 'coverage',
+        JSON.stringify({
+          sharpness: Math.round(sharpness),
+          coverage: Number(geometry.coverage.toFixed(3)),
+          rejectionCount: rejectionCountRef.current,
+        })
+      );
+      setRejectionMessage(reason);
+      setTimeout(() => setRejectionMessage(''), 4000);
+      // Resume scanning: the stream is still live, so just clear the latch
+      // and restart the analysis loop for another attempt.
+      consecutiveGoodRef.current = 0;
+      capturedRef.current = false;
+      setState('searching');
+      // Via a ref: tick depends on captureFrame, so calling it directly here
+      // would make the two useCallbacks circular.
+      rafRef.current = requestAnimationFrame((t) => tickRef.current?.(t));
+      return;
+    }
+
+    if (!geometry.isFrontal) {
+      console.log('[GuidedDocumentCapture] captureFrame: accepted but not face-on (advisory)');
+    }
+
+    // Passed the gate (or forced with no sharper frame retained): emit the
+    // current frame. See buildOutputs above for the OCR vs. hi-res split.
+    const { base64, highResBase64 } = buildOutputs();
+    bestSharpnessRef.current = 0;
+    bestBase64Ref.current = null;
+    bestHiResRef.current = undefined;
+
     stopStream();
     setState('captured');
-    setTimeout(() => onCapture(base64), 350);
+    setTimeout(() => onCapture(base64, highResBase64), 350);
   }, [onCapture, stopStream]);
 
   // Lets the client force a photo instead of waiting on the auto-stability
@@ -274,7 +451,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
   const handleManualCapture = useCallback(() => {
     if (capturedRef.current || state === 'initializing' || state === 'error' || state === 'captured') return;
     capturedRef.current = true;
-    captureFrame();
+    captureFrame({ force: true });
   }, [captureFrame, state]);
 
   // Nudges the camera to refocus — mainly useful when the frame is stuck
@@ -370,6 +547,13 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     },
     [captureFrame]
   );
+
+  // captureFrame restarts the analysis loop through this ref after rejecting a
+  // capture, which it can't do by calling tick directly without the two
+  // useCallbacks becoming circular.
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -471,6 +655,11 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       )}
 
       {focusMessage && <div className="gdc-focus-message">{focusMessage}</div>}
+
+      {/* Shown when a capture was taken but rejected as too blurry or too
+          small — the stream is still live and scanning has resumed, so this
+          tells the client what to change before the next attempt. */}
+      {rejectionMessage && <div className="gdc-focus-message">{rejectionMessage}</div>}
 
       {state !== 'error' && (
         <div className="gdc-controls">

@@ -235,16 +235,21 @@ const ClientsPage: React.FC = () => {
     setOcrLoading(true);
     setOcrError('');
 
-    Promise.all([extractIneFields(idFrontImageBase64), extractIneFields(idBackImageBase64)])
-      .then(([front, back]) => {
+    extractIneFields({
+      frontUrl: idFrontBlobUrl || undefined,
+      backUrl: idBackBlobUrl || undefined,
+      frontBase64: idFrontImageBase64,
+      backBase64: idBackImageBase64,
+    })
+      .then(({ fields }) => {
         if (cancelled) return;
         setExtractedIdFields((prev) => ({
           ...prev,
-          nombre: front.nombre || back.nombre || prev.nombre,
-          domicilio: front.domicilio || back.domicilio || prev.domicilio,
-          curp: front.curp || back.curp || prev.curp,
-          claveElector: front.claveElector || back.claveElector || prev.claveElector,
-          fechaNacimiento: front.fechaNacimiento || back.fechaNacimiento || prev.fechaNacimiento,
+          nombre: fields.nombre || prev.nombre,
+          domicilio: fields.domicilio || prev.domicilio,
+          curp: fields.curp || prev.curp,
+          claveElector: fields.claveElector || prev.claveElector,
+          fechaNacimiento: fields.fechaNacimiento || prev.fechaNacimiento,
         }));
       })
       .catch((err) => {
@@ -1087,16 +1092,6 @@ const ClientsPage: React.FC = () => {
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
           <h2 className="cfr-capture-title">Confirma que la información sea correcta</h2>
-          <p className="cfr-capture-desc">
-            Revisa los datos y las capturas de la identificación antes de continuar con la validación facial.
-          </p>
-
-          <div className="ion-margin-top">
-            <p><strong>Cliente:</strong> {newClient.first_name} {newClient.last_name}</p>
-            <p><strong>Teléfono:</strong> {newClient.cellphone || '—'}</p>
-            <p><strong>Email:</strong> {newClient.email || '—'}</p>
-            <p><strong>Documento:</strong> {documentType || '—'}</p>
-          </div>
 
           <div className="id-summary-images">
             <div className="id-summary-image-card">

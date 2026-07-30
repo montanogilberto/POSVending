@@ -65,10 +65,30 @@ async function detectFace(
   return { descriptor: result.descriptor, landmarks: result.landmarks };
 }
 
+// Second pass at a lower confidence bar, used only when the first misses.
+// Pitching the head down foreshortens the jaw and partially closes the eyelids,
+// which drops TinyFaceDetector's score below 0.5 — device logs showed clusters
+// of "face not detected" frames during the down challenge and none during
+// up/left/right. Retrying the same frame more permissively recovers those
+// frames instead of stalling the challenge; the cost is only paid on frames
+// that would otherwise have been lost entirely.
+const VIDEO_DETECTOR_OPTIONS_PERMISSIVE = new faceapi.TinyFaceDetectorOptions({
+  inputSize: 320,
+  scoreThreshold: 0.3,
+});
+
 export async function detectFaceFromVideo(video: HTMLVideoElement): Promise<FaceDetectionResult | null> {
   await loadFaceApiModels();
-  const result = await detectFace(video, VIDEO_DETECTOR_OPTIONS);
-  console.log('[FaceLiveness] detectFaceFromVideo: face', result ? 'DETECTED' : 'not detected this frame');
+  let result = await detectFace(video, VIDEO_DETECTOR_OPTIONS);
+  if (!result) {
+    result = await detectFace(video, VIDEO_DETECTOR_OPTIONS_PERMISSIVE);
+    console.log(
+      '[FaceLiveness] detectFaceFromVideo: first pass missed, permissive retry',
+      result ? 'RECOVERED' : 'also missed'
+    );
+    return result;
+  }
+  console.log('[FaceLiveness] detectFaceFromVideo: face DETECTED');
   return result;
 }
 
@@ -136,7 +156,11 @@ export function pickChallengeSequence(): LivenessChallenge[] {
   return sequence;
 }
 
-const YAW_OFFSET_RATIO = 0.18; // left/right — confirmed against real device logs (0.34 / -0.187 observed)
+// Kept permissive on purpose. This flow's goal is extracting the INE data, not
+// a forensic face-match, so liveness only needs to prove a live person is
+// present — not to satisfy a strict biometric-distinctness bar. 0.18 completes
+// a left/right turn with an easy, comfortable movement.
+const YAW_OFFSET_RATIO = 0.18; // left/right
 const PITCH_UP_OFFSET_RATIO = 0.15; // up — confirmed reliable against real device logs (-0.208 observed)
 // "down" needs a lower bar than "up": confirmed via device logs that tilting
 // the head down destabilizes face-api.js's landmark detection much more than
@@ -144,16 +168,54 @@ const PITCH_UP_OFFSET_RATIO = 0.15; // up — confirmed reliable against real de
 // challenge, none during up/left/right) — chin/jaw contour foreshortens and
 // eyelids partially close, so the same 0.15 threshold took ~27s to satisfy
 // instead of under a second like every other direction.
+//
+// Lowering it to 0.10 was not enough on its own: a later device log shows down
+// completing at 0.102 against the 0.10 bar — a 2% margin, taking 9.5s, versus
+// 1.1-1.6x margins and under a second for the other three. Dropping the
+// absolute number further would put it inside landmark noise and weaken the
+// anti-spoofing value, so pitch is now measured RELATIVE to the user's own
+// resting pose instead (see PITCH_*_DELTA below). This absolute floor is kept
+// as a fallback for the frames before a baseline exists.
 const PITCH_DOWN_OFFSET_RATIO = 0.10;
+
+// Pitch is the one axis where the resting value is not centered near zero: how
+// far the phone sits below eye level shifts every user's neutral offsetYRatio,
+// and it is normal to hold it low, which eats most of the downward range
+// before the challenge even starts. Yaw does not have this problem — nobody
+// holds the phone systematically off to one side — which is why left/right
+// clear their thresholds comfortably and down does not.
+//
+// Measuring the CHANGE from the user's own neutral pose removes that offset.
+// The deltas are set from the one device log available (down moved ~0.10 from
+// a near-zero baseline), so treat them as a starting point: the logged
+// baseline/delta values are what to calibrate against once there are more runs.
+// Kept permissive (goal is data extraction, not a strict biometric challenge):
+// a small, comfortable head tilt is enough to prove liveness.
+const PITCH_DOWN_DELTA = 0.09;
+const PITCH_UP_DELTA = 0.13;
 
 export interface ChallengeFrameState {
   /** true once the challenge's motion was actually observed this attempt */
   triggered: boolean;
+  /**
+   * The user's resting offsetYRatio, sampled from the first frames of the
+   * challenge before they start moving. Pitch is judged as movement away from
+   * this rather than against an absolute number — see PITCH_DOWN_DELTA.
+   */
+  pitchBaseline?: number;
+  /** Frames folded into pitchBaseline so far. */
+  baselineSamples?: number;
 }
 
 export function newChallengeState(): ChallengeFrameState {
   return { triggered: false };
 }
+
+// Frames averaged into the resting-pose baseline before the pitch challenge is
+// judged. At ~150ms per frame this is roughly half a second — long enough to
+// average out landmark jitter, short enough that the user has not started
+// moving yet (the prompt only appears once the face is acquired).
+const PITCH_BASELINE_FRAMES = 4;
 
 // Called once per analyzed video frame. Mutates `state` and returns whether
 // the given challenge just completed on this frame.
@@ -196,12 +258,54 @@ export function evaluateChallengeFrame(
   const faceHeight = Math.abs(chin.y - eyeMidY) || 1;
   const offsetYRatio = (noseTip.y - (eyeMidY + chin.y) / 2) / faceHeight;
 
-  if (challenge === 'down' && offsetYRatio > PITCH_DOWN_OFFSET_RATIO) {
-    if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[down]: offsetYRatio =', offsetYRatio.toFixed(3), '→ challenge COMPLETE');
+  // Accumulate the resting pose from the first frames of the challenge, WITHOUT
+  // gating on it: a device log shows "up" completing about three frames after
+  // the prompt appeared, so returning early until a baseline existed would have
+  // made a challenge that already worked measurably slower. The absolute test
+  // below runs from frame one regardless; the delta test simply switches on
+  // once there are enough samples to be meaningful.
+  const samples = state.baselineSamples ?? 0;
+  if (samples < PITCH_BASELINE_FRAMES) {
+    const previous = state.pitchBaseline ?? 0;
+    state.pitchBaseline = (previous * samples + offsetYRatio) / (samples + 1);
+    state.baselineSamples = samples + 1;
+    if (state.baselineSamples === PITCH_BASELINE_FRAMES) {
+      console.log(
+        `[FaceLiveness] evaluateChallengeFrame[${challenge}]: pitch baseline =`,
+        state.pitchBaseline.toFixed(3)
+      );
+    }
+  }
+
+  const baselineReady = (state.baselineSamples ?? 0) >= PITCH_BASELINE_FRAMES;
+  const baseline = state.pitchBaseline ?? 0;
+  const delta = offsetYRatio - baseline;
+
+  // Either the movement from rest OR the absolute pose satisfies the challenge.
+  // The absolute floor is the primary path and always applies. The delta only
+  // adds a second route for users whose resting pitch is already offset (phone
+  // held well below eye level), which eats into the downward range before the
+  // challenge even starts — it never blocks a pose the absolute test accepts.
+  if (challenge === 'down' && ((baselineReady && delta > PITCH_DOWN_DELTA) || offsetYRatio > PITCH_DOWN_OFFSET_RATIO)) {
+    if (!state.triggered) {
+      console.log(
+        '[FaceLiveness] evaluateChallengeFrame[down]: offsetYRatio =', offsetYRatio.toFixed(3),
+        '| baseline =', baseline.toFixed(3),
+        '| delta =', delta.toFixed(3),
+        '→ challenge COMPLETE'
+      );
+    }
     state.triggered = true;
   }
-  if (challenge === 'up' && offsetYRatio < -PITCH_UP_OFFSET_RATIO) {
-    if (!state.triggered) console.log('[FaceLiveness] evaluateChallengeFrame[up]: offsetYRatio =', offsetYRatio.toFixed(3), '→ challenge COMPLETE');
+  if (challenge === 'up' && ((baselineReady && delta < -PITCH_UP_DELTA) || offsetYRatio < -PITCH_UP_OFFSET_RATIO)) {
+    if (!state.triggered) {
+      console.log(
+        '[FaceLiveness] evaluateChallengeFrame[up]: offsetYRatio =', offsetYRatio.toFixed(3),
+        '| baseline =', baseline.toFixed(3),
+        '| delta =', delta.toFixed(3),
+        '→ challenge COMPLETE'
+      );
+    }
     state.triggered = true;
   }
   return state.triggered;
@@ -229,15 +333,24 @@ function eyeAspectRatio(eye: faceapi.Point[]): number {
   return (vertical1 + vertical2) / (2 * horizontal);
 }
 
-const EAR_CLOSED_THRESHOLD = 0.21;
+// 0.21 is the canonical dlib EAR-closed value, but face-api's 68-point
+// landmark net at inputSize 224 reads noisier/higher — a real full blink on a
+// phone often only dips to ~0.24-0.27 and never crosses 0.21, so that absolute
+// cutoff made blinks structurally undetectable (the session hung on the passive
+// blink gate). We now use a higher absolute floor AND a per-person relative
+// drop learned from that user's own open-eye EAR, which adapts to face/device.
+const EAR_CLOSED_ABS = 0.24;   // absolute "eyes closed" cutoff
+const EAR_CLOSED_REL = 0.78;   // …or a 22% drop below this person's open baseline
+const EAR_NOISE_FLOOR = 0.10;  // below this the landmarks are garbage — ignore
 
 export interface BlinkTrackerState {
   earWasClosed: boolean;
   blinkDetected: boolean;
+  openBaseline: number; // running estimate of this person's eyes-open EAR
 }
 
 export function newBlinkTrackerState(): BlinkTrackerState {
-  return { earWasClosed: false, blinkDetected: false };
+  return { earWasClosed: false, blinkDetected: false, openBaseline: 0 };
 }
 
 // Called every frame regardless of which directional challenge is active.
@@ -246,10 +359,15 @@ export function newBlinkTrackerState(): BlinkTrackerState {
 // moves — kills the simplest, most common spoofing attempt.
 export function trackBlink(detection: FaceDetectionResult, state: BlinkTrackerState): boolean {
   const ear = (eyeAspectRatio(detection.landmarks.getLeftEye()) + eyeAspectRatio(detection.landmarks.getRightEye())) / 2;
-  if (ear < EAR_CLOSED_THRESHOLD) {
+  if (ear < EAR_NOISE_FLOOR) return state.blinkDetected; // implausible reading — skip
+  // Learn the open-eye EAR from the highest values seen (eyes are open the vast
+  // majority of frames), so the closed cutoff scales to wide- vs narrow-eyed users.
+  if (ear > state.openBaseline) state.openBaseline = ear;
+  const closedCutoff = Math.max(EAR_CLOSED_ABS, state.openBaseline * EAR_CLOSED_REL);
+  if (ear < closedCutoff) {
     state.earWasClosed = true;
   } else if (state.earWasClosed && !state.blinkDetected) {
-    console.log('[FaceLiveness] trackBlink: blink detected, EAR =', ear.toFixed(3));
+    console.log('[FaceLiveness] trackBlink: blink detected, EAR =', ear.toFixed(3), '| cutoff =', closedCutoff.toFixed(3), '| baseline =', state.openBaseline.toFixed(3));
     state.blinkDetected = true;
   }
   return state.blinkDetected;
