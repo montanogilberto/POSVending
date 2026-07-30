@@ -920,8 +920,12 @@ const ClientDashboardPage: React.FC = () => {
           <IonGrid>
             <IonRow>
               <IonCol size="6">
+                {/* DESHABILITADO (decisión de prueba): el flujo directo creaba
+                    préstamos 'Pending' huérfanos sin prestamista/dinero/cuotas.
+                    Las solicitudes reales van por el marketplace P2P (oferta →
+                    Enviar solicitud). */}
                 <IonButton expand="block" shape="round" className="client-dashboard-action-button"
-                  onClick={() => { setShowLoanModal(true); }}>
+                  disabled>
                   <IonIcon icon={addCircleOutline} slot="start" /> Solicitar préstamo
                 </IonButton>
               </IonCol>
@@ -964,7 +968,7 @@ const ClientDashboardPage: React.FC = () => {
       <IonCardHeader>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <IonCardTitle>Mis Préstamos</IonCardTitle>
-          <IonButton fill="clear" size="small" onClick={() => setShowLoanModal(true)}>
+          <IonButton fill="clear" size="small" disabled>
             <IonIcon icon={addCircleOutline} slot="start" /> Nuevo
           </IonButton>
         </div>
@@ -975,7 +979,7 @@ const ClientDashboardPage: React.FC = () => {
           <div className="cd-empty-state">
             <IonIcon icon={documentTextOutline} />
             <p>No tienes préstamos registrados.</p>
-            <IonButton size="small" onClick={() => setShowLoanModal(true)}>Solicitar préstamo</IonButton>
+            <IonButton size="small" disabled>Solicitar préstamo</IonButton>
           </div>
         )}
         <div className="cd-loan-list">

@@ -101,6 +101,7 @@ import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
+import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import P2PLendingPage from './pages/loans/P2PLendingPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
@@ -603,6 +604,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
+            <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
           </IonRouterOutlet>
 
           {/* Custom bottom nav (was IonTabBar/IonTabButton). The SmartLoans

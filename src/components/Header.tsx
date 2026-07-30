@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useUser } from './UserContext';
+import { fetchMyNotifications } from '../api/myNotificationsApi';
 import './Header.css';
 
 interface HeaderProps {
@@ -27,11 +28,21 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const history = useHistory();
   const { cart } = useCart();
-  const { roleCode } = useUser();
+  const { roleCode, userId } = useUser();
   // No shopping cart concept in the SmartLoans (borrower/lender) experience.
   const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
   const [unreadCount, setUnreadCount] = useState(0);
   const listenerRef = useRef<any>(null);
+
+  // Seed the badge from the persisted inbox (NotificationDeliveries.isRead) so
+  // it survives app restarts — previously it only counted pushes received while
+  // the app was open, so nothing was trackable afterwards.
+  useEffect(() => {
+    if (!userId) return;
+    fetchMyNotifications(userId)
+      .then(({ unreadCount: n }) => setUnreadCount(n))
+      .catch(() => {});
+  }, [userId]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -42,8 +53,9 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const handleNotificationsClick = () => {
+    console.log('[Header] bell → /notifications (inbox), unread =', unreadCount);
     setUnreadCount(0);
-    history.push('/pushNotifications');
+    history.push('/notifications');
   };
 
   // Calculate total quantity of products in cart
