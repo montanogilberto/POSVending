@@ -173,6 +173,43 @@ const LoanChatPage: React.FC = () => {
     setToast(msg); setToastColor(color);
   };
 
+  // Assistant quick topics — route the LLM agent to the right sub-agent:
+  // cuenta, contratos, o legal (GUÍA).
+  const AGENT_TOPICS = [
+    { topic: 'invest',   label: '🎯 Cómo invertir', msg: 'Quiero invertir, guíame paso a paso.' },
+    { topic: 'account',  label: '📊 Mi cuenta',     msg: 'Quiero información sobre mi cuenta.' },
+    { topic: 'contract', label: '📄 Contratos',     msg: 'Tengo dudas sobre mis contratos.' },
+    { topic: 'legal',    label: '⚖️ Legal (GUÍA)',  msg: 'Necesito orientación legal.' },
+  ];
+
+  const sendTopic = async (t: typeof AGENT_TOPICS[number]) => {
+    if (!conv) return;
+    console.log('[ChatUI] topic chip →', t.topic);
+    await loanChatApi.sendMessage({
+      companyId: companyId!, conversationId: conv.conversationId,
+      senderId: mySenderId, senderUserId: userId ?? undefined,
+      senderRole: myRole, msgType: 'text', body: t.msg, topic: t.topic,
+    });
+    fetchMessages(conv.conversationId);
+  };
+
+  // Deep-link topic (?topic=invest desde el banner de soporte): captured in a
+  // ref because initConversation history.replace()s the URL, dropping the
+  // param before the conversation is ready. Auto-sends ONCE.
+  const initTopicRef = useRef(params.get('topic'));
+  const topicSentRef = useRef(false);
+  useEffect(() => {
+    if (!conv || topicSentRef.current) return;
+    const t = AGENT_TOPICS.find(x => x.topic === initTopicRef.current);
+    if (!t) return;
+    const assistant = conv.isAssistant ?? (agentClientId > 0 && conv.lenderId === agentClientId);
+    if (!assistant) return;
+    topicSentRef.current = true;
+    console.log('[ChatUI] auto-send topic from URL →', t.topic);
+    sendTopic(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv, agentClientId]);
+
   const sendText = async () => {
     if (!text.trim() || !conv) return;
     const body = text.trim();
@@ -364,7 +401,7 @@ const LoanChatPage: React.FC = () => {
           </IonButtons>
         </IonToolbar>
         {isAssistantChat && (
-          <div style={{ padding: '6px 14px', fontSize: 12, background: '#eef2ff', color: '#3730a3' }}>
+          <div className="lc-assistant-banner">
             Chat informativo con el asistente. Para negociar un préstamo real,
             ve al marketplace y chatea desde una oferta.
           </div>
@@ -438,6 +475,15 @@ const LoanChatPage: React.FC = () => {
 
       {conv?.status === 'open' && (
         <IonFooter className="lc-footer">
+          {isAssistantChat && (
+            <div className="lc-topic-chips">
+              {AGENT_TOPICS.map(t => (
+                <button key={t.topic} className="lc-topic-chip" onClick={() => sendTopic(t)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="lc-toolbar">
             {!isAssistantChat && (
               <IonButton fill="clear" size="small"

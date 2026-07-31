@@ -124,8 +124,10 @@ const LoanChatListPage: React.FC = () => {
         })}
 
         {/* Asistente IA — identidad desde GET /loanChat/config (LOANCHAT_AGENT_CLIENT_ID);
-            oculto si el backend no lo tiene configurado. */}
-        {roleCode === 'borrower' && agentClientId > 0 && (
+            oculto si el backend no lo tiene configurado. Ambos roles: el
+            borrower para negociar/preguntar, el lender para soporte
+            (cuenta · contratos · legal GUÍA). */}
+        {agentClientId > 0 && (
           <IonButton expand="block" fill="outline" style={{ marginTop: 16 }}
             onClick={() => history.push(`/loan-chat/new?lenderId=${agentClientId}`)}>
             <IonIcon icon={sparklesOutline} slot="start" />

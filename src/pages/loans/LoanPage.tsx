@@ -62,15 +62,29 @@ const LoanPage: React.FC = () => {
   const [displayedLoans, setDisplayedLoans] = useState<Loan[]>([]);
   const [page, setPage] = useState(1);
 
-  const { companyId } = useUser();
+  const { companyId, roleCode, clientId } = useUser();
+  // P2P loans are contracts born from negotiation (oferta → propuesta →
+  // aprobación) and backed by real money movement. Borrowers and lenders see
+  // them READ-ONLY here — no editar/eliminar/registrar. Back-office roles
+  // keep the CRUD.
+  const canManageLoans = roleCode !== 'borrower' && roleCode !== 'lender';
 
   const filteredLoans = useMemo(() => {
-    return loans.filter((loan) =>
+    // Scope by role: a borrower only sees their own loans; a lender only the
+    // ones they funded (the P2P accept flow stamps "Prestamista clientId=N"
+    // in notes). Back-office roles see everything.
+    let scoped = loans;
+    if (roleCode === 'borrower') {
+      scoped = loans.filter(l => l.clientId === clientId);
+    } else if (roleCode === 'lender') {
+      scoped = loans.filter(l => l.notes?.includes(`Prestamista clientId=${clientId}`));
+    }
+    return scoped.filter((loan) =>
       loan.loanNumber.toLowerCase().includes(searchText.toLowerCase()) ||
       loan.loanStatus.toLowerCase().includes(searchText.toLowerCase()) ||
       (loan.notes && loan.notes.toLowerCase().includes(searchText.toLowerCase()))
     );
-  }, [loans, searchText]);
+  }, [loans, searchText, roleCode, clientId]);
 
   useEffect(() => {
     fetchLoans();
@@ -317,26 +331,28 @@ const LoanPage: React.FC = () => {
                     </IonLabel>
                   </div>
                 )}
-                <div className="loan-actions">
-                  <IonButton
-                    fill="outline"
-                    color="primary"
-                    onClick={() => presentEditModal(loan)}
-                    className="action-button edit-button"
-                  >
-                    <IonIcon icon={createOutline} slot="start" />
-                    Editar
-                  </IonButton>
-                  <IonButton
-                    fill="outline"
-                    color="danger"
-                    onClick={() => presentDeleteAlert(loan)}
-                    className="action-button delete-button"
-                  >
-                    <IonIcon icon={trashOutline} slot="start" />
-                    Eliminar
-                  </IonButton>
-                </div>
+                {canManageLoans && (
+                  <div className="loan-actions">
+                    <IonButton
+                      fill="outline"
+                      color="primary"
+                      onClick={() => presentEditModal(loan)}
+                      className="action-button edit-button"
+                    >
+                      <IonIcon icon={createOutline} slot="start" />
+                      Editar
+                    </IonButton>
+                    <IonButton
+                      fill="outline"
+                      color="danger"
+                      onClick={() => presentDeleteAlert(loan)}
+                      className="action-button delete-button"
+                    >
+                      <IonIcon icon={trashOutline} slot="start" />
+                      Eliminar
+                    </IonButton>
+                  </div>
+                )}
               </IonCardContent>
             </IonCard>
           ))}
@@ -353,11 +369,13 @@ const LoanPage: React.FC = () => {
           )}
         </IonList>
 
-        <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={presentCreateModal}>
-            <IonIcon icon={addOutline} />
-          </IonFabButton>
-        </IonFab>
+        {canManageLoans && (
+          <IonFab vertical="bottom" horizontal="end" slot="fixed">
+            <IonFabButton onClick={presentCreateModal}>
+              <IonIcon icon={addOutline} />
+            </IonFabButton>
+          </IonFab>
+        )}
 
         <IonModal isOpen={showModal} onDidDismiss={dismissModal} className="loan-modal">
           <IonContent className="ion-padding">

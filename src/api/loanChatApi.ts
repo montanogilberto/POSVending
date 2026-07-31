@@ -104,6 +104,9 @@ export const loanChatApi = {
     senderId: number; senderUserId?: number; senderRole: string;
     msgType?: MsgType; body?: string;
     amount?: number; rate?: number; termMonths?: number;
+    // Assistant-only: routes the ADK agent to the right sub-agent
+    // ('account' | 'contract' | 'legal' → GUÍA). Ignored by the SP.
+    topic?: string;
   }) => sp({ action: 'send_message', ...p }),
 
   listMessages: (conversationId: number) =>

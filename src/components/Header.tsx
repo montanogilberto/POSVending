@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBackButton, IonBadge, IonMenuButton } from '@ionic/react';
-import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline } from 'ionicons/icons';
+import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline } from 'ionicons/icons';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useUser } from './UserContext';
 import { fetchMyNotifications } from '../api/myNotificationsApi';
+import { getChatConfig } from '../api/loanChatApi';
 import './Header.css';
 
 interface HeaderProps {
@@ -33,6 +34,13 @@ const Header: React.FC<HeaderProps> = ({
   const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
   const [unreadCount, setUnreadCount] = useState(0);
   const listenerRef = useRef<any>(null);
+  // LLM support agent (cuenta · contratos · legal GUÍA) — id from backend
+  // config; icon hidden when the assistant is not configured.
+  const [agentClientId, setAgentClientId] = useState(0);
+  useEffect(() => {
+    if (!isSmartLoansRole) return;
+    getChatConfig().then(c => setAgentClientId(c.agentEnabled ? c.agentClientId : 0)).catch(() => {});
+  }, [isSmartLoansRole]);
 
   // Seed the badge from the persisted inbox (NotificationDeliveries.isRead) so
   // it survives app restarts — previously it only counted pushes received while
@@ -92,6 +100,16 @@ const Header: React.FC<HeaderProps> = ({
                   </IonBadge>
                 )}
               </span>
+            </IonButton>
+          )}
+          {isSmartLoansRole && agentClientId > 0 && (
+            <IonButton
+              onClick={() => { console.log('[Header] agent icon → /loan-chat/new?lenderId=' + agentClientId); history.push(`/loan-chat/new?lenderId=${agentClientId}`); }}
+              title="Asistente SmartLoans"
+              className="header-action-button"
+              style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
+            >
+              <IonIcon icon={sparklesOutline} style={{ fontSize: '28px' }} />
             </IonButton>
           )}
           {isSmartLoansRole && (

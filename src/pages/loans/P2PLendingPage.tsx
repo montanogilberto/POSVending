@@ -23,6 +23,7 @@ import {
   cashOutline, trendingUpOutline, documentTextOutline, notificationsOutline,
   cardOutline,
   sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline,
+  flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../components/UserContext';
@@ -33,7 +34,7 @@ const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 // STP virtual CLABEs exist, so this is how the deposit→saldo→retiro loop is
 // exercised today. FLIP TO false BEFORE real STP goes live (it self-credits
 // the ledger).
-const SHOW_BANKING_TEST_TOOLS = true;
+const SHOW_BANKING_TEST_TOOLS = false;
 
 // ── Loan Proposal / Offer types & fetchers (single-use, kept inline) ─────────
 
@@ -193,6 +194,7 @@ import {
 import BankAccountLink from '../../components/BankAccountLink';
 import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
 import { createLoan } from '../../api/loanApi';
+import { getChatConfig } from '../../api/loanChatApi';
 import './P2PLendingPage.css';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -859,34 +861,33 @@ const P2PLendingPage: React.FC = () => {
           <IonRefresherContent />
         </IonRefresher>
 
-        {/* ── Lender wallet actions — SPEI primario, tarjeta (Stripe) 2ª opción ── */}
+        {/* ── Lender wallet actions — tiles compactos (SPEI primario,
+            tarjeta/Stripe 2ª opción) ── */}
         {isLender && (
-          <div className="p2p-wallet-actions">
-            <IonButton expand="block" fill="outline" className="p2p-topup-btn" onClick={() => setShowBankModal(true)}>
-              <IonIcon icon={cardOutline} slot="start" />
-              {hasVerifiedAccount
-                ? `Cuenta SPEI: ${bankAccounts.find(a => a.isVerified && a.isDefault)?.bankName ?? 'verificada'} ····${bankAccounts.find(a => a.isVerified && a.isDefault)?.clabeLast4 ?? ''}`
-                : 'Vincular cuenta bancaria (CLABE)'}
-            </IonButton>
-            <IonButton expand="block" fill="outline" className="p2p-topup-btn" onClick={goTopUp}>
-              <IonIcon icon={walletOutline} slot="start" />
-              Recargar con tarjeta (2ª opción)
-            </IonButton>
-            <IonButton
-              expand="block"
-              fill="outline"
-              color="medium"
-              className="p2p-topup-btn"
-              disabled={!walletBalance}
-              onClick={() => setShowWithdrawAlert(true)}
-            >
-              <IonIcon icon={cashOutline} slot="start" />
-              Retirar fondos a mi cuenta bancaria
-            </IonButton>
+          <div className="p2p-action-tiles">
+            <button className="p2p-action-tile" onClick={() => setShowBankModal(true)}>
+              <IonIcon icon={cardOutline} />
+              <strong>{hasVerifiedAccount ? 'Cuenta SPEI' : 'Vincular CLABE'}</strong>
+              <span>{hasVerifiedAccount
+                ? `···· ${bankAccounts.find(a => a.isVerified && a.isDefault)?.clabeLast4 ?? ''}`
+                : 'requerida'}</span>
+            </button>
+            <button className="p2p-action-tile" onClick={goTopUp}>
+              <IonIcon icon={walletOutline} />
+              <strong>Recargar tarjeta</strong>
+              <span>2ª opción</span>
+            </button>
+            <button className="p2p-action-tile" disabled={!walletBalance} onClick={() => setShowWithdrawAlert(true)}>
+              <IonIcon icon={cashOutline} />
+              <strong>Retirar fondos</strong>
+              <span>A mi cuenta</span>
+            </button>
             {SHOW_BANKING_TEST_TOOLS && (
-              <IonButton expand="block" fill="clear" size="small" color="warning" onClick={() => setShowDepositAlert(true)}>
-                Simular depósito SPEI (prueba)
-              </IonButton>
+              <button className="p2p-action-tile p2p-tile-test" onClick={() => setShowDepositAlert(true)}>
+                <IonIcon icon={flaskOutline} />
+                <strong>Simular depósito</strong>
+                <span>Prueba SPEI</span>
+              </button>
             )}
           </div>
         )}
@@ -913,21 +914,21 @@ const P2PLendingPage: React.FC = () => {
           </div>
         )}
 
-        {/* ── KPI row (lender) ── */}
+        {/* ── KPI row (lender) — chips de color como el mockup ── */}
         {isLender && (
           <div className="p2p-kpi-row">
-            <div className="p2p-kpi" onClick={openMovements} style={{ cursor: 'pointer' }}>
-              <IonIcon icon={walletOutline} />
+            <div className="p2p-kpi p2p-kpi2" onClick={openMovements} style={{ cursor: 'pointer' }}>
+              <span className="p2p-kpi2-icon p2p-kpi2-blue"><IonIcon icon={walletOutline} /></span>
               <span className="p2p-kpi-val">{walletBalance !== null ? fmt(walletBalance) : fmt(myOffers.reduce((s, o) => s + o.availableCapital, 0))}</span>
               <span className="p2p-kpi-label">Saldo en cartera{stripeBalance > 0 && speiBalance > 0 ? ' (SPEI + Stripe)' : ''}</span>
             </div>
-            <div className="p2p-kpi">
-              <IonIcon icon={notificationsOutline} />
+            <div className="p2p-kpi p2p-kpi2">
+              <span className="p2p-kpi2-icon p2p-kpi2-purple"><IonIcon icon={notificationsOutline} /></span>
               <span className="p2p-kpi-val">{inboxProposals.length}</span>
               <span className="p2p-kpi-label">Propuestas nuevas</span>
             </div>
-            <div className="p2p-kpi">
-              <IonIcon icon={checkmarkCircle} />
+            <div className="p2p-kpi p2p-kpi2">
+              <span className="p2p-kpi2-icon p2p-kpi2-green"><IonIcon icon={trendingUpOutline} /></span>
               <span className="p2p-kpi-val">{proposals.filter(p => p.lenderId === clientId && p.status === 'accepted').length}</span>
               <span className="p2p-kpi-label">Préstamos activos</span>
             </div>
@@ -967,10 +968,17 @@ const P2PLendingPage: React.FC = () => {
           {tab === 'offers' && (
             <div>
               {isLender && (
-                <IonButton expand="block" className="p2p-pub-btn" onClick={() => setShowOfferModal(true)}>
-                  <IonIcon icon={sendOutline} slot="start" />
-                  Publicar capital disponible
-                </IonButton>
+                <div className="p2p-pub-banner" onClick={() => setShowOfferModal(true)}>
+                  <span className="p2p-pub-icon">🎯</span>
+                  <div className="p2p-pub-text">
+                    <strong>Publica tu capital disponible</strong>
+                    <span>Conecta con acreditados verificados y genera rendimientos atractivos.</span>
+                  </div>
+                  <IonButton className="p2p-pub-cta" onClick={(e) => { e.stopPropagation(); setShowOfferModal(true); }}>
+                    Publicar capital
+                    <IonIcon icon={chevronForwardOutline} slot="end" />
+                  </IonButton>
+                </div>
               )}
 
               {offers.length === 0 && (
@@ -1000,24 +1008,29 @@ const P2PLendingPage: React.FC = () => {
                       )}
                     </div>
                     <div className="p2p-offer-amounts">
-                      <div className="p2p-offer-amount-item">
+                      <div className="p2p-offer-amount-item p2p-stat-blue">
                         <IonIcon icon={cashOutline} />
                         <span>{fmt(offer.availableCapital)}</span>
-                        <label>Capital</label>
+                        <label>Capital disponible</label>
                       </div>
-                      <div className="p2p-offer-amount-item">
+                      <div className="p2p-offer-amount-item p2p-stat-purple">
                         <IonIcon icon={trendingUpOutline} />
                         <span>{offer.minRate}% – {offer.maxRate}%</span>
                         <label>Tasa anual</label>
                       </div>
-                      <div className="p2p-offer-amount-item">
+                      <div className="p2p-offer-amount-item p2p-stat-orange">
                         <IonIcon icon={timeOutline} />
                         <span>{offer.minTermMonths}–{offer.maxTermMonths} m</span>
-                        <label>Plazo</label>
+                        <label>Plazo disponible</label>
                       </div>
+                    </div>
+                    <div className="p2p-offer-trust">
+                      <span><IonIcon icon={shieldCheckmarkOutline} /> Acreditados verificados</span>
+                      <span><IonIcon icon={shieldCheckmarkOutline} /> Cobertura legal incluida</span>
                     </div>
                     {offer.description && <p className="p2p-offer-desc">"{offer.description}"</p>}
                     {isBorrower && offer.lenderId !== clientId && (
+
                       <>
                         <IonButton
                           expand="block"
@@ -1055,6 +1068,26 @@ const P2PLendingPage: React.FC = () => {
                   </div>
                 );
               })}
+
+              {/* Soporte — abre el asistente LLM (cuenta · contratos · GUÍA) */}
+              <div className="p2p-support-banner">
+                <span className="p2p-support-icon">🎓</span>
+                <div className="p2p-support-text">
+                  <strong>¿Necesitas ayuda para invertir?</strong>
+                  <span>Nuestro asistente te guía paso a paso.</span>
+                </div>
+                <IonButton fill="outline" size="small" onClick={async () => {
+                  const cfg = await getChatConfig();
+                  console.log('[P2P] support banner → assistant (topic=invest)', cfg.agentClientId);
+                  // topic=invest → el chat auto-envía la pregunta y el agente
+                  // guía de inversión responde con el siguiente paso real.
+                  if (cfg.agentEnabled) history.push(`/loan-chat/new?lenderId=${cfg.agentClientId}&topic=invest`);
+                  else history.push('/loan-chats');
+                }}>
+                  <IonIcon icon={chatbubblesOutline} slot="start" />
+                  Contactar soporte
+                </IonButton>
+              </div>
             </div>
           )}
 
