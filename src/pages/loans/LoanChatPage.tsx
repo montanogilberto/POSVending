@@ -398,9 +398,9 @@ const LoanChatPage: React.FC = () => {
           {messages.map((msg, i) => renderMessage(msg, i))}
         </div>
 
-        {/* Proposal modal */}
-        <IonModal isOpen={showProposalModal} onDidDismiss={() => setShowProposalModal(false)}
-          breakpoints={[0, 0.6, 0.9]} initialBreakpoint={0.6}>
+        {/* Proposal modal — full-screen with fixed footer: as a 0.6 sheet, the
+            send button sat at the bottom and the open keyboard covered it. */}
+        <IonModal isOpen={showProposalModal} onDidDismiss={() => setShowProposalModal(false)}>
           <IonHeader>
             <IonToolbar>
               <IonTitle>{propType === 'counter' ? 'Contrapropuesta' : 'Propuesta de préstamo'}</IonTitle>
@@ -425,12 +425,14 @@ const LoanChatPage: React.FC = () => {
                   {fmt((parseFloat(propAmount) * (1 + parseFloat(propRate) / 100)) / parseInt(propTerm))}
                 </div>
               )}
-              <IonButton expand="block" shape="round" onClick={sendProposal} className="lc-send-prop-btn">
-                <IonIcon icon={cashOutline} slot="start" />
-                Enviar {propType === 'counter' ? 'contrapropuesta' : 'propuesta'}
-              </IonButton>
             </div>
           </IonContent>
+          <IonFooter className="ion-padding" style={{ background: '#fff' }}>
+            <IonButton expand="block" shape="round" onClick={sendProposal} className="lc-send-prop-btn">
+              <IonIcon icon={cashOutline} slot="start" />
+              Enviar {propType === 'counter' ? 'contrapropuesta' : 'propuesta'}
+            </IonButton>
+          </IonFooter>
         </IonModal>
       </IonContent>
 

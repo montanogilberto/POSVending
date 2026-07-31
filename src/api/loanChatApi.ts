@@ -6,20 +6,27 @@ const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azureweb
 async function sp(payload: Record<string, unknown>) {
   const { action, conversationId, senderId, msgType, amount, rate, termMonths } = payload as any;
   console.log('[Chat] →', JSON.stringify({ action, conversationId, senderId, msgType, amount, rate, termMonths }));
-  const r = await fetch(`${BASE}/loanChat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat: [payload] }),
-  });
-  const data = await r.json();
-  console.log('[Chat] ←', JSON.stringify({
-    action, http: r.status,
-    conversationId: data?.conversationId ?? conversationId,
-    messageId: data?.messageId, status: data?.status,
-    targetUserId: data?.targetUserId, // who the push went to (server resolves it)
-    error: data?.error,
-  }));
-  return data;
+  try {
+    const r = await fetch(`${BASE}/loanChat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat: [payload] }),
+    });
+    const data = await r.json();
+    console.log('[Chat] ←', JSON.stringify({
+      action, http: r.status,
+      conversationId: data?.conversationId ?? conversationId,
+      messageId: data?.messageId, status: data?.status,
+      targetUserId: data?.targetUserId, // who the push went to (server resolves it)
+      error: data?.error,
+    }));
+    return data;
+  } catch (e) {
+    // Backgrounded app / lost network: the 8s poll must fail quietly, not spam
+    // "Uncaught (in promise) TypeError: Failed to fetch" into the logcat.
+    console.log('[Chat] ← NETWORK', JSON.stringify({ action, conversationId, error: String(e) }));
+    return { error: 'network' };
+  }
 }
 
 export type MsgType = 'text' | 'proposal' | 'counter' | 'accept' | 'reject' | 'system';

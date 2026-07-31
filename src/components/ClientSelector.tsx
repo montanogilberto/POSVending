@@ -19,13 +19,12 @@ import {
   IonFooter,
   IonInput,
   IonToast,
-  IonActionSheet,
   IonRow,
   IonCol,
   IonSelect,
   IonSelectOption,
 } from '@ionic/react';
-import { person, close, checkmarkCircle, business, add, save } from 'ionicons/icons';
+import { person, close, checkmarkCircle, business, add, save, informationCircle } from 'ionicons/icons';
 import { Client, getAllClients, createOrUpdateClient } from '../api/clientsApi';
 
 interface ClientSelectorProps {
@@ -70,8 +69,11 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
+  // Inline banner (NOT an action sheet): the sheet's OK button rendered at the
+  // bottom of the screen, hidden behind the keyboard that is still open when
+  // the phone field blurs.
   const [cellphoneInfoMessage, setCellphoneInfoMessage] = useState('');
-  const [showCellphoneInfoSheet, setShowCellphoneInfoSheet] = useState(false);
+  const [showCellphoneInfo, setShowCellphoneInfo] = useState(false);
 
   useEffect(() => {
     if (isOpen && !hasLoaded) {
@@ -87,6 +89,8 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     } else {
       setSearchText('');
       setShowCreateForm(false);
+      setShowCellphoneInfo(false);
+      setCellphoneInfoMessage('');
       setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
       setSelectedCountryCode('+52');
       setCreateErrors({
@@ -267,16 +271,17 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         const phoneText = matchedClient.cellphone ? ` • ${matchedClient.cellphone}` : '';
         const emailText = matchedClient.email ? ` • ${matchedClient.email}` : '';
         const infoMessage = `Asociado: ${fullName || 'Cliente'}${phoneText}${emailText}`;
-        console.log('[ClientSelector] showing action sheet (matched):', infoMessage);
+        console.log('[ClientSelector] showing inline info banner (matched):', infoMessage);
         setCellphoneInfoMessage(infoMessage);
-        setShowCellphoneInfoSheet(true);
+        setShowCellphoneInfo(true);
       } else {
-        console.log('[ClientSelector] no associated person found for digits:', localDigits, '(no action sheet shown)');
+        console.log('[ClientSelector] no associated person found for digits:', localDigits, '(no banner shown)');
+        setShowCellphoneInfo(false);
       }
     } catch (error) {
       console.error('[ClientSelector] error looking up cellphone association:', error);
       setCellphoneInfoMessage('No se pudo validar el teléfono en este momento');
-      setShowCellphoneInfoSheet(true);
+      setShowCellphoneInfo(true);
     }
   };
 
@@ -363,6 +368,8 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     setShowCreateForm(false);
     setNewClient({ first_name: '', last_name: '', cellphone: '', email: '' });
     setSelectedCountryCode('+52');
+    setShowCellphoneInfo(false);
+    setCellphoneInfoMessage('');
     setCreateErrors({
       first_name: '',
       last_name: '',
@@ -492,6 +499,23 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
                     pattern="[0-9]*"
                     maxlength={15}
                   />
+                  {showCellphoneInfo && (
+                    <div className="cellphone-info-banner">
+                      <IonIcon icon={informationCircle} className="cellphone-info-icon" />
+                      <span className="cellphone-info-text">{cellphoneInfoMessage}</span>
+                      <IonButton
+                        fill="clear"
+                        size="small"
+                        className="cellphone-info-close"
+                        onClick={() => {
+                          console.log('[ClientSelector] info banner dismissed');
+                          setShowCellphoneInfo(false);
+                        }}
+                      >
+                        <IonIcon icon={close} slot="icon-only" />
+                      </IonButton>
+                    </div>
+                  )}
                 </div>
               </IonCol>
             </IonRow>
@@ -663,27 +687,6 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         color={toastColor}
       />
 
-      <IonActionSheet
-        isOpen={showCellphoneInfoSheet}
-        cssClass="cellphone-info-sheet"
-        header="Información de teléfono"
-        subHeader={cellphoneInfoMessage}
-        onDidDismiss={() => {
-          console.log('[ClientSelector] action sheet dismissed');
-          setShowCellphoneInfoSheet(false);
-        }}
-        buttons={[
-          {
-            text: 'OK',
-            role: 'confirm',
-            data: { action: 'ok' },
-            handler: () => {
-              console.log('[ClientSelector] action sheet OK tapped');
-              setShowCellphoneInfoSheet(false);
-            },
-          },
-        ]}
-      />
     </IonModal>
   );
 };

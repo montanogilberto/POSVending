@@ -14,7 +14,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
   IonIcon, IonToast, IonLoading, IonModal, IonBadge, IonRefresher,
   IonRefresherContent, IonAlert, IonLabel, IonInput, IonTextarea, IonSelect,
-  IonSelectOption, IonProgressBar, IonSegment, IonSegmentButton,
+  IonSelectOption, IonProgressBar, IonSegment, IonSegmentButton, IonFooter,
   useIonViewWillEnter,
 } from '@ionic/react';
 import {
@@ -1110,7 +1110,9 @@ const P2PLendingPage: React.FC = () => {
       </IonContent>
 
       {/* ══════════ Modal: Publish loan offer (lender) ══════════ */}
-      <IonModal isOpen={showOfferModal} onDidDismiss={() => setShowOfferModal(false)} breakpoints={[0, 0.9]} initialBreakpoint={0.9}>
+      {/* Full-screen modal + fixed footer: as a 0.9 sheet, the submit button
+          lived at the bottom of the scroll and the open keyboard hid it. */}
+      <IonModal isOpen={showOfferModal} onDidDismiss={() => setShowOfferModal(false)}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Publicar capital disponible</IonTitle>
@@ -1159,15 +1161,18 @@ const P2PLendingPage: React.FC = () => {
             <IonTextarea rows={3} placeholder="Ej: Préstamos para negocios, sin aval…" value={offerDesc}
               onIonInput={e => setOfferDesc(e.detail.value ?? '')} className="p2p-input" />
           </div>
+        </IonContent>
+        <IonFooter className="ion-padding" style={{ background: '#fff' }}>
           <IonButton expand="block" onClick={publishOffer} disabled={saving}>
             <IonIcon icon={sendOutline} slot="start" />
             Publicar y notificar prestatarios
           </IonButton>
-        </IonContent>
+        </IonFooter>
       </IonModal>
 
       {/* ══════════ Modal: Send proposal (borrower) ══════════ */}
-      <IonModal isOpen={showProposalModal} onDidDismiss={() => setShowProposalModal(false)} breakpoints={[0, 0.85]} initialBreakpoint={0.85}>
+      {/* Full-screen modal + fixed footer (same keyboard-hides-button fix). */}
+      <IonModal isOpen={showProposalModal} onDidDismiss={() => setShowProposalModal(false)}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Solicitar préstamo</IonTitle>
@@ -1213,13 +1218,15 @@ const P2PLendingPage: React.FC = () => {
               <p className="p2p-legal-note">
                 Al enviar esta solicitud confirmas que has leído y firmado el Pagaré y el Contrato de Crédito P2P. El Pagaré firmado digitalmente es el único documento que se presentará ante juez en caso de incumplimiento.
               </p>
-              <IonButton expand="block" onClick={submitProposal} disabled={saving}>
-                <IonIcon icon={sendOutline} slot="start" />
-                Enviar solicitud al prestamista
-              </IonButton>
             </>
           )}
         </IonContent>
+        <IonFooter className="ion-padding" style={{ background: '#fff' }}>
+          <IonButton expand="block" onClick={submitProposal} disabled={saving || !selectedOffer}>
+            <IonIcon icon={sendOutline} slot="start" />
+            Enviar solicitud al prestamista
+          </IonButton>
+        </IonFooter>
       </IonModal>
 
       {/* ── Accept alert ── */}
