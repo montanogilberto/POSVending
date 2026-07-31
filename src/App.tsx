@@ -224,7 +224,19 @@ const AppShell: React.FC = () => {
 
     let registrationHandle: PluginListenerHandle | undefined;
     let receivedHandle: PluginListenerHandle | undefined;
+    let tapHandle: PluginListenerHandle | undefined;
+    let localTapHandle: PluginListenerHandle | undefined;
     let cancelled = false;
+
+    // Tapping a notification must DO something: deep-link to the payload's
+    // navigationRoute (e.g. /loan-chat/12) or fall back to the inbox.
+    const openFromNotification = (data: Record<string, any> | undefined, source: string) => {
+      const route = typeof data?.navigationRoute === 'string' && data.navigationRoute.startsWith('/')
+        ? data.navigationRoute
+        : '/notifications';
+      console.log('[Push] tap →', JSON.stringify({ source, route, data }));
+      history.push(route);
+    };
 
     const registerPush = async () => {
       let permission = await PushNotifications.checkPermissions();
@@ -261,8 +273,20 @@ const AppShell: React.FC = () => {
             body: notification.body ?? '',
             channelId: 'push_notifications',
             smallIcon: 'ic_launcher',
+            // carry the route so tapping the foreground banner also navigates
+            extra: notification.data ?? {},
           }],
         });
+      });
+
+      // App in background/closed: user taps the system (FCM) notification.
+      tapHandle = await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        openFromNotification(action.notification?.data, 'push');
+      });
+
+      // App was foreground: user taps the LocalNotifications banner we scheduled.
+      localTapHandle = await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+        openFromNotification(action.notification?.extra, 'local');
       });
 
       await PushNotifications.register();
@@ -274,6 +298,8 @@ const AppShell: React.FC = () => {
       cancelled = true;
       registrationHandle?.remove();
       receivedHandle?.remove();
+      tapHandle?.remove();
+      localTapHandle?.remove();
     };
   }, [userId]);
 
