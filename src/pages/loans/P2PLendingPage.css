@@ -477,3 +477,17 @@
   border: 1px solid #e5e7eb;
   line-height: 1.5;
 }
+
+/* Insufficient-funds action sheet: wrap the explanation instead of truncating */
+.p2p-funds-sheet .action-sheet-title,
+.p2p-funds-sheet .action-sheet-sub-title {
+  white-space: normal !important;
+  text-align: left;
+}
+
+.p2p-funds-sheet .action-sheet-sub-title {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #374151;
+  padding-top: 4px;
+}

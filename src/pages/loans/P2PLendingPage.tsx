@@ -15,7 +15,7 @@ import {
   IonIcon, IonToast, IonLoading, IonModal, IonBadge, IonRefresher,
   IonRefresherContent, IonAlert, IonLabel, IonInput, IonTextarea, IonSelect,
   IonSelectOption, IonProgressBar, IonSegment, IonSegmentButton, IonFooter,
-  useIonViewWillEnter,
+  IonActionSheet, useIonViewWillEnter,
 } from '@ionic/react';
 import {
   refreshOutline, addOutline, arrowBackOutline, checkmarkCircle, closeCircle,
@@ -242,6 +242,10 @@ const P2PLendingPage: React.FC = () => {
   const [selectedProposal,  setSelectedProposal]  = useState<LoanProposal | null>(null);
   const [showAcceptAlert,   setShowAcceptAlert]   = useState(false);
   const [showRejectAlert,   setShowRejectAlert]   = useState(false);
+  // Blocking failure explanation for approve — a toast dies in 3s unseen.
+  const [errorAlert,        setErrorAlert]        = useState('');
+  // Insufficient-funds variant with deposit actions built in.
+  const [fundsAlertMsg,     setFundsAlertMsg]     = useState('');
   const [offerToDelete,     setOfferToDelete]     = useState<LoanOffer | null>(null);
 
   // ── offer form ─────────────────────────────────────────────────────────
@@ -513,6 +517,20 @@ const P2PLendingPage: React.FC = () => {
       const { proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths } = selectedProposal;
       console.log('[P2P] acceptProposal: START', JSON.stringify({ proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths }));
 
+      // Funds first, with exact numbers and a way OUT: the alert offers the
+      // deposit actions directly instead of a dead-end "Entendido".
+      const totalBalance = speiBalance + stripeBalance;
+      if (requestedAmount > totalBalance) {
+        console.log('[P2P] acceptProposal: BLOCKED — insufficient funds', JSON.stringify({ requestedAmount, speiBalance, stripeBalance }));
+        setShowAcceptAlert(false);
+        setFundsAlertMsg(
+          `Para fondear ${fmt(requestedAmount)} tu billetera tiene ${fmt(totalBalance)} ` +
+          `(SPEI ${fmt(speiBalance)} · Stripe ${fmt(stripeBalance)}). El capital publicado en tu ` +
+          `oferta es un anuncio, no dinero depositado: el préstamo sale de tu saldo en cartera.`);
+        setSaving(false);
+        return;
+      }
+
       // Preconditions: the borrower needs SOME payout destination — a verified
       // CLABE (SPEI, primary) or a Stripe connected account with bank on file
       // (2nd option) — plus a card on file for the automatic monthly cuotas.
@@ -627,7 +645,10 @@ const P2PLendingPage: React.FC = () => {
       load();
     } catch (e: any) {
       console.log('[P2P] acceptProposal: FAILED —', String(e?.message ?? e));
-      setToast(e?.message ?? 'Error al aprobar préstamo');
+      // Blocking alert (not a toast): the lender must read WHY the approval
+      // did not happen and what to do next.
+      setErrorAlert(e?.message ?? 'Error al aprobar préstamo');
+      setShowAcceptAlert(false);
     }
     setSaving(false);
   };
@@ -1240,6 +1261,31 @@ const P2PLendingPage: React.FC = () => {
         buttons={[
           { text: 'Cancelar', role: 'cancel' },
           { text: 'Aprobar', handler: acceptProposal, cssClass: 'alert-button-confirm' },
+        ]}
+      />
+
+      {/* ── Approve-failure alert (blocking, explains the fix) ── */}
+      <IonAlert
+        isOpen={!!errorAlert}
+        onDidDismiss={() => setErrorAlert('')}
+        header="No se pudo aprobar"
+        message={errorAlert}
+        buttons={['Entendido']}
+      />
+
+      {/* ── Insufficient funds → action sheet with the deposit options ── */}
+      <IonActionSheet
+        isOpen={!!fundsAlertMsg}
+        onDidDismiss={() => setFundsAlertMsg('')}
+        cssClass="p2p-funds-sheet"
+        header="Fondos insuficientes"
+        subHeader={fundsAlertMsg}
+        buttons={[
+          ...(SHOW_BANKING_TEST_TOOLS
+            ? [{ text: '🏦 Simular depósito SPEI (prueba)', handler: () => { setFundsAlertMsg(''); setShowDepositAlert(true); } }]
+            : []),
+          { text: '💳 Recargar con tarjeta', handler: () => { setFundsAlertMsg(''); goTopUp(); } },
+          { text: 'Cancelar', role: 'cancel' },
         ]}
       />
 
