@@ -9,11 +9,15 @@ import {
   cashOutline, trendingUpOutline, peopleOutline, walletOutline,
   checkmarkCircleOutline, alertCircleOutline, ellipseOutline, refreshOutline,
   personCircleOutline, timeOutline, cardOutline, barChartOutline, addCircleOutline,
-  documentTextOutline, megaphoneOutline,
+  documentTextOutline, megaphoneOutline, notificationsOutline,
+  shieldCheckmarkOutline, checkmarkCircle, informationCircleOutline,
+  addOutline, arrowUpOutline, arrowDownOutline,
 } from 'ionicons/icons';
 import { useUser } from '../../components/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
+import { fetchActiveLoanOffers, countPendingProposalsForLender } from '../../api/loanMarketplaceApi';
 import { getAllClients, Client } from '../../api/clientsApi';
+import { ledgerStatement, LedgerEntry } from '../../api/bankingApi';
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../api/stripeApi';
@@ -76,6 +80,11 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   // Sum of this lender's ACTIVE published offers (loanOffers) — announced
   // capital, distinct from Capital total (disbursed loans) and the wallet.
   const [publishedCapital, setPublishedCapital] = useState(0);
+  // Pending borrower solicitudes — surfaced here too so the lender doesn't
+  // have to enter P2P to find out someone is waiting for an answer.
+  const [pendingProposals, setPendingProposals] = useState(0);
+  // Ledger movements — Ganancias (interest received) + Actividad reciente.
+  const [statement, setStatement] = useState<LedgerEntry[]>([]);
 
   // The lender's own identity verification — digital contracts (loanContracts,
   // signed via the same ClientFaceRecognitionPage wizard borrowers use)
@@ -187,19 +196,28 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
 
       // Published (announced) capital: my active loanOffers. Failure keeps 0 —
       // the card just shows $0 rather than blocking the dashboard.
-      fetch('https://smartloansbackend.azurewebsites.net/all_loanOffers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loanOffers: [{ companyId, isActive: true }] }),
-      })
-        .then(r => (r.ok ? r.json() : { loanOffers: [] }))
-        .then(d => {
-          const mine = (d.loanOffers ?? []).filter((o: { lenderId: number }) => o.lenderId === lenderClientId);
-          const sum = mine.reduce((s: number, o: { availableCapital?: number }) => s + (o.availableCapital ?? 0), 0);
+      fetchActiveLoanOffers(companyId)
+        .then(all => {
+          const mine = all.filter(o => o.lenderId === lenderClientId);
+          const sum = mine.reduce((s, o) => s + (o.availableCapital ?? 0), 0);
           console.log('[LenderDashboard] published offers:', mine.length, '→ Capital publicado:', sum);
           setPublishedCapital(sum);
         })
         .catch(() => setPublishedCapital(0));
+      // Ledger movements: earnings (interest entries) + recent activity feed.
+      ledgerStatement(companyId, lenderClientId)
+        .then(entries => {
+          console.log('[LenderDashboard] statement:', entries.length, 'movimientos');
+          setStatement(entries);
+        })
+        .catch(() => setStatement([]));
+      // Solicitudes waiting for this lender's answer (same source as P2P's banner).
+      countPendingProposalsForLender(companyId, lenderClientId)
+        .then(pending => {
+          console.log('[LenderDashboard] pending proposals:', pending);
+          setPendingProposals(pending);
+        })
+        .catch(() => setPendingProposals(0));
       // loans has no lenderId column at all — the only place that link
       // exists is loanContracts (borrowerClientId/lenderClientId), so we
       // scope to this lender's actual portfolio by joining through the
@@ -274,6 +292,43 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
     return map;
   }, [clients]);
 
+  // ── Redesign metrics (mockup) ────────────────────────────────────────────
+  // Ganancias = interest actually received in the ledger (REPAYMENT_INTEREST).
+  const interestEntries = useMemo(
+    () => statement.filter(e => e.entryType === 'REPAYMENT_INTEREST' && e.direction === 'C'),
+    [statement]);
+  const earningsTotal = useMemo(() => interestEntries.reduce((s, e) => s + e.amountMXN, 0), [interestEntries]);
+  const earningsMonth = useMemo(() => {
+    const now = new Date();
+    return interestEntries
+      .filter(e => {
+        const d = new Date(e.created_At.includes('Z') ? e.created_At : e.created_At + 'Z');
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((s, e) => s + e.amountMXN, 0);
+  }, [interestEntries]);
+
+  // Portfolio donut: publicado (anunciado) · prestado (activo) · recuperado.
+  const portfolioTotal = publishedCapital + totalActive + totalRepaid;
+  const pct = (v: number) => (portfolioTotal > 0 ? Math.round((v / portfolioTotal) * 100) : 0);
+  const deg = (v: number) => (portfolioTotal > 0 ? (v / portfolioTotal) * 360 : 0);
+  const donutStyle = portfolioTotal > 0
+    ? { background: `conic-gradient(#7da2f7 0deg ${deg(publishedCapital)}deg, #c084fc ${deg(publishedCapital)}deg ${deg(publishedCapital) + deg(totalActive)}deg, #4ade80 ${deg(publishedCapital) + deg(totalActive)}deg 360deg)` }
+    : { background: '#ffffff33' };
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    return h < 12 ? '¡Buenos días!' : h < 19 ? '¡Buenas tardes!' : '¡Buenas noches!';
+  })();
+
+  const activityIcon = (e: LedgerEntry) => (e.direction === 'C' ? arrowDownOutline : arrowUpOutline);
+  const activityLabel = (e: LedgerEntry) => ({
+    DEPOSIT: 'Depósito SPEI', LOAN_FUNDING: 'Préstamo fondeado',
+    REPAYMENT_PRINCIPAL: 'Capital recuperado', REPAYMENT_INTEREST: 'Interés ganado',
+    WITHDRAWAL: 'Retiro a banco', REVERSAL: 'Reversa', LOAN_REPAYMENT: 'Pago de cuota',
+    DISBURSEMENT_RECEIVED: 'Desembolso recibido',
+  }[e.entryType] ?? e.entryType);
+
   return (
     <IonPage>
       <Header
@@ -296,36 +351,101 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
         <IonLoading isOpen={loading} message="Cargando portfolio..." />
         <IonToast isOpen={!!error} message={error} duration={3000} onDidDismiss={() => setError('')} color="danger" />
 
-        {/* Lender profile header */}
-        {lender && (
-          <div className="ld-profile-bar">
-            <IonAvatar className="ld-avatar">
-              {selfieMap[lender.clientId]
-                ? <img src={selfieMap[lender.clientId]} alt="selfie" />
-                : <IonIcon icon={personCircleOutline} style={{ fontSize: 40, color: '#9ca3af' }} />}
-            </IonAvatar>
-            <div>
-              <h2 className="ld-name">{lender.first_name} {lender.last_name}</h2>
-              <IonBadge className="ld-type-badge">Prestamista</IonBadge>
+        {/* Greeting + Ganancias (interés real del ledger) */}
+        <div className="ldx-top-row">
+          {lender && (
+            <div className="ldx-greeting">
+              <IonAvatar className="ld-avatar">
+                {selfieMap[lender.clientId]
+                  ? <img src={selfieMap[lender.clientId]} alt="selfie" />
+                  : <IonIcon icon={personCircleOutline} style={{ fontSize: 40, color: '#9ca3af' }} />}
+              </IonAvatar>
+              <div>
+                <p className="ldx-greeting-hi">{greeting}</p>
+                <h2 className="ld-name">{lender.first_name} {lender.last_name}</h2>
+                {faceRecord?.isVerified
+                  ? <IonBadge className="ldx-verified-badge"><IonIcon icon={checkmarkCircle} /> Prestamista verificado</IonBadge>
+                  : <IonBadge className="ld-type-badge">Prestamista</IonBadge>}
+              </div>
             </div>
+          )}
+          <div className="ldx-earnings-card">
+            <p>Ganancias totales <IonIcon icon={informationCircleOutline} /></p>
+            <h2>${earningsTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</h2>
+            <span className="ldx-earnings-month">
+              <IonIcon icon={arrowUpOutline} /> +${earningsMonth.toLocaleString('es-MX', { minimumFractionDigits: 2 })} este mes
+            </span>
+            <svg className="ldx-sparkline" viewBox="0 0 100 32" preserveAspectRatio="none">
+              <polyline fill="none" stroke="#22c55e" strokeWidth="2"
+                points="0,26 12,22 22,25 34,17 45,20 56,12 68,15 80,8 90,11 100,4" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Pending solicitudes — same alert as P2P, one tap away */}
+        {pendingProposals > 0 && (
+          <div
+            className="pending-proposals-banner"
+            onClick={() => { console.log('[LenderDashboard] proposals banner → /p2p-lending'); history.push('/p2p-lending'); }}>
+            <IonIcon icon={notificationsOutline} />
+            <span>
+              Tienes <strong>{pendingProposals}</strong> {pendingProposals === 1 ? 'solicitud pendiente' : 'solicitudes pendientes'} de respuesta
+            </span>
+            <IonBadge color="danger">{pendingProposals}</IonBadge>
           </div>
         )}
 
-        {/* KPI grid */}
+        {/* Hero: valor del portafolio + donut publicado/prestado/recuperado */}
+        <div className="ldx-hero">
+          <div className="ldx-hero-left">
+            <p>Valor de mi portafolio <IonIcon icon={informationCircleOutline} /></p>
+            <h1>${portfolioTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</h1>
+            <span className="ldx-hero-month">
+              <IonIcon icon={arrowUpOutline} /> +${earningsMonth.toLocaleString('es-MX', { minimumFractionDigits: 2 })} este mes
+            </span>
+            <IonButton fill="outline" className="ldx-hero-btn"
+              onClick={() => { console.log('[LenderDashboard] hero → /p2p-lending'); history.push('/p2p-lending'); }}>
+              <IonIcon icon={addOutline} slot="start" /> Publicar más capital
+            </IonButton>
+          </div>
+          <div className="ldx-hero-right">
+            <div className="ldx-donut" style={donutStyle}><div className="ldx-donut-hole" /></div>
+            <div className="ldx-donut-legend">
+              {[
+                { label: 'Publicado',  dot: '#7da2f7', v: publishedCapital },
+                { label: 'Prestado',   dot: '#c084fc', v: totalActive },
+                { label: 'Recuperado', dot: '#4ade80', v: totalRepaid },
+              ].map(r => (
+                <div key={r.label} className="ldx-legend-row">
+                  <span className="ldx-legend-dot" style={{ background: r.dot }} />
+                  <span className="ldx-legend-label">{r.label}</span>
+                  <span className="ldx-legend-val">{pct(r.v)}%<small>${r.v.toLocaleString()}</small></span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* KPI cards */}
         <IonGrid className="ld-kpi-grid">
           <IonRow>
             {[
-              { icon: megaphoneOutline,  label: 'Capital publicado', value: `$${publishedCapital.toLocaleString()}`,   color: '#0e7490' },
-              { icon: cashOutline,       label: 'Capital prestado',  value: `$${totalDeployed.toLocaleString()}`,      color: '#2563eb' },
-              { icon: walletOutline,     label: 'Activo',          value: `$${totalActive.toLocaleString()}`,          color: '#15803d' },
-              { icon: trendingUpOutline, label: 'Recuperado',      value: `$${totalRepaid.toLocaleString()}`,          color: '#7c3aed' },
-              { icon: barChartOutline,   label: 'Tasa promedio',   value: `${avgInterest.toFixed(1)}%`,                color: '#b45309' },
+              { icon: megaphoneOutline,  label: 'Capital publicado', value: `$${publishedCapital.toLocaleString()}`, sub: `${pct(publishedCapital)}% del portafolio`, color: '#2563eb', bg: '#eff6ff' },
+              { icon: cardOutline,       label: 'Capital prestado',  value: `$${totalActive.toLocaleString()}`,      sub: `${pct(totalActive)}% del portafolio`,      color: '#9333ea', bg: '#faf5ff' },
+              { icon: trendingUpOutline, label: 'Recuperado',        value: `$${totalRepaid.toLocaleString()}`,      sub: `${pct(totalRepaid)}% del portafolio`,      color: '#16a34a', bg: '#f0fdf4' },
+              { icon: barChartOutline,   label: 'Tasa promedio (APR)', value: `${avgInterest.toFixed(1)}%`,          sub: 'Rendimiento actual',                        color: '#ea580c', bg: '#fff7ed' },
             ].map(k => (
-              <IonCol size="6" key={k.label}>
-                <div className="ld-kpi-card">
-                  <IonIcon icon={k.icon} style={{ color: k.color, fontSize: 22 }} />
+              <IonCol size="6" sizeMd="3" key={k.label}>
+                <div className="ldx-kpi-card">
+                  <span className="ldx-kpi-icon" style={{ background: k.bg, color: k.color }}>
+                    <IonIcon icon={k.icon} />
+                  </span>
                   <p>{k.label}</p>
-                  <h3 style={{ color: k.color }}>{k.value}</h3>
+                  <h3>{k.value}</h3>
+                  <small style={{ color: k.color }}>{k.sub}</small>
+                  <div className="ldx-kpi-bar" style={{ background: k.bg }}>
+                    <div style={{ width: `${Math.max(4, pct(k.label.includes('Tasa') ? 0 : (k.label.includes('publicado') ? publishedCapital : k.label.includes('prestado') ? totalActive : totalRepaid)))}%`, background: k.color }} />
+                  </div>
                 </div>
               </IonCol>
             ))}
@@ -341,9 +461,21 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
           <IonCardHeader><IonCardTitle>Verificación de identidad</IonCardTitle></IonCardHeader>
           <IonCardContent>
             {faceRecord?.isVerified && faceRecord?.contractAccepted && faceRecord?.pagareAccepted ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <IonIcon icon={checkmarkCircleOutline} style={{ fontSize: 26, color: '#059669' }} />
-                <strong>Identidad verificada</strong>
+              <div className="ldx-identity-ok">
+                <span className="ldx-shield">
+                  <IonIcon icon={shieldCheckmarkOutline} />
+                </span>
+                <div className="ldx-identity-text">
+                  <strong>Identidad verificada</strong>
+                  <p>Nivel 3 de verificación</p>
+                  <p>Completado</p>
+                </div>
+                {/* Read-only view of the full expediente (datos + documentos) */}
+                <IonButton expand="block" size="small" fill="outline" className="ldx-expediente-btn"
+                  onClick={() => { console.log('[LenderDashboard] → expediente', lenderClientId); history.push(`/client-expediente/${lenderClientId}`); }}>
+                  <IonIcon icon={documentTextOutline} slot="start" />
+                  Ver mi expediente y datos
+                </IonButton>
               </div>
             ) : verificationDone > 0 ? (
               <div style={{ padding: '4px 0' }}>
@@ -449,29 +581,37 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
               </div>
             ) : (
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <IonIcon
-                    icon={stripeAccount.hasExternalAccount ? checkmarkCircleOutline : alertCircleOutline}
-                    style={{ fontSize: 26, color: stripeAccount.hasExternalAccount ? '#059669' : '#b45309' }}
-                  />
-                  <div>
-                    <strong>{stripeAccount.hasExternalAccount ? 'Cuenta verificada' : 'Verificación pendiente'}</strong>
-                    <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{stripeAccount.connectedAccountId}</p>
-                  </div>
+                {/* Checklist con conector vertical (mockup) */}
+                <div className="ldx-checklist">
+                  {[
+                    { ok: true, label: 'Cuenta verificada', sub: stripeAccount.connectedAccountId },
+                    { ok: !!stripeAccount.hasExternalAccount, label: 'Cuenta bancaria vinculada',
+                      sub: stripeAccount.externalAccountLast4
+                        ? `${stripeAccount.externalAccountBankName ?? 'Banco'} · ····${stripeAccount.externalAccountLast4}`
+                        : 'Pendiente' },
+                    { ok: !!stripeAccount.chargesEnabled, label: 'Cobros habilitados' },
+                    { ok: !!stripeAccount.payoutsEnabled, label: 'Retiros habilitados' },
+                  ].map((row, i, arr) => (
+                    <div key={row.label} className="ldx-check-row">
+                      <div className="ldx-check-rail">
+                        <IonIcon icon={row.ok ? checkmarkCircle : ellipseOutline}
+                          className={row.ok ? 'ldx-check-ok' : 'ldx-check-off'} />
+                        {i < arr.length - 1 && <span className="ldx-check-line" />}
+                      </div>
+                      <div className="ldx-check-text">
+                        <strong>{row.label}</strong>
+                        {row.sub && <p>{row.sub}</p>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <IonBadge color={stripeAccount.hasExternalAccount ? 'success' : 'medium'}>
-                    Cuenta bancaria {stripeAccount.hasExternalAccount ? '✓' : '✗'}
-                  </IonBadge>
-                  <IonBadge color={stripeAccount.chargesEnabled ? 'success' : 'medium'}>
-                    Cobros {stripeAccount.chargesEnabled ? '✓' : '✗'}
-                  </IonBadge>
-                  <IonBadge color={stripeAccount.payoutsEnabled ? 'success' : 'medium'}>
-                    Retiros {stripeAccount.payoutsEnabled ? '✓' : '✗'}
-                  </IonBadge>
+                <div className="ldx-chips">
+                  <IonBadge color={stripeAccount.hasExternalAccount ? 'success' : 'medium'}>Cuenta bancaria {stripeAccount.hasExternalAccount ? '✓' : '✗'}</IonBadge>
+                  <IonBadge color={stripeAccount.chargesEnabled ? 'success' : 'medium'}>Cobros {stripeAccount.chargesEnabled ? '✓' : '✗'}</IonBadge>
+                  <IonBadge color={stripeAccount.payoutsEnabled ? 'success' : 'medium'}>Retiros {stripeAccount.payoutsEnabled ? '✓' : '✗'}</IonBadge>
                 </div>
                 {!stripeAccount.hasExternalAccount && (
-                  <IonButton shape="round" expand="block" disabled={stripeLoading} onClick={handleStripeKyc}>
+                  <IonButton shape="round" expand="block" disabled={stripeLoading} onClick={handleStripeKyc} style={{ marginTop: 10 }}>
                     <IonIcon icon={documentTextOutline} slot="start" />
                     {stripeLoading ? 'Procesando...' : 'Completar verificación'}
                   </IonButton>
@@ -481,14 +621,22 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
           </IonCardContent>
         </IonCard>
 
-        {/* Collection rate */}
+        {/* Rendimiento del portafolio — gauge semicircular (mockup) */}
         <IonCard className="ld-card">
+          <IonCardHeader><IonCardTitle>Rendimiento del portafolio <IonIcon icon={informationCircleOutline} style={{ fontSize: 15, color: '#9ca3af' }} /></IonCardTitle></IonCardHeader>
           <IonCardContent>
-            <div className="ld-collection-header">
-              <span>Tasa de cobro</span>
-              <strong>{(collectionRate * 100).toFixed(1)}%</strong>
+            <p className="ldx-gauge-caption">Tasa de recuperación</p>
+            <div className="ldx-gauge">
+              <svg viewBox="0 0 120 68" preserveAspectRatio="xMidYMid meet">
+                <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#e5e7eb" strokeWidth="11" strokeLinecap="round" />
+                <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#22c55e" strokeWidth="11" strokeLinecap="round"
+                  strokeDasharray={`${Math.max(0.01, collectionRate) * 157} 157`} />
+              </svg>
+              <div className="ldx-gauge-value">
+                <strong>{(collectionRate * 100).toFixed(0)}%</strong>
+                <span>Objetivo: 90%+</span>
+              </div>
             </div>
-            <IonProgressBar value={collectionRate} color={collectionRate >= 0.8 ? 'success' : collectionRate >= 0.5 ? 'warning' : 'danger'} style={{ height: 10, borderRadius: 8 }} />
             <div className="ld-collection-legend">
               <span className="ld-legend-dot" style={{ background: '#15803d' }} /> Pagados: {paidLoans.length}
               <span className="ld-legend-dot" style={{ background: '#2563eb', marginLeft: 14 }} /> Activos: {activeLoans.length}
@@ -500,13 +648,20 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
         {/* Loan list */}
         <IonCard className="ld-card">
           <IonCardHeader>
-            <IonCardTitle>Préstamos otorgados ({loans.length})</IonCardTitle>
+            <div className="ldx-card-title-row">
+              <IonCardTitle>Préstamos otorgados{loans.length > 0 ? ` (${loans.length})` : ''}</IonCardTitle>
+              {loans.length > 0 && (
+                <IonButton fill="clear" size="small" onClick={() => history.push('/loans')}>Ver todos</IonButton>
+              )}
+            </div>
           </IonCardHeader>
           <IonCardContent style={{ padding: '0 0 12px' }}>
             {loans.length === 0 && !loading && (
               <div className="ld-empty">
-                <IonIcon icon={cashOutline} />
-                <p>Sin préstamos registrados.</p>
+                <IonIcon icon={walletOutline} />
+                <p><strong>Aún no tienes préstamos activos</strong></p>
+                <p className="ldx-empty-sub">Publica tu capital y comienza a generar rendimientos.</p>
+                <IonButton onClick={() => history.push('/p2p-lending')}>Publicar capital</IonButton>
               </div>
             )}
             <IonList lines="none">
@@ -556,6 +711,45 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
                 <span className="ld-summary-label">{row.label}</span>
                 <span className="ld-summary-count">{row.count} préstamos</span>
                 <span className="ld-summary-amount" style={{ color: row.color }}>${row.amount.toLocaleString()}</span>
+              </div>
+            ))}
+            <div className="ld-summary-row ldx-summary-total">
+              <span className="ld-summary-label"><strong>Total</strong></span>
+              <span className="ld-summary-count">{loans.length} préstamos</span>
+              <span className="ld-summary-amount"><strong>${totalDeployed.toLocaleString()}</strong></span>
+            </div>
+          </IonCardContent>
+        </IonCard>
+
+        {/* Actividad reciente — ledger real */}
+        <IonCard className="ld-card">
+          <IonCardHeader>
+            <div className="ldx-card-title-row">
+              <IonCardTitle>Actividad reciente</IonCardTitle>
+              {statement.length > 0 && (
+                <IonButton fill="clear" size="small" onClick={() => history.push('/p2p-lending')}>Ver todo</IonButton>
+              )}
+            </div>
+          </IonCardHeader>
+          <IonCardContent>
+            {statement.length === 0 && (
+              <div className="ldx-activity-empty">
+                <p>No hay movimientos aún</p>
+                <span>Comienza a invertir para ver tu actividad aquí.</span>
+              </div>
+            )}
+            {statement.slice(0, 5).map(e => (
+              <div key={e.entryId} className="ldx-activity-row">
+                <span className={`ldx-activity-icon ${e.direction === 'C' ? 'ldx-in' : 'ldx-out'}`}>
+                  <IonIcon icon={activityIcon(e)} />
+                </span>
+                <div className="ldx-activity-text">
+                  <strong>{activityLabel(e)}</strong>
+                  <span>{toDate(e.created_At)}</span>
+                </div>
+                <span className={`ldx-activity-amount ${e.direction === 'C' ? 'ldx-in' : 'ldx-out'}`}>
+                  {e.direction === 'C' ? '+' : '−'}${e.amountMXN.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </span>
               </div>
             ))}
           </IonCardContent>

@@ -101,12 +101,14 @@ import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
+import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import P2PLendingPage from './pages/loans/P2PLendingPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
 import RewardsPage from './pages/finance/RewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
+import LoanChatListPage from './pages/loans/LoanChatListPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -222,7 +224,19 @@ const AppShell: React.FC = () => {
 
     let registrationHandle: PluginListenerHandle | undefined;
     let receivedHandle: PluginListenerHandle | undefined;
+    let tapHandle: PluginListenerHandle | undefined;
+    let localTapHandle: PluginListenerHandle | undefined;
     let cancelled = false;
+
+    // Tapping a notification must DO something: deep-link to the payload's
+    // navigationRoute (e.g. /loan-chat/12) or fall back to the inbox.
+    const openFromNotification = (data: Record<string, any> | undefined, source: string) => {
+      const route = typeof data?.navigationRoute === 'string' && data.navigationRoute.startsWith('/')
+        ? data.navigationRoute
+        : '/notifications';
+      console.log('[Push] tap →', JSON.stringify({ source, route, data }));
+      history.push(route);
+    };
 
     const registerPush = async () => {
       let permission = await PushNotifications.checkPermissions();
@@ -259,8 +273,20 @@ const AppShell: React.FC = () => {
             body: notification.body ?? '',
             channelId: 'push_notifications',
             smallIcon: 'ic_launcher',
+            // carry the route so tapping the foreground banner also navigates
+            extra: notification.data ?? {},
           }],
         });
+      });
+
+      // App in background/closed: user taps the system (FCM) notification.
+      tapHandle = await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        openFromNotification(action.notification?.data, 'push');
+      });
+
+      // App was foreground: user taps the LocalNotifications banner we scheduled.
+      localTapHandle = await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+        openFromNotification(action.notification?.extra, 'local');
       });
 
       await PushNotifications.register();
@@ -272,6 +298,8 @@ const AppShell: React.FC = () => {
       cancelled = true;
       registrationHandle?.remove();
       receivedHandle?.remove();
+      tapHandle?.remove();
+      localTapHandle?.remove();
     };
   }, [userId]);
 
@@ -497,10 +525,12 @@ const AppShell: React.FC = () => {
               {canAccess(roleCode, 'loanChat') && (
               <IonItem
                 button
-                // Borrowers land in a chat with the SmartLoans virtual agent
-                // (clientId must match LOANCHAT_AGENT_CLIENT_ID in the backend .env)
-                // by default, since there's no conversation-list view yet.
-                routerLink={roleCode === 'borrower' ? '/loan-chat/new?lenderId=2127' : '/loan-chat/new'}
+                // Both roles land on the conversations LIST. New chats start
+                // from an offer (P2P) or, for borrowers, from the AI-assistant
+                // button inside the list — never a bare /loan-chat/new, which
+                // used to mint lenderId=0 conversations whose pushes targeted
+                // nobody.
+                routerLink="/loan-chats"
                 title="Chat de Préstamo"
               >
                 <IonIcon icon={chatbubblesOutline} slot="start" />
@@ -602,7 +632,9 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
+            <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
+            <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
           </IonRouterOutlet>
 
           {/* Custom bottom nav (was IonTabBar/IonTabButton). The SmartLoans

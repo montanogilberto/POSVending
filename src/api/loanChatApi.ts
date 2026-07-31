@@ -1,12 +1,32 @@
 const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
 
+// Every chat action funnels through here, so this one pair of logs tracks the
+// whole negotiation flow (start/send/accept/reject → push server-side). Bodies
+// are user content — log metadata only, never the message text.
 async function sp(payload: Record<string, unknown>) {
-  const r = await fetch(`${BASE}/loanChat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat: [payload] }),
-  });
-  return r.json();
+  const { action, conversationId, senderId, msgType, amount, rate, termMonths } = payload as any;
+  console.log('[Chat] →', JSON.stringify({ action, conversationId, senderId, msgType, amount, rate, termMonths }));
+  try {
+    const r = await fetch(`${BASE}/loanChat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat: [payload] }),
+    });
+    const data = await r.json();
+    console.log('[Chat] ←', JSON.stringify({
+      action, http: r.status,
+      conversationId: data?.conversationId ?? conversationId,
+      messageId: data?.messageId, status: data?.status,
+      targetUserId: data?.targetUserId, // who the push went to (server resolves it)
+      error: data?.error,
+    }));
+    return data;
+  } catch (e) {
+    // Backgrounded app / lost network: the 8s poll must fail quietly, not spam
+    // "Uncaught (in promise) TypeError: Failed to fetch" into the logcat.
+    console.log('[Chat] ← NETWORK', JSON.stringify({ action, conversationId, error: String(e) }));
+    return { error: 'network' };
+  }
 }
 
 export type MsgType = 'text' | 'proposal' | 'counter' | 'accept' | 'reject' | 'system';
@@ -26,11 +46,18 @@ export interface LoanMessage {
   created_At: string;
 }
 
+export interface LoanChatConfig {
+  agentClientId: number;      // 0 = assistant not configured
+  agentEnabled: boolean;
+  agentReplyEnabled: boolean; // real ADK replies vs fallback message
+}
+
 export interface LoanConversation {
   conversationId: number;
   companyId: number;
   borrowerId: number;
   lenderId: number;
+  isAssistant?: boolean;      // server-tagged: lender is the reserved agent
   borrowerUserId?: number;
   lenderUserId?: number;
   loanProposalId?: number;
@@ -42,6 +69,27 @@ export interface LoanConversation {
   title?: string;
   lastMessageAt?: string;
   created_At: string;
+}
+
+// The agent identity is backend config (LOANCHAT_AGENT_CLIENT_ID) — never
+// hardcode it here. Cached for the session; safe fallback disables the
+// assistant UI when the endpoint is missing or errors.
+let chatConfigCache: LoanChatConfig | null = null;
+export async function getChatConfig(): Promise<LoanChatConfig> {
+  if (chatConfigCache) return chatConfigCache;
+  try {
+    const r = await fetch(`${BASE}/loanChat/config`);
+    const data = await r.json();
+    chatConfigCache = {
+      agentClientId: data?.agentClientId ?? 0,
+      agentEnabled: !!data?.agentEnabled,
+      agentReplyEnabled: !!data?.agentReplyEnabled,
+    };
+  } catch {
+    chatConfigCache = { agentClientId: 0, agentEnabled: false, agentReplyEnabled: false };
+  }
+  console.log('[Chat] config ←', JSON.stringify(chatConfigCache));
+  return chatConfigCache;
 }
 
 export const loanChatApi = {
@@ -56,6 +104,9 @@ export const loanChatApi = {
     senderId: number; senderUserId?: number; senderRole: string;
     msgType?: MsgType; body?: string;
     amount?: number; rate?: number; termMonths?: number;
+    // Assistant-only: routes the ADK agent to the right sub-agent
+    // ('account' | 'contract' | 'legal' → GUÍA). Ignored by the SP.
+    topic?: string;
   }) => sp({ action: 'send_message', ...p }),
 
   listMessages: (conversationId: number) =>

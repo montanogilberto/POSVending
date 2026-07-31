@@ -133,6 +133,36 @@ const ExpedienteDigitalPage: React.FC = () => {
           </IonCard>
         )}
 
+        {/* ── Datos de identidad (lectura) — cierra el gap de que nombre/CURP/
+            RFC/domicilio solo se veían dentro de los flujos de captura. ── */}
+        <IonCard className="client-face-recognition-step-card">
+          <IonCardHeader>
+            <IonCardTitle className="expediente-section-title">
+              <IonIcon icon={personOutline} /> Datos de identidad
+            </IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            {[
+              ['Nombre (INE)', record?.nombre],
+              ['Fecha de nacimiento', record?.fechaNacimiento],
+              ['CURP', record?.curp],
+              ['Clave de elector', record?.claveElector],
+              ['RFC', record?.rfc],
+              ['Domicilio', record?.domicilio],
+              ['Teléfono', client?.cellphone],
+              ['Correo', client?.email],
+            ].map(([label, value]) => (
+              <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ fontSize: 13, color: '#6b7280', flexShrink: 0 }}>{label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, textAlign: 'right', wordBreak: 'break-word' }}>{value || '—'}</span>
+              </div>
+            ))}
+            <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 8 }}>
+              Extraídos de tu INE y corregidos durante la verificación. Se actualizan al editar tu identidad en el registro de cuenta de pago.
+            </p>
+          </IonCardContent>
+        </IonCard>
+
         <IonCard className="client-face-recognition-step-card">
           <IonCardHeader>
             <IonCardTitle className="expediente-section-title">

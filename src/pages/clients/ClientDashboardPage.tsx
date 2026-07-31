@@ -64,6 +64,13 @@ import QRCode from 'qrcode';
 import { useUser } from '../../components/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
+import { countPendingProposalsForBorrower } from '../../api/loanMarketplaceApi';
+import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
+import { ledgerBalance, postLedgerEntry } from '../../api/bankingApi';
+
+// Muestra el simulador de depósito SPEI (igual que P2PLendingPage) — apagar
+// antes de conectar STP real.
+const SHOW_BANKING_TEST_TOOLS = false;
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
@@ -206,6 +213,13 @@ const ClientDashboardPage: React.FC = () => {
 
   // Face recognition / completion
   const [faceRecord, setFaceRecord] = useState<ClientFaceRecognition | null>(null);
+  // Solicitudes P2P propias aún sin respuesta — banner en el home.
+  const [myPendingProposals, setMyPendingProposals] = useState(0);
+  // Cuotas SPEI: calendario de pagos + saldo de billetera del borrower.
+  const [cuotas, setCuotas] = useState<Installment[]>([]);
+  const [speiWallet, setSpeiWallet] = useState(0);
+  const [payingCuotaId, setPayingCuotaId] = useState<number | null>(null);
+  const [showCuotaDeposit, setShowCuotaDeposit] = useState(false);
   const [clientRecord, setClientRecord] = useState<Client | null>(null);
 
   // Profile tab — self-service edit of the client's own contact info
@@ -546,6 +560,15 @@ const ClientDashboardPage: React.FC = () => {
     fetchDashboard();
     fetchLoans();
     fetchStripe();
+    // Solicitudes que este borrower envió y siguen sin respuesta — banner del home.
+    if (companyId && clientId) {
+      countPendingProposalsForBorrower(companyId, Number(clientId))
+        .then(pending => {
+          console.log('[ClientDashboard] my pending proposals:', pending);
+          setMyPendingProposals(pending);
+        })
+        .catch(() => setMyPendingProposals(0));
+    }
     if (companyId && clientId) {
       getAllClientFaceRecognitions(companyId)
         .then(records => {
@@ -751,8 +774,69 @@ const ClientDashboardPage: React.FC = () => {
 
   // ── Renderers ─────────────────────────────────────────────────────────────
 
+  // ── Cuotas SPEI ───────────────────────────────────────────────────────────
+  const loadCuotas = async () => {
+    if (!companyId || !clientId) return;
+    const active = loans.filter(l => l.loanStatus?.toLowerCase() === 'active');
+    const lists = await Promise.all(active.map(l => fetchInstallmentSchedule(l.loanId, Number(companyId))));
+    setCuotas(lists.flat());
+    const bal = await ledgerBalance(Number(companyId), Number(clientId));
+    setSpeiWallet(bal.availableBalance);
+  };
+
+  useEffect(() => {
+    loadCuotas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loans, companyId, clientId]);
+
+  const handlePayCuota = async (cuota: Installment) => {
+    if (payingCuotaId) return;
+    setPayingCuotaId(cuota.installmentId);
+    const r = await payInstallmentSpei({
+      companyId: Number(companyId), loanId: cuota.loanId,
+      installmentId: cuota.installmentId, clientId: Number(clientId),
+    });
+    setPayingCuotaId(null);
+    if (r.error) {
+      setError(r.error);
+      return;
+    }
+    setSuccessMsg(`✓ Cuota #${cuota.installmentNumber} pagada por SPEI — saldo $${(r.borrowerBalanceAfter ?? 0).toFixed(2)}`);
+    loadCuotas();
+  };
+
+  const handleCuotaSimDeposit = async (amountStr: string) => {
+    const amount = Number(amountStr);
+    if (!amount || amount <= 0) return;
+    const r = await postLedgerEntry({
+      companyId: Number(companyId), clientId: Number(clientId),
+      entryType: 'DEPOSIT', direction: 'C', amountMXN: amount,
+      idempotencyKey: `sim:dep:${clientId}:${Date.now()}`,
+      note: 'Depósito SPEI simulado (prueba)',
+    });
+    if (r.error) {
+      setError(r.error);
+      return;
+    }
+    setSuccessMsg(`✓ Depósito de prueba: $${amount.toFixed(2)}`);
+    loadCuotas();
+  };
+
   const renderHome = () => (
     <>
+      {/* Solicitudes enviadas en espera de respuesta */}
+      {myPendingProposals > 0 && (
+        <div
+          className="pending-proposals-banner"
+          onClick={() => { console.log('[ClientDashboard] proposals banner → /p2p-lending'); history.push('/p2p-lending'); }}>
+          <IonIcon icon={timeOutline} />
+          <span>
+            Tienes <strong>{myPendingProposals}</strong> {myPendingProposals === 1 ? 'solicitud enviada' : 'solicitudes enviadas'} en espera de respuesta
+          </span>
+          <IonBadge color="warning">{myPendingProposals}</IonBadge>
+        </div>
+      )}
+
       {/* Hero */}
       <IonCard className="client-dashboard-card hero-card">
         <IonCardContent>
@@ -920,8 +1004,12 @@ const ClientDashboardPage: React.FC = () => {
           <IonGrid>
             <IonRow>
               <IonCol size="6">
+                {/* DESHABILITADO (decisión de prueba): el flujo directo creaba
+                    préstamos 'Pending' huérfanos sin prestamista/dinero/cuotas.
+                    Las solicitudes reales van por el marketplace P2P (oferta →
+                    Enviar solicitud). */}
                 <IonButton expand="block" shape="round" className="client-dashboard-action-button"
-                  onClick={() => { setShowLoanModal(true); }}>
+                  disabled>
                   <IonIcon icon={addCircleOutline} slot="start" /> Solicitar préstamo
                 </IonButton>
               </IonCol>
@@ -964,7 +1052,7 @@ const ClientDashboardPage: React.FC = () => {
       <IonCardHeader>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <IonCardTitle>Mis Préstamos</IonCardTitle>
-          <IonButton fill="clear" size="small" onClick={() => setShowLoanModal(true)}>
+          <IonButton fill="clear" size="small" disabled>
             <IonIcon icon={addCircleOutline} slot="start" /> Nuevo
           </IonButton>
         </div>
@@ -975,7 +1063,7 @@ const ClientDashboardPage: React.FC = () => {
           <div className="cd-empty-state">
             <IonIcon icon={documentTextOutline} />
             <p>No tienes préstamos registrados.</p>
-            <IonButton size="small" onClick={() => setShowLoanModal(true)}>Solicitar préstamo</IonButton>
+            <IonButton size="small" disabled>Solicitar préstamo</IonButton>
           </div>
         )}
         <div className="cd-loan-list">
@@ -1024,8 +1112,68 @@ const ClientDashboardPage: React.FC = () => {
     // file — that's the piece that determines whether the client can
     // actually receive or withdraw money, not just generic KYC completion.
     const kycDone = !!stripeAccount?.hasExternalAccount;
+    const pendingCuotas = cuotas.filter(c => c.status !== 'paid');
+    const paidCuotas = cuotas.filter(c => c.status === 'paid');
     return (
       <>
+        {/* Cuotas — riel STP/SPEI (primario): se pagan desde la billetera */}
+        {cuotas.length > 0 && (
+          <IonCard className="client-dashboard-card">
+            <IonCardHeader>
+              <div className="cd-stripe-header">
+                <IonCardTitle>Mis cuotas (SPEI)</IonCardTitle>
+                <IonButton fill="clear" size="small" onClick={loadCuotas}>
+                  <IonIcon icon={refreshOutline} slot="icon-only" />
+                </IonButton>
+              </div>
+            </IonCardHeader>
+            <IonCardContent>
+              <div className="cd-wallet-row">
+                <span>Saldo en billetera</span>
+                <strong>${speiWallet.toFixed(2)}</strong>
+              </div>
+              {SHOW_BANKING_TEST_TOOLS && (
+                <IonButton size="small" fill="outline" expand="block"
+                  onClick={() => setShowCuotaDeposit(true)}>
+                  Simular depósito SPEI (prueba)
+                </IonButton>
+              )}
+              {pendingCuotas.map(c => (
+                <div key={c.installmentId} className="cd-cuota-item">
+                  <div className="cd-cuota-info">
+                    <strong>Cuota #{c.installmentNumber} · ${c.amount.toFixed(2)}</strong>
+                    <span>Vence {toDate(c.dueDate)} · capital ${c.principal.toFixed(2)} + interés ${c.interest.toFixed(2)}</span>
+                  </div>
+                  <IonButton size="small" disabled={payingCuotaId !== null}
+                    onClick={() => handlePayCuota(c)}>
+                    {payingCuotaId === c.installmentId ? 'Pagando…' : 'Pagar'}
+                  </IonButton>
+                </div>
+              ))}
+              {paidCuotas.map(c => (
+                <div key={c.installmentId} className="cd-cuota-item cd-cuota-paid">
+                  <div className="cd-cuota-info">
+                    <strong>✓ Cuota #{c.installmentNumber} · ${c.amount.toFixed(2)}</strong>
+                    <span>Pagada {c.paidAt ? toDate(c.paidAt) : ''}</span>
+                  </div>
+                </div>
+              ))}
+            </IonCardContent>
+          </IonCard>
+        )}
+
+        <IonAlert
+          isOpen={showCuotaDeposit}
+          onDidDismiss={() => setShowCuotaDeposit(false)}
+          header="Simular depósito SPEI"
+          message="Solo pruebas: acredita tu billetera como si hubiera llegado una transferencia SPEI."
+          inputs={[{ name: 'amount', type: 'number', placeholder: 'Monto (MXN)', min: 1 }]}
+          buttons={[
+            { text: 'Cancelar', role: 'cancel' },
+            { text: 'Depositar', handler: (d) => { handleCuotaSimDeposit(d.amount); } },
+          ]}
+        />
+
         {/* Stripe account status */}
         <IonCard className="client-dashboard-card cd-stripe-card">
           <IonCardHeader>

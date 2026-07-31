@@ -157,13 +157,19 @@ const LoanPaymentPage: React.FC = () => {
         ]);
         stripeRef.current = stripe;
         setConnAccount(acct);
+        console.log('[Payment] init', JSON.stringify({
+          mode, clientId, amountQP,
+          chargesEnabled: acct?.chargesEnabled ?? false,
+          detailsSubmitted: acct?.detailsSubmitted ?? false,
+        }));
         // Skip KYC step if already verified
         if (acct?.chargesEnabled && acct?.detailsSubmitted) {
           setStep(amountQP > 0 ? 'card' : 'amount');
         } else {
+          console.log('[Payment] init: account not charge-ready → KYC step');
           setStep('kyc');
         }
-      } catch { setStep('kyc'); }
+      } catch (e) { console.log('[Payment] init FAILED —', String(e)); setStep('kyc'); }
       setLoading(false);
     })();
   }, [clientId, companyId, amountQP]);
@@ -178,6 +184,7 @@ const LoanPaymentPage: React.FC = () => {
         const finalAmount = amountQP > 0 ? amountQP : amount;
 
         // Ask backend to create a PaymentIntent and return clientSecret
+        console.log('[Payment] creating PaymentIntent', JSON.stringify({ mode, finalAmount, clientId, loanId: loanId || null }));
         let intentResponse;
         if (isTopUp) {
           intentResponse = await createWalletTopUp(clientId, companyId, finalAmount);
@@ -193,6 +200,7 @@ const LoanPaymentPage: React.FC = () => {
         }
 
         intentIdRef.current = intentResponse.paymentIntentId;
+        console.log('[Payment] PaymentIntent created ←', JSON.stringify({ paymentIntentId: intentResponse.paymentIntentId }));
 
         // Mount the Payment Element
         const elements = stripeRef.current!.elements({
@@ -219,6 +227,7 @@ const LoanPaymentPage: React.FC = () => {
 
         paymentElement.mount(cardElRef.current!);
       } catch (e: any) {
+        console.log('[Payment] intent/element setup FAILED —', String(e?.message ?? e));
         setStripeError(e?.message ?? 'No se pudo inicializar el formulario de pago');
         setStep('error');
       }
@@ -252,6 +261,7 @@ const LoanPaymentPage: React.FC = () => {
     }
 
     setStep('processing');
+    console.log('[Payment] confirmPayment: START', JSON.stringify({ mode, intentId: intentIdRef.current }));
 
     const { error } = await stripeRef.current.confirmPayment({
       elements: elementsRef.current,
@@ -265,6 +275,7 @@ const LoanPaymentPage: React.FC = () => {
     });
 
     if (error) {
+      console.log('[Payment] confirmPayment: Stripe REJECTED —', JSON.stringify({ type: error.type, message: error.message }));
       setStripeError(
         error.type === 'card_error'
           ? error.message ?? 'Error en la tarjeta'
@@ -273,10 +284,12 @@ const LoanPaymentPage: React.FC = () => {
       setStep('error');
       return;
     }
+    console.log('[Payment] confirmPayment: Stripe charge OK — verifying server-side + recording transaction');
 
     // Payment succeeded — verify server-side and record transaction
     try {
       const tx = await confirmPaymentIntent(intentIdRef.current, companyId);
+      console.log('[Payment] confirm-intent ←', JSON.stringify(tx));
       setTransaction(tx);
 
       // Push notification to the counterparty
@@ -299,8 +312,10 @@ const LoanPaymentPage: React.FC = () => {
         }),
       }).catch(() => {});
 
+      console.log('[Payment] SUCCESS —', mode, 'completed; wallet ledger updated server-side');
       setStep('success');
     } catch (e: any) {
+      console.log('[Payment] charge OK but server-side record FAILED —', String(e?.message ?? e));
       setStripeError('El pago fue procesado pero hubo un error al registrarlo. Contacta soporte.');
       setStep('error');
     }

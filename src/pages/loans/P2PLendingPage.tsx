@@ -14,18 +14,27 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
   IonIcon, IonToast, IonLoading, IonModal, IonBadge, IonRefresher,
   IonRefresherContent, IonAlert, IonLabel, IonInput, IonTextarea, IonSelect,
-  IonSelectOption, IonProgressBar, IonSegment, IonSegmentButton,
+  IonSelectOption, IonProgressBar, IonSegment, IonSegmentButton, IonFooter,
+  IonActionSheet, useIonViewWillEnter,
 } from '@ionic/react';
 import {
   refreshOutline, addOutline, arrowBackOutline, checkmarkCircle, closeCircle,
   walletOutline, personOutline, timeOutline, alertCircleOutline,
   cashOutline, trendingUpOutline, documentTextOutline, notificationsOutline,
-  sendOutline, handLeftOutline, ribbonOutline, trashOutline,
+  cardOutline,
+  sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline,
+  flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../components/UserContext';
 import { getAllClients, Client, ClientType } from '../../api/clientsApi';
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+
+// Shows the "Simular depósito SPEI" test tool. There is no real SPEI-in until
+// STP virtual CLABEs exist, so this is how the deposit→saldo→retiro loop is
+// exercised today. FLIP TO false BEFORE real STP goes live (it self-credits
+// the ledger).
+const SHOW_BANKING_TEST_TOOLS = false;
 
 // ── Loan Proposal / Offer types & fetchers (single-use, kept inline) ─────────
 
@@ -104,42 +113,43 @@ async function deleteLoanOffer(offerId: number, companyId: number): Promise<void
   if (!res.ok) throw new Error(await res.text());
 }
 
-// ── Wallet / Stripe disbursement helpers (single-use, kept inline to match
-// the pattern above) ──────────────────────────────────────────────────────
+// ── Wallet / disbursement helpers ─────────────────────────────────────────
+// TWO rails, by user decision: SPEI (banking-first, new walletTransactions
+// ledger, /payments/disburse) is PRIMARY; Stripe (clientWallets + Connect)
+// stays as the SECOND option — handlers try SPEI first and fall back to
+// Stripe automatically. Each rail keeps its own ledger; the displayed saldo
+// is the sum of both.
 
-interface WalletBalance {
+interface StripeWallet {
   availableBalance: number;
   reservedBalance: number;
-  totalTopUps: number;
-  totalDisbursed: number;
-  totalRepaid: number;
 }
 
-async function getWallet(clientId: number, companyId: number): Promise<WalletBalance | null> {
+async function getStripeWallet(clientId: number, companyId: number): Promise<StripeWallet | null> {
   const res = await fetch(`${API_BASE_URL}/wallet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId }) });
   if (!res.ok) return null;
   const data = await res.json();
   return data.wallet ?? null;
 }
 
-async function reserveWallet(clientId: number, companyId: number, amountMXN: number): Promise<{ error?: string }> {
+async function reserveStripeWallet(clientId: number, companyId: number, amountMXN: number): Promise<{ error?: string }> {
   const res = await fetch(`${API_BASE_URL}/wallet/reserve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN }) });
   return res.json();
 }
 
-async function releaseWallet(clientId: number, companyId: number, amountMXN: number): Promise<void> {
+async function releaseStripeWallet(clientId: number, companyId: number, amountMXN: number): Promise<void> {
   await fetch(`${API_BASE_URL}/wallet/release`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN }) }).catch(() => {});
 }
 
-async function debitWallet(clientId: number, companyId: number, amountMXN: number, type: 'disbursement' | 'withdrawal'): Promise<void> {
+async function debitStripeWallet(clientId: number, companyId: number, amountMXN: number, type: 'disbursement' | 'withdrawal'): Promise<void> {
   await fetch(`${API_BASE_URL}/wallet/debit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN, type }) });
 }
 
-async function creditWallet(clientId: number, companyId: number, amountMXN: number, type: 'top_up' | 'repayment_received' | 'disbursement_received'): Promise<void> {
+async function creditStripeWallet(clientId: number, companyId: number, amountMXN: number, type: 'top_up' | 'repayment_received' | 'disbursement_received'): Promise<void> {
   await fetch(`${API_BASE_URL}/wallet/credit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN, type }) });
 }
 
-async function withdrawToBank(clientId: number, companyId: number, amount: number): Promise<{ status?: string; error?: string }> {
+async function stripeWithdrawToBank(clientId: number, companyId: number, amount: number): Promise<{ status?: string; error?: string }> {
   const res = await fetch(`${API_BASE_URL}/stripe/withdraw`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amount }) });
   return res.json();
 }
@@ -151,18 +161,18 @@ async function getStripeAccountStatus(clientId: number, companyId: number): Prom
   return data.account ?? null;
 }
 
+async function stripeDisburseLoan(payload: {
+  companyId: number; loanId?: number; proposalId: number; lenderId: number; borrowerId: number; amount: number;
+}): Promise<{ status?: string; stripeTransferId?: string; error?: string }> {
+  const res = await fetch(`${API_BASE_URL}/stripe/disburse`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  return res.json();
+}
+
 async function getSavedPaymentMethod(clientId: number, companyId: number): Promise<{ stripePaymentMethodId?: string } | null> {
   const res = await fetch(`${API_BASE_URL}/automated-payments/saved-method`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId }) });
   if (!res.ok) return null;
   const data = await res.json();
   return data.paymentMethod ?? null;
-}
-
-async function disburseLoan(payload: {
-  companyId: number; loanId?: number; proposalId: number; lenderId: number; borrowerId: number; amount: number;
-}): Promise<{ status?: string; stripeTransferId?: string; error?: string }> {
-  const res = await fetch(`${API_BASE_URL}/stripe/disburse`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-  return res.json();
 }
 
 async function generateInstallmentSchedule(payload: {
@@ -175,8 +185,16 @@ async function generateInstallmentSchedule(payload: {
 import {
   getAllClientFaceRecognitions, ClientFaceRecognition,
 } from '../../api/clientFaceRecognitionApi';
+// Banking-first Phase 1: ledger + CLABEs + SPEI orchestrator (mock STP until
+// the contract exists) — replaces the Stripe wallet/withdraw path on this page.
+import {
+  BankAccount, listBankAccounts, ledgerBalance, ledgerStatement, LedgerEntry,
+  postLedgerEntry, disbursePayment,
+} from '../../api/bankingApi';
+import BankAccountLink from '../../components/BankAccountLink';
 import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
 import { createLoan } from '../../api/loanApi';
+import { getChatConfig } from '../../api/loanChatApi';
 import './P2PLendingPage.css';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -203,7 +221,10 @@ const P2PLendingPage: React.FC = () => {
   const isLender   = clientType === 'lender' || clientType === 'both';
   const isBorrower = clientType === 'borrower' || clientType === 'both';
 
-  const goTopUp    = () => history.push(`/payment?mode=top_up`);
+  const goTopUp    = () => {
+    console.log('[P2P] goTopUp → /payment?mode=top_up', JSON.stringify({ clientId, companyId, walletBalance }));
+    history.push(`/payment?mode=top_up`);
+  };
   const goRepay    = (lId: number, lendId: number, amount: number, inst: number) =>
     history.push(`/payment?mode=repayment&loanId=${lId}&lenderId=${lendId}&amount=${amount}&installment=${inst}`);
 
@@ -223,6 +244,10 @@ const P2PLendingPage: React.FC = () => {
   const [selectedProposal,  setSelectedProposal]  = useState<LoanProposal | null>(null);
   const [showAcceptAlert,   setShowAcceptAlert]   = useState(false);
   const [showRejectAlert,   setShowRejectAlert]   = useState(false);
+  // Blocking failure explanation for approve — a toast dies in 3s unseen.
+  const [errorAlert,        setErrorAlert]        = useState('');
+  // Insufficient-funds variant with deposit actions built in.
+  const [fundsAlertMsg,     setFundsAlertMsg]     = useState('');
   const [offerToDelete,     setOfferToDelete]     = useState<LoanOffer | null>(null);
 
   // ── offer form ─────────────────────────────────────────────────────────
@@ -246,6 +271,18 @@ const P2PLendingPage: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [showWithdrawAlert, setShowWithdrawAlert] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
+  // Banking-first Phase 1 state: linked CLABEs + bank modal + movements.
+  // Two rails coexist (user decision): SPEI ledger (primary) + Stripe wallet
+  // (2nd option). walletBalance shows the SUM; per-rail balances drive which
+  // rail each operation uses.
+  const [speiBalance, setSpeiBalance] = useState(0);
+  const [stripeBalance, setStripeBalance] = useState(0);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [showMovements, setShowMovements] = useState(false);
+  const [movements, setMovements] = useState<LedgerEntry[]>([]);
+  const [showDepositAlert, setShowDepositAlert] = useState(false);
+  const hasVerifiedAccount = bankAccounts.some(a => a.isVerified);
 
   // ── load data ───────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -263,11 +300,25 @@ const P2PLendingPage: React.FC = () => {
       setBiometrics(bio);
       const me = allClients.find(c => c.clientId === clientId) ?? null;
       setMyClient(me);
-      // Load wallet balance
+      console.log('[P2P] load ✅', JSON.stringify({
+        clients: allClients.length, proposals: allProps.length, offers: allOffers.length,
+        myOffers: allOffers.filter(o => o.lenderId === clientId).length,
+      }));
+      // Both rails' balances (SPEI ledger primary + Stripe wallet 2nd option);
+      // the UI shows the sum, handlers pick the rail with funds.
       if (clientId && companyId) {
-        getWallet(clientId, companyId)
-          .then(w => { if (w) setWalletBalance(w.availableBalance); })
-          .catch(() => {});
+        Promise.all([
+          ledgerBalance(companyId, clientId).catch(() => ({ availableBalance: 0, reservedBalance: 0 })),
+          getStripeWallet(clientId, companyId).catch(() => null),
+        ]).then(([spei, stripeW]) => {
+          const s1 = spei.availableBalance ?? 0;
+          const s2 = stripeW?.availableBalance ?? 0;
+          setSpeiBalance(s1); setStripeBalance(s2); setWalletBalance(s1 + s2);
+          console.log('[P2P] balances ←', JSON.stringify({ spei: s1, stripe: s2, total: s1 + s2 }));
+        });
+        listBankAccounts(companyId, clientId)
+          .then(setBankAccounts)
+          .catch((e) => console.log('[P2P] bankAccounts ❌', String(e)));
       }
     } finally {
       setLoading(false);
@@ -275,6 +326,15 @@ const P2PLendingPage: React.FC = () => {
   }, [companyId, clientId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Ionic keeps this page mounted while the user is off topping up on
+  // /payment, so the mount effect alone never refreshes the saldo they just
+  // changed — refetch on every re-entry so the wallet/UI reflects the top-up
+  // (or withdrawal) immediately.
+  useIonViewWillEnter(() => {
+    console.log('[P2P] view re-entered → refreshing wallet + offers');
+    load();
+  }, [load]);
 
   // ── computed slices ─────────────────────────────────────────────────────
   const clientMap = Object.fromEntries(clients.map(c => [c.clientId, c]));
@@ -298,7 +358,17 @@ const P2PLendingPage: React.FC = () => {
     if (!capital || !minRate || !maxRate) {
       setToast('Completa todos los campos requeridos'); return;
     }
+    // Published capital must be backed by wallet funds (either rail) — an
+    // unfunded offer dies at accept time when the SPEI debit hits insufficient
+    // funds, after the borrower already negotiated in good faith.
+    const totalBalance = speiBalance + stripeBalance;
+    if (capital > totalBalance) {
+      console.log('[P2P] publishOffer: BLOCKED — insufficient funds', JSON.stringify({ capital, speiBalance, stripeBalance }));
+      setToast(`Saldo insuficiente: tienes ${fmt(totalBalance)} en tu billetera y quieres publicar ${fmt(capital)}. Deposita primero.`);
+      return;
+    }
     setSaving(true);
+    console.log('[P2P] publishOffer: START', JSON.stringify({ clientId, capital, minRate, maxRate }));
     try {
       const expires = new Date();
       expires.setDate(expires.getDate() + 30);
@@ -341,11 +411,13 @@ const P2PLendingPage: React.FC = () => {
         }),
       });
 
+      console.log('[P2P] publishOffer: SUCCESS — notified', borrowers.length, 'borrowers');
       setToast(`✓ Oferta publicada y notificación enviada a ${borrowers.length} prestatarios`);
       setShowOfferModal(false);
       setOfferCapital(''); setOfferMinRate('12'); setOfferMaxRate('36'); setOfferDesc('');
       load();
     } catch (e: any) {
+      console.log('[P2P] publishOffer: FAILED —', String(e?.message ?? e));
       setToast(e?.message ?? 'Error al publicar oferta');
     }
     setSaving(false);
@@ -355,11 +427,14 @@ const P2PLendingPage: React.FC = () => {
   const removeOffer = async () => {
     if (!offerToDelete) return;
     setSaving(true);
+    console.log('[P2P] removeOffer: START', JSON.stringify({ offerId: offerToDelete.offerId }));
     try {
       await deleteLoanOffer(offerToDelete.offerId, companyId);
+      console.log('[P2P] removeOffer: SUCCESS — offerId', offerToDelete.offerId);
       setToast('✓ Oferta eliminada');
       load();
     } catch (e: any) {
+      console.log('[P2P] removeOffer: FAILED —', String(e?.message ?? e));
       setToast(e?.message ?? 'Error al eliminar la oferta');
     }
     setOfferToDelete(null);
@@ -383,17 +458,24 @@ const P2PLendingPage: React.FC = () => {
     }
 
     setSaving(true);
+    console.log('[P2P] submitProposal: START', JSON.stringify({
+      borrowerId: clientId, lenderId: selectedOffer.lenderId, amount, rate, term,
+    }));
     try {
       const lenderClient = clientMap[selectedOffer.lenderId];
       const borrowerName = myClient ? `${myClient.first_name} ${myClient.last_name}` : 'Prestatario';
 
-      // 1. Persist proposal
+      // 1. Persist proposal — MUST succeed before notifying the lender.
+      // Previously .catch(() => {}) swallowed failures here, so a lender could
+      // get a push for a proposal that never existed (same bug publishOffer
+      // had: a success toast hiding persistent 500s).
       await createLoanProposal({
         companyId, lenderId: selectedOffer.lenderId, borrowerId: clientId,
         requestedAmount: amount, proposedRate: rate, termMonths: term,
         status: 'pending',
         borrowerNote: propNote,
-      }).catch(() => {});
+      });
+      console.log('[P2P] submitProposal: proposal persisted — notifying lender');
 
       // 2. Push notification to the lender
       await createPushNotification({
@@ -413,11 +495,13 @@ const P2PLendingPage: React.FC = () => {
         }),
       });
 
+      console.log('[P2P] submitProposal: SUCCESS — push sent to lender', selectedOffer.lenderId);
       setToast(`✓ Solicitud enviada a ${lenderClient?.first_name ?? 'prestamista'}`);
       setShowProposalModal(false);
       setPropAmount(''); setPropRate(''); setPropTerm('12'); setPropNote('');
       load();
     } catch (e: any) {
+      console.log('[P2P] submitProposal: FAILED —', String(e?.message ?? e));
       setToast(e?.message ?? 'Error al enviar solicitud');
     }
     setSaving(false);
@@ -433,42 +517,85 @@ const P2PLendingPage: React.FC = () => {
     setSaving(true);
     try {
       const { proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths } = selectedProposal;
+      console.log('[P2P] acceptProposal: START', JSON.stringify({ proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths }));
 
-      const [borrowerStripe, borrowerCard, lenderWallet] = await Promise.all([
+      // Funds first, with exact numbers and a way OUT: the alert offers the
+      // deposit actions directly instead of a dead-end "Entendido".
+      const totalBalance = speiBalance + stripeBalance;
+      if (requestedAmount > totalBalance) {
+        console.log('[P2P] acceptProposal: BLOCKED — insufficient funds', JSON.stringify({ requestedAmount, speiBalance, stripeBalance }));
+        setShowAcceptAlert(false);
+        setFundsAlertMsg(
+          `Para fondear ${fmt(requestedAmount)} tu billetera tiene ${fmt(totalBalance)} ` +
+          `(SPEI ${fmt(speiBalance)} · Stripe ${fmt(stripeBalance)}). El capital publicado en tu ` +
+          `oferta es un anuncio, no dinero depositado: el préstamo sale de tu saldo en cartera.`);
+        setSaving(false);
+        return;
+      }
+
+      // Preconditions: the borrower needs SOME payout destination — a verified
+      // CLABE (SPEI, primary) or a Stripe connected account with bank on file
+      // (2nd option) — plus a card on file for the automatic monthly cuotas.
+      const [borrowerAccounts, borrowerStripe, borrowerCard] = await Promise.all([
+        listBankAccounts(companyId, borrowerId),
         getStripeAccountStatus(borrowerId, companyId),
         getSavedPaymentMethod(borrowerId, companyId),
-        getWallet(lenderId, companyId),
       ]);
-
-      if (!borrowerStripe?.hasExternalAccount) {
-        throw new Error('El prestatario no ha vinculado una cuenta bancaria o tarjeta de débito. No se puede depositar el préstamo.');
+      const borrowerHasClabe  = borrowerAccounts.some(a => a.isVerified);
+      const borrowerHasStripe = !!borrowerStripe?.hasExternalAccount;
+      console.log('[P2P] acceptProposal: preconditions', JSON.stringify({
+        borrowerHasClabe, borrowerHasStripe,
+        borrowerHasCard: !!borrowerCard?.stripePaymentMethodId,
+        lenderSpei: speiBalance, lenderStripe: stripeBalance,
+      }));
+      if (!borrowerHasClabe && !borrowerHasStripe) {
+        throw new Error('El prestatario no tiene una cuenta bancaria vinculada (CLABE ni Stripe). No se puede depositar el préstamo.');
       }
       if (!borrowerCard?.stripePaymentMethodId) {
         throw new Error('El prestatario no ha registrado una tarjeta para el cobro automático de las cuotas.');
       }
-      if (!lenderWallet || lenderWallet.availableBalance < requestedAmount) {
-        throw new Error('Saldo insuficiente en tu cartera para fondear este préstamo.');
+
+      // ── Rail 1 — SPEI (primary): one orchestrator call debits the lender's
+      // ledger, sends to the borrower's verified CLABE and auto-reverses on
+      // failure (mock STP hasta contrato).
+      let moneyMoved = false;
+      if (borrowerHasClabe && requestedAmount <= speiBalance) {
+        const disburseResult = await disbursePayment({
+          companyId, lenderId, borrowerId, amountMXN: requestedAmount,
+          purpose: 'loan_disbursement',
+          idempotencyKey: `proposal:${proposalId}:disburse:${Date.now()}`,
+        });
+        console.log('[P2P] acceptProposal: /payments/disburse ←', JSON.stringify(disburseResult));
+        if (!disburseResult.error && disburseResult.status !== 'failed') {
+          console.log('[P2P] acceptProposal: SPEI moved — transferId', disburseResult.transferId, 'CEP', disburseResult.cepUrl);
+          moneyMoved = true;
+        } else {
+          console.log('[P2P] acceptProposal: SPEI FAILED — trying Stripe as 2nd option:', disburseResult.error);
+        }
+      } else {
+        console.log('[P2P] acceptProposal: SPEI not eligible — trying Stripe as 2nd option');
       }
 
-      // Lock the lender's funds before attempting the transfer.
-      const reserveResult = await reserveWallet(lenderId, companyId, requestedAmount);
-      if (reserveResult.error) throw new Error(reserveResult.error);
+      // ── Rail 2 — Stripe (segunda opción): the pre-banking sequence, kept by
+      // user decision: reserve → Connect transfer → old-wallet debit/credit.
+      if (!moneyMoved) {
+        if (!borrowerHasStripe) throw new Error('SPEI no disponible y el prestatario no tiene cuenta Stripe vinculada.');
+        if (requestedAmount > stripeBalance) throw new Error('Saldo insuficiente en tu cartera para fondear este préstamo.');
 
-      // Real Stripe Transfer to the borrower's Connected Account (from which
-      // Stripe pays out to their bank account/debit card).
-      const disburseResult = await disburseLoan({ companyId, proposalId, lenderId, borrowerId, amount: requestedAmount });
-      if (disburseResult.error || disburseResult.status !== 'succeeded') {
-        await releaseWallet(lenderId, companyId, requestedAmount);
-        throw new Error(disburseResult.error || 'No se pudo transferir el capital al prestatario.');
+        const reserveResult = await reserveStripeWallet(lenderId, companyId, requestedAmount);
+        console.log('[P2P] acceptProposal: stripe RESERVE ←', JSON.stringify(reserveResult));
+        if (reserveResult.error) throw new Error(reserveResult.error);
+
+        const stripeResult = await stripeDisburseLoan({ companyId, proposalId, lenderId, borrowerId, amount: requestedAmount });
+        console.log('[P2P] acceptProposal: /stripe/disburse ←', JSON.stringify(stripeResult));
+        if (stripeResult.error || stripeResult.status !== 'succeeded') {
+          await releaseStripeWallet(lenderId, companyId, requestedAmount);
+          throw new Error(stripeResult.error || 'No se pudo transferir el capital al prestatario.');
+        }
+        await debitStripeWallet(lenderId, companyId, requestedAmount, 'disbursement');
+        await creditStripeWallet(borrowerId, companyId, requestedAmount, 'disbursement_received');
+        console.log('[P2P] acceptProposal: STRIPE moved — transfer', stripeResult.stripeTransferId);
       }
-
-      // Money has moved — safe to finalize the ledger and records now.
-      await debitWallet(lenderId, companyId, requestedAmount, 'disbursement');
-      // Credit the borrower's own ledger too — real money just landed on
-      // their Connected Account via the Transfer above, and withdrawToBank()
-      // reads this same ledger, so without this a borrower would show a
-      // real Stripe balance but $0 available to withdraw.
-      await creditWallet(borrowerId, companyId, requestedAmount, 'disbursement_received');
 
       const disbursementDate = new Date().toISOString();
       const loan = await createLoan({
@@ -513,12 +640,17 @@ const P2PLendingPage: React.FC = () => {
         payloadJson: JSON.stringify({ type: 'ProposalAccepted', proposalId }),
       });
 
+      console.log('[P2P] acceptProposal: SUCCESS — loan created + schedule generated + proposal accepted');
       setToast(`✓ Préstamo aprobado y depositado — ${fmt(requestedAmount)} para ${borrowerClient?.first_name ?? 'prestatario'}`);
       setShowAcceptAlert(false);
       setSelectedProposal(null);
       load();
     } catch (e: any) {
-      setToast(e?.message ?? 'Error al aprobar préstamo');
+      console.log('[P2P] acceptProposal: FAILED —', String(e?.message ?? e));
+      // Blocking alert (not a toast): the lender must read WHY the approval
+      // did not happen and what to do next.
+      setErrorAlert(e?.message ?? 'Error al aprobar préstamo');
+      setShowAcceptAlert(false);
     }
     setSaving(false);
   };
@@ -527,10 +659,11 @@ const P2PLendingPage: React.FC = () => {
   const rejectProposal = async () => {
     if (!selectedProposal) return;
     setSaving(true);
+    console.log('[P2P] rejectProposal: START', JSON.stringify({ proposalId: selectedProposal.proposalId, borrowerId: selectedProposal.borrowerId }));
     try {
       await updateLoanProposal(selectedProposal.proposalId, {
         status: 'rejected', respondedAt: new Date().toISOString(),
-      }).catch(() => {});
+      }).catch((e) => console.log('[P2P] rejectProposal: status update FAILED —', String(e)));
 
       await createPushNotification({
         companyId,
@@ -544,11 +677,13 @@ const P2PLendingPage: React.FC = () => {
         payloadJson: JSON.stringify({ type: 'ProposalRejected', proposalId: selectedProposal.proposalId }),
       });
 
+      console.log('[P2P] rejectProposal: SUCCESS — borrower notified');
       setToast('Solicitud rechazada y notificación enviada');
       setShowRejectAlert(false);
       setSelectedProposal(null);
       load();
     } catch (e: any) {
+      console.log('[P2P] rejectProposal: FAILED —', String(e?.message ?? e));
       setToast(e?.message ?? 'Error');
     }
     setSaving(false);
@@ -560,17 +695,72 @@ const P2PLendingPage: React.FC = () => {
     if (!amount || amount <= 0) { setToast('Ingresa un monto válido'); return; }
     if (walletBalance !== null && amount > walletBalance) { setToast('El monto supera tu saldo disponible'); return; }
     setWithdrawing(true);
-    try {
-      const result = await withdrawToBank(clientId, companyId, amount);
-      if (result.error || result.status !== 'succeeded') {
-        throw new Error(result.error || 'No se pudo procesar el retiro.');
+    console.log('[P2P] withdraw: START', JSON.stringify({ clientId, amount, speiBalance, stripeBalance }));
+
+    // Rail 1 — SPEI (primary): verified CLABE + funds in the new ledger.
+    if (hasVerifiedAccount && amount <= speiBalance) {
+      // Attempt-scoped idempotencyKey: a failed attempt's key is burned by its
+      // automatic ledger reversal, so every user retry gets a fresh key.
+      const idemKey = `withdraw:${clientId}:${Date.now()}`;
+      try {
+        const result = await disbursePayment({
+          companyId, clientId, purpose: 'lender_payout', amountMXN: amount, idempotencyKey: idemKey,
+        });
+        if (result.error || result.status === 'failed') throw new Error(result.error || 'SPEI rechazado');
+        console.log('[P2P] withdraw: SPEI SUCCESS — transferId', result.transferId, 'CEP', result.cepUrl);
+        setToast(`✓ Retiro de ${fmt(amount)} enviado por SPEI${result.mock ? ' (modo prueba)' : ''}`);
+        setWithdrawing(false); load(); return;
+      } catch (e) {
+        console.log('[P2P] withdraw: SPEI FAILED — trying Stripe as 2nd option:', e instanceof Error ? e.message : String(e));
       }
-      setToast(`✓ Retiro de ${fmt(amount)} enviado a tu cuenta bancaria`);
+    } else {
+      console.log('[P2P] withdraw: SPEI not eligible', JSON.stringify({ hasVerifiedAccount, speiBalance }), '— trying Stripe');
+    }
+
+    // Rail 2 — Stripe (segunda opción): connected-account payout from the
+    // Stripe wallet (kept by user decision).
+    try {
+      if (amount > stripeBalance) {
+        throw new Error(hasVerifiedAccount
+          ? 'Saldo insuficiente en ambos rieles para este monto.'
+          : 'Vincula tu CLABE (SPEI) o recarga tu cartera Stripe para retirar.');
+      }
+      const result = await stripeWithdrawToBank(clientId, companyId, amount);
+      console.log('[P2P] withdraw: /stripe/withdraw ←', JSON.stringify(result));
+      if (result.error || result.status !== 'succeeded') throw new Error(result.error || 'No se pudo procesar el retiro.');
+      console.log('[P2P] withdraw: STRIPE SUCCESS');
+      setToast(`✓ Retiro de ${fmt(amount)} enviado vía Stripe (2ª opción)`);
       load();
     } catch (e) {
+      console.log('[P2P] withdraw: FAILED on both rails —', e instanceof Error ? e.message : String(e));
       setToast(e instanceof Error ? e.message : 'Error al procesar el retiro');
     }
     setWithdrawing(false);
+  };
+
+  // ── Simulated SPEI deposit (test tool) ──────────────────────────────────
+  // Until STP virtual CLABEs exist there is no real SPEI-in; this posts a
+  // DEPOSIT ledger entry so the full loop (deposit → saldo → retiro SPEI) is
+  // testable from the app. Money credited here is only spendable through the
+  // mock rail. Remove/gate before real STP goes live.
+  const handleSimulatedDeposit = async (amountStr: string) => {
+    const amount = Number(amountStr);
+    if (!amount || amount <= 0) { setToast('Ingresa un monto válido'); return; }
+    console.log('[P2P] simulatedDeposit: START', JSON.stringify({ clientId, amount }));
+    const r = await postLedgerEntry({
+      companyId, clientId, entryType: 'DEPOSIT', direction: 'C', amountMXN: amount,
+      idempotencyKey: `sim:dep:${clientId}:${Date.now()}`, note: 'Depósito SPEI simulado (prueba)',
+    });
+    if (r.error) { setToast(r.error); return; }
+    setToast(`✓ Depósito de prueba: ${fmt(amount)} — saldo ${fmt(r.balanceAfter)}`);
+    load();
+  };
+
+  const openMovements = async () => {
+    console.log('[P2P] openMovements');
+    setShowMovements(true);
+    try { setMovements(await ledgerStatement(companyId, clientId)); }
+    catch (e) { console.log('[P2P] movements ❌', String(e)); }
   };
 
   // ── render helpers ──────────────────────────────────────────────────────
@@ -671,42 +861,74 @@ const P2PLendingPage: React.FC = () => {
           <IonRefresherContent />
         </IonRefresher>
 
-        {/* ── Lender top-up / withdraw buttons ── */}
+        {/* ── Lender wallet actions — tiles compactos (SPEI primario,
+            tarjeta/Stripe 2ª opción) ── */}
         {isLender && (
-          <div className="p2p-wallet-actions">
-            <IonButton expand="block" fill="outline" className="p2p-topup-btn" onClick={goTopUp}>
-              <IonIcon icon={walletOutline} slot="start" />
-              Recargar cartera con tarjeta
-            </IonButton>
-            <IonButton
-              expand="block"
-              fill="outline"
-              color="medium"
-              className="p2p-topup-btn"
-              disabled={!walletBalance}
-              onClick={() => setShowWithdrawAlert(true)}
-            >
-              <IonIcon icon={cashOutline} slot="start" />
-              Retirar fondos a mi cuenta bancaria
-            </IonButton>
+          <div className="p2p-action-tiles">
+            <button className="p2p-action-tile" onClick={() => setShowBankModal(true)}>
+              <IonIcon icon={cardOutline} />
+              <strong>{hasVerifiedAccount ? 'Cuenta SPEI' : 'Vincular CLABE'}</strong>
+              <span>{hasVerifiedAccount
+                ? `···· ${bankAccounts.find(a => a.isVerified && a.isDefault)?.clabeLast4 ?? ''}`
+                : 'requerida'}</span>
+            </button>
+            <button className="p2p-action-tile" onClick={goTopUp}>
+              <IonIcon icon={walletOutline} />
+              <strong>Recargar tarjeta</strong>
+              <span>2ª opción</span>
+            </button>
+            <button className="p2p-action-tile" disabled={!walletBalance} onClick={() => setShowWithdrawAlert(true)}>
+              <IonIcon icon={cashOutline} />
+              <strong>Retirar fondos</strong>
+              <span>A mi cuenta</span>
+            </button>
+            {SHOW_BANKING_TEST_TOOLS && (
+              <button className="p2p-action-tile p2p-tile-test" onClick={() => setShowDepositAlert(true)}>
+                <IonIcon icon={flaskOutline} />
+                <strong>Simular depósito</strong>
+                <span>Prueba SPEI</span>
+              </button>
+            )}
           </div>
         )}
 
-        {/* ── KPI row (lender) ── */}
+        {/* ── Borrower: CLABE destino del préstamo — sin esto acceptProposal
+            no puede depositarles por SPEI (solo quedaría el riel Stripe). ── */}
+        {isBorrower && !isLender && (
+          <div className="p2p-wallet-actions">
+            <IonButton expand="block" fill="outline" className="p2p-topup-btn" onClick={() => setShowBankModal(true)}>
+              <IonIcon icon={cardOutline} slot="start" />
+              {hasVerifiedAccount
+                ? `Cuenta para recibir tu préstamo: ${bankAccounts.find(a => a.isVerified && a.isDefault)?.bankName ?? ''} ····${bankAccounts.find(a => a.isVerified && a.isDefault)?.clabeLast4 ?? ''}`
+                : 'Vincular cuenta para recibir tu préstamo (CLABE)'}
+            </IonButton>
+            {/* Saldo + movimientos también para el borrower (antes lender-only):
+                aquí verá reembolsos, ajustes y cualquier crédito a su ledger. */}
+            <div className="p2p-kpi-row">
+              <div className="p2p-kpi" onClick={openMovements} style={{ cursor: 'pointer' }}>
+                <IonIcon icon={walletOutline} />
+                <span className="p2p-kpi-val">{walletBalance !== null ? fmt(walletBalance) : fmt(0)}</span>
+                <span className="p2p-kpi-label">Saldo en cartera · ver movimientos</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── KPI row (lender) — chips de color como el mockup ── */}
         {isLender && (
           <div className="p2p-kpi-row">
-            <div className="p2p-kpi">
-              <IonIcon icon={walletOutline} />
+            <div className="p2p-kpi p2p-kpi2" onClick={openMovements} style={{ cursor: 'pointer' }}>
+              <span className="p2p-kpi2-icon p2p-kpi2-blue"><IonIcon icon={walletOutline} /></span>
               <span className="p2p-kpi-val">{walletBalance !== null ? fmt(walletBalance) : fmt(myOffers.reduce((s, o) => s + o.availableCapital, 0))}</span>
-              <span className="p2p-kpi-label">Saldo en cartera</span>
+              <span className="p2p-kpi-label">Saldo en cartera{stripeBalance > 0 && speiBalance > 0 ? ' (SPEI + Stripe)' : ''}</span>
             </div>
-            <div className="p2p-kpi">
-              <IonIcon icon={notificationsOutline} />
+            <div className="p2p-kpi p2p-kpi2">
+              <span className="p2p-kpi2-icon p2p-kpi2-purple"><IonIcon icon={notificationsOutline} /></span>
               <span className="p2p-kpi-val">{inboxProposals.length}</span>
               <span className="p2p-kpi-label">Propuestas nuevas</span>
             </div>
-            <div className="p2p-kpi">
-              <IonIcon icon={checkmarkCircle} />
+            <div className="p2p-kpi p2p-kpi2">
+              <span className="p2p-kpi2-icon p2p-kpi2-green"><IonIcon icon={trendingUpOutline} /></span>
               <span className="p2p-kpi-val">{proposals.filter(p => p.lenderId === clientId && p.status === 'accepted').length}</span>
               <span className="p2p-kpi-label">Préstamos activos</span>
             </div>
@@ -746,10 +968,17 @@ const P2PLendingPage: React.FC = () => {
           {tab === 'offers' && (
             <div>
               {isLender && (
-                <IonButton expand="block" className="p2p-pub-btn" onClick={() => setShowOfferModal(true)}>
-                  <IonIcon icon={sendOutline} slot="start" />
-                  Publicar capital disponible
-                </IonButton>
+                <div className="p2p-pub-banner" onClick={() => setShowOfferModal(true)}>
+                  <span className="p2p-pub-icon">🎯</span>
+                  <div className="p2p-pub-text">
+                    <strong>Publica tu capital disponible</strong>
+                    <span>Conecta con acreditados verificados y genera rendimientos atractivos.</span>
+                  </div>
+                  <IonButton className="p2p-pub-cta" onClick={(e) => { e.stopPropagation(); setShowOfferModal(true); }}>
+                    Publicar capital
+                    <IonIcon icon={chevronForwardOutline} slot="end" />
+                  </IonButton>
+                </div>
               )}
 
               {offers.length === 0 && (
@@ -779,44 +1008,86 @@ const P2PLendingPage: React.FC = () => {
                       )}
                     </div>
                     <div className="p2p-offer-amounts">
-                      <div className="p2p-offer-amount-item">
+                      <div className="p2p-offer-amount-item p2p-stat-blue">
                         <IonIcon icon={cashOutline} />
                         <span>{fmt(offer.availableCapital)}</span>
-                        <label>Capital</label>
+                        <label>Capital disponible</label>
                       </div>
-                      <div className="p2p-offer-amount-item">
+                      <div className="p2p-offer-amount-item p2p-stat-purple">
                         <IonIcon icon={trendingUpOutline} />
                         <span>{offer.minRate}% – {offer.maxRate}%</span>
                         <label>Tasa anual</label>
                       </div>
-                      <div className="p2p-offer-amount-item">
+                      <div className="p2p-offer-amount-item p2p-stat-orange">
                         <IonIcon icon={timeOutline} />
                         <span>{offer.minTermMonths}–{offer.maxTermMonths} m</span>
-                        <label>Plazo</label>
+                        <label>Plazo disponible</label>
                       </div>
+                    </div>
+                    <div className="p2p-offer-trust">
+                      <span><IonIcon icon={shieldCheckmarkOutline} /> Acreditados verificados</span>
+                      <span><IonIcon icon={shieldCheckmarkOutline} /> Cobertura legal incluida</span>
                     </div>
                     {offer.description && <p className="p2p-offer-desc">"{offer.description}"</p>}
                     {isBorrower && offer.lenderId !== clientId && (
-                      <IonButton
-                        expand="block"
-                        className="p2p-propose-btn"
-                        disabled={!profileComplete}
-                        onClick={() => {
-                          if (!profileComplete) { history.push('/borrower-onboarding'); return; }
-                          setSelectedOffer(offer);
-                          setPropAmount('');
-                          setPropRate(String(offer.minRate));
-                          setPropTerm(String(offer.minTermMonths));
-                          setShowProposalModal(true);
-                        }}
-                      >
-                        <IonIcon icon={handLeftOutline} slot="start" />
-                        {profileComplete ? 'Enviar solicitud' : 'Completa tu perfil para solicitar'}
-                      </IonButton>
+
+                      <>
+                        <IonButton
+                          expand="block"
+                          className="p2p-propose-btn"
+                          disabled={!profileComplete}
+                          onClick={() => {
+                            if (!profileComplete) { history.push('/borrower-onboarding'); return; }
+                            setSelectedOffer(offer);
+                            setPropAmount('');
+                            setPropRate(String(offer.minRate));
+                            setPropTerm(String(offer.minTermMonths));
+                            setShowProposalModal(true);
+                          }}
+                        >
+                          <IonIcon icon={handLeftOutline} slot="start" />
+                          {profileComplete ? 'Enviar solicitud' : 'Completa tu perfil para solicitar'}
+                        </IonButton>
+                        {/* Direct chat with THIS lender — the conversation start
+                            fires a push to the lender (sp_loanChat resolves their
+                            userId from lenderId server-side). */}
+                        <IonButton
+                          expand="block"
+                          fill="outline"
+                          size="small"
+                          onClick={() => {
+                            console.log('[P2P] chat with lender →', offer.lenderId);
+                            history.push(`/loan-chat/new?lenderId=${offer.lenderId}&borrowerId=${clientId}&amount=${offer.availableCapital}&title=${encodeURIComponent(`Oferta de ${lender ? lender.first_name : `#${offer.lenderId}`} — ${fmt(offer.availableCapital)}`)}`);
+                          }}
+                        >
+                          <IonIcon icon={chatbubblesOutline} slot="start" />
+                          Chatear con el prestamista
+                        </IonButton>
+                      </>
                     )}
                   </div>
                 );
               })}
+
+              {/* Soporte — abre el asistente LLM (cuenta · contratos · GUÍA) */}
+              <div className="p2p-support-banner">
+                <span className="p2p-support-icon">🎓</span>
+                <div className="p2p-support-text">
+                  <strong>¿Necesitas ayuda para invertir?</strong>
+                  <span>Nuestro asistente te guía paso a paso.</span>
+                </div>
+                <IonButton fill="outline" size="small" onClick={async () => {
+                  const cfg = await getChatConfig();
+                  console.log('[P2P] support banner → assistant (topic=invest)', cfg.agentClientId);
+                  // topic=invest → el chat auto-envía la pregunta y el agente
+                  // guía de inversión responde con el siguiente paso real.
+                  if (cfg.agentEnabled) history.push(`/loan-chat/new?lenderId=${cfg.agentClientId}&topic=invest`);
+                  else history.push('/loan-chats');
+                }}>
+                  <IonIcon icon={chatbubblesOutline} slot="start" />
+                  Contactar soporte
+                </IonButton>
+              </div>
             </div>
           )}
 
@@ -893,7 +1164,9 @@ const P2PLendingPage: React.FC = () => {
       </IonContent>
 
       {/* ══════════ Modal: Publish loan offer (lender) ══════════ */}
-      <IonModal isOpen={showOfferModal} onDidDismiss={() => setShowOfferModal(false)} breakpoints={[0, 0.9]} initialBreakpoint={0.9}>
+      {/* Full-screen modal + fixed footer: as a 0.9 sheet, the submit button
+          lived at the bottom of the scroll and the open keyboard hid it. */}
+      <IonModal isOpen={showOfferModal} onDidDismiss={() => setShowOfferModal(false)}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Publicar capital disponible</IonTitle>
@@ -942,15 +1215,18 @@ const P2PLendingPage: React.FC = () => {
             <IonTextarea rows={3} placeholder="Ej: Préstamos para negocios, sin aval…" value={offerDesc}
               onIonInput={e => setOfferDesc(e.detail.value ?? '')} className="p2p-input" />
           </div>
+        </IonContent>
+        <IonFooter className="ion-padding" style={{ background: '#fff' }}>
           <IonButton expand="block" onClick={publishOffer} disabled={saving}>
             <IonIcon icon={sendOutline} slot="start" />
             Publicar y notificar prestatarios
           </IonButton>
-        </IonContent>
+        </IonFooter>
       </IonModal>
 
       {/* ══════════ Modal: Send proposal (borrower) ══════════ */}
-      <IonModal isOpen={showProposalModal} onDidDismiss={() => setShowProposalModal(false)} breakpoints={[0, 0.85]} initialBreakpoint={0.85}>
+      {/* Full-screen modal + fixed footer (same keyboard-hides-button fix). */}
+      <IonModal isOpen={showProposalModal} onDidDismiss={() => setShowProposalModal(false)}>
         <IonHeader>
           <IonToolbar>
             <IonTitle>Solicitar préstamo</IonTitle>
@@ -996,13 +1272,15 @@ const P2PLendingPage: React.FC = () => {
               <p className="p2p-legal-note">
                 Al enviar esta solicitud confirmas que has leído y firmado el Pagaré y el Contrato de Crédito P2P. El Pagaré firmado digitalmente es el único documento que se presentará ante juez en caso de incumplimiento.
               </p>
-              <IonButton expand="block" onClick={submitProposal} disabled={saving}>
-                <IonIcon icon={sendOutline} slot="start" />
-                Enviar solicitud al prestamista
-              </IonButton>
             </>
           )}
         </IonContent>
+        <IonFooter className="ion-padding" style={{ background: '#fff' }}>
+          <IonButton expand="block" onClick={submitProposal} disabled={saving || !selectedOffer}>
+            <IonIcon icon={sendOutline} slot="start" />
+            Enviar solicitud al prestamista
+          </IonButton>
+        </IonFooter>
       </IonModal>
 
       {/* ── Accept alert ── */}
@@ -1016,6 +1294,31 @@ const P2PLendingPage: React.FC = () => {
         buttons={[
           { text: 'Cancelar', role: 'cancel' },
           { text: 'Aprobar', handler: acceptProposal, cssClass: 'alert-button-confirm' },
+        ]}
+      />
+
+      {/* ── Approve-failure alert (blocking, explains the fix) ── */}
+      <IonAlert
+        isOpen={!!errorAlert}
+        onDidDismiss={() => setErrorAlert('')}
+        header="No se pudo aprobar"
+        message={errorAlert}
+        buttons={['Entendido']}
+      />
+
+      {/* ── Insufficient funds → action sheet with the deposit options ── */}
+      <IonActionSheet
+        isOpen={!!fundsAlertMsg}
+        onDidDismiss={() => setFundsAlertMsg('')}
+        cssClass="p2p-funds-sheet"
+        header="Fondos insuficientes"
+        subHeader={fundsAlertMsg}
+        buttons={[
+          ...(SHOW_BANKING_TEST_TOOLS
+            ? [{ text: '🏦 Simular depósito SPEI (prueba)', handler: () => { setFundsAlertMsg(''); setShowDepositAlert(true); } }]
+            : []),
+          { text: '💳 Recargar con tarjeta', handler: () => { setFundsAlertMsg(''); goTopUp(); } },
+          { text: 'Cancelar', role: 'cancel' },
         ]}
       />
 
@@ -1045,12 +1348,12 @@ const P2PLendingPage: React.FC = () => {
         ]}
       />
 
-      {/* ── Withdraw alert ── */}
+      {/* ── Withdraw alert (SPEI primario, Stripe 2ª opción) ── */}
       <IonAlert
         isOpen={showWithdrawAlert}
         onDidDismiss={() => setShowWithdrawAlert(false)}
         header="Retirar fondos"
-        message={`Saldo disponible: ${walletBalance !== null ? fmt(walletBalance) : '—'}. El monto se transferirá a tu cuenta bancaria o tarjeta de débito vinculada.`}
+        message={`Saldo: ${walletBalance !== null ? fmt(walletBalance) : '—'} (SPEI ${fmt(speiBalance)} · Stripe ${fmt(stripeBalance)}). Se enviará por SPEI a tu CLABE; si no aplica, vía Stripe.`}
         inputs={[{ name: 'amount', type: 'number', placeholder: 'Monto a retirar (MXN)', min: 1, max: walletBalance ?? undefined }]}
         buttons={[
           { text: 'Cancelar', role: 'cancel' },
@@ -1061,6 +1364,72 @@ const P2PLendingPage: React.FC = () => {
           },
         ]}
       />
+
+      {/* ── Simulated SPEI deposit (test tool — SHOW_BANKING_TEST_TOOLS) ── */}
+      <IonAlert
+        isOpen={showDepositAlert}
+        onDidDismiss={() => setShowDepositAlert(false)}
+        header="Simular depósito SPEI"
+        message="Solo pruebas: acredita el ledger como si hubiera llegado una transferencia SPEI a tu CLABE virtual."
+        inputs={[{ name: 'amount', type: 'number', placeholder: 'Monto (MXN)', min: 1 }]}
+        buttons={[
+          { text: 'Cancelar', role: 'cancel' },
+          { text: 'Depositar', handler: (data) => { handleSimulatedDeposit(data.amount); } },
+        ]}
+      />
+
+      {/* ── Bank account (CLABE) modal ── */}
+      <IonModal isOpen={showBankModal} onDidDismiss={() => setShowBankModal(false)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Cuenta bancaria (SPEI)</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowBankModal(false)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <p style={{ fontSize: 13, color: '#6b7280' }}>
+            Tu CLABE verificada es el destino de tus retiros por SPEI (sin comisiones de tarjeta).
+            La tarjeta queda como segunda opción.
+          </p>
+          <BankAccountLink
+            clientId={clientId}
+            companyId={companyId}
+            holderName={myClient ? `${myClient.first_name} ${myClient.last_name}` : ''}
+            onChanged={(accs) => { setBankAccounts(accs); }}
+          />
+        </IonContent>
+      </IonModal>
+
+      {/* ── Movements (ledger statement) modal ── */}
+      <IonModal isOpen={showMovements} onDidDismiss={() => setShowMovements(false)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Movimientos</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowMovements(false)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {movements.length === 0 && <p style={{ color: '#6b7280' }}>Sin movimientos todavía.</p>}
+          {movements.map(m => (
+            <div key={m.entryId} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{m.entryType}</div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>{m.note ?? ''} · {new Date(m.created_At).toLocaleString('es-MX')}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 700, color: m.direction === 'C' ? '#059669' : '#b91c1c' }}>
+                  {m.direction === 'C' ? '+' : '−'}{fmt(m.amountMXN)}
+                </div>
+                {m.balanceAfter !== null && <div style={{ fontSize: 12, color: '#9ca3af' }}>saldo {fmt(m.balanceAfter)}</div>}
+              </div>
+            </div>
+          ))}
+        </IonContent>
+      </IonModal>
     </IonPage>
   );
 };

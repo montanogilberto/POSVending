@@ -245,3 +245,30 @@
 .lc-send-prop-btn {
   margin-top: 4px;
 }
+
+/* Aviso de modo asistente (chat informativo, sin negociación) */
+.lc-assistant-banner {
+  padding: 6px 14px;
+  font-size: 12px;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+/* Chips de tema del asistente (cuenta · contratos · legal GUÍA) */
+.lc-topic-chips {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px 0;
+  overflow-x: auto;
+}
+
+.lc-topic-chip {
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}

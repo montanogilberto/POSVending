@@ -387,7 +387,7 @@ const BorrowerOnboardingPage: React.FC = () => {
             </IonBadge>
             <br />
             <IonButton className="ion-margin-top" onClick={() => history.replace('/p2p-lending')}>
-              Ir a la plataforma P2P
+              Ir a la plataforma SmartLoans
             </IonButton>
           </div>
         )}

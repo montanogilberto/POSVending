@@ -16,8 +16,9 @@ import {
 import { useHistory, useParams, useLocation } from 'react-router-dom';
 import { useUser } from '../../components/UserContext';
 import {
-  loanChatApi, LoanMessage, LoanConversation, MsgType,
+  loanChatApi, getChatConfig, LoanMessage, LoanConversation, MsgType,
 } from '../../api/loanChatApi';
+import { disbursePayment } from '../../api/bankingApi';
 import './LoanChatPage.css';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
@@ -85,6 +86,11 @@ const LoanChatPage: React.FC = () => {
   const myRole = (roleCode === 'lender') ? 'lender' : 'borrower';
   const mySenderId = clientId ?? 0;
 
+  // Agent clientId comes from backend config (LOANCHAT_AGENT_CLIENT_ID) — the
+  // frontend never hardcodes it. 0 while loading / when not configured.
+  const [agentClientId, setAgentClientId] = useState(0);
+  useEffect(() => { getChatConfig().then(c => setAgentClientId(c.agentClientId)); }, []);
+
   const [conv, setConv]         = useState<LoanConversation | null>(null);
   const [messages, setMessages] = useState<LoanMessage[]>([]);
   const [loading, setLoading]   = useState(false);
@@ -108,12 +114,27 @@ const LoanChatPage: React.FC = () => {
     setLoading(true);
     try {
       if (isNew) {
+        // Guard: a conversation needs BOTH parties. The menu used to land here
+        // with lenderId=0, minting garbage conversations whose pushes targeted
+        // userId 0 (nobody). Send the user to the conversations list instead.
+        if (!initLenderId || !initBorrowerId || initLenderId === initBorrowerId) {
+          console.log('[ChatUI] init: INVALID parties — redirecting to /loan-chats', JSON.stringify({
+            borrowerId: initBorrowerId, lenderId: initLenderId,
+          }));
+          showToast('Elige una conversación o inicia el chat desde una oferta.', 'danger');
+          history.replace('/loan-chats');
+          return;
+        }
+        console.log('[ChatUI] init: starting NEW conversation', JSON.stringify({
+          borrowerId: initBorrowerId, lenderId: initLenderId, amount: initAmount,
+        }));
         const res = await loanChatApi.startConversation({
           companyId, borrowerId: initBorrowerId, lenderId: initLenderId,
           borrowerUserId: initBorrowerUserId, lenderUserId: initLenderUserId,
           requestedAmount: initAmount, title: initTitle,
         });
         if (res?.error) { showToast(res.error, 'danger'); return; }
+        console.log('[ChatUI] init: conversation ready —', res.conversationId, '(push al lender via targetUserId del SP)');
         setConv(res);
         // Replace URL so refresh doesn't start a new conversation
         history.replace(`/loan-chat/${res.conversationId}`);
@@ -151,6 +172,43 @@ const LoanChatPage: React.FC = () => {
   const showToast = (msg: string, color: 'success' | 'danger' = 'success') => {
     setToast(msg); setToastColor(color);
   };
+
+  // Assistant quick topics — route the LLM agent to the right sub-agent:
+  // cuenta, contratos, o legal (GUÍA).
+  const AGENT_TOPICS = [
+    { topic: 'invest',   label: '🎯 Cómo invertir', msg: 'Quiero invertir, guíame paso a paso.' },
+    { topic: 'account',  label: '📊 Mi cuenta',     msg: 'Quiero información sobre mi cuenta.' },
+    { topic: 'contract', label: '📄 Contratos',     msg: 'Tengo dudas sobre mis contratos.' },
+    { topic: 'legal',    label: '⚖️ Legal (GUÍA)',  msg: 'Necesito orientación legal.' },
+  ];
+
+  const sendTopic = async (t: typeof AGENT_TOPICS[number]) => {
+    if (!conv) return;
+    console.log('[ChatUI] topic chip →', t.topic);
+    await loanChatApi.sendMessage({
+      companyId: companyId!, conversationId: conv.conversationId,
+      senderId: mySenderId, senderUserId: userId ?? undefined,
+      senderRole: myRole, msgType: 'text', body: t.msg, topic: t.topic,
+    });
+    fetchMessages(conv.conversationId);
+  };
+
+  // Deep-link topic (?topic=invest desde el banner de soporte): captured in a
+  // ref because initConversation history.replace()s the URL, dropping the
+  // param before the conversation is ready. Auto-sends ONCE.
+  const initTopicRef = useRef(params.get('topic'));
+  const topicSentRef = useRef(false);
+  useEffect(() => {
+    if (!conv || topicSentRef.current) return;
+    const t = AGENT_TOPICS.find(x => x.topic === initTopicRef.current);
+    if (!t) return;
+    const assistant = conv.isAssistant ?? (agentClientId > 0 && conv.lenderId === agentClientId);
+    if (!assistant) return;
+    topicSentRef.current = true;
+    console.log('[ChatUI] auto-send topic from URL →', t.topic);
+    sendTopic(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv, agentClientId]);
 
   const sendText = async () => {
     if (!text.trim() || !conv) return;
@@ -219,20 +277,45 @@ const LoanChatPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
+  // Dual-rail disbursement, same policy as P2PLendingPage.acceptProposal:
+  // SPEI orchestrator first (debits the lender's ledger, sends to the
+  // borrower's verified CLABE, auto-reverses on failure — mock STP for now),
+  // Stripe Connect transfer as the 2nd option.
   const triggerDisbursement = async (msg: LoanMessage) => {
     if (!conv) return;
+    const amount = msg.amount ?? 0;
+    console.log('[ChatUI] disburse: START', JSON.stringify({
+      conversationId: conv.conversationId, lenderId: conv.lenderId, borrowerId: conv.borrowerId, amount,
+    }));
     try {
-      const amountCentavos = Math.round((msg.amount ?? 0) * 100);
-      await fetch(`${API_BASE}/stripe/disburse`, {
+      const spei = await disbursePayment({
+        companyId: companyId!, lenderId: conv.lenderId, borrowerId: conv.borrowerId,
+        amountMXN: amount, purpose: 'loan_disbursement',
+        loanId: conv.loanProposalId ?? conv.conversationId,
+        idempotencyKey: `chat:${conv.conversationId}:disburse:${Date.now()}`,
+      });
+      if (!spei.error && spei.status !== 'failed') {
+        console.log('[ChatUI] disburse: SPEI SUCCESS — transferId', spei.transferId, 'CEP', spei.cepUrl);
+        showToast(`💸 Desembolso enviado por SPEI${spei.mock ? ' (modo prueba)' : ''}`);
+        return;
+      }
+      console.log('[ChatUI] disburse: SPEI FAILED — trying Stripe as 2nd option:', spei.error);
+      const res = await fetch(`${API_BASE}/stripe/disburse`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId, lenderId: conv.lenderId, borrowerId: conv.borrowerId,
-          amount: msg.amount, loanId: conv.loanProposalId ?? conv.conversationId,
+          amount, loanId: conv.loanProposalId ?? conv.conversationId,
         }),
       });
-      showToast('💸 Desembolso Stripe iniciado');
-    } catch {
-      showToast('Propuesta aceptada. Inicia desembolso manualmente.', 'danger');
+      const stripeResult = await res.json().catch(() => ({}));
+      console.log('[ChatUI] disburse: /stripe/disburse ←', JSON.stringify(stripeResult));
+      if (stripeResult.error || stripeResult.status !== 'succeeded') {
+        throw new Error(stripeResult.error || spei.error || 'Desembolso rechazado en ambos rieles');
+      }
+      showToast('💸 Desembolso enviado vía Stripe (2ª opción)');
+    } catch (e) {
+      console.log('[ChatUI] disburse: FAILED on both rails —', e instanceof Error ? e.message : String(e));
+      showToast('Propuesta aceptada, pero el desembolso falló. Revisa saldo/cuenta e intenta desde la plataforma.', 'danger');
     }
   };
 
@@ -286,6 +369,11 @@ const LoanChatPage: React.FC = () => {
     );
   };
 
+  // Prefer the server-computed tag; fall back to comparing against the
+  // config-provided agentClientId (covers the brief window before `conv` loads).
+  const isAssistantChat = conv?.isAssistant
+    ?? (agentClientId > 0 && (conv?.lenderId === agentClientId || (isNew && initLenderId === agentClientId)));
+
   const statusColor = conv?.status === 'accepted' ? 'success' : conv?.status === 'rejected' ? 'danger' : 'primary';
   const statusLabel = { open: 'Abierta', accepted: 'Aceptada', rejected: 'Rechazada', closed: 'Cerrada' }[conv?.status ?? 'open'];
 
@@ -300,8 +388,8 @@ const LoanChatPage: React.FC = () => {
           </IonButtons>
           <IonTitle>
             <div className="lc-title">
-              <span>{conv?.title ?? 'Préstamo'}</span>
-              {conv && (
+              <span>{isAssistantChat ? '🤖 Asistente SmartLoans' : (conv?.title ?? 'Préstamo')}</span>
+              {conv && !isAssistantChat && (
                 <IonBadge color={statusColor} className="lc-status-badge">{statusLabel}</IonBadge>
               )}
             </div>
@@ -312,6 +400,12 @@ const LoanChatPage: React.FC = () => {
             </IonButton>
           </IonButtons>
         </IonToolbar>
+        {isAssistantChat && (
+          <div className="lc-assistant-banner">
+            Chat informativo con el asistente. Para negociar un préstamo real,
+            ve al marketplace y chatea desde una oferta.
+          </div>
+        )}
         {conv?.status === 'accepted' && (
           <div className="lc-agreed-bar">
             <IonIcon icon={checkmarkCircle} color="success" />
@@ -328,8 +422,8 @@ const LoanChatPage: React.FC = () => {
         {messages.length === 0 && !loading && (
           <div className="lc-empty">
             <IonIcon icon={documentTextOutline} />
-            <p>Sin mensajes aún.</p>
-            {conv?.status === 'open' && myRole === 'borrower' && (
+            <p>{isAssistantChat ? 'Pregúntame sobre préstamos, requisitos o tu cuenta.' : 'Sin mensajes aún.'}</p>
+            {conv?.status === 'open' && myRole === 'borrower' && !isAssistantChat && (
               <IonButton size="small" onClick={() => { setPropType('proposal'); setShowProposalModal(true); }}>
                 Enviar solicitud de préstamo
               </IonButton>
@@ -341,9 +435,9 @@ const LoanChatPage: React.FC = () => {
           {messages.map((msg, i) => renderMessage(msg, i))}
         </div>
 
-        {/* Proposal modal */}
-        <IonModal isOpen={showProposalModal} onDidDismiss={() => setShowProposalModal(false)}
-          breakpoints={[0, 0.6, 0.9]} initialBreakpoint={0.6}>
+        {/* Proposal modal — full-screen with fixed footer: as a 0.6 sheet, the
+            send button sat at the bottom and the open keyboard covered it. */}
+        <IonModal isOpen={showProposalModal} onDidDismiss={() => setShowProposalModal(false)}>
           <IonHeader>
             <IonToolbar>
               <IonTitle>{propType === 'counter' ? 'Contrapropuesta' : 'Propuesta de préstamo'}</IonTitle>
@@ -368,22 +462,35 @@ const LoanChatPage: React.FC = () => {
                   {fmt((parseFloat(propAmount) * (1 + parseFloat(propRate) / 100)) / parseInt(propTerm))}
                 </div>
               )}
-              <IonButton expand="block" shape="round" onClick={sendProposal} className="lc-send-prop-btn">
-                <IonIcon icon={cashOutline} slot="start" />
-                Enviar {propType === 'counter' ? 'contrapropuesta' : 'propuesta'}
-              </IonButton>
             </div>
           </IonContent>
+          <IonFooter className="ion-padding" style={{ background: '#fff' }}>
+            <IonButton expand="block" shape="round" onClick={sendProposal} className="lc-send-prop-btn">
+              <IonIcon icon={cashOutline} slot="start" />
+              Enviar {propType === 'counter' ? 'contrapropuesta' : 'propuesta'}
+            </IonButton>
+          </IonFooter>
         </IonModal>
       </IonContent>
 
       {conv?.status === 'open' && (
         <IonFooter className="lc-footer">
+          {isAssistantChat && (
+            <div className="lc-topic-chips">
+              {AGENT_TOPICS.map(t => (
+                <button key={t.topic} className="lc-topic-chip" onClick={() => sendTopic(t)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="lc-toolbar">
-            <IonButton fill="clear" size="small"
-              onClick={() => { setPropType(myRole === 'lender' ? 'counter' : 'proposal'); setShowProposalModal(true); }}>
-              <IonIcon icon={cashOutline} slot="icon-only" />
-            </IonButton>
+            {!isAssistantChat && (
+              <IonButton fill="clear" size="small"
+                onClick={() => { setPropType(myRole === 'lender' ? 'counter' : 'proposal'); setShowProposalModal(true); }}>
+                <IonIcon icon={cashOutline} slot="icon-only" />
+              </IonButton>
+            )}
             <input
               className="lc-input"
               placeholder="Escribe un mensaje..."
