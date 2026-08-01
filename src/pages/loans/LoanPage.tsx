@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useHistory } from 'react-router-dom';
 import {
   IonPage,
   IonContent,
@@ -42,6 +43,7 @@ const toHermosillo = (utc: string | undefined): string => {
 };
 
 const LoanPage: React.FC = () => {
+  const history = useHistory();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -331,6 +333,15 @@ const LoanPage: React.FC = () => {
                     </IonLabel>
                   </div>
                 )}
+                <div className="loan-actions">
+                  <IonButton
+                    fill="outline"
+                    onClick={() => history.push(`/loan-detail/${loan.loanId}`)}
+                    className="action-button"
+                  >
+                    Ver detalle y pagos
+                  </IonButton>
+                </div>
                 {canManageLoans && (
                   <div className="loan-actions">
                     <IonButton

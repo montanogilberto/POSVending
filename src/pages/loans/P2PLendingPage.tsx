@@ -108,6 +108,13 @@ async function createLoanOffer(payload: Omit<LoanOffer, 'offerId' | 'created_At'
   return res.json();
 }
 
+async function updateLoanOffer(offerId: number, companyId: number, fields: {
+  availableCapital?: number; isActive?: boolean; description?: string;
+}): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/loanOffers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanOffers: [{ action: 2, offerId, companyId, ...fields }] }) });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 async function deleteLoanOffer(offerId: number, companyId: number): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/loanOffers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loanOffers: [{ action: 3, offerId, companyId }] }) });
   if (!res.ok) throw new Error(await res.text());
@@ -195,6 +202,7 @@ import BankAccountLink from '../../components/BankAccountLink';
 import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
 import { createLoan } from '../../api/loanApi';
 import { getChatConfig } from '../../api/loanChatApi';
+import { createLoanContract } from '../../api/digitalContractsApi';
 import './P2PLendingPage.css';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -622,10 +630,39 @@ const P2PLendingPage: React.FC = () => {
         disbursementDate,
       });
 
+      // Contract row = the loan↔lender link (LenderDashboard scopes through
+      // it). Non-fatal: money already moved; a miss falls back to the notes tag.
+      await createLoanContract({
+        companyId, loanId: loan.loanId, borrowerClientId: borrowerId, lenderClientId: lenderId,
+        principalAmount: requestedAmount, interestRate: proposedRate, termMonths,
+        notes: `Aceptado desde propuesta ${proposalId} (P2P)`,
+      }).catch((e) => console.log('[P2P] acceptProposal: contract create FAILED —', String(e)));
+
       await updateLoanProposal(proposalId, {
         status: 'accepted',
         respondedAt: new Date().toISOString(),
       }).catch(() => {});
+
+      // The lent amount consumes the lender's announced capital — decrement
+      // the active offer(s) and deactivate at $0 so nobody is notified about
+      // money that is no longer available.
+      try {
+        let toConsume = requestedAmount;
+        for (const o of offers.filter(x => x.lenderId === lenderId && x.isActive)) {
+          if (toConsume <= 0) break;
+          const take = Math.min(o.availableCapital, toConsume);
+          const remaining = o.availableCapital - take;
+          toConsume -= take;
+          console.log('[P2P] acceptProposal: offer bookkeeping', JSON.stringify({ offerId: o.offerId, remaining }));
+          await updateLoanOffer(o.offerId, companyId, {
+            availableCapital: remaining,
+            isActive: remaining > 0,
+            ...(remaining <= 0 ? { description: 'Capital consumido por préstamo (P2P)' } : {}),
+          });
+        }
+      } catch (e) {
+        console.log('[P2P] acceptProposal: offer bookkeeping FAILED —', String(e));
+      }
 
       const borrowerClient = clientMap[borrowerId];
       await createPushNotification({
@@ -694,6 +731,17 @@ const P2PLendingPage: React.FC = () => {
     const amount = Number(amountStr);
     if (!amount || amount <= 0) { setToast('Ingresa un monto válido'); return; }
     if (walletBalance !== null && amount > walletBalance) { setToast('El monto supera tu saldo disponible'); return; }
+    // Dependencia Capital Publicado → Saldo en cartera: el dinero que respalda
+    // ofertas activas NO es retirable — primero reduce o cierra la oferta.
+    const publishedBacked = myOffers.filter(o => o.isActive).reduce((s, o) => s + o.availableCapital, 0);
+    const withdrawable = Math.max(0, (walletBalance ?? 0) - publishedBacked);
+    if (amount > withdrawable) {
+      console.log('[P2P] withdraw: BLOCKED — backs published capital', JSON.stringify({ amount, publishedBacked, withdrawable }));
+      setErrorAlert(
+        `Tienes ${fmt(publishedBacked)} publicados como capital disponible — ese dinero respalda tu oferta ` +
+        `y no es retirable. Puedes retirar hasta ${fmt(withdrawable)}, o cierra/reduce tu oferta en "Mis ofertas" primero.`);
+      return;
+    }
     setWithdrawing(true);
     console.log('[P2P] withdraw: START', JSON.stringify({ clientId, amount, speiBalance, stripeBalance }));
 
@@ -1301,7 +1349,7 @@ const P2PLendingPage: React.FC = () => {
       <IonAlert
         isOpen={!!errorAlert}
         onDidDismiss={() => setErrorAlert('')}
-        header="No se pudo aprobar"
+        header="No se pudo completar"
         message={errorAlert}
         buttons={['Entendido']}
       />

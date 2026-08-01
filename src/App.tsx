@@ -109,6 +109,7 @@ import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
 import RewardsPage from './pages/finance/RewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
+import LoanDetailPage from './pages/loans/LoanDetailPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -633,6 +634,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
+            <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
           </IonRouterOutlet>

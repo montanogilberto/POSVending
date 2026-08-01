@@ -24,6 +24,10 @@ import { getPostLoginRoute } from '../../utils/postLoginRoute';
 interface AppProfile {
   id: string;
   label: string;
+  // Outcome-first phrasing shown on the profile picker ("what do you want to
+  // do?"), so the user chooses by goal instead of by system name. `label`
+  // stays the brand name, still used in the final summary.
+  intent: string;
   description: string;
   icon: string;
   modules: string[];
@@ -35,6 +39,7 @@ const APP_PROFILES: AppProfile[] = [
   {
     id: 'pos',
     label: 'Punto de Venta',
+    intent: 'Vender y cobrar en mi negocio',
     description: 'Ventas, carrito, caja, inventario y recompensas.',
     icon: '🏪',
     modules: ['pos_cart', 'cash_register', 'inventory_products', 'receipts_printing', 'accounting_ledger', 'rewards'],
@@ -44,6 +49,7 @@ const APP_PROFILES: AppProfile[] = [
   {
     id: 'loans',
     label: 'SmartLoans',
+    intent: 'Pedir o dar préstamos',
     description: 'Créditos, chat, validación facial y pagos Stripe.',
     icon: '💰',
     modules: ['clients', 'clientFaceRecognition', 'pushNotifications', 'loanChat', 'accounting_ledger'],
@@ -53,7 +59,8 @@ const APP_PROFILES: AppProfile[] = [
   {
     id: 'custom',
     label: 'Personalizado',
-    description: 'Elige exactamente los módulos que necesitas.',
+    intent: 'Armar mi propia combinación',
+    description: 'Elige exactamente las herramientas que necesitas.',
     icon: '🔧',
     modules: [],
     color: '#d97706',
@@ -72,6 +79,21 @@ const ALL_MODULES = [
   { id: 'pushNotifications',     label: 'Notificaciones Push' },
   { id: 'rewards',               label: 'Puntos de Recompensa' },
   { id: 'loanChat',              label: 'Chat de Préstamos' },
+];
+
+// Custom profile: instead of a technical checklist of module IDs, ask the user
+// what they want to DO — each goal maps to the module(s) that deliver it. The
+// union of the chosen goals' modules is what gets saved as enabledModules.
+// Covers every id in ALL_MODULES exactly once.
+const MODULE_GOALS: { label: string; modules: string[] }[] = [
+  { label: 'Vender productos físicos',        modules: ['pos_cart', 'inventory_products', 'receipts_printing'] },
+  { label: 'Manejar caja y efectivo',         modules: ['cash_register'] },
+  { label: 'Llevar contabilidad y finanzas',  modules: ['accounting_ledger'] },
+  { label: 'Administrar clientes',            modules: ['clients'] },
+  { label: 'Verificar identidad (facial)',    modules: ['clientFaceRecognition'] },
+  { label: 'Enviar notificaciones push',      modules: ['pushNotifications'] },
+  { label: 'Dar puntos de recompensa',        modules: ['rewards'] },
+  { label: 'Chat de préstamos',               modules: ['loanChat'] },
 ];
 
 // Client type is a real choice the client makes at signup (previously
@@ -124,6 +146,11 @@ const CreateAccount: React.FC = () => {
   }, [isAuthenticated, sessionRoleCode, sessionClientId, history]);
 
   const [step, setStep] = useState(0);
+
+  // Sub-step inside the "Perfil" step, so it plays as a quiz (one question per
+  // screen, tap to advance) instead of a single scrolling form: 0 = intent
+  // ("¿Qué quieres hacer?"), 1 = the branch detail for the chosen objetivo.
+  const [q1, setQ1] = useState(0);
 
   // Step 0 — credentials
   // Single smart contact field — user types email OR phone; we detect which
@@ -225,6 +252,14 @@ const CreateAccount: React.FC = () => {
     if (selectedProfile !== 'loans') return;
     setUserRole(ROLE_BY_CLIENT_TYPE[clientType]);
   }, [selectedProfile, clientType]);
+
+  // Quiz sub-step: entering "Perfil" with an objetivo already chosen (resume,
+  // or stepping back and forward) jumps past the intent question to its detail;
+  // leaving the step resets it. Back within the step is handled in goBack.
+  useEffect(() => {
+    if (step === 1) setQ1(selectedProfile ? 1 : 0);
+    else setQ1(0);
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -433,9 +468,15 @@ const CreateAccount: React.FC = () => {
     setUserRole(DEFAULT_ROLE_BY_PROFILE[profile.id] ?? 'employee');
   };
 
-  const toggleModule = (id: string) => {
-    console.log('[toggleModule] id=%s', id);
-    setEnabledModules(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
+  // A goal is "on" only when every module it maps to is enabled; toggling it
+  // adds or removes that goal's whole module group as a unit.
+  const goalActive = (modules: string[]) => modules.every(m => enabledModules.includes(m));
+  const toggleGoal = (modules: string[]) => {
+    setEnabledModules(prev =>
+      modules.every(m => prev.includes(m))
+        ? prev.filter(m => !modules.includes(m))
+        : [...prev, ...modules.filter(m => !prev.includes(m))]
+    );
   };
 
   const handleSelectCompany = async (company: Company) => {
@@ -739,8 +780,11 @@ const CreateAccount: React.FC = () => {
   };
 
   const goBack = () => {
-    console.log('[goBack] from step=%d branchScreen=%s', step, branchScreen);
+    console.log('[goBack] from step=%d branchScreen=%s q1=%d', step, branchScreen, q1);
     if (branchScreen) { setBranchScreen(false); return; }
+    // Within "Perfil": from the detail screen, go back to the objetivo question
+    // rather than leaving the step entirely.
+    if (step === 1 && q1 === 1) { setQ1(0); return; }
     setStep(s => s - 1);
   };
 
@@ -1056,17 +1100,22 @@ const CreateAccount: React.FC = () => {
 
   // ── Step 1: App profile ───────────────────────────────────────────────────
 
-  const renderStep1 = () => (
+  // Step "Perfil" as a quiz. q1 === 0 asks the objetivo and auto-advances on
+  // tap; q1 === 1 shows only the detail for that objetivo. The footer "Next"
+  // is hidden on q1 === 0 (the card tap is the answer) — see the render footer.
+  const selectedProfileObj = APP_PROFILES.find(p => p.id === selectedProfile);
+
+  const renderStep1Intent = () => (
     <div className="ca-step-body">
       <div className="ca-step-header">
         <div className="ca-step-icon-wrap" style={{ background: '#F5F3FF' }}>
           <IonIcon icon={buildOutline} style={{ fontSize: 36, color: '#7c3aed' }} />
         </div>
-        <h2 className="ca-step-title">Perfil de aplicación</h2>
-        <p className="ca-step-desc">¿Qué tipo de sistema necesitas?</p>
+        <h2 className="ca-step-title">¿Qué quieres hacer?</h2>
+        <p className="ca-step-desc">Elige tu objetivo — configuramos el resto por ti.</p>
       </div>
 
-      {/* Profile selector — same card pattern as wizard-doc-type-btn */}
+      {/* Objetivo — tapping a card answers and advances to its detail. */}
       <div className="ca-profile-list">
         {APP_PROFILES.map(p => {
           const selected = selectedProfile === p.id;
@@ -1076,13 +1125,13 @@ const CreateAccount: React.FC = () => {
               type="button"
               className={`ca-profile-btn${selected ? ' selected' : ''}`}
               style={selected ? { borderColor: p.color, background: p.bgColor } : undefined}
-              onClick={() => selectProfile(p)}
+              onClick={() => { selectProfile(p); setQ1(1); }}
             >
               <div className="ca-profile-icon-wrap" style={selected ? { background: p.bgColor, color: p.color } : undefined}>
                 <span style={{ fontSize: 22 }}>{p.icon}</span>
               </div>
               <div className="ca-profile-text">
-                <span className="ca-profile-name" style={selected ? { color: p.color } : undefined}>{p.label}</span>
+                <span className="ca-profile-name" style={selected ? { color: p.color } : undefined}>{p.intent}</span>
                 <span className="ca-profile-desc">{p.description}</span>
               </div>
               <div className={`ca-radio-dot${selected ? ' selected' : ''}`}
@@ -1091,13 +1140,31 @@ const CreateAccount: React.FC = () => {
           );
         })}
       </div>
+    </div>
+  );
 
-      {/* SmartLoans needs a dbo.clients row (cellphone NOT NULL + UNIQUE) —
-          collect it here when the signup was email-only, and let the client
-          pick their clientType too (the phone-first picker in renderStep0
-          never ran for this path — see contactType === 'phone' gate there). */}
-      {needsClientPhone && renderClientTypePicker()}
-      {needsClientPhone && (
+  const renderStep1Detail = () => (
+    <div className="ca-step-body">
+      <div className="ca-step-header">
+        <div className="ca-step-icon-wrap" style={{ background: selectedProfileObj?.bgColor ?? '#F5F3FF' }}>
+          <span style={{ fontSize: 30 }}>{selectedProfileObj?.icon ?? '🔧'}</span>
+        </div>
+        <h2 className="ca-step-title">
+          {selectedProfile === 'loans' ? 'En SmartLoans, ¿qué harás?'
+            : selectedProfile === 'custom' ? '¿Qué necesitas hacer?'
+            : 'Esto es lo que incluye'}
+        </h2>
+        <p className="ca-step-desc">
+          {selectedProfile === 'loans' ? 'Tu rol se define solo — no lo preguntamos otra vez.'
+            : selectedProfile === 'custom' ? 'Marca todo lo que apliques.'
+            : 'Listo para continuar.'}
+        </p>
+      </div>
+
+      {/* SmartLoans: client type (and, for an email-only signup, the phone a
+          dbo.clients row needs). clientType drives the derived roleCode. */}
+      {selectedProfile === 'loans' && needsClientPhone && renderClientTypePicker()}
+      {selectedProfile === 'loans' && needsClientPhone && (
         <div className="ca-form-fields" style={{ marginTop: 16, marginBottom: 4 }}>
           <IonInput
             fill="outline" label="Teléfono (requerido para SmartLoans)" labelPlacement="floating"
@@ -1125,7 +1192,44 @@ const CreateAccount: React.FC = () => {
         </div>
       )}
 
-      {/* Active modules summary */}
+      {/* Custom goal picker — outcome-first cards; each goal maps to a module
+          group (MODULE_GOALS), and the union becomes enabledModules. */}
+      {selectedProfile === 'custom' && (
+        <div className="ca-modules-custom">
+          <div className="ca-modules-custom-header">
+            <p className="ca-modules-title">Objetivos</p>
+            <label className="ca-select-all-label">
+              <input
+                type="checkbox"
+                checked={enabledModules.length === ALL_MODULES.length}
+                ref={el => { if (el) el.indeterminate = enabledModules.length > 0 && enabledModules.length < ALL_MODULES.length; }}
+                onChange={e => setEnabledModules(e.target.checked ? ALL_MODULES.map(m => m.id) : [])}
+              />
+              <span>Todo</span>
+            </label>
+          </div>
+          <div className="ca-module-list">
+            {MODULE_GOALS.map(g => {
+              const checked = goalActive(g.modules);
+              return (
+                <button
+                  key={g.label}
+                  type="button"
+                  className={`ca-module-btn${checked ? ' checked' : ''}`}
+                  onClick={() => toggleGoal(g.modules)}
+                >
+                  <div className={`ca-checkbox-box${checked ? ' checked' : ''}`}>
+                    {checked && <IonIcon icon={checkmark} />}
+                  </div>
+                  <span className="ca-module-label">{g.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Included-modules summary — for objetivos with a fixed bundle. */}
       {selectedProfile && selectedProfile !== 'custom' && (
         <div className="ca-modules-summary">
           <p className="ca-modules-title">Módulos incluidos:</p>
@@ -1138,44 +1242,10 @@ const CreateAccount: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Custom module picker — checkbox cards */}
-      {selectedProfile === 'custom' && (
-        <div className="ca-modules-custom">
-          <div className="ca-modules-custom-header">
-            <p className="ca-modules-title">Selecciona los módulos:</p>
-            <label className="ca-select-all-label">
-              <input
-                type="checkbox"
-                checked={enabledModules.length === ALL_MODULES.length}
-                ref={el => { if (el) el.indeterminate = enabledModules.length > 0 && enabledModules.length < ALL_MODULES.length; }}
-                onChange={e => setEnabledModules(e.target.checked ? ALL_MODULES.map(m => m.id) : [])}
-              />
-              <span>Todos</span>
-            </label>
-          </div>
-          <div className="ca-module-list">
-            {ALL_MODULES.map(m => {
-              const checked = enabledModules.includes(m.id);
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`ca-module-btn${checked ? ' checked' : ''}`}
-                  onClick={() => toggleModule(m.id)}
-                >
-                  <div className={`ca-checkbox-box${checked ? ' checked' : ''}`}>
-                    {checked && <IonIcon icon={checkmark} />}
-                  </div>
-                  <span className="ca-module-label">{m.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
+
+  const renderStep1 = () => (q1 === 0 ? renderStep1Intent() : renderStep1Detail());
 
   // ── Step 3: Role + company (Acceso) ──────────────────────────────────────
 
@@ -1463,8 +1533,10 @@ const CreateAccount: React.FC = () => {
                 <span>Atrás</span>
               </button>
             )}
-            {/* Steps 0 and 1 use footer Next; step 3 has its own submit inside render */}
-            {(step === 0 || step === 1) && (
+            {/* Step 0 and the "Perfil" detail sub-step use footer Next; the
+                objetivo question (step 1, q1 === 0) advances on card tap, and
+                step 3 has its own submit inside render. */}
+            {(step === 0 || (step === 1 && q1 === 1)) && (
               <button
                 type="button"
                 className="ca-btn-next"

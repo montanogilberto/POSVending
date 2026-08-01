@@ -36,19 +36,23 @@ const toDate = (utc: string | undefined) => {
   });
 };
 
+// Status compare is case-insensitive: the P2P accept flow writes 'active'
+// (lowercase) while the legacy CRUD wrote 'Active' — both must match.
+const normStatus = (s?: string) => (s ?? '').toLowerCase();
+
 const statusColor = (s: string) => ({
-  Active: '#15803d', Pending: '#b45309', Closed: '#2563eb',
-  PaidOff: '#2563eb', Rejected: '#dc2626',
-}[s] ?? '#6b7280');
+  active: '#15803d', pending: '#b45309', closed: '#2563eb',
+  paidoff: '#2563eb', rejected: '#dc2626',
+}[normStatus(s)] ?? '#6b7280');
 
 const statusLabel = (s: string) => ({
-  Active: 'Activo', Pending: 'Pendiente', Closed: 'Cerrado',
-  PaidOff: 'Pagado', Rejected: 'Rechazado',
-}[s] ?? s);
+  active: 'Activo', pending: 'Pendiente', closed: 'Cerrado',
+  paidoff: 'Pagado', rejected: 'Rechazado',
+}[normStatus(s)] ?? s);
 
 const statusIcon = (s: string) =>
-  s === 'Active' ? checkmarkCircleOutline
-  : s === 'Pending' ? ellipseOutline
+  normStatus(s) === 'active' ? checkmarkCircleOutline
+  : normStatus(s) === 'pending' ? ellipseOutline
   : alertCircleOutline;
 
 interface LenderDashboardPageProps {}
@@ -225,7 +229,11 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
       const myLoanIds = new Set(
         contracts.filter(c => c.lenderClientId === lenderClientId).map(c => c.loanId)
       );
-      const myLoans = allLoans.filter(l => myLoanIds.has(l.loanId));
+      // Fallback: P2P-accepted loans stamp "Prestamista clientId=N" in notes —
+      // covers loans whose contract row is missing (pre-contract-creation fix).
+      const myLoans = allLoans.filter(l =>
+        myLoanIds.has(l.loanId) || l.notes?.includes(`Prestamista clientId=${lenderClientId}`)
+      );
       console.log('[LenderDashboard] fetchAll ✅ loans:', allLoans.length, '→ scoped to lender:', myLoans.length, 'clients:', allClients.length, 'faceRecs:', faceRecs.length);
       setLoans(myLoans);
       setClients(allClients);
@@ -267,9 +275,9 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
     setPopoverState({ ...popoverState, showMailPopover: false });
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
-  const activeLoans   = loans.filter(l => l.loanStatus === 'Active');
-  const paidLoans     = loans.filter(l => l.loanStatus === 'PaidOff' || l.loanStatus === 'Closed');
-  const pendingLoans  = loans.filter(l => l.loanStatus === 'Pending');
+  const activeLoans   = loans.filter(l => normStatus(l.loanStatus) === 'active');
+  const paidLoans     = loans.filter(l => ['paidoff', 'closed'].includes(normStatus(l.loanStatus)));
+  const pendingLoans  = loans.filter(l => normStatus(l.loanStatus) === 'pending');
 
   const totalDeployed = useMemo(() => loans.reduce((s, l) => s + (l.approvedAmount ?? l.principalAmount), 0), [loans]);
   const totalActive   = useMemo(() => activeLoans.reduce((s, l) => s + (l.approvedAmount ?? l.principalAmount), 0), [activeLoans]);
@@ -669,7 +677,7 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
                 const borrower = clientById[loan.clientId];
                 return (
                   <IonItem key={loan.loanId} className="ld-loan-item"
-                    button onClick={() => history.push(`/client-dashboard`)}>
+                    button onClick={() => { console.log('[LenderDashboard] loan →', loan.loanId); history.push(`/loan-detail/${loan.loanId}`); }}>
                     <div slot="start" className="ld-borrower-avatar">
                       {selfieMap[loan.clientId]
                         ? <img src={selfieMap[loan.clientId]} alt="borrower" />

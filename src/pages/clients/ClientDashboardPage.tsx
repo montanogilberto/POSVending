@@ -145,19 +145,24 @@ const toDate = (utc: string | undefined): string => {
   });
 };
 
+// Case-insensitive: P2P-accepted loans use 'active' (lowercase), legacy CRUD
+// used 'Active'. Both must render the same.
+const normLoanStatus = (s?: string) => (s ?? '').toLowerCase();
+
 const loanStatusColor = (status: string) => {
-  if (status === 'Active') return '#148742';
-  if (status === 'Pending') return '#b45309';
-  if (status === 'Closed' || status === 'PaidOff') return '#2563eb';
+  const s = normLoanStatus(status);
+  if (s === 'active') return '#148742';
+  if (s === 'pending') return '#b45309';
+  if (s === 'closed' || s === 'paidoff') return '#2563eb';
   return '#6b7280';
 };
 
 const loanStatusLabel = (status: string) => {
   const map: Record<string, string> = {
-    Active: 'Activo', Pending: 'Pendiente', Closed: 'Cerrado',
-    PaidOff: 'Pagado', Rejected: 'Rechazado',
+    active: 'Activo', pending: 'Pendiente', closed: 'Cerrado',
+    paidoff: 'Pagado', rejected: 'Rechazado',
   };
-  return map[status] ?? status;
+  return map[normLoanStatus(status)] ?? status;
 };
 
 const PAGE_SIZE = 10;
@@ -728,7 +733,7 @@ const ClientDashboardPage: React.FC = () => {
   ];
   const loanCompletionPct = Math.round((loanSteps.filter(s => s.done).length / loanSteps.length) * 100);
 
-  const activeLoans = loans.filter(l => l.loanStatus === 'Active');
+  const activeLoans = loans.filter(l => normLoanStatus(l.loanStatus) === 'active');
   const paymentActivities = recentActivities.filter(a =>
     a.activityType?.toLowerCase().includes('pago') ||
     a.activityType?.toLowerCase().includes('payment')
@@ -1068,11 +1073,12 @@ const ClientDashboardPage: React.FC = () => {
         )}
         <div className="cd-loan-list">
           {loans.map(loan => (
-            <div key={loan.loanId} className="cd-loan-card">
+            <div key={loan.loanId} className="cd-loan-card" style={{ cursor: 'pointer' }}
+              onClick={() => { console.log('[ClientDashboard] loan →', loan.loanId); history.push(`/loan-detail/${loan.loanId}`); }}>
               <div className="cd-loan-header">
                 <span className="cd-loan-number">{loan.loanNumber}</span>
                 <span className="cd-loan-status" style={{ color: loanStatusColor(loan.loanStatus) }}>
-                  <IonIcon icon={loan.loanStatus === 'Active' ? checkmarkCircleOutline : loan.loanStatus === 'Pending' ? ellipseOutline : alertCircleOutline} />
+                  <IonIcon icon={normLoanStatus(loan.loanStatus) === 'active' ? checkmarkCircleOutline : normLoanStatus(loan.loanStatus) === 'pending' ? ellipseOutline : alertCircleOutline} />
                   {loanStatusLabel(loan.loanStatus)}
                 </span>
               </div>
