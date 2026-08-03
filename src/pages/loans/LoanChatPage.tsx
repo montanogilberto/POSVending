@@ -6,18 +6,22 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonFooter,
-  IonButtons, IonButton, IonIcon, IonToast, IonLoading,
+  IonButtons, IonButton, IonIcon, IonToast, IonLoading, IonSpinner,
   IonModal, IonInput, IonBadge, IonChip, IonLabel,
 } from '@ionic/react';
 import {
   arrowBack, sendOutline, cashOutline, checkmarkCircle, closeCircle,
   refreshOutline, createOutline, documentTextOutline, alertCircleOutline,
+  micOutline, volumeHighOutline, volumeMuteOutline,
 } from 'ionicons/icons';
 import { useHistory, useParams, useLocation } from 'react-router-dom';
 import { useUser } from '../../components/UserContext';
 import {
   loanChatApi, getChatConfig, LoanMessage, LoanConversation, MsgType,
 } from '../../api/loanChatApi';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+import { TextToSpeech } from '@capacitor-community/text-to-speech';
 import { disbursePayment } from '../../api/bankingApi';
 import './LoanChatPage.css';
 
@@ -98,6 +102,16 @@ const LoanChatPage: React.FC = () => {
   const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
 
   const [text, setText]         = useState('');
+  // Feedback de actividad: enviando (todo chat) y "el asistente está
+  // escribiendo…" (solo asistente — su respuesta tarda 5-15 s y sin indicador
+  // el usuario reenvía el mensaje pensando que no pasó nada).
+  const [sending, setSending]   = useState(false);
+  const [agentTyping, setAgentTyping] = useState(false);
+  const agentTypingSince = useRef(0);
+  // Voz: dictado (STT nativo) + lectura de respuestas del asistente (TTS es-MX)
+  const [listening, setListening]   = useState(false);
+  const [voiceOn, setVoiceOn]       = useState(false);
+  const lastSpokenIdRef = useRef<number | null>(null);
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [propAmount, setPropAmount] = useState('');
   const [propRate, setPropRate]     = useState('');
@@ -107,6 +121,12 @@ const LoanChatPage: React.FC = () => {
 
   const contentRef = useRef<HTMLIonContentElement>(null);
   const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Prefer the server-computed tag; fall back to comparing against the
+  // config-provided agentClientId (covers the brief window before `conv` loads).
+  // Declared BEFORE the voice/TTS effects that depend on it.
+  const isAssistantChat = conv?.isAssistant
+    ?? (agentClientId > 0 && (conv?.lenderId === agentClientId || (isNew && initLenderId === agentClientId)));
 
   // ── Init ─────────────────────────────────────────────────────────────────
   const initConversation = useCallback(async () => {
@@ -151,6 +171,18 @@ const LoanChatPage: React.FC = () => {
     const res = await loanChatApi.listMessages(convId);
     if (Array.isArray(res)) {
       setMessages(res);
+      // Llegó respuesta del agente (mensaje ajeno posterior al envío) → apagar "escribiendo…"
+      const lastOther = [...res].reverse().find(m => m.senderId !== mySenderId);
+      if (lastOther && agentTypingSince.current > 0) {
+        const ts = new Date((lastOther.created_At ?? '') + 'Z').getTime();
+        if (ts >= agentTypingSince.current || Date.now() - agentTypingSince.current > 45000) {
+          setAgentTyping(false);
+          agentTypingSince.current = 0;
+        }
+      } else if (agentTypingSince.current > 0 && Date.now() - agentTypingSince.current > 45000) {
+        setAgentTyping(false);
+        agentTypingSince.current = 0;
+      }
       loanChatApi.markRead(convId, mySenderId);
       setTimeout(() => contentRef.current?.scrollToBottom(300), 100);
     }
@@ -163,10 +195,11 @@ const LoanChatPage: React.FC = () => {
   useEffect(() => {
     if (!conv) return;
     fetchMessages(conv.conversationId);
-    // Poll every 8 seconds for new messages
-    pollRef.current = setInterval(() => fetchMessages(conv.conversationId), 8000);
+    // Poll: 8 s normal; 2.5 s mientras el asistente "escribe" para que su
+    // respuesta aparezca sin esperar el ciclo largo.
+    pollRef.current = setInterval(() => fetchMessages(conv.conversationId), agentTyping ? 2500 : 8000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [conv?.conversationId]);
+  }, [conv?.conversationId, agentTyping]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const showToast = (msg: string, color: 'success' | 'danger' = 'success') => {
@@ -182,14 +215,83 @@ const LoanChatPage: React.FC = () => {
     { topic: 'legal',    label: '⚖️ Legal (GUÍA)',  msg: 'Necesito orientación legal.' },
   ];
 
+  // ── Voz ───────────────────────────────────────────────────────────────────
+  const toggleListen = async () => {
+    if (!Capacitor.isNativePlatform()) { showToast('El dictado por voz está disponible en la app móvil.'); return; }
+    if (listening) {
+      console.log('[ChatUI] voice: stop dictado');
+      try { await SpeechRecognition.stop(); } catch { /* ya detenido */ }
+      setListening(false);
+      return;
+    }
+    try {
+      const perm = await SpeechRecognition.requestPermissions();
+      if ((perm as any).speechRecognition !== 'granted') {
+        showToast('Permiso de micrófono denegado.', 'danger'); return;
+      }
+      const avail = await SpeechRecognition.available();
+      if (!avail.available) { showToast('Dictado no disponible en este dispositivo.', 'danger'); return; }
+      await SpeechRecognition.removeAllListeners();
+      SpeechRecognition.addListener('partialResults', (data: any) => {
+        const t = data?.matches?.[0];
+        if (t) setText(t);
+      });
+      SpeechRecognition.addListener('listeningState' as any, (s: any) => {
+        if (s?.status === 'stopped') setListening(false);
+      });
+      console.log('[ChatUI] voice: start dictado (es-MX)');
+      setListening(true);
+      await SpeechRecognition.start({ language: 'es-MX', partialResults: true, popup: false });
+    } catch (e) {
+      console.log('[ChatUI] voice: dictado ❌', String(e));
+      setListening(false);
+    }
+  };
+
+  const speak = async (body: string) => {
+    try {
+      await TextToSpeech.stop().catch(() => {});
+      console.log('[ChatUI] voice: TTS →', body.slice(0, 60));
+      await TextToSpeech.speak({ text: body, lang: 'es-MX', rate: 1.0 });
+    } catch (e) { console.log('[ChatUI] voice: TTS ❌', String(e)); }
+  };
+
+  // Lee en voz alta cada respuesta NUEVA del asistente (nunca el historial:
+  // el primer render solo siembra el marcador).
+  useEffect(() => {
+    if (!isAssistantChat || messages.length === 0) return;
+    const agentMsgs = messages.filter(m => m.senderId !== mySenderId && m.msgType === 'text' && m.body);
+    const last = agentMsgs[agentMsgs.length - 1];
+    if (!last) return;
+    if (lastSpokenIdRef.current === null) { lastSpokenIdRef.current = last.messageId; return; }
+    if (last.messageId > lastSpokenIdRef.current) {
+      lastSpokenIdRef.current = last.messageId;
+      if (voiceOn) speak(last.body!);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, voiceOn, isAssistantChat]);
+
+  // Al salir: silenciar TTS y soltar el micrófono.
+  useEffect(() => () => {
+    TextToSpeech.stop().catch(() => {});
+    if (Capacitor.isNativePlatform()) {
+      SpeechRecognition.stop().catch(() => {});
+      SpeechRecognition.removeAllListeners().catch(() => {});
+    }
+  }, []);
+
   const sendTopic = async (t: typeof AGENT_TOPICS[number]) => {
-    if (!conv) return;
+    if (!conv || sending) return;
     console.log('[ChatUI] topic chip →', t.topic);
+    setSending(true);
+    setAgentTyping(true);
+    agentTypingSince.current = Date.now();
     await loanChatApi.sendMessage({
       companyId: companyId!, conversationId: conv.conversationId,
       senderId: mySenderId, senderUserId: userId ?? undefined,
       senderRole: myRole, msgType: 'text', body: t.msg, topic: t.topic,
     });
+    setSending(false);
     fetchMessages(conv.conversationId);
   };
 
@@ -211,14 +313,20 @@ const LoanChatPage: React.FC = () => {
   }, [conv, agentClientId]);
 
   const sendText = async () => {
-    if (!text.trim() || !conv) return;
+    if (!text.trim() || !conv || sending) return;
     const body = text.trim();
     setText('');
+    setSending(true);
+    if (isAssistantChat) {
+      setAgentTyping(true);
+      agentTypingSince.current = Date.now();
+    }
     await loanChatApi.sendMessage({
       companyId: companyId!, conversationId: conv.conversationId,
       senderId: mySenderId, senderUserId: userId ?? undefined,
       senderRole: myRole, msgType: 'text', body,
     });
+    setSending(false);
     fetchMessages(conv.conversationId);
   };
 
@@ -369,11 +477,6 @@ const LoanChatPage: React.FC = () => {
     );
   };
 
-  // Prefer the server-computed tag; fall back to comparing against the
-  // config-provided agentClientId (covers the brief window before `conv` loads).
-  const isAssistantChat = conv?.isAssistant
-    ?? (agentClientId > 0 && (conv?.lenderId === agentClientId || (isNew && initLenderId === agentClientId)));
-
   const statusColor = conv?.status === 'accepted' ? 'success' : conv?.status === 'rejected' ? 'danger' : 'primary';
   const statusLabel = { open: 'Abierta', accepted: 'Aceptada', rejected: 'Rechazada', closed: 'Cerrada' }[conv?.status ?? 'open'];
 
@@ -395,6 +498,17 @@ const LoanChatPage: React.FC = () => {
             </div>
           </IonTitle>
           <IonButtons slot="end">
+            {isAssistantChat && (
+              <IonButton onClick={() => {
+                const next = !voiceOn;
+                console.log('[ChatUI] voice: respuestas en voz alta →', next);
+                setVoiceOn(next);
+                if (!next) TextToSpeech.stop().catch(() => {});
+                showToast(next ? '🔊 Respuestas en voz alta activadas' : 'Respuestas en voz alta desactivadas');
+              }}>
+                <IonIcon icon={voiceOn ? volumeHighOutline : volumeMuteOutline} slot="icon-only" />
+              </IonButton>
+            )}
             <IonButton onClick={() => conv && fetchMessages(conv.conversationId)}>
               <IonIcon icon={refreshOutline} slot="icon-only" />
             </IonButton>
@@ -433,6 +547,13 @@ const LoanChatPage: React.FC = () => {
 
         <div className="lc-messages">
           {messages.map((msg, i) => renderMessage(msg, i))}
+          {agentTyping && (
+            <div className="lc-typing" aria-label="El asistente está escribiendo">
+              <span className="lc-typing-dot" />
+              <span className="lc-typing-dot" />
+              <span className="lc-typing-dot" />
+            </div>
+          )}
         </div>
 
         {/* Proposal modal — full-screen with fixed footer: as a 0.6 sheet, the
@@ -478,7 +599,8 @@ const LoanChatPage: React.FC = () => {
           {isAssistantChat && (
             <div className="lc-topic-chips">
               {AGENT_TOPICS.map(t => (
-                <button key={t.topic} className="lc-topic-chip" onClick={() => sendTopic(t)}>
+                <button key={t.topic} className="lc-topic-chip" disabled={sending || agentTyping}
+                  onClick={() => sendTopic(t)}>
                   {t.label}
                 </button>
               ))}
@@ -491,15 +613,21 @@ const LoanChatPage: React.FC = () => {
                 <IonIcon icon={cashOutline} slot="icon-only" />
               </IonButton>
             )}
+            <IonButton fill="clear" size="small" onClick={toggleListen}
+              className={listening ? 'lc-mic-live' : ''}>
+              <IonIcon icon={micOutline} slot="icon-only" color={listening ? 'danger' : 'medium'} />
+            </IonButton>
             <input
               className="lc-input"
-              placeholder="Escribe un mensaje..."
+              placeholder={listening ? '🎙️ Escuchando…' : 'Escribe un mensaje...'}
               value={text}
               onChange={e => setText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendText()}
             />
-            <IonButton fill="clear" size="small" onClick={sendText} disabled={!text.trim()}>
-              <IonIcon icon={sendOutline} slot="icon-only" color="primary" />
+            <IonButton fill="clear" size="small" onClick={sendText} disabled={!text.trim() || sending}>
+              {sending
+                ? <IonSpinner name="dots" style={{ width: 22, height: 22 }} />
+                : <IonIcon icon={sendOutline} slot="icon-only" color="primary" />}
             </IonButton>
           </div>
         </IonFooter>
