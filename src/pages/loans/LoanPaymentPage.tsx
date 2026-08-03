@@ -437,6 +437,17 @@ const LoanPaymentPage: React.FC = () => {
         {/* ════ STEP: Card (Stripe Payment Element) ════ */}
         {step === 'card' && (
           <div className="lpp-panel">
+            {/* Por qué pide tarjeta teniendo CLABE: una CLABE no se puede
+                cobrar (SPEI es push — solo el titular envía). Hasta activar el
+                riel STP (CLABE virtual que recibe depósitos), la única entrada
+                de dinero es cargo a tarjeta vía Stripe. */}
+            {isTopUp && (
+              <div className="lpp-rail-note">
+                💡 Tu cuenta CLABE sirve para <strong>retirar</strong> — para depositar hoy se usa
+                <strong> tarjeta</strong> (una CLABE no se puede cobrar). Cuando activemos el riel SPEI
+                podrás transferir directo desde tu banco.
+              </div>
+            )}
             <div className="lpp-summary-card">
               <div className="lpp-summary-row">
                 <span>Concepto</span>

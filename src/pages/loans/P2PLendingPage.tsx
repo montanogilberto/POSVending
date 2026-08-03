@@ -1461,6 +1461,24 @@ const P2PLendingPage: React.FC = () => {
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
+          {/* Saldo actual + agregar fondos, siempre a la vista */}
+          <div className="p2p-movements-balance">
+            <div>
+              <span>Saldo en cartera</span>
+              <strong>{walletBalance !== null ? fmt(walletBalance) : fmt(0)}</strong>
+            </div>
+            <IonButton size="small" onClick={() => {
+              console.log('[P2P] movements → add funds (top-up tarjeta)');
+              setShowMovements(false);
+              goTopUp();
+            }}>
+              <IonIcon icon={addOutline} slot="start" />
+              Agregar fondos
+            </IonButton>
+          </div>
+          <p className="p2p-movements-hint">
+            Recarga con tarjeta hoy · depósitos SPEI a tu CLABE virtual disponibles al activar el riel STP.
+          </p>
           {movements.length === 0 && <p style={{ color: '#6b7280' }}>Sin movimientos todavía.</p>}
           {movements.map(m => (
             <div key={m.entryId} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
