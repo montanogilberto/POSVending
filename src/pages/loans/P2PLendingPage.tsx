@@ -913,7 +913,7 @@ const P2PLendingPage: React.FC = () => {
             tarjeta/Stripe 2ª opción) ── */}
         {isLender && (
           <div className="p2p-action-tiles">
-            <button className="p2p-action-tile" onClick={() => setShowBankModal(true)}>
+            <button className="p2p-action-tile" onClick={() => { console.log('[P2P] tile → bank modal (CLABE)'); setShowBankModal(true); }}>
               <IonIcon icon={cardOutline} />
               <strong>{hasVerifiedAccount ? 'Cuenta SPEI' : 'Vincular CLABE'}</strong>
               <span>{hasVerifiedAccount
@@ -925,7 +925,7 @@ const P2PLendingPage: React.FC = () => {
               <strong>Recargar tarjeta</strong>
               <span>2ª opción</span>
             </button>
-            <button className="p2p-action-tile" disabled={!walletBalance} onClick={() => setShowWithdrawAlert(true)}>
+            <button className="p2p-action-tile" disabled={!walletBalance} onClick={() => { console.log('[P2P] tile → withdraw alert'); setShowWithdrawAlert(true); }}>
               <IonIcon icon={cashOutline} />
               <strong>Retirar fondos</strong>
               <span>A mi cuenta</span>
@@ -1016,7 +1016,7 @@ const P2PLendingPage: React.FC = () => {
           {tab === 'offers' && (
             <div>
               {isLender && (
-                <div className="p2p-pub-banner" onClick={() => setShowOfferModal(true)}>
+                <div className="p2p-pub-banner" onClick={() => { console.log('[P2P] pub banner → offer modal'); setShowOfferModal(true); }}>
                   <span className="p2p-pub-icon">🎯</span>
                   <div className="p2p-pub-text">
                     <strong>Publica tu capital disponible</strong>

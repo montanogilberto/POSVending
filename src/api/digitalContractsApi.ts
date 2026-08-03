@@ -46,5 +46,7 @@ export async function listContractsForClient(companyId: number, clientId: number
   });
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  const list = Array.isArray(data) ? data : [];
+  console.log('[Contracts] list ←', JSON.stringify({ clientId, total: list.length }));
+  return list;
 }

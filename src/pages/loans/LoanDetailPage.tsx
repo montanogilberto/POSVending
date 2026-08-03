@@ -102,12 +102,14 @@ const LoanDetailPage: React.FC = () => {
 
   const handlePay = async (c: Installment) => {
     if (payingId) return;
+    console.log('[LoanDetail] pay cuota → START', JSON.stringify({ loanId, installmentId: c.installmentId, amount: c.amount, walletBalance }));
     setPayingId(c.installmentId);
     const r = await payInstallmentSpei({
       companyId: Number(companyId), loanId, installmentId: c.installmentId, clientId: Number(clientId),
     });
     setPayingId(null);
-    if (r.error) { setToast(r.error); setToastColor('danger'); return; }
+    if (r.error) { console.log('[LoanDetail] pay cuota → FAILED', r.error); setToast(r.error); setToastColor('danger'); return; }
+    console.log('[LoanDetail] pay cuota → SUCCESS', JSON.stringify({ installmentId: c.installmentId, balanceAfter: r.borrowerBalanceAfter }));
     setToast(`✓ Cuota #${c.installmentNumber} pagada por SPEI`);
     setToastColor('success');
     load();

@@ -336,7 +336,7 @@ const LoanPage: React.FC = () => {
                 <div className="loan-actions">
                   <IonButton
                     fill="outline"
-                    onClick={() => history.push(`/loan-detail/${loan.loanId}`)}
+                    onClick={() => { console.log('[LoanPage] → detail', loan.loanId); history.push(`/loan-detail/${loan.loanId}`); }}
                     className="action-button"
                   >
                     Ver detalle y pagos
