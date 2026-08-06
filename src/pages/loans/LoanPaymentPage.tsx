@@ -20,7 +20,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
   IonIcon, IonToast, IonLoading, IonBadge, IonProgressBar, IonInput, IonChip,
-  IonSpinner, IonText,
+  IonSpinner, IonText, IonCheckbox,
 } from '@ionic/react';
 import {
   arrowBackOutline, checkmarkCircle, cardOutline, lockClosedOutline,
@@ -83,8 +83,8 @@ async function _createPaymentIntent(payload: object): Promise<PaymentIntentRespo
   return res.json();
 }
 
-async function confirmPaymentIntent(paymentIntentId: string, companyId: number): Promise<PaymentTransaction> {
-  const res = await fetch(`${_api}/stripe/payment-intents/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentIntentId, companyId }) });
+async function confirmPaymentIntent(paymentIntentId: string, companyId: number, savePaymentMethod = false): Promise<PaymentTransaction> {
+  const res = await fetch(`${_api}/stripe/payment-intents/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentIntentId, companyId, savePaymentMethod }) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -128,6 +128,12 @@ const LoanPaymentPage: React.FC = () => {
   const [amount, setAmount]     = useState(amountQP > 0 ? amountQP : 0);
   const [amountInput, setAmountInput] = useState(amountQP > 0 ? String(amountQP) : '');
   const [loading, setLoading]   = useState(false);
+  // Cobro en curso — el Payment Element debe seguir montado mientras Stripe
+  // lee la tarjeta, así que el paso 'card' se queda visible con el botón en spinner.
+  const [confirming, setConfirming] = useState(false);
+  // Consentimiento para guardar la tarjeta (cuotas automáticas). En repayment
+  // viene marcado: el cobro automático mensual depende de una tarjeta guardada.
+  const [saveCard, setSaveCard] = useState(mode === 'repayment');
   const [toast, setToast]       = useState<string | null>(null);
   const [toastColor, setToastColor] = useState<string>('primary');
   const [connAccount, setConnAccount] = useState<ConnectedAccount | null>(null);
@@ -254,42 +260,57 @@ const LoanPaymentPage: React.FC = () => {
 
   // ── Confirm payment ────────────────────────────────────────────────────
   const handleConfirmPayment = async () => {
-    if (!stripeRef.current || !elementsRef.current) return;
+    if (!stripeRef.current || !elementsRef.current || confirming) return;
 
     if (await isBiometricLockEnabled()) {
       const confirmed = await authenticateBiometric('Confirma tu identidad para autorizar el pago');
       if (!confirmed) return;
     }
 
-    setStep('processing');
-    console.log('[Payment] confirmPayment: START', JSON.stringify({ mode, intentId: intentIdRef.current }));
+    // NO cambiar de paso todavía: salir de 'card' desmonta el Payment Element
+    // y stripe.confirmPayment falla con IntegrationError (pantalla colgada en
+    // "Procesando…"). El paso card se queda montado con el botón en spinner.
+    setConfirming(true);
+    console.log('[Payment] confirmPayment: START', JSON.stringify({ mode, intentId: intentIdRef.current, saveCard }));
 
-    const { error } = await stripeRef.current.confirmPayment({
-      elements: elementsRef.current,
-      confirmParams: {
-        return_url: `${window.location.origin}/payment-result?intent=${intentIdRef.current}&mode=${mode}&loanId=${loanId}`,
-        payment_method_data: {
-          billing_details: { name: username },
+    try {
+      const { error } = await stripeRef.current.confirmPayment({
+        elements: elementsRef.current,
+        confirmParams: {
+          return_url: `${window.location.origin}/payment-result?intent=${intentIdRef.current}&mode=${mode}&loanId=${loanId}`,
+          payment_method_data: {
+            billing_details: { name: username },
+          },
         },
-      },
-      redirect: 'if_required',
-    });
+        redirect: 'if_required',
+      });
 
-    if (error) {
-      console.log('[Payment] confirmPayment: Stripe REJECTED —', JSON.stringify({ type: error.type, message: error.message }));
-      setStripeError(
-        error.type === 'card_error'
-          ? error.message ?? 'Error en la tarjeta'
-          : 'El pago no pudo procesarse. Intenta de nuevo.',
-      );
+      if (error) {
+        console.log('[Payment] confirmPayment: Stripe REJECTED —', JSON.stringify({ type: error.type, message: error.message }));
+        setStripeError(
+          error.type === 'card_error'
+            ? error.message ?? 'Error en la tarjeta'
+            : 'El pago no pudo procesarse. Intenta de nuevo.',
+        );
+        setStep('error');
+        return;
+      }
+    } catch (e: any) {
+      console.log('[Payment] confirmPayment: THREW —', String(e?.message ?? e));
+      setStripeError('El pago no pudo procesarse. Intenta de nuevo.');
       setStep('error');
       return;
+    } finally {
+      setConfirming(false);
     }
+
     console.log('[Payment] confirmPayment: Stripe charge OK — verifying server-side + recording transaction');
+    // Cargo hecho: ya es seguro desmontar el card element y mostrar "Procesando".
+    setStep('processing');
 
     // Payment succeeded — verify server-side and record transaction
     try {
-      const tx = await confirmPaymentIntent(intentIdRef.current, companyId);
+      const tx = await confirmPaymentIntent(intentIdRef.current, companyId, saveCard);
       console.log('[Payment] confirm-intent ←', JSON.stringify(tx));
       setTransaction(tx);
 
@@ -472,14 +493,33 @@ const LoanPaymentPage: React.FC = () => {
               <div ref={cardElRef} className="lpp-stripe-element" id="stripe-payment-element" />
             </div>
 
+            {/* Consentimiento: guardar la tarjeta para pagos futuros */}
+            <div className="lpp-save-row">
+              <IonCheckbox
+                labelPlacement="end"
+                justify="start"
+                alignment="start"
+                checked={saveCard}
+                disabled={confirming}
+                onIonChange={e => setSaveCard(e.detail.checked)}
+              >
+                Guardar esta tarjeta de forma segura para pagos futuros
+                {isRepayment ? ' (necesaria para el cobro automático de tus cuotas)' : ''}
+              </IonCheckbox>
+            </div>
+
             <div className="lpp-security-row">
               <IonIcon icon={lockClosedOutline} />
               <span>Pago procesado por Stripe · Tu número de tarjeta nunca llega a nuestros servidores</span>
             </div>
 
-            <IonButton expand="block" onClick={handleConfirmPayment} disabled={loading}>
-              <IonIcon icon={lockClosedOutline} slot="start" />
-              Pagar {fmt(amountQP || amount)} MXN
+            <IonButton expand="block" onClick={handleConfirmPayment} disabled={loading || confirming}>
+              {confirming
+                ? <IonSpinner name="dots" />
+                : <>
+                    <IonIcon icon={lockClosedOutline} slot="start" />
+                    Pagar {fmt(amountQP || amount)} MXN
+                  </>}
             </IonButton>
 
             <div className="lpp-accepted-methods">
