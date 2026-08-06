@@ -3,6 +3,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
+import { APP_ENV } from './utils/appEnv';
 import { Redirect, Route, useHistory, useLocation } from 'react-router-dom';
 import {
   IonApp,
@@ -246,6 +247,25 @@ const AppShell: React.FC = () => {
       }
       if (permission.receive !== 'granted' || cancelled) return;
 
+      // Android 8+: el canal DEBE existir o las notificaciones se descartan en
+      // silencio. El backend (FCM) y el espejo local apuntan ambos a este id.
+      if (Capacitor.getPlatform() === 'android') {
+        try {
+          await PushNotifications.createChannel({
+            id: 'push_notifications',
+            name: 'Notificaciones',
+            description: 'Préstamos, pagos y negociación',
+            importance: 5,
+            visibility: 1,
+            sound: 'default',
+            vibration: true,
+          });
+          console.log('[Push] canal Android push_notifications listo');
+        } catch (e) {
+          console.log('[Push] createChannel ❌', String(e));
+        }
+      }
+
       registrationHandle = await PushNotifications.addListener('registration', async (token) => {
         const platform = Capacitor.getPlatform();
         try {
@@ -259,17 +279,27 @@ const AppShell: React.FC = () => {
               userId,
               token: token.value,
               platform,
+              // Flag dev/prod → tag env_* en el Hub: distingue dispositivos de
+              // desarrolladores de usuarios reales.
+              appEnv: APP_ENV,
             }),
           });
+          console.log('[Push] device registrado', JSON.stringify({ userId, platform, appEnv: APP_ENV }));
         } catch {
           // registration failure is non-fatal
         }
       });
 
       receivedHandle = await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+        console.log('[Push] recibida en foreground', JSON.stringify({ title: notification.title, data: notification.data }));
+        // iOS ya la muestra nativamente (presentationOptions en capacitor.config)
+        // — duplicarla con LocalNotifications daría doble banner.
+        if (Capacitor.getPlatform() === 'ios') return;
         await LocalNotifications.schedule({
           notifications: [{
-            id: Date.now(),
+            // LocalNotifications exige int32: Date.now() lo desborda y Android
+            // rechaza la notificación.
+            id: Math.floor(Date.now() % 2147483647),
             title: notification.title ?? 'Notificación',
             body: notification.body ?? '',
             channelId: 'push_notifications',

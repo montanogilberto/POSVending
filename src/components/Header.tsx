@@ -8,6 +8,7 @@ import { useCart } from '../context/CartContext';
 import { useUser } from './UserContext';
 import { fetchMyNotifications } from '../api/myNotificationsApi';
 import { getChatConfig } from '../api/loanChatApi';
+import { APP_ENV, IS_DEV_BUILD } from '../utils/appEnv';
 import './Header.css';
 
 interface HeaderProps {
@@ -88,7 +89,12 @@ const Header: React.FC<HeaderProps> = ({
             />
           )}
         </IonButtons>
-        <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>{screenTitle}</IonTitle>
+        <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>
+          {screenTitle}
+          {/* Bandera de build: visible solo en builds de desarrollo para saber
+              al instante si este dispositivo/app es de un developer. */}
+          {IS_DEV_BUILD && <IonBadge color="warning" className="header-env-badge">{APP_ENV.toUpperCase()}</IonBadge>}
+        </IonTitle>
         <IonButtons slot="end">
           {!isSmartLoansRole && (
             <IonButton onClick={handleCartClick} title="Cart" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>

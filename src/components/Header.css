@@ -108,3 +108,11 @@
   line-height: 1;
 }
 
+
+/* Chip de entorno (solo builds dev) — junto al título */
+.header-env-badge {
+  margin-left: 8px;
+  font-size: 10px;
+  vertical-align: middle;
+  letter-spacing: 0.5px;
+}
