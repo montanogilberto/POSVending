@@ -4,6 +4,7 @@ import {
   IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonGrid, IonRow, IonCol, IonButton, IonLoading, IonToast, IonIcon,
   IonAvatar, IonBadge, IonList, IonItem, IonLabel, IonNote, IonProgressBar, IonSpinner,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import {
   cashOutline, trendingUpOutline, peopleOutline, walletOutline,
@@ -262,6 +263,16 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
 
   useEffect(() => {
     console.log('[LenderDashboard] initial-load effect: mounting, companyId =', companyId, 'lenderClientId =', lenderClientId);
+    fetchAll();
+    fetchStripeStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId, lenderClientId]);
+
+  // Ionic mantiene la página montada: al volver de recargar/pagar/aceptar, el
+  // efecto de montaje NO se repite y el dashboard mostraba saldos viejos.
+  // Refrescar en cada re-entrada para que los movimientos se reflejen solos.
+  useIonViewWillEnter(() => {
+    console.log('[LenderDashboard] view re-entered → refreshing');
     fetchAll();
     fetchStripeStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps

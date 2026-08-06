@@ -30,6 +30,7 @@ import {
   IonTitle,
   IonButtons,
   IonAlert,
+  useIonViewWillEnter,
 } from '@ionic/react';
 
 import {
@@ -601,6 +602,31 @@ const ClientDashboardPage: React.FC = () => {
         })
         .catch(() => setSavedCard(null));
     }
+  }, [companyId, clientId]);
+
+  // Ionic mantiene la página montada: al volver de pagar/solicitar/chatear el
+  // efecto de montaje no se repite y el dashboard mostraba datos viejos —
+  // refrescar lo esencial (saldos, préstamos, Stripe, tarjeta) en cada entrada.
+  useIonViewWillEnter(() => {
+    if (!companyId || !clientId) return;
+    console.log('[ClientDashboard] view re-entered → refreshing');
+    fetchDashboard();
+    fetchLoans();
+    fetchStripe();
+    countPendingProposalsForBorrower(companyId, Number(clientId))
+      .then(setMyPendingProposals)
+      .catch(() => {});
+    fetch(`${API_BASE_URL}/automated-payments/saved-method`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, companyId }),
+    })
+      .then(r => r.json())
+      .then(d => setSavedCard(d?.paymentMethod?.stripePaymentMethodId
+        ? { last4: d.paymentMethod.last4, brand: d.paymentMethod.brand }
+        : null))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, clientId]);
 
   // Keep the edit form in sync with the latest fetched record — but not

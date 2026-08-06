@@ -246,6 +246,20 @@
   /* Stripe's iframe mounts here */
 }
 
+/* ── Fee transparency (comisión Stripe) ── */
+.lpp-fee-preview {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 6px 14px;
+  margin-bottom: 16px;
+}
+
+.lpp-fee-val {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 /* ── Save-card consent ── */
 .lpp-save-row {
   background: #f8fafc;

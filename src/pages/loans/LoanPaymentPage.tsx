@@ -58,6 +58,9 @@ interface PaymentTransaction {
   status: string;
   stripePaymentIntentId?: string;
   failureReason?: string;
+  // Reales de Stripe (balance transaction) — devueltos por /confirm
+  feeMXN?: number;
+  netCreditedMXN?: number;
 }
 
 interface PaymentIntentResponse {
@@ -106,6 +109,17 @@ const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_P
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+
+// Comisión Stripe México por cargo exitoso: 3.6% + $3 MXN + IVA (16%) sobre la
+// comisión. Verificada contra el dashboard: $500 → $24.36. La cartera se
+// acredita con el NETO real (backend lo lee del balance transaction de Stripe);
+// esta fórmula es la vista previa y el fallback.
+const STRIPE_PCT = 0.036;
+const STRIPE_FIXED_MXN = 3;
+const IVA_RATE = 0.16;
+const stripeFee = (amountMXN: number) =>
+  amountMXN > 0 ? (amountMXN * STRIPE_PCT + STRIPE_FIXED_MXN) * (1 + IVA_RATE) : 0;
+const STRIPE_FEE_LABEL = `Comisión Stripe (${(STRIPE_PCT * 100).toFixed(1)}% + $${STRIPE_FIXED_MXN} + IVA)`;
 
 type Mode = 'top_up' | 'repayment' | null;
 type Step = 'kyc' | 'amount' | 'card' | 'processing' | 'success' | 'error';
@@ -314,14 +328,18 @@ const LoanPaymentPage: React.FC = () => {
       console.log('[Payment] confirm-intent ←', JSON.stringify(tx));
       setTransaction(tx);
 
-      // Push notification to the counterparty
+      // Push notification to the counterparty — reporta el NETO real abonado
+      // (lo que Stripe entrega tras su comisión), no el monto bruto pagado.
+      const paidMXN = amountQP || amount;
+      const netMXN  = tx.netCreditedMXN ?? (paidMXN - stripeFee(paidMXN));
+      const feeMXN  = tx.feeMXN ?? stripeFee(paidMXN);
       const notifTarget = isTopUp ? clientId : lenderId;
       await createPushNotification({
         companyId,
         title: isTopUp ? '💰 Cartera recargada' : '✅ Pago recibido',
         message: isTopUp
-          ? `Tu cartera P2P se recargó con ${fmt(amount)} MXN. Capital disponible para prestar.`
-          : `${username} realizó un pago de ${fmt(amountQP || amount)} MXN sobre préstamo #${loanId}.`,
+          ? `Se abonaron ${fmt(netMXN)} a tu cartera P2P (pagaste ${fmt(paidMXN)}, comisión Stripe ${fmt(feeMXN)}). Capital disponible para prestar.`
+          : `${username} realizó un pago de ${fmt(paidMXN)} MXN sobre préstamo #${loanId}.`,
         notificationType: 'Success',
         priority: 'High',
         targetType: 'User',
@@ -441,6 +459,21 @@ const LoanPaymentPage: React.FC = () => {
               ))}
             </div>
 
+            {/* Transparencia de comisión: lo que cobra Stripe y el neto que
+                realmente se abona a la cartera */}
+            {parseFloat(amountInput) > 0 && (
+              <div className="lpp-fee-preview">
+                <div className="lpp-summary-row">
+                  <span>{STRIPE_FEE_LABEL}</span>
+                  <span className="lpp-fee-val">-{fmt(stripeFee(parseFloat(amountInput)))}</span>
+                </div>
+                <div className="lpp-summary-row">
+                  <span>{isTopUp ? 'Se abona a tu cartera' : 'Neto después de comisión'}</span>
+                  <strong>{fmt(parseFloat(amountInput) - stripeFee(parseFloat(amountInput)))}</strong>
+                </div>
+              </div>
+            )}
+
             <IonButton
               expand="block"
               onClick={() => {
@@ -477,9 +510,19 @@ const LoanPaymentPage: React.FC = () => {
                 <span>{isTopUp ? 'Recarga de cartera P2P' : `Pago cuota #${installment}`}</span>
               </div>
               <div className="lpp-summary-row">
-                <span>Monto</span>
+                <span>Monto que pagas</span>
                 <strong className="lpp-summary-amount">{fmt(amountQP || amount)}</strong>
               </div>
+              <div className="lpp-summary-row">
+                <span>{STRIPE_FEE_LABEL}</span>
+                <span className="lpp-fee-val">-{fmt(stripeFee(amountQP || amount))}</span>
+              </div>
+              {isTopUp && (
+                <div className="lpp-summary-row">
+                  <span>Se abona a tu cartera</span>
+                  <strong>{fmt((amountQP || amount) - stripeFee(amountQP || amount))}</strong>
+                </div>
+              )}
               {isRepayment && loanId && (
                 <div className="lpp-summary-row">
                   <span>Préstamo</span>
@@ -549,7 +592,7 @@ const LoanPaymentPage: React.FC = () => {
             <h2 className="lpp-panel-title lpp-title--success">¡Pago exitoso!</h2>
             <p className="lpp-panel-desc">
               {isTopUp
-                ? `${fmt(amount)} MXN han sido acreditados a tu cartera P2P. Ya puedes publicar ofertas de préstamo.`
+                ? `Se abonaron ${fmt(transaction?.netCreditedMXN ?? (amount - stripeFee(amount)))} a tu cartera P2P (comisión Stripe ${fmt(transaction?.feeMXN ?? stripeFee(amount))}). Ya puedes publicar ofertas de préstamo.`
                 : `Tu pago de ${fmt(amountQP || amount)} MXN fue recibido. El prestamista fue notificado.`}
             </p>
             {transaction && (
@@ -559,9 +602,19 @@ const LoanPaymentPage: React.FC = () => {
                   <span className="lpp-mono">{transaction.stripePaymentIntentId?.slice(-12) ?? '—'}</span>
                 </div>
                 <div className="lpp-receipt-row">
-                  <span>Monto</span>
+                  <span>Monto pagado</span>
                   <span>{fmt(transaction.amount / 100)}</span>
                 </div>
+                <div className="lpp-receipt-row">
+                  <span>{STRIPE_FEE_LABEL}</span>
+                  <span className="lpp-fee-val">-{fmt(transaction.feeMXN ?? stripeFee(transaction.amount / 100))}</span>
+                </div>
+                {isTopUp && (
+                  <div className="lpp-receipt-row">
+                    <span>Abonado a tu cartera</span>
+                    <strong>{fmt(transaction.netCreditedMXN ?? (transaction.amount / 100 - stripeFee(transaction.amount / 100)))}</strong>
+                  </div>
+                )}
                 <div className="lpp-receipt-row">
                   <span>Fecha</span>
                   <span>{new Date().toLocaleDateString('es-MX', { dateStyle: 'long' })}</span>
