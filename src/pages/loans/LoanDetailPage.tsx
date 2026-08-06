@@ -10,7 +10,8 @@ import React, { useCallback, useState } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonIcon, IonBadge, IonSpinner, IonToast, IonProgressBar, useIonViewWillEnter,
+  IonIcon, IonBadge, IonSpinner, IonToast, IonProgressBar, IonCard,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import {
   arrowBack, cashOutline, trendingUpOutline, timeOutline, personCircleOutline,
@@ -157,7 +158,7 @@ const LoanDetailPage: React.FC = () => {
         {loan && (
           <>
             {/* Resumen */}
-            <div className="lde-hero">
+            <IonCard className="lde-hero">
               <div className="lde-hero-top">
                 <h1>{fmt(loan.principalAmount)}</h1>
                 <IonBadge color={meta.color}>{meta.label}</IonBadge>
@@ -167,10 +168,10 @@ const LoanDetailPage: React.FC = () => {
                 <span><IonIcon icon={timeOutline} /> {loan.termMonths} meses · {loan.paymentFrequency}</span>
                 <span><IonIcon icon={cashOutline} /> Desembolso: {toDate(loan.disbursementDate)}</span>
               </div>
-            </div>
+            </IonCard>
 
             {/* Partes */}
-            <div className="lde-card">
+            <IonCard className="lde-card">
               <h2>Partes del contrato</h2>
               <div className="lde-party">
                 <IonIcon icon={personCircleOutline} />
@@ -180,10 +181,10 @@ const LoanDetailPage: React.FC = () => {
                 <IonIcon icon={personCircleOutline} />
                 <div><strong>{clientName(loan.clientId)}</strong><span>Prestatario{isBorrowerViewer ? ' (tú)' : ''}</span></div>
               </div>
-            </div>
+            </IonCard>
 
             {/* Progreso */}
-            <div className="lde-card">
+            <IonCard className="lde-card">
               <h2>Progreso de pago</h2>
               <div className="lde-progress-row">
                 <span>{paid.length} de {cuotas.length} cuotas pagadas</span>
@@ -194,10 +195,10 @@ const LoanDetailPage: React.FC = () => {
                 <p className="lde-next">Siguiente: cuota #{nextDue.installmentNumber} · {fmt(nextDue.amount)} · vence {toDate(nextDue.dueDate)}</p>
               )}
               {!nextDue && cuotas.length > 0 && <p className="lde-next lde-done">✓ Préstamo liquidado</p>}
-            </div>
+            </IonCard>
 
             {/* Cuotas */}
-            <div className="lde-card">
+            <IonCard className="lde-card">
               <h2>Calendario de cuotas</h2>
               {isBorrowerViewer && (
                 <p className="lde-wallet">Tu saldo en billetera: <strong>{fmt(walletBalance)}</strong></p>
@@ -222,10 +223,10 @@ const LoanDetailPage: React.FC = () => {
                 </div>
               ))}
               {cuotas.length === 0 && <p className="lde-empty">Sin calendario de cuotas registrado.</p>}
-            </div>
+            </IonCard>
 
             {/* Historial de pagos */}
-            <div className="lde-card">
+            <IonCard className="lde-card">
               <h2>Historial de pagos</h2>
               {historyEvents.length === 0 && <p className="lde-empty">Sin movimientos aún.</p>}
               {historyEvents.map(ev => (
@@ -242,7 +243,7 @@ const LoanDetailPage: React.FC = () => {
                   </strong>
                 </div>
               ))}
-            </div>
+            </IonCard>
           </>
         )}
       </IonContent>

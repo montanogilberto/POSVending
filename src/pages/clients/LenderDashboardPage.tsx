@@ -3,7 +3,7 @@ import { useParams, useHistory, useLocation } from 'react-router-dom';
 import {
   IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonGrid, IonRow, IonCol, IonButton, IonLoading, IonToast, IonIcon,
-  IonAvatar, IonBadge, IonList, IonItem, IonLabel, IonNote, IonProgressBar,
+  IonAvatar, IonBadge, IonList, IonItem, IonLabel, IonNote, IonProgressBar, IonSpinner,
 } from '@ionic/react';
 import {
   cashOutline, trendingUpOutline, peopleOutline, walletOutline,
@@ -89,6 +89,12 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
   const [pendingProposals, setPendingProposals] = useState(0);
   // Ledger movements — Ganancias (interest received) + Actividad reciente.
   const [statement, setStatement] = useState<LedgerEntry[]>([]);
+  // Spinners por gráfica: las sub-cargas (statement/offers) llegan DESPUÉS del
+  // fetch principal — cada gráfica muestra su spinner hasta tener SU dato.
+  const [statementLoaded, setStatementLoaded] = useState(false);
+  const [offersLoaded, setOffersLoaded]       = useState(false);
+  // Aviso de carga lenta: si las gráficas siguen cargando tras 6 s, se notifica.
+  const [slowLoad, setSlowLoad] = useState(false);
 
   // The lender's own identity verification — digital contracts (loanContracts,
   // signed via the same ClientFaceRecognitionPage wizard borrowers use)
@@ -200,6 +206,7 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
 
       // Published (announced) capital: my active loanOffers. Failure keeps 0 —
       // the card just shows $0 rather than blocking the dashboard.
+      setOffersLoaded(false);
       fetchActiveLoanOffers(companyId)
         .then(all => {
           const mine = all.filter(o => o.lenderId === lenderClientId);
@@ -207,14 +214,17 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
           console.log('[LenderDashboard] published offers:', mine.length, '→ Capital publicado:', sum);
           setPublishedCapital(sum);
         })
-        .catch(() => setPublishedCapital(0));
+        .catch(() => setPublishedCapital(0))
+        .finally(() => setOffersLoaded(true));
       // Ledger movements: earnings (interest entries) + recent activity feed.
+      setStatementLoaded(false);
       ledgerStatement(companyId, lenderClientId)
         .then(entries => {
           console.log('[LenderDashboard] statement:', entries.length, 'movimientos');
           setStatement(entries);
         })
-        .catch(() => setStatement([]));
+        .catch(() => setStatement([]))
+        .finally(() => setStatementLoaded(true));
       // Solicitudes waiting for this lender's answer (same source as P2P's banner).
       countPendingProposalsForLender(companyId, lenderClientId)
         .then(pending => {
@@ -256,6 +266,18 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
     fetchStripeStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, lenderClientId]);
+
+  // Las gráficas siguen cargando: si pasan 6 s, avisamos al cliente en vez de
+  // dejarlo mirando spinners sin explicación.
+  const graphsLoading = loading || !statementLoaded || !offersLoaded;
+  useEffect(() => {
+    if (!graphsLoading) { setSlowLoad(false); return; }
+    const t = setTimeout(() => {
+      console.log('[LenderDashboard] slow load — notificando al cliente');
+      setSlowLoad(true);
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [graphsLoading]);
 
   // Shared Header (menu + notifications + mail + help) — same component and
   // popoverState shape the borrower dashboard uses, so both roles get the same
@@ -358,6 +380,14 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
       <IonContent className="lender-dashboard-content ion-padding">
         <IonLoading isOpen={loading} message="Cargando portfolio..." />
         <IonToast isOpen={!!error} message={error} duration={3000} onDidDismiss={() => setError('')} color="danger" />
+        <IonToast
+          isOpen={slowLoad}
+          message="La carga está tardando más de lo normal — seguimos obteniendo tus datos…"
+          duration={4000}
+          position="top"
+          color="warning"
+          onDidDismiss={() => setSlowLoad(false)}
+        />
 
         {/* Greeting + Ganancias (interés real del ledger) */}
         <div className="ldx-top-row">
@@ -379,7 +409,9 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
           )}
           <div className="ldx-earnings-card">
             <p>Ganancias totales <IonIcon icon={informationCircleOutline} /></p>
-            <h2>${earningsTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</h2>
+            {!statementLoaded
+              ? <div className="ldx-graph-loading"><IonSpinner name="crescent" /><span>Calculando…</span></div>
+              : <h2>${earningsTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</h2>}
             <span className="ldx-earnings-month">
               <IonIcon icon={arrowUpOutline} /> +${earningsMonth.toLocaleString('es-MX', { minimumFractionDigits: 2 })} este mes
             </span>
@@ -417,7 +449,9 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
             </IonButton>
           </div>
           <div className="ldx-hero-right">
-            <div className="ldx-donut" style={donutStyle}><div className="ldx-donut-hole" /></div>
+            {!offersLoaded
+              ? <div className="ldx-donut ldx-donut-loading"><IonSpinner name="crescent" /></div>
+              : <div className="ldx-donut" style={donutStyle}><div className="ldx-donut-hole" /></div>}
             <div className="ldx-donut-legend">
               {[
                 { label: 'Publicado',  dot: '#7da2f7', v: publishedCapital },
@@ -634,7 +668,8 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
           <IonCardHeader><IonCardTitle>Rendimiento del portafolio <IonIcon icon={informationCircleOutline} style={{ fontSize: 15, color: '#9ca3af' }} /></IonCardTitle></IonCardHeader>
           <IonCardContent>
             <p className="ldx-gauge-caption">Tasa de recuperación</p>
-            <div className="ldx-gauge">
+            {loading && <div className="ldx-graph-loading"><IonSpinner name="crescent" /><span>Cargando…</span></div>}
+            {!loading && <div className="ldx-gauge">
               <svg viewBox="0 0 120 68" preserveAspectRatio="xMidYMid meet">
                 <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#e5e7eb" strokeWidth="11" strokeLinecap="round" />
                 <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#22c55e" strokeWidth="11" strokeLinecap="round"
@@ -644,7 +679,7 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
                 <strong>{(collectionRate * 100).toFixed(0)}%</strong>
                 <span>Objetivo: 90%+</span>
               </div>
-            </div>
+            </div>}
             <div className="ld-collection-legend">
               <span className="ld-legend-dot" style={{ background: '#15803d' }} /> Pagados: {paidLoans.length}
               <span className="ld-legend-dot" style={{ background: '#2563eb', marginLeft: 14 }} /> Activos: {activeLoans.length}
@@ -740,7 +775,10 @@ const LenderDashboardPage: React.FC<LenderDashboardPageProps> = () => {
             </div>
           </IonCardHeader>
           <IonCardContent>
-            {statement.length === 0 && (
+            {!statementLoaded && (
+              <div className="ldx-graph-loading"><IonSpinner name="crescent" /><span>Cargando movimientos…</span></div>
+            )}
+            {statementLoaded && statement.length === 0 && (
               <div className="ldx-activity-empty">
                 <p>No hay movimientos aún</p>
                 <span>Comienza a invertir para ver tu actividad aquí.</span>

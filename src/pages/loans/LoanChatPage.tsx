@@ -585,7 +585,7 @@ const LoanChatPage: React.FC = () => {
               )}
             </div>
           </IonContent>
-          <IonFooter className="ion-padding" style={{ background: '#fff' }}>
+          <IonFooter className="ion-padding lc-modal-footer">
             <IonButton expand="block" shape="round" onClick={sendProposal} className="lc-send-prop-btn">
               <IonIcon icon={cashOutline} slot="start" />
               Enviar {propType === 'counter' ? 'contrapropuesta' : 'propuesta'}
@@ -599,10 +599,10 @@ const LoanChatPage: React.FC = () => {
           {isAssistantChat && (
             <div className="lc-topic-chips">
               {AGENT_TOPICS.map(t => (
-                <button key={t.topic} className="lc-topic-chip" disabled={sending || agentTyping}
+                <IonChip key={t.topic} className="lc-topic-chip" disabled={sending || agentTyping}
                   onClick={() => sendTopic(t)}>
                   {t.label}
-                </button>
+                </IonChip>
               ))}
             </div>
           )}
@@ -617,16 +617,17 @@ const LoanChatPage: React.FC = () => {
               className={listening ? 'lc-mic-live' : ''}>
               <IonIcon icon={micOutline} slot="icon-only" color={listening ? 'danger' : 'medium'} />
             </IonButton>
-            <input
+            <IonInput
               className="lc-input"
               placeholder={listening ? '🎙️ Escuchando…' : 'Escribe un mensaje...'}
               value={text}
-              onChange={e => setText(e.target.value)}
+              enterkeyhint="send"
+              onIonInput={e => setText(e.detail.value ?? '')}
               onKeyDown={e => e.key === 'Enter' && sendText()}
             />
             <IonButton fill="clear" size="small" onClick={sendText} disabled={!text.trim() || sending}>
               {sending
-                ? <IonSpinner name="dots" style={{ width: 22, height: 22 }} />
+                ? <IonSpinner name="dots" className="lc-send-spinner" />
                 : <IonIcon icon={sendOutline} slot="icon-only" color="primary" />}
             </IonButton>
           </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
   IonIcon, IonToast, IonLoading, IonCheckbox, IonProgressBar, IonBadge,
+  IonCard, IonNote,
 } from '@ionic/react';
 import {
   checkmarkCircle, ellipseOutline, fingerPrintOutline, documentTextOutline,
@@ -208,7 +209,7 @@ const BorrowerOnboardingPage: React.FC = () => {
         <IonToast isOpen={!!toast} message={toast ?? ''} duration={3000} onDidDismiss={() => setToast(null)} color="warning" position="top" />
 
         {/* ── Progress bar ── */}
-        <IonProgressBar value={(step + (stepDone[step] ? 1 : 0)) / 3} color="primary" style={{ height: 6 }} />
+        <IonProgressBar value={(step + (stepDone[step] ? 1 : 0)) / 3} color="primary" className="bop-progress" />
 
         {/* ── Step indicator ── */}
         <div className="bop-steps">
@@ -224,7 +225,7 @@ const BorrowerOnboardingPage: React.FC = () => {
 
         {/* ══════════════ STEP 0 — Biometría ══════════════ */}
         {step === 0 && (
-          <div className="bop-panel">
+          <IonCard className="bop-panel">
             <div className="bop-section-title">
               <IonIcon icon={fingerPrintOutline} />
               Verificación Biométrica
@@ -234,21 +235,21 @@ const BorrowerOnboardingPage: React.FC = () => {
             </p>
 
             {biometricDone ? (
-              <div className="bop-done-card">
+              <IonCard className="bop-done-card">
                 <IonIcon icon={checkmarkCircle} color="success" />
                 <div>
                   <strong>Biometría verificada</strong>
                   <p>Puntuación de confianza: {((record?.confidenceScore ?? 0) * 100).toFixed(0)}%</p>
                 </div>
-              </div>
+              </IonCard>
             ) : (
-              <div className="bop-alert-card">
+              <IonCard className="bop-alert-card">
                 <p>⚠️ Aún no tienes datos biométricos registrados. Completa la verificación facial para continuar.</p>
                 <IonButton expand="block" onClick={goToFaceRecognition}>
                   Ir a verificación facial
                   <IonIcon icon={arrowForwardOutline} slot="end" />
                 </IonButton>
-              </div>
+              </IonCard>
             )}
 
             <IonButton
@@ -260,12 +261,12 @@ const BorrowerOnboardingPage: React.FC = () => {
               Continuar → Pagaré
               <IonIcon icon={arrowForwardOutline} slot="end" />
             </IonButton>
-          </div>
+          </IonCard>
         )}
 
         {/* ══════════════ STEP 1 — Pagaré ══════════════ */}
         {step === 1 && (
-          <div className="bop-panel">
+          <IonCard className="bop-panel">
             <div className="bop-section-title">
               <IonIcon icon={documentTextOutline} />
               Pagaré — Título de Crédito
@@ -275,13 +276,13 @@ const BorrowerOnboardingPage: React.FC = () => {
             </p>
 
             {pagareDone ? (
-              <div className="bop-done-card">
+              <IonCard className="bop-done-card">
                 <IonIcon icon={checkmarkCircle} color="success" />
                 <div>
                   <strong>Pagaré firmado y aceptado</strong>
                   <p>Firmado digitalmente el {record?.pagareAcceptedAt ? new Date(record.pagareAcceptedAt).toLocaleDateString('es-MX') : '—'}</p>
                 </div>
-              </div>
+              </IonCard>
             ) : (
               <>
                 <div className="bop-legal-doc">
@@ -296,17 +297,19 @@ const BorrowerOnboardingPage: React.FC = () => {
                   onClear={() => setSignatureDataUrl(null)}
                 />
                 {signatureDataUrl && (
-                  <p style={{ fontSize: 12, color: '#16a34a', marginTop: 6 }}>✓ Firma capturada</p>
+                  <IonNote className="bop-sig-ok">✓ Firma capturada</IonNote>
                 )}
 
                 <div className="bop-check-row">
                   <IonCheckbox
+                    labelPlacement="end"
+                    justify="start"
+                    alignment="start"
                     checked={pagareAccepted}
                     onIonChange={e => setPagareAccepted(e.detail.checked)}
-                  />
-                  <label onClick={() => setPagareAccepted(v => !v)}>
+                  >
                     He leído, entendido y acepto el presente Pagaré, reconociendo su carácter ejecutivo conforme a la Ley General de Títulos y Operaciones de Crédito.
-                  </label>
+                  </IonCheckbox>
                 </div>
               </>
             )}
@@ -323,12 +326,12 @@ const BorrowerOnboardingPage: React.FC = () => {
                 <IonIcon icon={arrowForwardOutline} slot="end" />
               </IonButton>
             </div>
-          </div>
+          </IonCard>
         )}
 
         {/* ══════════════ STEP 2 — Contrato ══════════════ */}
         {step === 2 && (
-          <div className="bop-panel">
+          <IonCard className="bop-panel">
             <div className="bop-section-title">
               <IonIcon icon={shieldCheckmarkOutline} />
               Contrato de Crédito P2P
@@ -338,13 +341,13 @@ const BorrowerOnboardingPage: React.FC = () => {
             </p>
 
             {contractDone ? (
-              <div className="bop-done-card">
+              <IonCard className="bop-done-card">
                 <IonIcon icon={checkmarkCircle} color="success" />
                 <div>
                   <strong>Contrato aceptado</strong>
                   <p>Aceptado el {record?.contractAcceptedAt ? new Date(record.contractAcceptedAt).toLocaleDateString('es-MX') : '—'}</p>
                 </div>
-              </div>
+              </IonCard>
             ) : (
               <>
                 <div className="bop-legal-doc">
@@ -353,12 +356,14 @@ const BorrowerOnboardingPage: React.FC = () => {
 
                 <div className="bop-check-row">
                   <IonCheckbox
+                    labelPlacement="end"
+                    justify="start"
+                    alignment="start"
                     checked={contractAccepted}
                     onIonChange={e => setContractAccepted(e.detail.checked)}
-                  />
-                  <label onClick={() => setContractAccepted(v => !v)}>
+                  >
                     He leído, entendido y acepto íntegramente el Contrato de Crédito Personal P2P, incluyendo el tratamiento de mis datos personales y biométricos conforme al Aviso de Privacidad de POS GMO.
-                  </label>
+                  </IonCheckbox>
                 </div>
               </>
             )}
@@ -376,13 +381,13 @@ const BorrowerOnboardingPage: React.FC = () => {
                 <IonIcon icon={checkmarkCircle} slot="end" />
               </IonButton>
             </div>
-          </div>
+          </IonCard>
         )}
 
         {/* ── All done summary ── */}
         {allDone && step < 2 && (
-          <div style={{ margin: '16px', textAlign: 'center' }}>
-            <IonBadge color="success" style={{ fontSize: 14, padding: '8px 16px' }}>
+          <div className="bop-complete ion-margin ion-text-center">
+            <IonBadge color="success" className="bop-complete-badge">
               ✓ Perfil completo — listo para solicitar préstamos
             </IonBadge>
             <br />

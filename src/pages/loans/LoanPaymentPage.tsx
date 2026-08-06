@@ -19,7 +19,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
-  IonIcon, IonToast, IonLoading, IonBadge, IonProgressBar,
+  IonIcon, IonToast, IonLoading, IonBadge, IonProgressBar, IonInput, IonChip,
+  IonSpinner, IonText,
 } from '@ionic/react';
 import {
   arrowBackOutline, checkmarkCircle, cardOutline, lockClosedOutline,
@@ -336,7 +337,7 @@ const LoanPaymentPage: React.FC = () => {
           </IonButtons>
           <IonTitle>{isTopUp ? 'Recargar cartera' : 'Pagar cuota'}</IonTitle>
           <IonButtons slot="end">
-            <IonIcon icon={lockClosedOutline} style={{ marginRight: 14, fontSize: 18, color: '#16a34a' }} />
+            <IonIcon icon={lockClosedOutline} className="lpp-lock-icon" />
           </IonButtons>
         </IonToolbar>
         <IonProgressBar value={progressValue} color={step === 'error' ? 'danger' : 'primary'} />
@@ -396,25 +397,26 @@ const LoanPaymentPage: React.FC = () => {
             </p>
 
             <div className="lpp-amount-input-wrap">
-              <span className="lpp-currency">$</span>
-              <input
+              <IonText className="lpp-currency">$</IonText>
+              <IonInput
                 className="lpp-amount-input"
                 type="number"
+                inputmode="decimal"
                 min="1"
                 step="0.01"
                 placeholder="0.00"
                 value={amountInput}
-                onChange={e => setAmountInput(e.target.value)}
+                onIonInput={e => setAmountInput(e.detail.value ?? '')}
               />
-              <span className="lpp-amount-suffix">MXN</span>
+              <IonText className="lpp-amount-suffix">MXN</IonText>
             </div>
 
             {/* Quick-select amounts */}
             <div className="lpp-quick-amounts">
               {[500, 1000, 2000, 5000, 10000, 20000].map(q => (
-                <button key={q} className="lpp-quick-btn" onClick={() => setAmountInput(String(q))}>
+                <IonChip key={q} className="lpp-quick-btn" onClick={() => setAmountInput(String(q))}>
                   {fmt(q)}
-                </button>
+                </IonChip>
               ))}
             </div>
 
@@ -483,7 +485,7 @@ const LoanPaymentPage: React.FC = () => {
             <div className="lpp-accepted-methods">
               <span>Aceptamos:</span>
               {['Visa', 'Mastercard', 'Amex', 'OXXO'].map(m => (
-                <span key={m} className="lpp-method-chip">{m}</span>
+                <IonChip key={m} className="lpp-method-chip">{m}</IonChip>
               ))}
             </div>
           </div>
@@ -492,7 +494,7 @@ const LoanPaymentPage: React.FC = () => {
         {/* ════ STEP: Processing ════ */}
         {step === 'processing' && (
           <div className="lpp-panel lpp-panel--centered">
-            <div className="lpp-spinner" />
+            <IonSpinner name="crescent" className="lpp-spinner" />
             <h2 className="lpp-panel-title">Procesando pago…</h2>
             <p className="lpp-panel-desc">No cierres esta pantalla. Estamos verificando tu transacción con Stripe.</p>
           </div>

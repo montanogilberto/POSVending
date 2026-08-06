@@ -7,7 +7,8 @@
 import React, { useCallback, useState } from 'react';
 import {
   IonPage, IonContent, IonRefresher, IonRefresherContent, IonIcon, IonBadge,
-  IonButton, IonSpinner, useIonViewWillEnter,
+  IonButton, IonSpinner, IonList, IonItem, IonLabel, IonNote,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import { chatbubblesOutline, sparklesOutline, storefrontOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
@@ -17,6 +18,7 @@ import AlertPopover from '../../components/PopOver/AlertPopover';
 import MailPopover from '../../components/PopOver/MailPopover';
 import { loanChatApi, getChatConfig, LoanConversation } from '../../api/loanChatApi';
 import { getAllClients, Client } from '../../api/clientsApi';
+import './LoanChatListPage.css';
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
   open:     { label: 'Abierta',   color: 'primary' },
@@ -82,12 +84,12 @@ const LoanChatListPage: React.FC = () => {
         </IonRefresher>
 
         {loading && convs.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 24 }}><IonSpinner name="crescent" /></div>
+          <div className="clst-center"><IonSpinner name="crescent" /></div>
         )}
 
         {!loading && convs.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 16px', color: '#6b7280' }}>
-            <IonIcon icon={chatbubblesOutline} style={{ fontSize: 44, color: '#cbd5e1' }} />
+          <div className="clst-empty">
+            <IonIcon icon={chatbubblesOutline} />
             <p>Aún no tienes conversaciones.</p>
             <IonButton size="small" onClick={() => history.push('/p2p-lending')}>
               <IonIcon icon={storefrontOutline} slot="start" />
@@ -96,39 +98,39 @@ const LoanChatListPage: React.FC = () => {
           </div>
         )}
 
-        {convs.map(c => {
-          const meta = STATUS_META[c.status] ?? STATUS_META.open;
-          return (
-            <div key={c.conversationId}
-              onClick={() => { console.log('[ChatList] open →', c.conversationId); history.push(`/loan-chat/${c.conversationId}`); }}
-              style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 8px',
-                       borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}>
-              <IonIcon icon={chatbubblesOutline} style={{ fontSize: 26, color: '#2563eb', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <strong style={{ fontSize: 14 }}>{counterpartName(c)}</strong>
-                  <IonBadge color={meta.color}>{meta.label}</IonBadge>
-                </div>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {c.title ?? 'Negociación de préstamo'}
-                  {c.agreedAmount ? ` · $${c.agreedAmount}` : c.requestedAmount ? ` · $${c.requestedAmount}` : ''}
-                </p>
-                {c.lastMessageAt && (
-                  <span style={{ fontSize: 11, color: '#9ca3af' }}>
-                    {new Date(c.lastMessageAt + 'Z').toLocaleString('es-MX')}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        <IonList className="clst-list" lines="none">
+          {convs.map(c => {
+            const meta = STATUS_META[c.status] ?? STATUS_META.open;
+            return (
+              <IonItem key={c.conversationId} button detail={false} lines="full" className="clst-item"
+                onClick={() => { console.log('[ChatList] open →', c.conversationId); history.push(`/loan-chat/${c.conversationId}`); }}>
+                <IonIcon icon={chatbubblesOutline} slot="start" className="clst-icon" />
+                <IonLabel className="clst-label">
+                  <div className="clst-row">
+                    <strong>{counterpartName(c)}</strong>
+                    <IonBadge color={meta.color}>{meta.label}</IonBadge>
+                  </div>
+                  <p className="clst-sub">
+                    {c.title ?? 'Negociación de préstamo'}
+                    {c.agreedAmount ? ` · $${c.agreedAmount}` : c.requestedAmount ? ` · $${c.requestedAmount}` : ''}
+                  </p>
+                  {c.lastMessageAt && (
+                    <IonNote className="clst-time">
+                      {new Date(c.lastMessageAt + 'Z').toLocaleString('es-MX')}
+                    </IonNote>
+                  )}
+                </IonLabel>
+              </IonItem>
+            );
+          })}
+        </IonList>
 
         {/* Asistente IA — identidad desde GET /loanChat/config (LOANCHAT_AGENT_CLIENT_ID);
             oculto si el backend no lo tiene configurado. Ambos roles: el
             borrower para negociar/preguntar, el lender para soporte
             (cuenta · contratos · legal GUÍA). */}
         {agentClientId > 0 && (
-          <IonButton expand="block" fill="outline" style={{ marginTop: 16 }}
+          <IonButton expand="block" fill="outline" className="ion-margin-top"
             onClick={() => history.push(`/loan-chat/new?lenderId=${agentClientId}`)}>
             <IonIcon icon={sparklesOutline} slot="start" />
             Chatear con el asistente SmartLoans
