@@ -623,3 +623,27 @@
 .ldx-activity-amount.ldx-in { color: #16a34a; }
 .ldx-activity-amount.ldx-out { color: #ea580c; }
 
+
+/* Spinner por gráfica (sub-cargas asíncronas) */
+.ldx-graph-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 0;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.ldx-donut-loading {
+  background: #ffffff22 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ldx-donut-loading ion-spinner {
+  color: #fff;
+  width: 34px;
+  height: 34px;
+}

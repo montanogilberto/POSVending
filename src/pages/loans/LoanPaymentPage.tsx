@@ -19,7 +19,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
-  IonIcon, IonToast, IonLoading, IonBadge, IonProgressBar,
+  IonIcon, IonToast, IonLoading, IonBadge, IonProgressBar, IonInput, IonChip,
+  IonSpinner, IonText, IonCheckbox,
 } from '@ionic/react';
 import {
   arrowBackOutline, checkmarkCircle, cardOutline, lockClosedOutline,
@@ -28,7 +29,7 @@ import {
 } from 'ionicons/icons';
 import { useHistory, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 // ── Stripe / Payment types & fetchers (single-use, kept inline) ──────────────
 
 const _api = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
@@ -57,6 +58,9 @@ interface PaymentTransaction {
   status: string;
   stripePaymentIntentId?: string;
   failureReason?: string;
+  // Reales de Stripe (balance transaction) — devueltos por /confirm
+  feeMXN?: number;
+  netCreditedMXN?: number;
 }
 
 interface PaymentIntentResponse {
@@ -82,8 +86,8 @@ async function _createPaymentIntent(payload: object): Promise<PaymentIntentRespo
   return res.json();
 }
 
-async function confirmPaymentIntent(paymentIntentId: string, companyId: number): Promise<PaymentTransaction> {
-  const res = await fetch(`${_api}/stripe/payment-intents/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentIntentId, companyId }) });
+async function confirmPaymentIntent(paymentIntentId: string, companyId: number, savePaymentMethod = false): Promise<PaymentTransaction> {
+  const res = await fetch(`${_api}/stripe/payment-intents/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentIntentId, companyId, savePaymentMethod }) });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -97,14 +101,26 @@ function createRepaymentIntent(payload: { companyId: number; loanId: number; bor
 }
 import { createPushNotification } from '../../api/pushNotificationsApi';
 import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biometricAuth';
-import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
+import { notifyDataChanged } from '../../utils/refreshBus';
+import { fmtMXN as fmt } from '../../utils/format';
+import { useToast } from '../../hooks/useToast';
 import './LoanPaymentPage.css';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-const fmt = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+// Comisión Stripe México por cargo exitoso: 3.6% + $3 MXN + IVA (16%) sobre la
+// comisión. Verificada contra el dashboard: $500 → $24.36. La cartera se
+// acredita con el NETO real (backend lo lee del balance transaction de Stripe);
+// esta fórmula es la vista previa y el fallback.
+const STRIPE_PCT = 0.036;
+const STRIPE_FIXED_MXN = 3;
+const IVA_RATE = 0.16;
+const stripeFee = (amountMXN: number) =>
+  amountMXN > 0 ? (amountMXN * STRIPE_PCT + STRIPE_FIXED_MXN) * (1 + IVA_RATE) : 0;
+const STRIPE_FEE_LABEL = `Comisión Stripe (${(STRIPE_PCT * 100).toFixed(1)}% + $${STRIPE_FIXED_MXN} + IVA)`;
 
 type Mode = 'top_up' | 'repayment' | null;
 type Step = 'kyc' | 'amount' | 'card' | 'processing' | 'success' | 'error';
@@ -127,8 +143,13 @@ const LoanPaymentPage: React.FC = () => {
   const [amount, setAmount]     = useState(amountQP > 0 ? amountQP : 0);
   const [amountInput, setAmountInput] = useState(amountQP > 0 ? String(amountQP) : '');
   const [loading, setLoading]   = useState(false);
-  const [toast, setToast]       = useState<string | null>(null);
-  const [toastColor, setToastColor] = useState<string>('primary');
+  // Cobro en curso — el Payment Element debe seguir montado mientras Stripe
+  // lee la tarjeta, así que el paso 'card' se queda visible con el botón en spinner.
+  const [confirming, setConfirming] = useState(false);
+  // Consentimiento para guardar la tarjeta (cuotas automáticas). En repayment
+  // viene marcado: el cobro automático mensual depende de una tarjeta guardada.
+  const [saveCard, setSaveCard] = useState(mode === 'repayment');
+  const { showToast, toastProps } = useToast({ defaultColor: 'primary', duration: 4000 });
   const [connAccount, setConnAccount] = useState<ConnectedAccount | null>(null);
   const [transaction, setTransaction] = useState<PaymentTransaction | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
@@ -140,11 +161,6 @@ const LoanPaymentPage: React.FC = () => {
 
   const isTopUp     = mode === 'top_up';
   const isRepayment = mode === 'repayment';
-
-  const showToast = (msg: string, color = 'primary') => {
-    setToastColor(color);
-    setToast(msg);
-  };
 
   // ── Load Stripe + check connected account ──────────────────────────────
   useEffect(() => {
@@ -253,53 +269,72 @@ const LoanPaymentPage: React.FC = () => {
 
   // ── Confirm payment ────────────────────────────────────────────────────
   const handleConfirmPayment = async () => {
-    if (!stripeRef.current || !elementsRef.current) return;
+    if (!stripeRef.current || !elementsRef.current || confirming) return;
 
     if (await isBiometricLockEnabled()) {
       const confirmed = await authenticateBiometric('Confirma tu identidad para autorizar el pago');
       if (!confirmed) return;
     }
 
-    setStep('processing');
-    console.log('[Payment] confirmPayment: START', JSON.stringify({ mode, intentId: intentIdRef.current }));
+    // NO cambiar de paso todavía: salir de 'card' desmonta el Payment Element
+    // y stripe.confirmPayment falla con IntegrationError (pantalla colgada en
+    // "Procesando…"). El paso card se queda montado con el botón en spinner.
+    setConfirming(true);
+    console.log('[Payment] confirmPayment: START', JSON.stringify({ mode, intentId: intentIdRef.current, saveCard }));
 
-    const { error } = await stripeRef.current.confirmPayment({
-      elements: elementsRef.current,
-      confirmParams: {
-        return_url: `${window.location.origin}/payment-result?intent=${intentIdRef.current}&mode=${mode}&loanId=${loanId}`,
-        payment_method_data: {
-          billing_details: { name: username },
+    try {
+      const { error } = await stripeRef.current.confirmPayment({
+        elements: elementsRef.current,
+        confirmParams: {
+          return_url: `${window.location.origin}/payment-result?intent=${intentIdRef.current}&mode=${mode}&loanId=${loanId}`,
+          payment_method_data: {
+            billing_details: { name: username },
+          },
         },
-      },
-      redirect: 'if_required',
-    });
+        redirect: 'if_required',
+      });
 
-    if (error) {
-      console.log('[Payment] confirmPayment: Stripe REJECTED —', JSON.stringify({ type: error.type, message: error.message }));
-      setStripeError(
-        error.type === 'card_error'
-          ? error.message ?? 'Error en la tarjeta'
-          : 'El pago no pudo procesarse. Intenta de nuevo.',
-      );
+      if (error) {
+        console.log('[Payment] confirmPayment: Stripe REJECTED —', JSON.stringify({ type: error.type, message: error.message }));
+        setStripeError(
+          error.type === 'card_error'
+            ? error.message ?? 'Error en la tarjeta'
+            : 'El pago no pudo procesarse. Intenta de nuevo.',
+        );
+        setStep('error');
+        return;
+      }
+    } catch (e: any) {
+      console.log('[Payment] confirmPayment: THREW —', String(e?.message ?? e));
+      setStripeError('El pago no pudo procesarse. Intenta de nuevo.');
       setStep('error');
       return;
+    } finally {
+      setConfirming(false);
     }
+
     console.log('[Payment] confirmPayment: Stripe charge OK — verifying server-side + recording transaction');
+    // Cargo hecho: ya es seguro desmontar el card element y mostrar "Procesando".
+    setStep('processing');
 
     // Payment succeeded — verify server-side and record transaction
     try {
-      const tx = await confirmPaymentIntent(intentIdRef.current, companyId);
+      const tx = await confirmPaymentIntent(intentIdRef.current, companyId, saveCard);
       console.log('[Payment] confirm-intent ←', JSON.stringify(tx));
       setTransaction(tx);
 
-      // Push notification to the counterparty
+      // Push notification to the counterparty — reporta el NETO real abonado
+      // (lo que Stripe entrega tras su comisión), no el monto bruto pagado.
+      const paidMXN = amountQP || amount;
+      const netMXN  = tx.netCreditedMXN ?? (paidMXN - stripeFee(paidMXN));
+      const feeMXN  = tx.feeMXN ?? stripeFee(paidMXN);
       const notifTarget = isTopUp ? clientId : lenderId;
       await createPushNotification({
         companyId,
         title: isTopUp ? '💰 Cartera recargada' : '✅ Pago recibido',
         message: isTopUp
-          ? `Tu cartera P2P se recargó con ${fmt(amount)} MXN. Capital disponible para prestar.`
-          : `${username} realizó un pago de ${fmt(amountQP || amount)} MXN sobre préstamo #${loanId}.`,
+          ? `Se abonaron ${fmt(netMXN)} a tu cartera P2P (pagaste ${fmt(paidMXN)}, comisión Stripe ${fmt(feeMXN)}). Capital disponible para prestar.`
+          : `${username} realizó un pago de ${fmt(paidMXN)} MXN sobre préstamo #${loanId}.`,
         notificationType: 'Success',
         priority: 'High',
         targetType: 'User',
@@ -314,6 +349,8 @@ const LoanPaymentPage: React.FC = () => {
 
       console.log('[Payment] SUCCESS —', mode, 'completed; wallet ledger updated server-side');
       setStep('success');
+      // Todos los dashboards recargan saldos/movimientos de inmediato.
+      notifyDataChanged(isTopUp ? 'wallet_top_up' : 'loan_repayment');
     } catch (e: any) {
       console.log('[Payment] charge OK but server-side record FAILED —', String(e?.message ?? e));
       setStripeError('El pago fue procesado pero hubo un error al registrarlo. Contacta soporte.');
@@ -336,7 +373,7 @@ const LoanPaymentPage: React.FC = () => {
           </IonButtons>
           <IonTitle>{isTopUp ? 'Recargar cartera' : 'Pagar cuota'}</IonTitle>
           <IonButtons slot="end">
-            <IonIcon icon={lockClosedOutline} style={{ marginRight: 14, fontSize: 18, color: '#16a34a' }} />
+            <IonIcon icon={lockClosedOutline} className="lpp-lock-icon" />
           </IonButtons>
         </IonToolbar>
         <IonProgressBar value={progressValue} color={step === 'error' ? 'danger' : 'primary'} />
@@ -344,10 +381,7 @@ const LoanPaymentPage: React.FC = () => {
 
       <IonContent className="lpp-content">
         <IonLoading isOpen={loading} message="Un momento..." />
-        <IonToast
-          isOpen={!!toast} message={toast ?? ''} duration={4000}
-          onDidDismiss={() => setToast(null)} color={toastColor} position="top"
-        />
+        <IonToast {...toastProps} />
 
         {/* ════ STEP: KYC (native, in-app — no Stripe redirect) ════ */}
         {step === 'kyc' && (
@@ -396,27 +430,43 @@ const LoanPaymentPage: React.FC = () => {
             </p>
 
             <div className="lpp-amount-input-wrap">
-              <span className="lpp-currency">$</span>
-              <input
+              <IonText className="lpp-currency">$</IonText>
+              <IonInput
                 className="lpp-amount-input"
                 type="number"
+                inputmode="decimal"
                 min="1"
                 step="0.01"
                 placeholder="0.00"
                 value={amountInput}
-                onChange={e => setAmountInput(e.target.value)}
+                onIonInput={e => setAmountInput(e.detail.value ?? '')}
               />
-              <span className="lpp-amount-suffix">MXN</span>
+              <IonText className="lpp-amount-suffix">MXN</IonText>
             </div>
 
             {/* Quick-select amounts */}
             <div className="lpp-quick-amounts">
               {[500, 1000, 2000, 5000, 10000, 20000].map(q => (
-                <button key={q} className="lpp-quick-btn" onClick={() => setAmountInput(String(q))}>
+                <IonChip key={q} className="lpp-quick-btn" onClick={() => setAmountInput(String(q))}>
                   {fmt(q)}
-                </button>
+                </IonChip>
               ))}
             </div>
+
+            {/* Transparencia de comisión: lo que cobra Stripe y el neto que
+                realmente se abona a la cartera */}
+            {parseFloat(amountInput) > 0 && (
+              <div className="lpp-fee-preview">
+                <div className="lpp-summary-row">
+                  <span>{STRIPE_FEE_LABEL}</span>
+                  <span className="lpp-fee-val">-{fmt(stripeFee(parseFloat(amountInput)))}</span>
+                </div>
+                <div className="lpp-summary-row">
+                  <span>{isTopUp ? 'Se abona a tu cartera' : 'Neto después de comisión'}</span>
+                  <strong>{fmt(parseFloat(amountInput) - stripeFee(parseFloat(amountInput)))}</strong>
+                </div>
+              </div>
+            )}
 
             <IonButton
               expand="block"
@@ -437,15 +487,36 @@ const LoanPaymentPage: React.FC = () => {
         {/* ════ STEP: Card (Stripe Payment Element) ════ */}
         {step === 'card' && (
           <div className="lpp-panel">
+            {/* Por qué pide tarjeta teniendo CLABE: una CLABE no se puede
+                cobrar (SPEI es push — solo el titular envía). Hasta activar el
+                riel STP (CLABE virtual que recibe depósitos), la única entrada
+                de dinero es cargo a tarjeta vía Stripe. */}
+            {isTopUp && (
+              <div className="lpp-rail-note">
+                💡 Tu cuenta CLABE sirve para <strong>retirar</strong> — para depositar hoy se usa
+                <strong> tarjeta</strong> (una CLABE no se puede cobrar). Cuando activemos el riel SPEI
+                podrás transferir directo desde tu banco.
+              </div>
+            )}
             <div className="lpp-summary-card">
               <div className="lpp-summary-row">
                 <span>Concepto</span>
                 <span>{isTopUp ? 'Recarga de cartera P2P' : `Pago cuota #${installment}`}</span>
               </div>
               <div className="lpp-summary-row">
-                <span>Monto</span>
+                <span>Monto que pagas</span>
                 <strong className="lpp-summary-amount">{fmt(amountQP || amount)}</strong>
               </div>
+              <div className="lpp-summary-row">
+                <span>{STRIPE_FEE_LABEL}</span>
+                <span className="lpp-fee-val">-{fmt(stripeFee(amountQP || amount))}</span>
+              </div>
+              {isTopUp && (
+                <div className="lpp-summary-row">
+                  <span>Se abona a tu cartera</span>
+                  <strong>{fmt((amountQP || amount) - stripeFee(amountQP || amount))}</strong>
+                </div>
+              )}
               {isRepayment && loanId && (
                 <div className="lpp-summary-row">
                   <span>Préstamo</span>
@@ -459,20 +530,39 @@ const LoanPaymentPage: React.FC = () => {
               <div ref={cardElRef} className="lpp-stripe-element" id="stripe-payment-element" />
             </div>
 
+            {/* Consentimiento: guardar la tarjeta para pagos futuros */}
+            <div className="lpp-save-row">
+              <IonCheckbox
+                labelPlacement="end"
+                justify="start"
+                alignment="start"
+                checked={saveCard}
+                disabled={confirming}
+                onIonChange={e => setSaveCard(e.detail.checked)}
+              >
+                Guardar esta tarjeta de forma segura para pagos futuros
+                {isRepayment ? ' (necesaria para el cobro automático de tus cuotas)' : ''}
+              </IonCheckbox>
+            </div>
+
             <div className="lpp-security-row">
               <IonIcon icon={lockClosedOutline} />
               <span>Pago procesado por Stripe · Tu número de tarjeta nunca llega a nuestros servidores</span>
             </div>
 
-            <IonButton expand="block" onClick={handleConfirmPayment} disabled={loading}>
-              <IonIcon icon={lockClosedOutline} slot="start" />
-              Pagar {fmt(amountQP || amount)} MXN
+            <IonButton expand="block" onClick={handleConfirmPayment} disabled={loading || confirming}>
+              {confirming
+                ? <IonSpinner name="dots" />
+                : <>
+                    <IonIcon icon={lockClosedOutline} slot="start" />
+                    Pagar {fmt(amountQP || amount)} MXN
+                  </>}
             </IonButton>
 
             <div className="lpp-accepted-methods">
               <span>Aceptamos:</span>
               {['Visa', 'Mastercard', 'Amex', 'OXXO'].map(m => (
-                <span key={m} className="lpp-method-chip">{m}</span>
+                <IonChip key={m} className="lpp-method-chip">{m}</IonChip>
               ))}
             </div>
           </div>
@@ -481,7 +571,7 @@ const LoanPaymentPage: React.FC = () => {
         {/* ════ STEP: Processing ════ */}
         {step === 'processing' && (
           <div className="lpp-panel lpp-panel--centered">
-            <div className="lpp-spinner" />
+            <IonSpinner name="crescent" className="lpp-spinner" />
             <h2 className="lpp-panel-title">Procesando pago…</h2>
             <p className="lpp-panel-desc">No cierres esta pantalla. Estamos verificando tu transacción con Stripe.</p>
           </div>
@@ -496,7 +586,7 @@ const LoanPaymentPage: React.FC = () => {
             <h2 className="lpp-panel-title lpp-title--success">¡Pago exitoso!</h2>
             <p className="lpp-panel-desc">
               {isTopUp
-                ? `${fmt(amount)} MXN han sido acreditados a tu cartera P2P. Ya puedes publicar ofertas de préstamo.`
+                ? `Se abonaron ${fmt(transaction?.netCreditedMXN ?? (amount - stripeFee(amount)))} a tu cartera P2P (comisión Stripe ${fmt(transaction?.feeMXN ?? stripeFee(amount))}). Ya puedes publicar ofertas de préstamo.`
                 : `Tu pago de ${fmt(amountQP || amount)} MXN fue recibido. El prestamista fue notificado.`}
             </p>
             {transaction && (
@@ -506,9 +596,19 @@ const LoanPaymentPage: React.FC = () => {
                   <span className="lpp-mono">{transaction.stripePaymentIntentId?.slice(-12) ?? '—'}</span>
                 </div>
                 <div className="lpp-receipt-row">
-                  <span>Monto</span>
+                  <span>Monto pagado</span>
                   <span>{fmt(transaction.amount / 100)}</span>
                 </div>
+                <div className="lpp-receipt-row">
+                  <span>{STRIPE_FEE_LABEL}</span>
+                  <span className="lpp-fee-val">-{fmt(transaction.feeMXN ?? stripeFee(transaction.amount / 100))}</span>
+                </div>
+                {isTopUp && (
+                  <div className="lpp-receipt-row">
+                    <span>Abonado a tu cartera</span>
+                    <strong>{fmt(transaction.netCreditedMXN ?? (transaction.amount / 100 - stripeFee(transaction.amount / 100)))}</strong>
+                  </div>
+                )}
                 <div className="lpp-receipt-row">
                   <span>Fecha</span>
                   <span>{new Date().toLocaleDateString('es-MX', { dateStyle: 'long' })}</span>

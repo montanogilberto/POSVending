@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useHistory } from 'react-router-dom';
 import {
   IonPage,
   IonContent,
@@ -27,21 +28,18 @@ import {
 } from '@ionic/react';
 import { InputInputEventDetail, SearchbarInputEventDetail, SelectChangeEventDetail } from '@ionic/core';
 import { addOutline, trashOutline, createOutline, personCircleOutline } from 'ionicons/icons';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
 import { Loan, getAllLoans, createLoan, updateLoan, deleteLoan } from '../../api/loanApi';
 import { Client } from '../../api/clientsApi';
-import ClientSelector from '../../components/ClientSelector';
-import { useUser } from '../../components/UserContext';
-
-const toHermosillo = (utc: string | undefined): string => {
-  if (!utc) return '';
-  const d = new Date(utc.includes('Z') ? utc : utc + 'Z');
-  return new Date(d.getTime() - 7 * 60 * 60 * 1000).toLocaleString();
-};
+import ClientSelector from '../../components/pos/ClientSelector';
+import { useUser } from '../../contexts/UserContext';
+import { toHermosillo } from '../../utils/format';
+import { usePopovers } from '../../hooks/usePopovers';
 
 const LoanPage: React.FC = () => {
+  const history = useHistory();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -50,11 +48,7 @@ const LoanPage: React.FC = () => {
   const [editingLoan, setEditingLoan] = useState<Partial<Loan> | null>(null);
   const [showDeleteAlert, setShowDeleteAlert] = useState<boolean>(false);
   const [selectedLoanToDelete, setSelectedLoanToDelete] = useState<Loan | null>(null);
-  const [popoverState, setPopoverState] = useState<{
-    showAlertPopover: boolean;
-    showMailPopover: boolean;
-    event?: Event;
-  }>({ showAlertPopover: false, showMailPopover: false });
+  const pops = usePopovers();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
 
@@ -203,15 +197,6 @@ const LoanPage: React.FC = () => {
     setSearchText(e.detail.value || '');
   };
 
-  const presentAlertPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () =>
-    setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () =>
-    setPopoverState({ ...popoverState, showMailPopover: false });
-
   const handleClientSelection = (client: Client | null) => {
     setSelectedClient(client);
     if (client) {
@@ -223,21 +208,9 @@ const LoanPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
-        screenTitle="Préstamos — POS GMO"
-      />
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <Header screenTitle="Préstamos — POS GMO" {...pops.headerProps} />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
 
       <IonContent fullscreen className="ion-padding loans-page">
         <IonLoading isOpen={loading} message="Cargando préstamos..." />
@@ -331,6 +304,15 @@ const LoanPage: React.FC = () => {
                     </IonLabel>
                   </div>
                 )}
+                <div className="loan-actions">
+                  <IonButton
+                    fill="outline"
+                    onClick={() => { console.log('[LoanPage] → detail', loan.loanId); history.push(`/loan-detail/${loan.loanId}`); }}
+                    className="action-button"
+                  >
+                    Ver detalle y pagos
+                  </IonButton>
+                </div>
                 {canManageLoans && (
                   <div className="loan-actions">
                     <IonButton

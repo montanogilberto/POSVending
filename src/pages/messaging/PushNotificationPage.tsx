@@ -3,10 +3,11 @@ import '../shared-card-list.css';
 import { IonPage, IonContent, IonList, IonItem, IonLabel, IonText, IonLoading, IonToast, IonFab, IonFabButton, IonIcon, IonAlert, IonModal, IonInput, IonSelect, IonSelectOption, IonDatetime, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSearchbar, IonButton, IonInfiniteScroll, IonInfiniteScrollContent, DatetimeChangeEventDetail, InputInputEventDetail, SelectChangeEventDetail } from '@ionic/react';
 import { addOutline, notificationsOutline, createOutline, trashOutline, eyeOutline, closeOutline, informationCircleOutline, checkmarkCircleOutline, warningOutline, alertCircleOutline, cogOutline } from 'ionicons/icons';
 import { IonHeader, IonToolbar, IonTitle, IonButtons } from '@ionic/react';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
-import { useUser } from '../../components/UserContext';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
+import { useUser } from '../../contexts/UserContext';
 import { PushNotification, getAllPushNotifications, createPushNotification, updatePushNotification, deletePushNotification } from '../../api/pushNotificationsApi';
 
 const toHermosillo = (utc: string | undefined): string => {
@@ -29,12 +30,7 @@ const PushNotificationPage: React.FC = () => {
   const [limit] = useState(20);
   const [canLoadMore, setCanLoadMore] = useState(true);
 
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({ showAlertPopover: false, showMailPopover: false });
-
-  const presentAlertPopover = (e: React.MouseEvent) => setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) => setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
+  const pops = usePopovers();
 
   const fetchPushNotifications = async (offsetVal: number, initialLoad: boolean) => {
     if (loading || (!canLoadMore && !initialLoad)) return;
@@ -166,21 +162,9 @@ const PushNotificationPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
-        screenTitle="Notificaciones — POS GMO"
-      />
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <Header {...pops.headerProps} screenTitle="Notificaciones — POS GMO" />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
 
       <IonContent fullscreen className="push-notifications-page">
         <IonLoading isOpen={loading} message="Cargando Notificaciones..." />

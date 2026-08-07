@@ -19,9 +19,10 @@ import {
   IonBadge,
 } from '@ionic/react';
 import { notifications, warning, checkmarkCircle } from 'ionicons/icons';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
 
 interface Alert {
   id: number;
@@ -59,22 +60,7 @@ const AlertsPage: React.FC = () => {
       read: false,
     },
   ]);
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
-
-  const presentAlertPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  };
-
-  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-
-  const presentMailPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  };
-
-  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
+  const pops = usePopovers();
 
   const markAsRead = (alertId: number) => {
     setAlerts(alerts.map(alert =>
@@ -107,8 +93,7 @@ const AlertsPage: React.FC = () => {
   return (
     <IonPage>
       <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
+        {...pops.headerProps}
         screenTitle={`Alertas ${unreadCount > 0 ? `(${unreadCount})` : ''}`}
         showBackButton={true}
         backButtonText="Menú"
@@ -146,16 +131,8 @@ const AlertsPage: React.FC = () => {
         </IonList>
       </IonContent>
 
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
     </IonPage>
   );
 };

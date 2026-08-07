@@ -2,8 +2,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import { UserProvider } from './components/UserContext';
-import { CartProvider } from './context/CartContext';
+import { UserProvider } from './contexts/UserContext';
+import { CartProvider } from './contexts/CartContext';
 import { ObservabilityProvider } from './contexts/ObservabilityContext';
 import { installObservabilityFetch } from './utils/observability';
 import { defineCustomElements } from '@ionic/pwa-elements/loader';

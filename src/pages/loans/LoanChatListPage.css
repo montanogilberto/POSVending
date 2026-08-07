@@ -1,0 +1,65 @@
+/* ── LoanChatListPage ─────────────────────────────────────────── */
+
+.clst-center {
+  text-align: center;
+  padding: 24px;
+}
+
+.clst-empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: #6b7280;
+}
+
+.clst-empty ion-icon {
+  font-size: 44px;
+  color: #cbd5e1;
+}
+
+/* Lista de conversaciones (ion-list / ion-item) */
+.clst-list {
+  background: transparent;
+  padding: 0;
+}
+
+.clst-item {
+  --padding-start: 8px;
+  --inner-padding-end: 8px;
+  --background: transparent;
+  --border-color: #f1f5f9;
+  --min-height: 0;
+}
+
+.clst-icon {
+  font-size: 26px;
+  color: #2563eb;
+  margin: 12px 12px 12px 0;
+}
+
+.clst-label {
+  margin: 12px 0;
+}
+
+.clst-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.clst-row strong {
+  font-size: 14px;
+}
+
+.clst-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clst-time {
+  font-size: 11px;
+  color: #9ca3af;
+}

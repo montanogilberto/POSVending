@@ -10,12 +10,14 @@ import {
   IonLoading,
 } from '@ionic/react';
 import { add, trash, pencil, funnelOutline, swapVerticalOutline } from 'ionicons/icons';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
-import ProductForm from '../../components/ProductForm';
-import ProductWizard from '../../components/ProductWizard/ProductWizard';
-import { useProduct } from '../../context/ProductContext';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
+import { fmtMXN } from '../../utils/format';
+import ProductForm from '../../components/pos/ProductForm';
+import ProductWizard from '../../components/pos/productWizard/ProductWizard';
+import { useProduct } from '../../contexts/ProductContext';
 import { Product } from '../../data/type_products';
 import './ProductsManagementPage.css';
 
@@ -47,11 +49,7 @@ const ProductsManagementPage: React.FC = () => {
   const [sortAsc, setSortAsc] = useState(true);
 
   // ── Popover state ─────────────────────────────────────────────────────
-  const [popoverState, setPopoverState] = useState<{
-    showAlertPopover: boolean;
-    showMailPopover: boolean;
-    event?: Event;
-  }>({ showAlertPopover: false, showMailPopover: false });
+  const pops = usePopovers();
 
   // ── Data fetch ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -84,16 +82,6 @@ const ProductsManagementPage: React.FC = () => {
     setEditingProduct(productsDetail as Product);
     pendingEditProductIdRef.current = null;
   }, [productsDetail]);
-
-  // ── Popover handlers ──────────────────────────────────────────────────
-  const presentAlertPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () =>
-    setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () =>
-    setPopoverState({ ...popoverState, showMailPopover: false });
 
   // ── CRUD handlers ─────────────────────────────────────────────────────
   const handleDelete = (product: Product) => {
@@ -262,14 +250,10 @@ const ProductsManagementPage: React.FC = () => {
   }, [productsList, searchText, activeFilter, sortAsc]);
 
   // ── Helpers ───────────────────────────────────────────────────────────
-  const formatPrice = (price: number) =>
-    new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(price);
-
   return (
     <IonPage>
       <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
+        {...pops.headerProps}
         screenTitle="Productos"
         showBackButton={true}
         backButtonText="Menú"
@@ -430,7 +414,7 @@ const ProductsManagementPage: React.FC = () => {
                         <span className="product-detail-badge price">
                           <span className="detail-label">Precio</span>
                           <span className="detail-value">
-                            {formatPrice(product.details[0].salePrice)}
+                            {fmtMXN(product.details[0].salePrice)}
                           </span>
                         </span>
                         <span className="product-detail-badge stock">
@@ -443,7 +427,7 @@ const ProductsManagementPage: React.FC = () => {
                           <span className="product-detail-badge unit-price">
                             <span className="detail-label">Costo</span>
                             <span className="detail-value">
-                              {formatPrice(product.details[0].unitPrice)}
+                              {fmtMXN(product.details[0].unitPrice)}
                             </span>
                           </span>
                         )}
@@ -534,16 +518,8 @@ const ProductsManagementPage: React.FC = () => {
         />
       </IonContent>
 
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
     </IonPage>
   );
 };

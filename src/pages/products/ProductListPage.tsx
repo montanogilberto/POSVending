@@ -24,9 +24,10 @@ import { getProducts } from '../../data/products';
 import { Product } from '../../data/type_products';
 import { useEffect, useState, useRef } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
 import '../../styles/dashboard.css';
 
 interface RouteParams {
@@ -42,15 +43,7 @@ const ProductListPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const hasFetched = useRef(false);
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
-
-  const presentAlertPopover = (e: React.MouseEvent) => setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) => setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
+  const pops = usePopovers();
 
   const categoryIdNumber = +categoryId;
 
@@ -91,8 +84,7 @@ const ProductListPage: React.FC = () => {
     return (
       <IonPage>
         <Header
-          presentAlertPopover={presentAlertPopover}
-          presentMailPopover={presentMailPopover}
+          {...pops.headerProps}
           screenTitle=""
           showBackButton={true}
           backButtonText="Categorías"
@@ -108,8 +100,7 @@ const ProductListPage: React.FC = () => {
   return (
     <IonPage>
       <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
+        {...pops.headerProps}
         screenTitle="Productos"
         showBackButton={true}
         backButtonText="Categoria Productos"
@@ -222,8 +213,8 @@ const ProductListPage: React.FC = () => {
         </IonContent>
       </IonModal>
 
-      <AlertPopover isOpen={popoverState.showAlertPopover} event={popoverState.event} onDidDismiss={dismissAlertPopover} />
-      <MailPopover isOpen={popoverState.showMailPopover} event={popoverState.event} onDidDismiss={dismissMailPopover} />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
     </IonPage>
   );
 };

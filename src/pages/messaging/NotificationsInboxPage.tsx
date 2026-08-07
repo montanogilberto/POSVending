@@ -14,10 +14,10 @@ import {
   informationCircleOutline, warningOutline, chevronForwardOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import { useUser } from '../../components/UserContext';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import { useUser } from '../../contexts/UserContext';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
 import {
   fetchMyNotifications, markNotificationsRead, InboxNotification,
 } from '../../api/myNotificationsApi';

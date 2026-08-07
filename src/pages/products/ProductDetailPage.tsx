@@ -26,11 +26,12 @@ import {
 
 import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { useCart } from '../../context/CartContext';
+import { useCart } from '../../contexts/CartContext';
 import { Product, Piezas } from '../../data/type_products';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
 import { fetchCategories } from '../../data/categories';
 import '../../styles/dashboard.css';
 
@@ -58,14 +59,7 @@ const ProductDetailPage: React.FC = () => {
   const [selectedOptions, setSelectedOptions] = useState<Record<number, SelectedOptionValue>>({});
   const [showAlert, setShowAlert] = useState(false);
   const [missingMessage, setMissingMessage] = useState('');
-  const [popoverState, setPopoverState] = useState<{
-    showAlertPopover: boolean;
-    showMailPopover: boolean;
-    event?: Event;
-  }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
+  const pops = usePopovers();
 
   // Pieces state for "Servicio Completo" product
   const [pieces, setPieces] = useState<Piezas>({
@@ -79,15 +73,6 @@ const ProductDetailPage: React.FC = () => {
 
   // Helper to check if product is "Servicio Completo"
   const isServicioCompleto = product?.name?.toLowerCase().includes('servicio completo');
-
-  const presentAlertPopover = (e: React.MouseEvent) =>
-    setPopoverState(prev => ({ ...prev, showAlertPopover: true, event: e.nativeEvent }));
-  const dismissAlertPopover = () =>
-    setPopoverState(prev => ({ ...prev, showAlertPopover: false }));
-  const presentMailPopover = (e: React.MouseEvent) =>
-    setPopoverState(prev => ({ ...prev, showMailPopover: true, event: e.nativeEvent }));
-  const dismissMailPopover = () =>
-    setPopoverState(prev => ({ ...prev, showMailPopover: false }));
 
   useEffect(() => {
     const stateProduct = (location.state as any)?.product;
@@ -409,8 +394,7 @@ const ProductDetailPage: React.FC = () => {
   return (
     <IonPage>
       <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
+        {...pops.headerProps}
         screenTitle=""
         showBackButton={true}
         backButtonText="Detalle Productos"
@@ -651,16 +635,8 @@ const ProductDetailPage: React.FC = () => {
         />
       </IonContent>
 
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
     </IonPage>
   );
 };

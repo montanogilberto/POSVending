@@ -12,6 +12,11 @@ const config: CapacitorConfig = {
       style: 'default',
       backgroundColor: '#ffffff',
       overlaysWebView: false
+    },
+    PushNotifications: {
+      // iOS: mostrar la notificación TAMBIÉN con la app abierta (foreground).
+      // Sin esto iOS la suprime y el usuario nunca ve la negociación llegar.
+      presentationOptions: ['badge', 'sound', 'alert']
     }
   }
 };

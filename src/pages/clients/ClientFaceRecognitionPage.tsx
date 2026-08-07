@@ -21,21 +21,22 @@ import {
   IonSpinner,
 } from '@ionic/react';
 import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline } from 'ionicons/icons';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
-import ClientSelector from '../../components/ClientSelector';
-import GuidedDocumentCapture from '../../components/GuidedDocumentCapture';
-import FaceLivenessCapture, { FaceLivenessResult, FacePose } from '../../components/FaceLivenessCapture';
-import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary';
-import ZoomableImage from '../../components/ZoomableImage';
-import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
-import SignaturePad from '../../components/SignaturePad';
-import SavedCardSetup from '../../components/SavedCardSetup';
-import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
+import ClientSelector from '../../components/pos/ClientSelector';
+import GuidedDocumentCapture from '../../components/kyc/GuidedDocumentCapture';
+import FaceLivenessCapture, { FaceLivenessResult, FacePose } from '../../components/kyc/FaceLivenessCapture';
+import IdExtractedFieldsSummary from '../../components/kyc/IdExtractedFieldsSummary';
+import ZoomableImage from '../../components/ui/ZoomableImage';
+import PresenceCapture, { PresenceCaptureResult } from '../../components/kyc/PresenceCapture';
+import SignaturePad from '../../components/kyc/SignaturePad';
+import SavedCardSetup from '../../components/payments/SavedCardSetup';
+import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 import { saveProfileImage } from '../../api/usersApi';
 import { Client, getOneClient } from '../../api/clientsApi';
 import {
@@ -89,20 +90,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
 
   const [clientSelectorOpen, setClientSelectorOpen] = useState(false);
 
-  const [popoverState, setPopoverState] = useState<{
-    showAlertPopover: boolean;
-    showMailPopover: boolean;
-    event?: Event;
-  }>({ showAlertPopover: false, showMailPopover: false });
-
-  const presentAlertPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () =>
-    setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () =>
-    setPopoverState({ ...popoverState, showMailPopover: false });
+  const pops = usePopovers();
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const location = useLocation<{ clientId?: number; continueToPayments?: boolean; returnTo?: string } | undefined>();
@@ -1581,21 +1569,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
-        screenTitle="Reconocimiento Facial — POS GMO"
-      />
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <Header {...pops.headerProps} screenTitle="Reconocimiento Facial — POS GMO" />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
 
       <ClientSelector
         isOpen={clientSelectorOpen}

@@ -19,7 +19,8 @@ import {
 } from '@ionic/react';
 import { waterOutline, barChart, refresh } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import Header from '../../components/Header';
+import Header from '../../components/layout/Header';
+import { usePopovers } from '../../hooks/usePopovers';
 import { fetchWaterTanks, WaterTank, startPeriodicWaterTanksUpdate } from '../../api/waterTanksApi';
 
 const WaterTanksPage: React.FC = () => {
@@ -29,22 +30,7 @@ const WaterTanksPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
-
-  const presentAlertPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  };
-
-  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-
-  const presentMailPopover = (e: React.MouseEvent) => {
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  };
-
-  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
+  const pops = usePopovers();
 
   const loadWaterTanks = async (isRefresh = false) => {
     try {
@@ -96,11 +82,7 @@ const WaterTanksPage: React.FC = () => {
   if (loading) {
     return (
       <IonPage>
-        <Header
-          presentAlertPopover={presentAlertPopover}
-          presentMailPopover={presentMailPopover}
-          screenTitle="Tanques de Agua"
-        />
+        <Header {...pops.headerProps} screenTitle="Tanques de Agua" />
         <IonContent>
           <div style={{ textAlign: 'center', padding: '20px' }}>
             <IonText>Cargando tanques...</IonText>
@@ -112,11 +94,7 @@ const WaterTanksPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
-        screenTitle="Tanques de Agua"
-      />
+      <Header {...pops.headerProps} screenTitle="Tanques de Agua" />
       <div style={{ padding: '16px', textAlign: 'right' }}>
         <IonButton
           fill="outline"
