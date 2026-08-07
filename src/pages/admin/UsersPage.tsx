@@ -21,9 +21,10 @@ import {
   IonSearchbar,
 } from '@ionic/react';
 import { add, trash, pencil, camera, personCircle } from 'ionicons/icons';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
 
 interface User {
   id: number;
@@ -66,10 +67,7 @@ const UsersPage: React.FC = () => {
 
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
+  const pops = usePopovers();
 
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
@@ -85,22 +83,6 @@ const UsersPage: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<UserFilter>('all');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const presentAlertPopover = (e: React.MouseEvent) => {
-    setPopoverState({ showAlertPopover: true, showMailPopover: false, event: e.nativeEvent });
-  };
-
-  const dismissAlertPopover = () => {
-    setPopoverState({ showAlertPopover: false, showMailPopover: false });
-  };
-
-  const presentMailPopover = (e: React.MouseEvent) => {
-    setPopoverState({ showAlertPopover: false, showMailPopover: true, event: e.nativeEvent });
-  };
-
-  const dismissMailPopover = () => {
-    setPopoverState({ showAlertPopover: false, showMailPopover: false });
-  };
 
   const handleDelete = (user: User) => {
     setSelectedUser(user);
@@ -211,8 +193,7 @@ const UsersPage: React.FC = () => {
   return (
     <IonPage>
       <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
+        {...pops.headerProps}
         screenTitle="Usuarios"
         showBackButton={true}
         backButtonText="Menú"
@@ -418,16 +399,8 @@ const UsersPage: React.FC = () => {
         />
       </IonContent>
 
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
     </IonPage>
   );
 };

@@ -4,6 +4,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { APP_ENV } from './utils/appEnv';
+import { notifyDataChanged } from './utils/refreshBus';
 import { Redirect, Route, useHistory, useLocation } from 'react-router-dom';
 import {
   IonApp,
@@ -68,28 +69,28 @@ import {
 //import Vending from './pages/dashboard/Vending';
 import Setting from './pages/system/Setting';
 //mport Sells from './pages/dashboard/Sells';
-import Dashboard from './pages/Dashboard/Dashboard';
+import Dashboard from './pages/dashboard/Dashboard';
 //import ScannerQR from './pages/dashboard/ScannerQR';
-import Category from './pages/CategoryPage/CategoryPage';
+import Category from './pages/category/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
 import ProductDetailPage from './pages/products/ProductDetailPage';
-import CartPage from './pages/CartPage/CartPage';
+import CartPage from './pages/cart/CartPage';
 import MovementsPage from './pages/finance/MovementsPage';
 import LedStatusPage from './pages/iot/LedStatusPage';
 import ClientsPage from './pages/clients/ClientsPage';
 import ProductsManagementPage from './pages/products/ProductsManagementPage';
 import AlertsPage from './pages/messaging/AlertsPage';
 import EmailsPage from './pages/messaging/EmailsPage';
-import CategoriesPage from './pages/CategoryPage/CategoriesPage';
+import CategoriesPage from './pages/category/CategoriesPage';
 import UsersPage from './pages/admin/UsersPage';
 import IncomesPage from './pages/finance/IncomesPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
 import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
-import ReceiptPage from './pages/Receipt/ReceiptPage';
-import Login from './pages/Authentication/Login';
-import ForgotPassword from './pages/Authentication/ForgotPassword';
-import CreateAccount from './pages/Authentication/CreateAccount';
+import ReceiptPage from './pages/receipt/ReceiptPage';
+import Login from './pages/authentication/Login';
+import ForgotPassword from './pages/authentication/ForgotPassword';
+import CreateAccount from './pages/authentication/CreateAccount';
 import SupplierPage from './pages/admin/SupplierPage';
 import LoanPage from './pages/loans/LoanPage';
 // Lazy-loaded: pulls in the gated @azure/ai-vision-face-ui SDK, which isn't
@@ -106,7 +107,7 @@ import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import P2PLendingPage from './pages/loans/P2PLendingPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
-import ManufacturingPage from './pages/Manufacturing/ManufacturingPage';
+import ManufacturingPage from './pages/manufacturing/ManufacturingPage';
 import RewardsPage from './pages/finance/RewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
@@ -126,9 +127,9 @@ import '@ionic/react/css/display.css';
 import '@ionic/react/css/palettes/dark.system.css';
 import './theme/variables.css';
 
-import { IncomeProvider } from './context/IncomeContext';
-import { ProductProvider } from './context/ProductContext';
-import { useUser } from './components/UserContext';
+import { IncomeProvider } from './contexts/IncomeContext';
+import { ProductProvider } from './contexts/ProductContext';
+import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
@@ -292,6 +293,9 @@ const AppShell: React.FC = () => {
 
       receivedHandle = await PushNotifications.addListener('pushNotificationReceived', async (notification) => {
         console.log('[Push] recibida en foreground', JSON.stringify({ title: notification.title, data: notification.data }));
+        // Un push casi siempre significa que la contraparte movió dinero/datos:
+        // recargar dashboards y saldos sin esperar navegación.
+        notifyDataChanged('push_received');
         // iOS ya la muestra nativamente (presentationOptions en capacitor.config)
         // — duplicarla con LocalNotifications daría doble banner.
         if (Capacitor.getPlatform() === 'ios') return;
@@ -333,6 +337,25 @@ const AppShell: React.FC = () => {
       localTapHandle?.remove();
     };
   }, [userId]);
+
+  // Al volver a la app (nativo) o a la pestaña (web), recargar datos: pudieron
+  // llegar pagos/propuestas mientras estaba en segundo plano.
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible') notifyDataChanged('app_resumed');
+    };
+    document.addEventListener('visibilitychange', onVis);
+    let resumeHandle: PluginListenerHandle | undefined;
+    if (Capacitor.isNativePlatform()) {
+      CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) notifyDataChanged('app_resumed');
+      }).then(h => { resumeHandle = h; });
+    }
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      resumeHandle?.remove();
+    };
+  }, []);
 
   const [presentLogoutAlert] = useIonAlert();
 

@@ -13,19 +13,14 @@ import {
   checkmarkCircleOutline, removeCircleOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 import { canAccess } from '../../config/rolePermissions';
 import { rewardsApi, RewardRule, RewardTransaction, RewardBalance } from '../../api/rewardsApi';
+import { fmtInt as fmt, mxDate as toDate } from '../../utils/format';
+import { useToast } from '../../hooks/useToast';
 import './RewardsPage.css';
 
 type Tab = 'overview' | 'rules' | 'transactions';
-
-const fmt = (n: number) => n.toLocaleString('es-MX');
-const toDate = (s?: string) => {
-  if (!s) return '—';
-  const d = new Date(s.includes('Z') ? s : `${s}Z`);
-  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-};
 
 const EMPTY_RULE: Partial<RewardRule> = {
   ruleName: '', ruleType: 'purchase', pointsPerUnit: 1, minAmount: null, maxPointsPerTx: null, isActive: true,
@@ -38,8 +33,7 @@ const RewardsPage: React.FC = () => {
 
   const [tab, setTab]               = useState<Tab>('overview');
   const [loading, setLoading]       = useState(false);
-  const [toast, setToast]           = useState('');
-  const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
+  const { showToast, toastProps }   = useToast({ duration: 2500 });
 
   const [rules, setRules]           = useState<RewardRule[]>([]);
   const [balances, setBalances]     = useState<RewardBalance[]>([]);
@@ -81,10 +75,6 @@ const RewardsPage: React.FC = () => {
   useEffect(() => { load(); }, [companyId]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  const showToast = (msg: string, color: 'success' | 'danger' = 'success') => {
-    setToast(msg); setToastColor(color);
-  };
-
   const openNewRule = () => { setEditRule({ ...EMPTY_RULE, companyId }); setShowRuleModal(true); };
   const openEditRule = (r: RewardRule) => { setEditRule({ ...r }); setShowRuleModal(true); };
 
@@ -443,8 +433,7 @@ const RewardsPage: React.FC = () => {
 
       <IonContent className="ion-padding rw-page">
         <IonLoading isOpen={loading} message="Cargando..." />
-        <IonToast isOpen={!!toast} message={toast} duration={2500}
-          onDidDismiss={() => setToast('')} color={toastColor} position="top" />
+        <IonToast {...toastProps} />
 
         {tab === 'overview'      && renderOverview()}
         {tab === 'rules'         && renderRules()}

@@ -29,7 +29,7 @@ import {
 } from 'ionicons/icons';
 import { useHistory, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 // ── Stripe / Payment types & fetchers (single-use, kept inline) ──────────────
 
 const _api = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
@@ -101,15 +101,16 @@ function createRepaymentIntent(payload: { companyId: number; loanId: number; bor
 }
 import { createPushNotification } from '../../api/pushNotificationsApi';
 import { isBiometricLockEnabled, authenticateBiometric } from '../../utils/biometricAuth';
-import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
+import { notifyDataChanged } from '../../utils/refreshBus';
+import { fmtMXN as fmt } from '../../utils/format';
+import { useToast } from '../../hooks/useToast';
 import './LoanPaymentPage.css';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-const fmt = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
-
 // Comisión Stripe México por cargo exitoso: 3.6% + $3 MXN + IVA (16%) sobre la
 // comisión. Verificada contra el dashboard: $500 → $24.36. La cartera se
 // acredita con el NETO real (backend lo lee del balance transaction de Stripe);
@@ -148,8 +149,7 @@ const LoanPaymentPage: React.FC = () => {
   // Consentimiento para guardar la tarjeta (cuotas automáticas). En repayment
   // viene marcado: el cobro automático mensual depende de una tarjeta guardada.
   const [saveCard, setSaveCard] = useState(mode === 'repayment');
-  const [toast, setToast]       = useState<string | null>(null);
-  const [toastColor, setToastColor] = useState<string>('primary');
+  const { showToast, toastProps } = useToast({ defaultColor: 'primary', duration: 4000 });
   const [connAccount, setConnAccount] = useState<ConnectedAccount | null>(null);
   const [transaction, setTransaction] = useState<PaymentTransaction | null>(null);
   const [stripeError, setStripeError] = useState<string | null>(null);
@@ -161,11 +161,6 @@ const LoanPaymentPage: React.FC = () => {
 
   const isTopUp     = mode === 'top_up';
   const isRepayment = mode === 'repayment';
-
-  const showToast = (msg: string, color = 'primary') => {
-    setToastColor(color);
-    setToast(msg);
-  };
 
   // ── Load Stripe + check connected account ──────────────────────────────
   useEffect(() => {
@@ -354,6 +349,8 @@ const LoanPaymentPage: React.FC = () => {
 
       console.log('[Payment] SUCCESS —', mode, 'completed; wallet ledger updated server-side');
       setStep('success');
+      // Todos los dashboards recargan saldos/movimientos de inmediato.
+      notifyDataChanged(isTopUp ? 'wallet_top_up' : 'loan_repayment');
     } catch (e: any) {
       console.log('[Payment] charge OK but server-side record FAILED —', String(e?.message ?? e));
       setStripeError('El pago fue procesado pero hubo un error al registrarlo. Contacta soporte.');
@@ -384,10 +381,7 @@ const LoanPaymentPage: React.FC = () => {
 
       <IonContent className="lpp-content">
         <IonLoading isOpen={loading} message="Un momento..." />
-        <IonToast
-          isOpen={!!toast} message={toast ?? ''} duration={4000}
-          onDidDismiss={() => setToast(null)} color={toastColor} position="top"
-        />
+        <IonToast {...toastProps} />
 
         {/* ════ STEP: KYC (native, in-app — no Stripe redirect) ════ */}
         {step === 'kyc' && (

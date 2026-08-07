@@ -36,9 +36,10 @@ import {
   cogOutline,
   fingerPrintOutline,
 } from 'ionicons/icons';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
 import { RoleCode, UiFeature, ROLE_UI } from '../../config/rolePermissions';
 import {
   isBiometricAvailable,
@@ -179,21 +180,7 @@ const Setting: React.FC = () => {
     setShowToast(true);
   };
 
-  const [popoverState, setPopoverState] = useState<{
-    showAlertPopover: boolean;
-    showMailPopover: boolean;
-    event?: Event;
-  }>({ showAlertPopover: false, showMailPopover: false });
-
-  const presentAlertPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () =>
-    setPopoverState({ ...popoverState, showAlertPopover: false });
-
-  const presentMailPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () =>
-    setPopoverState({ ...popoverState, showMailPopover: false });
+  const pops = usePopovers();
 
   const currentPerms = permissions[selectedRole];
 
@@ -238,22 +225,10 @@ const Setting: React.FC = () => {
 
   return (
     <IonPage>
-      <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
-        screenTitle="Configuración"
-      />
+      <Header {...pops.headerProps} screenTitle="Configuración" />
 
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
 
       <IonContent className="setting-content">
 

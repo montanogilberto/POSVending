@@ -15,7 +15,7 @@ import {
   micOutline, volumeHighOutline, volumeMuteOutline,
 } from 'ionicons/icons';
 import { useHistory, useParams, useLocation } from 'react-router-dom';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 import {
   loanChatApi, getChatConfig, LoanMessage, LoanConversation, MsgType,
 } from '../../api/loanChatApi';
@@ -23,19 +23,12 @@ import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
 import { disbursePayment } from '../../api/bankingApi';
+import { notifyDataChanged } from '../../utils/refreshBus';
+import { fmtNum as fmt, mxChatDate as toDate, mxChatTime as toTime } from '../../utils/format';
+import { useToast } from '../../hooks/useToast';
 import './LoanChatPage.css';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
-
-const toTime = (s: string) => {
-  const d = new Date(s.includes('Z') ? s : `${s}Z`);
-  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-};
-const toDate = (s: string) => {
-  const d = new Date(s.includes('Z') ? s : `${s}Z`);
-  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
-};
-const fmt = (n: number) => n.toLocaleString('es-MX', { minimumFractionDigits: 2 });
 
 // ── Proposal Card ─────────────────────────────────────────────────────────────
 interface ProposalCardProps {
@@ -98,8 +91,7 @@ const LoanChatPage: React.FC = () => {
   const [conv, setConv]         = useState<LoanConversation | null>(null);
   const [messages, setMessages] = useState<LoanMessage[]>([]);
   const [loading, setLoading]   = useState(false);
-  const [toast, setToast]       = useState('');
-  const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
+  const { showToast, toastProps } = useToast();
 
   const [text, setText]         = useState('');
   // Feedback de actividad: enviando (todo chat) y "el asistente está
@@ -202,10 +194,6 @@ const LoanChatPage: React.FC = () => {
   }, [conv?.conversationId, agentTyping]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const showToast = (msg: string, color: 'success' | 'danger' = 'success') => {
-    setToast(msg); setToastColor(color);
-  };
-
   // Assistant quick topics — route the LLM agent to the right sub-agent:
   // cuenta, contratos, o legal (GUÍA).
   const AGENT_TOPICS = [
@@ -366,6 +354,7 @@ const LoanChatPage: React.FC = () => {
       fetchMessages(conv.conversationId);
       // Trigger loan disbursement via Stripe
       await triggerDisbursement(msg);
+      notifyDataChanged('chat_proposal_accepted');
     } catch { showToast('Error al aceptar', 'danger'); }
     finally { setLoading(false); }
   };
@@ -381,6 +370,7 @@ const LoanChatPage: React.FC = () => {
       setConv(prev => prev ? { ...prev, status: 'rejected' } : prev);
       showToast('Propuesta rechazada');
       fetchMessages(conv.conversationId);
+      notifyDataChanged('chat_proposal_rejected');
     } catch { showToast('Error al rechazar', 'danger'); }
     finally { setLoading(false); }
   };
@@ -530,8 +520,7 @@ const LoanChatPage: React.FC = () => {
 
       <IonContent ref={contentRef} className="lc-content">
         <IonLoading isOpen={loading} message="..." />
-        <IonToast isOpen={!!toast} message={toast} duration={3000}
-          onDidDismiss={() => setToast('')} color={toastColor} position="top" />
+        <IonToast {...toastProps} />
 
         {messages.length === 0 && !loading && (
           <div className="lc-empty">

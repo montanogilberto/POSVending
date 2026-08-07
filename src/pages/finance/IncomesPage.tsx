@@ -17,11 +17,11 @@ import {
   IonButton,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import Header from '../../components/Header';
+import Header from '../../components/layout/Header';
 
-import IncomesChart from '../../components/IncomesChart';
-import IncomesFilters from '../../components/IncomesFilters';
-import IncomesList from '../../components/IncomesList';
+import IncomesChart from '../../components/finance/IncomesChart';
+import IncomesFilters from '../../components/finance/IncomesFilters';
+import IncomesList from '../../components/finance/IncomesList';
 import { fetchAllLaundry } from '../../api/laundryApi';
 import { fetchTicket } from '../../api/ticketApi';
 import { ReceiptService } from '../../services/ReceiptService';

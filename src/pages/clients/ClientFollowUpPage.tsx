@@ -12,7 +12,7 @@ import {
   ellipseOutline, trashOutline, refreshOutline, personCircleOutline,
   timeOutline, createOutline, walletOutline, barChartOutline,
 } from 'ionicons/icons';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 import { getAllClients, Client } from '../../api/clientsApi';
 import { getAllClientFaceRecognitions } from '../../api/clientFaceRecognitionApi';
 import {

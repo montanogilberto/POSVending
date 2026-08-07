@@ -9,10 +9,11 @@ import {
   IonHeader, IonToolbar, IonButtons, IonTitle, IonText
 } from '@ionic/react';
 import { add, pencil, trash, peopleOutline, arrowBack, save, businessOutline } from 'ionicons/icons';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
-import { useUser } from '../../components/UserContext';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
+import { useUser } from '../../contexts/UserContext';
 import {
   getAllSuppliers,
   createSupplier,
@@ -46,16 +47,7 @@ const SupplierPage: React.FC = () => {
 
   const { companyId } = useUser();
 
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({ showAlertPopover: false, showMailPopover: false });
-
-  const presentAlertPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () =>
-    setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () =>
-    setPopoverState({ ...popoverState, showMailPopover: false });
+  const pops = usePopovers();
 
   const loadSuppliers = async () => {
     if (!companyId) return;
@@ -158,21 +150,9 @@ const SupplierPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
-        screenTitle="Proveedores — POS GMO"
-      />
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <Header {...pops.headerProps} screenTitle="Proveedores — POS GMO" />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
       <IonLoading isOpen={loading} message={'Cargando...'} />
       <IonToast
         isOpen={!!error}

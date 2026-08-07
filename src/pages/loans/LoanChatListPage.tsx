@@ -12,20 +12,18 @@ import {
 } from '@ionic/react';
 import { chatbubblesOutline, sparklesOutline, storefrontOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import { useUser } from '../../components/UserContext';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import { useUser } from '../../contexts/UserContext';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
 import { loanChatApi, getChatConfig, LoanConversation } from '../../api/loanChatApi';
 import { getAllClients, Client } from '../../api/clientsApi';
+import { onDataChanged } from '../../utils/refreshBus';
+import { usePopovers } from '../../hooks/usePopovers';
+import StatusBadge from '../../components/ui/StatusBadge';
+import { CONVERSATION_STATUS } from '../../components/ui/statusMaps';
+import EmptyState from '../../components/ui/EmptyState';
 import './LoanChatListPage.css';
-
-const STATUS_META: Record<string, { label: string; color: string }> = {
-  open:     { label: 'Abierta',   color: 'primary' },
-  accepted: { label: 'Aceptada',  color: 'success' },
-  rejected: { label: 'Rechazada', color: 'danger' },
-  closed:   { label: 'Cerrada',   color: 'medium' },
-};
 
 const LoanChatListPage: React.FC = () => {
   const history = useHistory();
@@ -36,9 +34,7 @@ const LoanChatListPage: React.FC = () => {
   // Agent identity from backend config — button hidden when not configured.
   const [agentClientId, setAgentClientId] = useState(0);
 
-  const [showAlert, setShowAlert] = useState(false);
-  const [showMail, setShowMail] = useState(false);
-  const [popEvent, setPopEvent] = useState<React.MouseEvent | undefined>();
+  const pops = usePopovers();
 
   const load = useCallback(async () => {
     if (!companyId || !clientId) return;
@@ -63,6 +59,9 @@ const LoanChatListPage: React.FC = () => {
     getChatConfig().then(c => setAgentClientId(c.agentEnabled ? c.agentClientId : 0));
   }, [load]);
 
+  // Refresco global: un push (mensaje/propuesta nueva) recarga la lista abierta.
+  React.useEffect(() => onDataChanged(() => load()), [load]);
+
   const counterpartName = (c: LoanConversation) => {
     const otherId = c.borrowerId === clientId ? c.lenderId : c.borrowerId;
     const other = clientMap[otherId];
@@ -71,13 +70,9 @@ const LoanChatListPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header
-        screenTitle="Mis chats"
-        presentAlertPopover={(e) => { setPopEvent(e); setShowAlert(true); }}
-        presentMailPopover={(e) => { setPopEvent(e); setShowMail(true); }}
-      />
-      <AlertPopover isOpen={showAlert} event={popEvent as any} onDidDismiss={() => setShowAlert(false)} />
-      <MailPopover isOpen={showMail} event={popEvent as any} onDidDismiss={() => setShowMail(false)} />
+      <Header screenTitle="Mis chats" {...pops.headerProps} />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
       <IonContent className="ion-padding">
         <IonRefresher slot="fixed" onIonRefresh={(e) => { load().then(() => e.detail.complete()); }}>
           <IonRefresherContent />
@@ -88,19 +83,18 @@ const LoanChatListPage: React.FC = () => {
         )}
 
         {!loading && convs.length === 0 && (
-          <div className="clst-empty">
-            <IonIcon icon={chatbubblesOutline} />
-            <p>Aún no tienes conversaciones.</p>
-            <IonButton size="small" onClick={() => history.push('/p2p-lending')}>
-              <IonIcon icon={storefrontOutline} slot="start" />
-              {roleCode === 'borrower' ? 'Busca una oferta y chatea' : 'Ir al marketplace'}
-            </IonButton>
-          </div>
+          <EmptyState className="clst-empty" icon={chatbubblesOutline}
+            text="Aún no tienes conversaciones."
+            action={
+              <IonButton size="small" onClick={() => history.push('/p2p-lending')}>
+                <IonIcon icon={storefrontOutline} slot="start" />
+                {roleCode === 'borrower' ? 'Busca una oferta y chatea' : 'Ir al marketplace'}
+              </IonButton>
+            } />
         )}
 
         <IonList className="clst-list" lines="none">
           {convs.map(c => {
-            const meta = STATUS_META[c.status] ?? STATUS_META.open;
             return (
               <IonItem key={c.conversationId} button detail={false} lines="full" className="clst-item"
                 onClick={() => { console.log('[ChatList] open →', c.conversationId); history.push(`/loan-chat/${c.conversationId}`); }}>
@@ -108,7 +102,7 @@ const LoanChatListPage: React.FC = () => {
                 <IonLabel className="clst-label">
                   <div className="clst-row">
                     <strong>{counterpartName(c)}</strong>
-                    <IonBadge color={meta.color}>{meta.label}</IonBadge>
+                    <StatusBadge status={c.status} map={CONVERSATION_STATUS} />
                   </div>
                   <p className="clst-sub">
                     {c.title ?? 'Negociación de préstamo'}

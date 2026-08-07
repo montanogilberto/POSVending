@@ -62,7 +62,7 @@ import {
 } from 'ionicons/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
 import { countPendingProposalsForBorrower } from '../../api/loanMarketplaceApi';
@@ -75,13 +75,15 @@ const SHOW_BANKING_TEST_TOOLS = false;
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
-import LoanCompletionRing, { LoanStep } from '../../components/LoanCompletionRing';
-import NativeConnectOnboarding from '../../components/NativeConnectOnboarding';
+import LoanCompletionRing, { LoanStep } from '../../components/loans/LoanCompletionRing';
+import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
+import { onDataChanged } from '../../utils/refreshBus';
+import { usePopovers } from '../../hooks/usePopovers';
 
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';
@@ -236,19 +238,7 @@ const ClientDashboardPage: React.FC = () => {
   // Header — same shared Header/AlertPopover/MailPopover components and
   // popoverState shape used everywhere else in the app (Dashboard.tsx,
   // ClientFaceRecognitionPage.tsx), instead of a one-off custom toolbar.
-  const [popoverState, setPopoverState] = useState<{
-    showAlertPopover: boolean;
-    showMailPopover: boolean;
-    event?: Event;
-  }>({ showAlertPopover: false, showMailPopover: false });
-  const presentAlertPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () =>
-    setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) =>
-    setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () =>
-    setPopoverState({ ...popoverState, showMailPopover: false });
+  const pops = usePopovers();
 
   // Profile tab — QR / invite-a-friend actions (mirrors ClientsPage.tsx's
   // staff-facing versions, minus the staff-only bits like Eliminar)
@@ -602,6 +592,18 @@ const ClientDashboardPage: React.FC = () => {
         })
         .catch(() => setSavedCard(null));
     }
+  }, [companyId, clientId]);
+
+  // Refresco global: transacciones y pushes recargan aunque la página esté visible.
+  useEffect(() => {
+    if (!companyId || !clientId) return;
+    return onDataChanged((reason) => {
+      console.log('[ClientDashboard] data-changed →', reason);
+      fetchDashboard();
+      fetchLoans();
+      fetchStripe();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, clientId]);
 
   // Ionic mantiene la página montada: al volver de pagar/solicitar/chatear el
@@ -1796,20 +1798,11 @@ const ClientDashboardPage: React.FC = () => {
   return (
     <IonPage>
       <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
+        {...pops.headerProps}
         screenTitle="Dashboard Cliente"
       />
-      <AlertPopover
-        isOpen={popoverState.showAlertPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissAlertPopover}
-      />
-      <MailPopover
-        isOpen={popoverState.showMailPopover}
-        event={popoverState.event}
-        onDidDismiss={dismissMailPopover}
-      />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
 
       <IonContent fullscreen className="ion-padding client-dashboard-page fintech-surface">
         <IonLoading isOpen={loading} message="Cargando..." />

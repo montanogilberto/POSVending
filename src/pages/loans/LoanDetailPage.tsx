@@ -17,21 +17,18 @@ import {
   arrowBack, cashOutline, trendingUpOutline, timeOutline, personCircleOutline,
   checkmarkCircle, ellipseOutline, arrowDownOutline, arrowUpOutline, refreshOutline,
 } from 'ionicons/icons';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
 import { getAllClients, Client } from '../../api/clientsApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
 import { ledgerBalance } from '../../api/bankingApi';
 import { listContractsForClient } from '../../api/digitalContractsApi';
+import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
+import { fmtMXN as fmt, mxDate as toDate } from '../../utils/format';
+import { useToast } from '../../hooks/useToast';
+import StatusBadge from '../../components/ui/StatusBadge';
+import { LOAN_STATUS } from '../../components/ui/statusMaps';
 import './LoanDetailPage.css';
-
-const fmt = (n: number) => `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
-
-const toDate = (utc?: string | null) => {
-  if (!utc) return '—';
-  const d = new Date(utc.includes('Z') || utc.includes('+') ? utc : utc + 'Z');
-  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-};
 
 const LoanDetailPage: React.FC = () => {
   const { loanId: loanIdParam } = useParams<{ loanId: string }>();
@@ -46,8 +43,7 @@ const LoanDetailPage: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(false);
   const [payingId, setPayingId] = useState<number | null>(null);
-  const [toast, setToast] = useState('');
-  const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
+  const { showToast, toastProps } = useToast({ duration: 3500 });
 
   const load = useCallback(async () => {
     if (!companyId || !loanId) return;
@@ -89,6 +85,9 @@ const LoanDetailPage: React.FC = () => {
 
   useIonViewWillEnter(() => { load(); }, [load]);
 
+  // Refresco global: pagos de la contraparte (push) recargan el detalle abierto.
+  React.useEffect(() => onDataChanged(() => load()), [load]);
+
   const clientName = (id: number) => {
     const c = clients.find(x => x.clientId === id);
     return c ? `${c.first_name} ${c.last_name}`.trim() : (id ? `Cliente #${id}` : '—');
@@ -109,10 +108,10 @@ const LoanDetailPage: React.FC = () => {
       companyId: Number(companyId), loanId, installmentId: c.installmentId, clientId: Number(clientId),
     });
     setPayingId(null);
-    if (r.error) { console.log('[LoanDetail] pay cuota → FAILED', r.error); setToast(r.error); setToastColor('danger'); return; }
+    if (r.error) { console.log('[LoanDetail] pay cuota → FAILED', r.error); showToast(r.error, 'danger'); return; }
     console.log('[LoanDetail] pay cuota → SUCCESS', JSON.stringify({ installmentId: c.installmentId, balanceAfter: r.borrowerBalanceAfter }));
-    setToast(`✓ Cuota #${c.installmentNumber} pagada por SPEI`);
-    setToastColor('success');
+    showToast(`✓ Cuota #${c.installmentNumber} pagada por SPEI`);
+    notifyDataChanged('installment_paid');
     load();
   };
 
@@ -129,12 +128,6 @@ const LoanDetailPage: React.FC = () => {
     })),
   ].sort((a, b) => a.when.localeCompare(b.when));
 
-  const statusMeta: Record<string, { label: string; color: string }> = {
-    active: { label: 'Activo', color: 'success' }, pending: { label: 'Pendiente', color: 'warning' },
-    paidoff: { label: 'Pagado', color: 'primary' }, closed: { label: 'Cerrado', color: 'medium' },
-  };
-  const meta = statusMeta[(loan?.loanStatus ?? '').toLowerCase()] ?? { label: loan?.loanStatus ?? '—', color: 'medium' };
-
   return (
     <IonPage>
       <IonHeader>
@@ -149,8 +142,7 @@ const LoanDetailPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
-        <IonToast isOpen={!!toast} message={toast} color={toastColor} duration={3500}
-          position="top" onDidDismiss={() => setToast('')} />
+        <IonToast {...toastProps} />
 
         {loading && !loan && <div className="lde-center"><IonSpinner name="crescent" /></div>}
         {!loading && !loan && <div className="lde-center"><p>Préstamo no encontrado.</p></div>}
@@ -161,7 +153,7 @@ const LoanDetailPage: React.FC = () => {
             <IonCard className="lde-hero">
               <div className="lde-hero-top">
                 <h1>{fmt(loan.principalAmount)}</h1>
-                <IonBadge color={meta.color}>{meta.label}</IonBadge>
+                <StatusBadge status={loan.loanStatus} map={LOAN_STATUS} />
               </div>
               <div className="lde-terms">
                 <span><IonIcon icon={trendingUpOutline} /> {loan.interestRate}% anual</span>

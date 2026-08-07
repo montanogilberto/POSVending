@@ -67,10 +67,11 @@ import {
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import Header from '../../components/Header';
-import AlertPopover from '../../components/PopOver/AlertPopover';
-import MailPopover from '../../components/PopOver/MailPopover';
-import { useUser } from '../../components/UserContext';
+import Header from '../../components/layout/Header';
+import AlertPopover from '../../components/popovers/AlertPopover';
+import MailPopover from '../../components/popovers/MailPopover';
+import { usePopovers } from '../../hooks/usePopovers';
+import { useUser } from '../../contexts/UserContext';
 import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr } from '../../api/clientsApi';
 import QRCode from 'qrcode';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
@@ -84,16 +85,16 @@ import {
   ContractSubmissionRequest,
   ClientFaceRecognition,
 } from '../../api/clientFaceRecognitionApi';
-import LoanCompletionRing from '../../components/LoanCompletionRing';
-import GuidedDocumentCapture from '../../components/GuidedDocumentCapture';
-import FaceLivenessCapture, { FaceLivenessResult } from '../../components/FaceLivenessCapture';
-import StripeAccountOnboarding from '../../components/StripeAccountOnboarding';
-import SavedCardSetup from '../../components/SavedCardSetup';
+import LoanCompletionRing from '../../components/loans/LoanCompletionRing';
+import GuidedDocumentCapture from '../../components/kyc/GuidedDocumentCapture';
+import FaceLivenessCapture, { FaceLivenessResult } from '../../components/kyc/FaceLivenessCapture';
+import StripeAccountOnboarding from '../../components/payments/StripeAccountOnboarding';
+import SavedCardSetup from '../../components/payments/SavedCardSetup';
 import { createPushNotification } from '../../api/pushNotificationsApi';
-import IdExtractedFieldsSummary from '../../components/IdExtractedFieldsSummary';
-import ZoomableImage from '../../components/ZoomableImage';
-import PresenceCapture, { PresenceCaptureResult } from '../../components/PresenceCapture';
-import SignaturePad from '../../components/SignaturePad';
+import IdExtractedFieldsSummary from '../../components/kyc/IdExtractedFieldsSummary';
+import ZoomableImage from '../../components/ui/ZoomableImage';
+import PresenceCapture, { PresenceCaptureResult } from '../../components/kyc/PresenceCapture';
+import SignaturePad from '../../components/kyc/SignaturePad';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
@@ -161,10 +162,7 @@ const ClientsPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<Client | null>(null);
-  const [popoverState, setPopoverState] = useState<{ showAlertPopover: boolean; showMailPopover: boolean; event?: Event }>({
-    showAlertPopover: false,
-    showMailPopover: false,
-  });
+  const pops = usePopovers();
 
   // ── Wizard state ───────────────────────────────────────────────────────────
   const [showWizard, setShowWizard] = useState(false);
@@ -288,11 +286,6 @@ const ClientsPage: React.FC = () => {
   const [contractSignatureBase64, setContractSignatureBase64] = useState('');
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  const presentAlertPopover = (e: React.MouseEvent) => setPopoverState({ ...popoverState, showAlertPopover: true, event: e.nativeEvent });
-  const dismissAlertPopover = () => setPopoverState({ ...popoverState, showAlertPopover: false });
-  const presentMailPopover = (e: React.MouseEvent) => setPopoverState({ ...popoverState, showMailPopover: true, event: e.nativeEvent });
-  const dismissMailPopover = () => setPopoverState({ ...popoverState, showMailPopover: false });
-
   const toast = (msg: string) => { setToastMessage(msg); setShowToast(true); };
 
   const handleDownloadQrPdf = async (client: Pick<Client, 'clientId' | 'first_name' | 'last_name' | 'cellphone' | 'email'>) => {
@@ -1679,8 +1672,7 @@ const ClientsPage: React.FC = () => {
   return (
     <IonPage>
       <Header
-        presentAlertPopover={presentAlertPopover}
-        presentMailPopover={presentMailPopover}
+        {...pops.headerProps}
         screenTitle="Clientes"
         showBackButton={true}
         backButtonText="Menú"
@@ -1950,8 +1942,8 @@ const ClientsPage: React.FC = () => {
         <WizardFooter />
       </IonModal>
 
-      <AlertPopover isOpen={popoverState.showAlertPopover} event={popoverState.event} onDidDismiss={dismissAlertPopover} />
-      <MailPopover isOpen={popoverState.showMailPopover} event={popoverState.event} onDidDismiss={dismissMailPopover} />
+      <AlertPopover {...pops.alertPopoverProps} />
+      <MailPopover {...pops.mailPopoverProps} />
     </IonPage>
   );
 };

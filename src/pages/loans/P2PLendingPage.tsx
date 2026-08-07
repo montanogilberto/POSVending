@@ -27,7 +27,7 @@ import {
   flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
-import { useUser } from '../../components/UserContext';
+import { useUser } from '../../contexts/UserContext';
 import { getAllClients, Client, ClientType } from '../../api/clientsApi';
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
@@ -199,16 +199,18 @@ import {
   BankAccount, listBankAccounts, ledgerBalance, ledgerStatement, LedgerEntry,
   postLedgerEntry, disbursePayment,
 } from '../../api/bankingApi';
-import BankAccountLink from '../../components/BankAccountLink';
+import BankAccountLink from '../../components/payments/BankAccountLink';
 import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
+import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
+import { fmtMXN as fmt } from '../../utils/format';
+import { useToast } from '../../hooks/useToast';
+import EmptyState from '../../components/ui/EmptyState';
 import { createLoan } from '../../api/loanApi';
 import { getChatConfig } from '../../api/loanChatApi';
 import { createLoanContract } from '../../api/digitalContractsApi';
 import './P2PLendingPage.css';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-const fmt = (n: number) => n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
 
 // Colores por estado en P2PLendingPage.css (.p2p-status-<status>)
 const STATUS_META: Record<ProposalStatus, { label: string }> = {
@@ -244,7 +246,7 @@ const P2PLendingPage: React.FC = () => {
   const [offers,    setOffers]    = useState<LoanOffer[]>([]);
   const [biometrics, setBiometrics] = useState<ClientFaceRecognition[]>([]);
   const [loading,   setLoading]   = useState(true);
-  const [toast,     setToast]     = useState<string | null>(null);
+  const { showToast, toastProps } = useToast({ defaultColor: 'primary', duration: 3500 });
   const [tab,       setTab]       = useState<'offers' | 'proposals' | 'my'>('offers');
 
   // ── modals ─────────────────────────────────────────────────────────────
@@ -346,6 +348,15 @@ const P2PLendingPage: React.FC = () => {
     load();
   }, [load]);
 
+  // Refresco global: acciones de la contraparte (push) o transacciones hechas
+  // en otras páginas recargan el marketplace aunque esté visible.
+  useEffect(() => {
+    return onDataChanged((reason) => {
+      console.log('[P2P] data-changed →', reason);
+      load();
+    });
+  }, [load]);
+
   // ── computed slices ─────────────────────────────────────────────────────
   const clientMap = Object.fromEntries(clients.map(c => [c.clientId, c]));
   const bioMap    = Object.fromEntries(biometrics.map(b => [b.clientId, b]));
@@ -366,7 +377,7 @@ const P2PLendingPage: React.FC = () => {
     const minRate  = parseFloat(offerMinRate);
     const maxRate  = parseFloat(offerMaxRate);
     if (!capital || !minRate || !maxRate) {
-      setToast('Completa todos los campos requeridos'); return;
+      showToast('Completa todos los campos requeridos'); return;
     }
     // Published capital must be backed by wallet funds (either rail) — an
     // unfunded offer dies at accept time when the SPEI debit hits insufficient
@@ -374,7 +385,7 @@ const P2PLendingPage: React.FC = () => {
     const totalBalance = speiBalance + stripeBalance;
     if (capital > totalBalance) {
       console.log('[P2P] publishOffer: BLOCKED — insufficient funds', JSON.stringify({ capital, speiBalance, stripeBalance }));
-      setToast(`Saldo insuficiente: tienes ${fmt(totalBalance)} en tu billetera y quieres publicar ${fmt(capital)}. Deposita primero.`);
+      showToast(`Saldo insuficiente: tienes ${fmt(totalBalance)} en tu billetera y quieres publicar ${fmt(capital)}. Deposita primero.`);
       return;
     }
     setSaving(true);
@@ -422,13 +433,14 @@ const P2PLendingPage: React.FC = () => {
       });
 
       console.log('[P2P] publishOffer: SUCCESS — notified', borrowers.length, 'borrowers');
-      setToast(`✓ Oferta publicada y notificación enviada a ${borrowers.length} prestatarios`);
+      showToast(`✓ Oferta publicada y notificación enviada a ${borrowers.length} prestatarios`);
+      notifyDataChanged('offer_published');
       setShowOfferModal(false);
       setOfferCapital(''); setOfferMinRate('12'); setOfferMaxRate('36'); setOfferDesc('');
       load();
     } catch (e: any) {
       console.log('[P2P] publishOffer: FAILED —', String(e?.message ?? e));
-      setToast(e?.message ?? 'Error al publicar oferta');
+      showToast(e?.message ?? 'Error al publicar oferta');
     }
     setSaving(false);
   };
@@ -441,11 +453,12 @@ const P2PLendingPage: React.FC = () => {
     try {
       await deleteLoanOffer(offerToDelete.offerId, companyId);
       console.log('[P2P] removeOffer: SUCCESS — offerId', offerToDelete.offerId);
-      setToast('✓ Oferta eliminada');
+      showToast('✓ Oferta eliminada');
+      notifyDataChanged('offer_removed');
       load();
     } catch (e: any) {
       console.log('[P2P] removeOffer: FAILED —', String(e?.message ?? e));
-      setToast(e?.message ?? 'Error al eliminar la oferta');
+      showToast(e?.message ?? 'Error al eliminar la oferta');
     }
     setOfferToDelete(null);
     setSaving(false);
@@ -461,10 +474,10 @@ const P2PLendingPage: React.FC = () => {
     const rate   = parseFloat(propRate);
     const term   = parseInt(propTerm);
     if (!amount || !rate || !term) {
-      setToast('Completa todos los campos'); return;
+      showToast('Completa todos los campos'); return;
     }
     if (amount > selectedOffer.availableCapital) {
-      setToast(`El monto no puede superar ${fmt(selectedOffer.availableCapital)}`); return;
+      showToast(`El monto no puede superar ${fmt(selectedOffer.availableCapital)}`); return;
     }
 
     setSaving(true);
@@ -506,13 +519,13 @@ const P2PLendingPage: React.FC = () => {
       });
 
       console.log('[P2P] submitProposal: SUCCESS — push sent to lender', selectedOffer.lenderId);
-      setToast(`✓ Solicitud enviada a ${lenderClient?.first_name ?? 'prestamista'}`);
+      showToast(`✓ Solicitud enviada a ${lenderClient?.first_name ?? 'prestamista'}`);
       setShowProposalModal(false);
       setPropAmount(''); setPropRate(''); setPropTerm('12'); setPropNote('');
       load();
     } catch (e: any) {
       console.log('[P2P] submitProposal: FAILED —', String(e?.message ?? e));
-      setToast(e?.message ?? 'Error al enviar solicitud');
+      showToast(e?.message ?? 'Error al enviar solicitud');
     }
     setSaving(false);
   };
@@ -680,7 +693,8 @@ const P2PLendingPage: React.FC = () => {
       });
 
       console.log('[P2P] acceptProposal: SUCCESS — loan created + schedule generated + proposal accepted');
-      setToast(`✓ Préstamo aprobado y depositado — ${fmt(requestedAmount)} para ${borrowerClient?.first_name ?? 'prestatario'}`);
+      showToast(`✓ Préstamo aprobado y depositado — ${fmt(requestedAmount)} para ${borrowerClient?.first_name ?? 'prestatario'}`);
+      notifyDataChanged('proposal_accepted');
       setShowAcceptAlert(false);
       setSelectedProposal(null);
       load();
@@ -717,13 +731,14 @@ const P2PLendingPage: React.FC = () => {
       });
 
       console.log('[P2P] rejectProposal: SUCCESS — borrower notified');
-      setToast('Solicitud rechazada y notificación enviada');
+      showToast('Solicitud rechazada y notificación enviada');
+      notifyDataChanged('proposal_rejected');
       setShowRejectAlert(false);
       setSelectedProposal(null);
       load();
     } catch (e: any) {
       console.log('[P2P] rejectProposal: FAILED —', String(e?.message ?? e));
-      setToast(e?.message ?? 'Error');
+      showToast(e?.message ?? 'Error');
     }
     setSaving(false);
   };
@@ -731,8 +746,8 @@ const P2PLendingPage: React.FC = () => {
   // ── Withdraw wallet balance to bank account ─────────────────────────────
   const handleWithdraw = async (amountStr: string) => {
     const amount = Number(amountStr);
-    if (!amount || amount <= 0) { setToast('Ingresa un monto válido'); return; }
-    if (walletBalance !== null && amount > walletBalance) { setToast('El monto supera tu saldo disponible'); return; }
+    if (!amount || amount <= 0) { showToast('Ingresa un monto válido'); return; }
+    if (walletBalance !== null && amount > walletBalance) { showToast('El monto supera tu saldo disponible'); return; }
     // Dependencia Capital Publicado → Saldo en cartera: el dinero que respalda
     // ofertas activas NO es retirable — primero reduce o cierra la oferta.
     const publishedBacked = myOffers.filter(o => o.isActive).reduce((s, o) => s + o.availableCapital, 0);
@@ -758,7 +773,8 @@ const P2PLendingPage: React.FC = () => {
         });
         if (result.error || result.status === 'failed') throw new Error(result.error || 'SPEI rechazado');
         console.log('[P2P] withdraw: SPEI SUCCESS — transferId', result.transferId, 'CEP', result.cepUrl);
-        setToast(`✓ Retiro de ${fmt(amount)} enviado por SPEI${result.mock ? ' (modo prueba)' : ''}`);
+        showToast(`✓ Retiro de ${fmt(amount)} enviado por SPEI${result.mock ? ' (modo prueba)' : ''}`);
+        notifyDataChanged('withdrawal_spei');
         setWithdrawing(false); load(); return;
       } catch (e) {
         console.log('[P2P] withdraw: SPEI FAILED — trying Stripe as 2nd option:', e instanceof Error ? e.message : String(e));
@@ -779,11 +795,12 @@ const P2PLendingPage: React.FC = () => {
       console.log('[P2P] withdraw: /stripe/withdraw ←', JSON.stringify(result));
       if (result.error || result.status !== 'succeeded') throw new Error(result.error || 'No se pudo procesar el retiro.');
       console.log('[P2P] withdraw: STRIPE SUCCESS');
-      setToast(`✓ Retiro de ${fmt(amount)} enviado vía Stripe (2ª opción)`);
+      showToast(`✓ Retiro de ${fmt(amount)} enviado vía Stripe (2ª opción)`);
+      notifyDataChanged('withdrawal_stripe');
       load();
     } catch (e) {
       console.log('[P2P] withdraw: FAILED on both rails —', e instanceof Error ? e.message : String(e));
-      setToast(e instanceof Error ? e.message : 'Error al procesar el retiro');
+      showToast(e instanceof Error ? e.message : 'Error al procesar el retiro');
     }
     setWithdrawing(false);
   };
@@ -795,14 +812,15 @@ const P2PLendingPage: React.FC = () => {
   // mock rail. Remove/gate before real STP goes live.
   const handleSimulatedDeposit = async (amountStr: string) => {
     const amount = Number(amountStr);
-    if (!amount || amount <= 0) { setToast('Ingresa un monto válido'); return; }
+    if (!amount || amount <= 0) { showToast('Ingresa un monto válido'); return; }
     console.log('[P2P] simulatedDeposit: START', JSON.stringify({ clientId, amount }));
     const r = await postLedgerEntry({
       companyId, clientId, entryType: 'DEPOSIT', direction: 'C', amountMXN: amount,
       idempotencyKey: `sim:dep:${clientId}:${Date.now()}`, note: 'Depósito SPEI simulado (prueba)',
     });
-    if (r.error) { setToast(r.error); return; }
-    setToast(`✓ Depósito de prueba: ${fmt(amount)} — saldo ${fmt(r.balanceAfter)}`);
+    if (r.error) { showToast(r.error); return; }
+    showToast(`✓ Depósito de prueba: ${fmt(amount)} — saldo ${fmt(r.balanceAfter)}`);
+    notifyDataChanged('deposit_sim');
     load();
   };
 
@@ -905,7 +923,7 @@ const P2PLendingPage: React.FC = () => {
 
       <IonContent className="p2p-content">
         <IonLoading isOpen={loading || saving} message={saving ? 'Guardando...' : 'Cargando...'} />
-        <IonToast isOpen={!!toast} message={toast ?? ''} duration={3500} onDidDismiss={() => setToast(null)} color="primary" position="top" />
+        <IonToast {...toastProps} />
 
         <IonRefresher slot="fixed" onIonRefresh={e => { load().then(() => e.detail.complete()); }}>
           <IonRefresherContent />
@@ -1033,10 +1051,8 @@ const P2PLendingPage: React.FC = () => {
               )}
 
               {offers.length === 0 && (
-                <div className="p2p-empty">
-                  <IonIcon icon={cashOutline} />
-                  <p>No hay ofertas de capital activas en este momento</p>
-                </div>
+                <EmptyState className="p2p-empty" icon={cashOutline}
+                  text="No hay ofertas de capital activas en este momento" />
               )}
 
               {offers.map(offer => {
@@ -1146,10 +1162,8 @@ const P2PLendingPage: React.FC = () => {
           {tab === 'proposals' && isLender && (
             <div>
               {inboxProposals.length === 0 && (
-                <div className="p2p-empty">
-                  <IonIcon icon={documentTextOutline} />
-                  <p>No hay solicitudes pendientes de revisión</p>
-                </div>
+                <EmptyState className="p2p-empty" icon={documentTextOutline}
+                  text="No hay solicitudes pendientes de revisión" />
               )}
               {/* pending first */}
               {inboxProposals.map(p => <ProposalCard key={p.proposalId} p={p} isLenderView />)}
@@ -1166,11 +1180,9 @@ const P2PLendingPage: React.FC = () => {
               {isBorrower && !isLender && (
                 <>
                   {myProposals.length === 0 && (
-                    <div className="p2p-empty">
-                      <IonIcon icon={sendOutline} />
-                      <p>Aún no has enviado solicitudes. Explora las ofertas disponibles.</p>
-                      <IonButton fill="outline" onClick={() => setTab('offers')}>Ver ofertas</IonButton>
-                    </div>
+                    <EmptyState className="p2p-empty" icon={sendOutline}
+                      text="Aún no has enviado solicitudes. Explora las ofertas disponibles."
+                      action={<IonButton fill="outline" onClick={() => setTab('offers')}>Ver ofertas</IonButton>} />
                   )}
                   {myProposals.map(p => <ProposalCard key={p.proposalId} p={p} />)}
                 </>
@@ -1178,11 +1190,9 @@ const P2PLendingPage: React.FC = () => {
               {isLender && (
                 <>
                   {myOffers.length === 0 && (
-                    <div className="p2p-empty">
-                      <IonIcon icon={walletOutline} />
-                      <p>No has publicado ninguna oferta todavía.</p>
-                      <IonButton fill="outline" onClick={() => setShowOfferModal(true)}>Publicar oferta</IonButton>
-                    </div>
+                    <EmptyState className="p2p-empty" icon={walletOutline}
+                      text="No has publicado ninguna oferta todavía."
+                      action={<IonButton fill="outline" onClick={() => setShowOfferModal(true)}>Publicar oferta</IonButton>} />
                   )}
                   {myOffers.map(offer => (
                     <IonCard key={offer.offerId} className="p2p-my-offer-card">

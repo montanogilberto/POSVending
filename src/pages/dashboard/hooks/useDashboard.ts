@@ -1,0 +1,322 @@
+import { useEffect, useState, useMemo } from 'react';
+import { useHistory, useLocation } from 'react-router-dom';
+import { useIncome } from '../../../contexts/IncomeContext';
+import { useUser } from '../../../contexts/UserContext';
+import { isCashRegisterOpen, closeCashRegister } from '../../../api/cashRegisterApi';
+import { fetchTicket } from '../../../api/ticketApi';
+import useInactivityTimer from '../../../hooks/useInactivityTimer';
+import { Transaction, CartItem } from '../types';
+
+type PaymentMethod = 'Efectivo' | 'Transferencia' | 'Tarjeta';
+
+const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
+
+const PAYMENT_COLORS: Record<PaymentMethod, string> = {
+  Efectivo: '#16A34A',
+  Transferencia: '#22C55E',
+  Tarjeta: '#86EFAC',
+};
+
+// 🔥 helper to normalize Hermosillo date (reused everywhere)
+const toHermosilloDate = (dateStr: string) => {
+  const utcDate = new Date(dateStr + (dateStr.includes('Z') ? '' : 'Z'));
+  return new Date(utcDate.getTime() - 7 * 60 * 60 * 1000);
+};
+
+export const useDashboard = () => {
+  const location = useLocation();
+  const history = useHistory();
+  const { allIncome, loadIncomes } = useIncome();
+  const { companyId, userId, logout } = useUser();
+
+
+  // 🔹 UI State
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showCart, setShowCart] = useState(false);
+  const [showLogoutAlert, setShowLogoutAlert] = useState(false);
+
+  // 🔹 Data State
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [receiptData, setReceiptData] = useState<any>(null);
+  //const [pieData, setPieData] = useState<any>(null);
+
+  const refreshDashboardData = () => {
+    console.log('[Dashboard] refreshDashboardData: loading incomes, companyId =', companyId);
+    const controller = new AbortController();
+    loadIncomes(controller.signal).catch(() => {});
+    return () => controller.abort();
+  };
+
+  useEffect(() => {
+    console.log('[Dashboard] initial-load effect: mounting, companyId =', companyId, 'userId =', userId);
+    return refreshDashboardData();
+  // loadIncomes is stable (useCallback with no deps) — omitting it avoids double-fetch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ✅ Refresh on inactivity
+  useInactivityTimer(300000, () => {
+    refreshDashboardData();
+  });
+
+  // ✅ Clear cart automatically
+  useEffect(() => {
+    if (!showCart) setCart([]);
+  }, [showCart]);
+
+  // ✅ PIE CHART (optimized with useMemo)
+  //const pieChartData = useMemo(() => {
+    //console.log("🔵 useLaundryDashboard - Computing pie chart, allIncome length:", allIncome?.length);
+
+  // ✅ PIE CHART (🔥 FIXED — single source of truth)
+  const pieData = useMemo(() => {
+    if (!allIncome?.length) return null;
+
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    const monthly = allIncome.filter((income) => {
+      if (!income?.paymentDate) return false;
+      const d = toHermosilloDate(income.paymentDate);
+      return (
+        d.getMonth() === hermosilloNow.getMonth() &&
+        d.getFullYear() === hermosilloNow.getFullYear()
+      );
+    });
+
+    if (!monthly.length) return null;
+
+    const methodMap: Record<string, PaymentMethod> = {
+      efectivo: 'Efectivo',
+      tarjeta: 'Tarjeta',
+      transferencia: 'Transferencia',
+    };
+
+    const totals = monthly.reduce(
+      (acc: Record<PaymentMethod, number>, income: any) => {
+        const method = methodMap[(income.paymentMethod || '').toLowerCase()];
+        if (!method) return acc;
+        acc[method] += Number(income.total) || 0;
+        return acc;
+      },
+      { Efectivo: 0, Transferencia: 0, Tarjeta: 0 }
+    );
+
+    const values = PAYMENT_METHODS.map((m) => totals[m] || 0);
+    if (values.every((v) => v === 0)) return null;
+
+    return {
+      labels: PAYMENT_METHODS,
+      datasets: [
+        {
+          data: values,
+          backgroundColor: PAYMENT_METHODS.map((m) => PAYMENT_COLORS[m]),
+          borderWidth: 0,
+        },
+      ],
+    };
+  }, [allIncome]);
+
+  // sync state (optional, keeps compatibility with your component)
+  //useEffect(() => {
+    //setPieData(pieChartData);
+  //}, [pieChartData]);
+
+  // ✅ METRICS
+  const calculateTotal = () =>
+    allIncome.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+
+  const calculateDailySales = () => {
+    const today = toHermosilloDate(new Date().toISOString())
+      .toISOString()
+      .split('T')[0];
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => {
+        const d = toHermosilloDate(i.paymentDate);
+        return d.toISOString().split('T')[0] === today;
+      })
+      .reduce((sum, i) => {
+        return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
+      }, 0);
+  };
+
+  const calculateMonthlyTotal = () => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => {
+        const d = toHermosilloDate(i.paymentDate);
+        return (
+          d.getMonth() === hermosilloNow.getMonth() &&
+          d.getFullYear() === hermosilloNow.getFullYear()
+        );
+      })
+      .reduce((sum, i) => {
+        return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
+      }, 0);
+  };
+
+  const currentMonthYear = new Date().toLocaleDateString('es-ES', {
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const percentageChange = useMemo(() => {
+    if (!allIncome?.length) return '0%';
+
+    const nowHerm = toHermosilloDate(new Date().toISOString());
+    const todayKey = nowHerm.toISOString().split('T')[0];
+
+    const yesterdayHerm = new Date(nowHerm);
+    yesterdayHerm.setDate(yesterdayHerm.getDate() - 1);
+    const yesterdayKey = yesterdayHerm.toISOString().split('T')[0];
+
+    const getNet = (dateKey: string) =>
+      allIncome
+        .filter((i) => i?.paymentDate)
+        .filter((i) => {
+          const d = toHermosilloDate(i.paymentDate);
+          return d.toISOString().split('T')[0] === dateKey;
+        })
+        .reduce((sum, i) => {
+          return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
+        }, 0);
+
+    const todayTotal = getNet(todayKey);
+    const yesterdayTotal = getNet(yesterdayKey);
+
+    if (yesterdayTotal === 0) {
+      if (todayTotal === 0) return '0%';
+      return '+100%';
+    }
+
+    const deltaPct = ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100;
+    const rounded = Math.round(deltaPct * 10) / 10;
+
+    if (rounded === 0) return '0%';
+    return `${rounded > 0 ? '+' : ''}${rounded}%`;
+  }, [allIncome]);
+
+  // ✅ ACTIONS
+  const handleStartSeller = () => history.push('/category');
+
+  const handleConfirmSale = async () => {
+    if (!cart.length) {
+      setToastMessage('El carrito está vacío.');
+      setShowToast(true);
+      return;
+    }
+
+    try {
+      const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+      console.log('[Dashboard] handleConfirmSale → /pos_laundry', { itemCount: cart.length, total });
+
+      const response = await fetch(
+        'https://smartloansbackend.azurewebsites.net/pos_laundry',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pos_laundry: {
+              details: cart.map((item) => ({
+                productId: item.productId,
+                cantidad: item.quantity,
+                precio_unitario: item.price,
+                subtotal: item.subtotal,
+              })),
+              total,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error();
+      console.log('[Dashboard] handleConfirmSale ✅ sale confirmed, total =', total);
+
+      setToastMessage(`Venta confirmada: $${total.toFixed(2)}`);
+      setShowToast(true);
+      setCart([]);
+      setShowCart(false);
+      loadIncomes();
+    } catch (err) {
+      console.log('[Dashboard] handleConfirmSale ❌', err);
+      setToastMessage('Error al confirmar la venta.');
+      setShowToast(true);
+    }
+  };
+
+  const handleShowReceipt = async (incomeId: number) => {
+    console.log('[Dashboard] handleShowReceipt: fetching ticket, incomeId =', incomeId);
+    try {
+      const ticket = await fetchTicket(incomeId.toString());
+      if (!ticket) throw new Error();
+      console.log('[Dashboard] handleShowReceipt ✅', ticket);
+
+      history.push('/receipt', { ticketData: ticket });
+    } catch (err) {
+      console.log('[Dashboard] handleShowReceipt ❌', err);
+      setToastMessage('Error al obtener el recibo.');
+      setShowToast(true);
+    }
+  };
+
+  // ✅ TITLE (clean)
+  const getTitleFromPath = () => 'Lavandería';
+
+  return {
+    location,
+    history,
+    allIncome,
+    showToast,
+    setShowToast,
+    toastMessage,
+    setToastMessage,
+    transactions,
+    cart,
+    setCart,
+    showCart,
+    setShowCart,
+    showLogoutAlert,
+    setShowLogoutAlert,
+    receiptData,
+    setReceiptData,
+    pieData,
+
+    calculateTotal,
+    calculateDailySales,
+    calculateMonthlyTotal,
+    currentMonthYear,
+
+    handleStartSeller,
+    handleConfirmSale,
+    handleShowReceipt,
+
+    handleLogoutConfirm: async () => {
+      try {
+        if (companyId && userId) {
+          const open = await isCashRegisterOpen(companyId);
+          if (open) {
+            await closeCashRegister(companyId, userId, 0, 'Cierre automático al cerrar sesión');
+          }
+        }
+      } catch (cashErr) {
+        console.warn('Cash register auto-close failed:', cashErr);
+      } finally {
+        logout();
+        history.push('/login');
+      }
+    },
+
+    currentUser: 'admin',
+    percentageChange,
+
+    getTitleFromPath,
+    refreshDashboardData,
+  };
+};
