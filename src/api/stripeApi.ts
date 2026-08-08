@@ -14,6 +14,11 @@ export interface StripeConnectedAccount {
   externalAccountLast4?: string | null;
   externalAccountType?: string | null;
   externalAccountBankName?: string | null;
+  // Confirmación del Acuerdo de Servicios de Stripe + términos SmartLoans.
+  // Stripe es la fuente legal (tos_acceptance en el Account); esto es el
+  // espejo local para poder mostrarlo sin llamar a la API de Stripe.
+  tosAccepted?: boolean;
+  tosAcceptedAt?: string | null;
 }
 
 // STATUS -- POST /stripe/connected-accounts/status

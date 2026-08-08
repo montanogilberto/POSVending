@@ -81,6 +81,8 @@ import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
+import ZoomableImage from '../../components/ui/ZoomableImage';
+import { pickAvatarPhoto } from '../../utils/pickAvatarPhoto';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
 import { onDataChanged } from '../../utils/refreshBus';
 import { usePopovers } from '../../hooks/usePopovers';
@@ -174,7 +176,23 @@ const ClientDashboardPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
   const location = useLocation();
-  const { companyId, clientId: contextClientId, username, avatarUrl, roleCode, clientType } = useUser();
+  const { companyId, clientId: contextClientId, username, avatarUrl, setAvatarUrl, roleCode, clientType } = useUser();
+  // Foto de cuenta (users.imageUrl) — distinta de la selfie biométrica KYC
+  // (clientFaceRecognitions.clientSelfieBlobUrl), así que sí se puede
+  // reemplazar con cualquier foto. setAvatarUrl solo actualiza esta sesión;
+  // persistirla al backend requiere un endpoint de perfil (pendiente).
+  const handlePickAvatar = async () => {
+    console.log('[ClientDashboard] avatar picker → START');
+    const dataUrl = await pickAvatarPhoto();
+    if (!dataUrl) {
+      console.log('[ClientDashboard] avatar picker → cancelado, sin cambios');
+      return;
+    }
+    // Solo sesión: setAvatarUrl actualiza el contexto en memoria. NO hay
+    // llamada al backend aquí — nada se persiste en users.imageUrl todavía.
+    setAvatarUrl(dataUrl);
+    console.log('[ClientDashboard] avatar picker → actualizado (solo local, NO persistido en backend)');
+  };
   // A lender/payout client's payment step IS a Stripe payout account (needs an
   // external bank). A borrower's is the repayment CARD — they are never asked
   // for a payout account, so the checklist must not gate them on one.
@@ -876,7 +894,11 @@ const ClientDashboardPage: React.FC = () => {
           <div className="hero-top">
             <div className="hero-profile">
               <IonAvatar className="hero-avatar">
-                <img src={avatarUrl} alt="avatar" />
+                <ZoomableImage
+                  src={avatarUrl}
+                  alt="avatar"
+                  onReplace={handlePickAvatar}
+                />
               </IonAvatar>
               <div>
                 <h2 className="hero-name">{username || 'Cliente POS GMO'}</h2>
@@ -1037,12 +1059,11 @@ const ClientDashboardPage: React.FC = () => {
           <IonGrid>
             <IonRow>
               <IonCol size="6">
-                {/* DESHABILITADO (decisión de prueba): el flujo directo creaba
-                    préstamos 'Pending' huérfanos sin prestamista/dinero/cuotas.
-                    Las solicitudes reales van por el marketplace P2P (oferta →
-                    Enviar solicitud). */}
+                {/* Las solicitudes van por el marketplace P2P (oferta → Enviar
+                    solicitud); el flujo directo creaba préstamos 'Pending'
+                    huérfanos sin prestamista/dinero/cuotas. */}
                 <IonButton expand="block" shape="round" className="client-dashboard-action-button"
-                  disabled>
+                  onClick={() => { console.log('[ClientDashboard] Solicitar préstamo → /p2p-lending'); history.push('/p2p-lending'); }}>
                   <IonIcon icon={addCircleOutline} slot="start" /> Solicitar préstamo
                 </IonButton>
               </IonCol>
@@ -1085,7 +1106,8 @@ const ClientDashboardPage: React.FC = () => {
       <IonCardHeader>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <IonCardTitle>Mis Préstamos</IonCardTitle>
-          <IonButton fill="clear" size="small" disabled>
+          <IonButton fill="clear" size="small"
+            onClick={() => { console.log('[ClientDashboard] Nuevo préstamo → /p2p-lending'); history.push('/p2p-lending'); }}>
             <IonIcon icon={addCircleOutline} slot="start" /> Nuevo
           </IonButton>
         </div>
@@ -1096,7 +1118,10 @@ const ClientDashboardPage: React.FC = () => {
           <div className="cd-empty-state">
             <IonIcon icon={documentTextOutline} />
             <p>No tienes préstamos registrados.</p>
-            <IonButton size="small" disabled>Solicitar préstamo</IonButton>
+            <IonButton size="small"
+              onClick={() => { console.log('[ClientDashboard] empty-state Solicitar → /p2p-lending'); history.push('/p2p-lending'); }}>
+              Solicitar préstamo
+            </IonButton>
           </div>
         )}
         <div className="cd-loan-list">
@@ -1459,7 +1484,11 @@ const ClientDashboardPage: React.FC = () => {
           <div className="hero-top" style={{ marginBottom: 20 }}>
             <div className="hero-profile">
               <IonAvatar className="hero-avatar">
-                <img src={avatarUrl} alt="avatar" />
+                <ZoomableImage
+                  src={avatarUrl}
+                  alt="avatar"
+                  onReplace={handlePickAvatar}
+                />
               </IonAvatar>
               <div>
                 <h2 className="hero-name">{username || 'Cliente POS GMO'}</h2>

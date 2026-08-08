@@ -90,6 +90,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'clientDashboards',
     'loanChat',
     'loans',
+    'p2pLending',
   ],
   lender: [
     'clientDashboards',

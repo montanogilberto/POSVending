@@ -1,0 +1,87 @@
+.profile-content {
+  --background: #f0f4f8;
+}
+
+.profile-header-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.profile-page-avatar {
+  width: 56px;
+  height: 56px;
+  color: #9ca3af;
+  font-size: 56px;
+}
+
+.profile-header-row h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.profile-header-row p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.profile-card {
+  margin: 0 0 12px;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.profile-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.profile-info-row strong {
+  color: #111827;
+  text-align: right;
+}
+
+.profile-row-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.profile-row-btns ion-button {
+  flex: 1;
+}
+
+.profile-security-item {
+  --padding-start: 0;
+}
+
+.profile-security-disabled {
+  opacity: 0.6;
+}
+
+.profile-security-note {
+  display: block;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+  line-height: 1.5;
+}
