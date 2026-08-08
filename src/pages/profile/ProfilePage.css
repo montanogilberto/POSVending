@@ -124,8 +124,11 @@
   flex-shrink: 0;
 }
 
-.profile-icon-blue  { background: #eff6ff; color: #2563eb; }
-.profile-icon-green { background: #f0fdf4; color: #16a34a; }
+.profile-icon-blue   { background: #eff6ff; color: #2563eb; }
+.profile-icon-green  { background: #f0fdf4; color: #16a34a; }
+.profile-icon-purple { background: #f5f3ff; color: #7c3aed; }
+.profile-icon-orange { background: #fff7ed; color: #ea580c; }
+.profile-icon-teal   { background: #f0fdfa; color: #0d9488; }
 
 /* ── Personal info rows (view mode) ── */
 .profile-info-list {
@@ -160,6 +163,13 @@
 .profile-icon-blue-soft   { background: #eff6ff; color: #2563eb; }
 .profile-icon-green-soft  { background: #f0fdf4; color: #16a34a; }
 .profile-icon-purple-soft { background: #f5f3ff; color: #7c3aed; }
+.profile-icon-amber-soft  { background: #fffbeb; color: #d97706; }
+.profile-icon-teal-soft   { background: #f0fdfa; color: #0d9488; }
+
+.profile-info-row ion-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+}
 
 .profile-row-text {
   display: flex;
@@ -246,4 +256,69 @@
   color: #94a3b8;
   flex-shrink: 0;
   margin-top: 1px;
+}
+
+/* ── Loading / empty states shared by the new cards ── */
+.profile-loading-row {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.profile-empty-block {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.profile-empty-block p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.profile-empty-text {
+  font-size: 13px;
+  color: #9ca3af;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.profile-link-btn {
+  margin-top: 10px;
+  --border-radius: 10px;
+}
+
+/* ── PDF link on a contract row ── */
+.profile-pdf-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.profile-pdf-link ion-icon {
+  font-size: 15px;
+}
+
+/* ── Per-loan contract list ── */
+.profile-loan-contracts {
+  margin-top: 6px;
+}
+
+.profile-loan-contracts-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 10px 0 4px;
+}
+
+.profile-loan-contracts .profile-row-text span {
+  font-size: 11px;
 }

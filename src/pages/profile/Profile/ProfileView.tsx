@@ -10,6 +10,9 @@ import { arrowBackOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { useProfile } from './ProfileLogic';
 import ProfileHero from './components/ProfileHero';
 import PersonalInfoCard from './components/PersonalInfoCard';
+import IdentificationCard from './components/IdentificationCard';
+import BankAccountsCard from './components/BankAccountsCard';
+import ContractsCard from './components/ContractsCard';
 import SecurityCard from './components/SecurityCard';
 
 const ProfileView: React.FC = () => {
@@ -41,6 +44,9 @@ const ProfileView: React.FC = () => {
 
         <ProfileHero vm={vm} />
         <PersonalInfoCard vm={vm} />
+        <IdentificationCard vm={vm} />
+        <BankAccountsCard vm={vm} />
+        <ContractsCard vm={vm} />
         <SecurityCard vm={vm} />
       </IonContent>
     </IonPage>
