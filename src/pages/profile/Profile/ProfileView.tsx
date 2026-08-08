@@ -4,10 +4,11 @@
 import React from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
-  IonIcon, IonLoading, IonToast, IonAvatar,
+  IonIcon, IonLoading, IonToast, IonBadge,
 } from '@ionic/react';
-import { arrowBackOutline, personCircleOutline } from 'ionicons/icons';
+import { arrowBackOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import { useProfile } from './ProfileLogic';
+import ProfileHero from './components/ProfileHero';
 import PersonalInfoCard from './components/PersonalInfoCard';
 import SecurityCard from './components/SecurityCard';
 
@@ -24,6 +25,13 @@ const ProfileView: React.FC = () => {
             </IonButton>
           </IonButtons>
           <IonTitle>Ajustes generales</IonTitle>
+          {vm.biometricEnabled && (
+            <IonButtons slot="end">
+              <IonBadge className="profile-header-secure-badge">
+                <IonIcon icon={shieldCheckmarkOutline} /> Cuenta segura
+              </IonBadge>
+            </IonButtons>
+          )}
         </IonToolbar>
       </IonHeader>
 
@@ -31,16 +39,7 @@ const ProfileView: React.FC = () => {
         <IonLoading isOpen={vm.loading} message="Cargando..." />
         <IonToast {...vm.toastProps} />
 
-        <div className="profile-header-row">
-          <IonAvatar className="profile-page-avatar">
-            <IonIcon icon={personCircleOutline} />
-          </IonAvatar>
-          <div>
-            <h2>{vm.username || 'Usuario'}</h2>
-            <p>{vm.roleName}</p>
-          </div>
-        </div>
-
+        <ProfileHero vm={vm} />
         <PersonalInfoCard vm={vm} />
         <SecurityCard vm={vm} />
       </IonContent>
