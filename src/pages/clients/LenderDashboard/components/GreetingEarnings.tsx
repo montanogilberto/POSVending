@@ -1,6 +1,7 @@
 import React from 'react';
 import { IonAvatar, IonBadge, IonIcon, IonSpinner } from '@ionic/react';
 import { arrowUpOutline, checkmarkCircle, informationCircleOutline, personCircleOutline } from 'ionicons/icons';
+import ZoomableImage from '../../../../components/ui/ZoomableImage';
 import { LenderDashboardVM } from '../LenderDashboardLogic';
 
 /** Saludo + tarjeta de Ganancias (interés real del ledger). */
@@ -10,7 +11,17 @@ const GreetingEarnings: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
       <div className="ldx-greeting">
         <IonAvatar className="ld-avatar">
           {vm.selfieMap[vm.lender.clientId]
-            ? <img src={vm.selfieMap[vm.lender.clientId]} alt="selfie" />
+            ? (
+              // "Elegir otra" reinicia la verificación de identidad en vez de
+              // aceptar cualquier archivo — esta foto es la selfie biométrica
+              // verificada (liveness), no un avatar decorativo.
+              <ZoomableImage
+                src={vm.selfieMap[vm.lender.clientId]}
+                alt="selfie"
+                replaceLabel="Actualizar verificación"
+                onReplace={vm.handleStartVerification}
+              />
+            )
             : <IonIcon icon={personCircleOutline} style={{ fontSize: 40, color: '#9ca3af' }} />}
         </IonAvatar>
         <div>

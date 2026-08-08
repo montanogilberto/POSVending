@@ -24,7 +24,6 @@ import {
   IonAvatar,
   IonSplitPane,
   IonPage,
-  IonImg,
   IonButton,
   IonButtons,
   useIonAlert,
@@ -93,6 +92,7 @@ import ForgotPassword from './pages/authentication/ForgotPassword';
 import CreateAccount from './pages/authentication/CreateAccount';
 import SupplierPage from './pages/admin/SupplierPage';
 import LoanPage from './pages/loans/LoanPage';
+import ProfilePage from './pages/profile/ProfilePage';
 // Lazy-loaded: pulls in the gated @azure/ai-vision-face-ui SDK, which isn't
 // installable without private-feed credentials. Keeping it out of the eager
 // bundle means environments without those credentials can still run the rest
@@ -133,7 +133,9 @@ import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
+import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
 import BiometricLockScreen from './components/BiometricLockScreen';
+import ZoomableImage from './components/ui/ZoomableImage';
 import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
 import { getPostLoginRoute } from './utils/postLoginRoute';
 
@@ -195,6 +197,29 @@ const AppShell: React.FC = () => {
     resolveAvatarUrl(avatarUrl)
   );
   const [menuCollapsed, setMenuCollapsed] = useState(false);
+  // true una vez que el usuario elige una foto local esta sesión — el efecto
+  // de resync (abajo) deja de pisarla con la que trae el backend.
+  const hasLocalAvatarOverride = useRef(false);
+
+  // Foto de perfil del menú lateral (users.imageUrl) — distinta de la selfie
+  // biométrica KYC, así que sí se puede reemplazar con cualquier foto.
+  // setAvatarUrl solo actualiza esta sesión; persistirla al backend requiere
+  // un endpoint de perfil (pendiente, mismo criterio que ClientDashboardPage).
+  const handlePickAvatar = async () => {
+    console.log('[App] menu avatar picker → START');
+    const dataUrl = await pickAvatarPhoto();
+    if (!dataUrl) {
+      console.log('[App] menu avatar picker → cancelado, sin cambios');
+      return;
+    }
+    // Solo sesión: setAvatarUrl actualiza el contexto en memoria. NO hay
+    // llamada al backend aquí — nada se persiste en users.imageUrl todavía.
+    // hasLocalAvatarOverride evita que el efecto de resync (abajo) la
+    // pise de vuelta con la foto vieja del backend en su próxima corrida.
+    hasLocalAvatarOverride.current = true;
+    setAvatarUrl(dataUrl);
+    console.log('[App] menu avatar picker → actualizado (solo local, NO persistido en backend)');
+  };
 
   useEffect(() => {
     setProfileImageSrc(resolveAvatarUrl(avatarUrl));
@@ -202,14 +227,14 @@ const AppShell: React.FC = () => {
 
   // Refresh profile photo from /one_users (e.g. after backend adds imageUrl)
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || hasLocalAvatarOverride.current) return;
 
     let cancelled = false;
     (async () => {
       try {
         const profile = await getOneUser(userId);
         const imageUrl = pickProfileImageUrl(profile);
-        if (!cancelled && imageUrl && imageUrl !== avatarUrl) {
+        if (!cancelled && imageUrl && imageUrl !== avatarUrl && !hasLocalAvatarOverride.current) {
           setAvatarUrl(imageUrl);
         }
       } catch {
@@ -403,10 +428,11 @@ const AppShell: React.FC = () => {
         <IonContent>
           <div className={`profile-header ${menuCollapsed ? 'profile-header-collapsed' : ''}`}>
             <IonAvatar className="profile-avatar">
-              <IonImg
+              <ZoomableImage
                 src={profileImageSrc}
                 alt="Foto de perfil"
-                onIonError={() => setProfileImageSrc(DEFAULT_AVATAR_URL)}
+                onError={() => setProfileImageSrc(DEFAULT_AVATAR_URL)}
+                onReplace={handlePickAvatar}
               />
             </IonAvatar>
 
@@ -423,6 +449,15 @@ const AppShell: React.FC = () => {
           </div>
 
           <IonList>
+            {!menuCollapsed && <IonItemDivider>Cuenta</IonItemDivider>}
+
+            <IonMenuToggle autoHide={false}>
+              <IonItem button routerLink="/profile" title="Mi perfil">
+                <IonIcon icon={personCircle} slot="start" />
+                {!menuCollapsed && <IonLabel>Mi perfil</IonLabel>}
+              </IonItem>
+            </IonMenuToggle>
+
             {!menuCollapsed && <IonItemDivider>Catálogo</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
@@ -558,7 +593,7 @@ const AppShell: React.FC = () => {
             {!menuCollapsed && <IonItemDivider>Finanzas P2P</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'clients') && (
+              {(canAccess(roleCode, 'clients') || canAccess(roleCode, 'p2pLending')) && (
               <IonItem button routerLink="/p2p-lending" title="SmartLoans">
                 <IonIcon icon={walletOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>SmartLoans</IonLabel>}
@@ -673,6 +708,7 @@ const AppShell: React.FC = () => {
             </Route>
             <PrivateRoute exact path="/suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
+            <PrivateRoute exact path="/profile" component={ProfilePage} />
             <React.Suspense fallback={null}>
               <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
             </React.Suspense>

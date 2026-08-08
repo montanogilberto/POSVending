@@ -1049,7 +1049,16 @@ const ClientsPage: React.FC = () => {
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
           <h2 className="cfr-capture-title">Asegúrate de que la identificación sea legible</h2>
-          {idFrontImageBase64 && <ZoomableImage src={idFrontImageBase64} alt="Frente" className="cfr-review-image" />}
+          {idFrontImageBase64 && (
+            <ZoomableImage src={idFrontImageBase64} alt="Frente" className="cfr-review-image"
+              replaceLabel="Tomar otra foto"
+              onReplace={() => {
+                setIdFrontImageBase64('');
+                setIdInfoConfirmed(false);
+                setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS);
+                setCaptureSubStep('front-capture');
+              }} />
+          )}
         </IonCardContent>
       </IonCard>
     );
@@ -1085,7 +1094,16 @@ const ClientsPage: React.FC = () => {
       <IonCard className="client-face-recognition-step-card cfr-capture-card">
         <IonCardContent>
           <h2 className="cfr-capture-title">Asegúrate de que la identificación sea legible</h2>
-          {idBackImageBase64 && <ZoomableImage src={idBackImageBase64} alt="Reverso" className="cfr-review-image" />}
+          {idBackImageBase64 && (
+            <ZoomableImage src={idBackImageBase64} alt="Reverso" className="cfr-review-image"
+              replaceLabel="Tomar otra foto"
+              onReplace={() => {
+                setIdBackImageBase64('');
+                setIdInfoConfirmed(false);
+                setExtractedIdFields(EMPTY_EXTRACTED_ID_FIELDS);
+                setCaptureSubStep('back-capture');
+              }} />
+          )}
         </IonCardContent>
       </IonCard>
     );

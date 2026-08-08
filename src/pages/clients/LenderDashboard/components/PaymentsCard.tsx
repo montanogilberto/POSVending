@@ -1,12 +1,13 @@
 import React from 'react';
 import {
-  IonBadge, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon,
+  IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon,
 } from '@ionic/react';
 import {
   addCircleOutline, cardOutline, checkmarkCircle, documentTextOutline,
   ellipseOutline, refreshOutline,
 } from 'ionicons/icons';
 import NativeConnectOnboarding from '../../../../components/payments/NativeConnectOnboarding';
+import { mxDate } from '../../../../utils/format';
 import { LenderDashboardVM } from '../LenderDashboardLogic';
 
 /**
@@ -16,7 +17,7 @@ import { LenderDashboardVM } from '../LenderDashboardLogic';
 const PaymentsCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
   <IonCard className="ld-card" id="ld-pagos">
     <IonCardHeader>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="ldx-card-title-row">
         <IonCardTitle>Cuenta de pago</IonCardTitle>
         <IonButton fill="clear" size="small" onClick={vm.fetchStripeStatus}>
           <IonIcon icon={refreshOutline} slot="icon-only" />
@@ -25,7 +26,7 @@ const PaymentsCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
     </IonCardHeader>
     <IonCardContent>
       {vm.stripeError && (
-        <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 10 }}>{vm.stripeError}</p>
+        <p className="ldx-payments-error">{vm.stripeError}</p>
       )}
 
       {vm.showStripeOnboarding ? (
@@ -44,10 +45,10 @@ const PaymentsCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
           prefill={vm.kycPrefill}
         />
       ) : !vm.stripeAccount ? (
-        <div style={{ textAlign: 'center', padding: '8px 0' }}>
-          <IonIcon icon={cardOutline} style={{ fontSize: 40, color: '#9ca3af' }} />
-          <p style={{ margin: '8px 0 4px', color: '#374151' }}>Sin cuenta bancaria registrada.</p>
-          <p style={{ margin: '0 0 14px', fontSize: 13, color: '#6b7280' }}>
+        <div className="ldx-payments-empty">
+          <IonIcon icon={cardOutline} />
+          <p className="ldx-payments-empty-title">Sin cuenta bancaria registrada.</p>
+          <p className="ldx-payments-empty-sub">
             Registra tu cuenta o tarjeta para fondear préstamos y recibir los pagos de tus prestatarios.
           </p>
           <IonButton shape="round" expand="block" disabled={vm.stripeLoading} onClick={vm.handleStripeKyc}>
@@ -57,16 +58,24 @@ const PaymentsCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
         </div>
       ) : (
         <div>
-          {/* Checklist con conector vertical (mockup) */}
+          {/* Checklist con conector vertical — cada fila refleja el dato real
+              (antes "Cuenta verificada" estaba fijo en true, y mostraba el
+              connectedAccountId crudo de Stripe, ilegible para el prestamista). */}
           <div className="ldx-checklist">
             {[
-              { ok: true, label: 'Cuenta verificada', sub: vm.stripeAccount.connectedAccountId },
+              { ok: !!vm.stripeAccount.identitySubmitted, label: 'Identidad verificada' },
               { ok: !!vm.stripeAccount.hasExternalAccount, label: 'Cuenta bancaria vinculada',
                 sub: vm.stripeAccount.externalAccountLast4
                   ? `${vm.stripeAccount.externalAccountBankName ?? 'Banco'} · ····${vm.stripeAccount.externalAccountLast4}`
                   : 'Pendiente' },
-              { ok: !!vm.stripeAccount.chargesEnabled, label: 'Cobros habilitados' },
-              { ok: !!vm.stripeAccount.payoutsEnabled, label: 'Retiros habilitados' },
+              { ok: !!vm.stripeAccount.tosAccepted, label: 'Términos y condiciones',
+                sub: vm.stripeAccount.tosAcceptedAt
+                  ? `Aceptados el ${mxDate(vm.stripeAccount.tosAcceptedAt)}`
+                  : 'Pendiente' },
+              { ok: !!vm.stripeAccount.payoutsEnabled, label: 'Retiros habilitados',
+                sub: vm.stripeAccount.payoutsEnabled
+                  ? 'Puedes recibir pagos de tus prestatarios'
+                  : 'Completa los pasos anteriores para habilitarlos' },
             ].map((row, i, arr) => (
               <div key={row.label} className="ldx-check-row">
                 <div className="ldx-check-rail">
@@ -81,13 +90,8 @@ const PaymentsCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
               </div>
             ))}
           </div>
-          <div className="ldx-chips">
-            <IonBadge color={vm.stripeAccount.hasExternalAccount ? 'success' : 'medium'}>Cuenta bancaria {vm.stripeAccount.hasExternalAccount ? '✓' : '✗'}</IonBadge>
-            <IonBadge color={vm.stripeAccount.chargesEnabled ? 'success' : 'medium'}>Cobros {vm.stripeAccount.chargesEnabled ? '✓' : '✗'}</IonBadge>
-            <IonBadge color={vm.stripeAccount.payoutsEnabled ? 'success' : 'medium'}>Retiros {vm.stripeAccount.payoutsEnabled ? '✓' : '✗'}</IonBadge>
-          </div>
           {!vm.stripeAccount.hasExternalAccount && (
-            <IonButton shape="round" expand="block" disabled={vm.stripeLoading} onClick={vm.handleStripeKyc} style={{ marginTop: 10 }}>
+            <IonButton shape="round" expand="block" disabled={vm.stripeLoading} onClick={vm.handleStripeKyc} className="ldx-payments-complete-btn">
               <IonIcon icon={documentTextOutline} slot="start" />
               {vm.stripeLoading ? 'Procesando...' : 'Completar verificación'}
             </IonButton>

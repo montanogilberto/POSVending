@@ -512,10 +512,35 @@
   overflow-wrap: anywhere;
 }
 
-.ldx-chips {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.ldx-payments-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.ldx-payments-empty {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.ldx-payments-empty ion-icon {
+  font-size: 40px;
+  color: #9ca3af;
+}
+
+.ldx-payments-empty-title {
+  margin: 8px 0 4px;
+  color: #374151;
+}
+
+.ldx-payments-empty-sub {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.ldx-payments-complete-btn {
+  margin-top: 10px;
 }
 
 /* Gauge */
