@@ -52,6 +52,7 @@ const MissionCleanRoomView: React.FC = () => {
         score={state.stats.score}
         progress={vm.progress}
         comboMultiplier={state.stats.comboMultiplier}
+        showTimer={false}
       />
 
       <GameWorld3D

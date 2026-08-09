@@ -14,8 +14,10 @@ export const WORLD3D_CONFIG = {
 
   INTERACT_RADIUS: 1.5,
 
-  CAMERA_HEIGHT: 3,
-  CAMERA_DISTANCE: 5.5,
+  // Tuned so the character reads at roughly 15-25% of frame height (third-person
+  // "see the world around you" framing, not a close-up) — verified visually.
+  CAMERA_HEIGHT: 3.6,
+  CAMERA_DISTANCE: 6.8,
   CAMERA_LOOK_HEIGHT: 1.4,
   CAMERA_DAMPING: 6,
   CAMERA_MIN_DISTANCE: 1.2,

@@ -1,272 +1,370 @@
-# Misión: Limpiar el Cuarto
+# Misión: Limpiar el Cuarto — 3D Vertical Slice
 
-Mini-juego 2.5D de plataformas/exploración integrado como módulo independiente dentro
-de POS GMO / SmartLoans (Ionic React + Capacitor). El niño controla a **Tiburón Boy**
-o **Dino Boy** dentro de una habitación explorable: corre, salta, recoge objetos
-desordenados y los lleva físicamente a su contenedor correcto.
+Mini-juego de exploración en tercera persona integrado como módulo independiente
+dentro de POS GMO / SmartLoans (Ionic React + Capacitor). El niño controla a
+**Tiburón Boy** o **Dino Boy** dentro de una habitación 3D explorable: camina,
+corre, salta, encuentra un objeto escondido, lo carga físicamente y lo lleva a su
+contenedor correcto.
 
-**Rama:** `feat/mission-clean-room-game` · **Estado:** Phase 1 — Prototype (validación
-de que el mundo se siente como un juego, no como una app administrativa).
+**Rama:** `feat/3d-mission-clean-room` · **Estado:** Vertical Slice validando si el
+gameplay se siente divertido, antes de invertir en los modelos GLB finales.
+
+> Este documento reemplaza al README de la rama `feat/mission-clean-room-game`
+> (prototipo Phaser 2D), que sigue intacta como referencia/fallback — ver §2.
 
 ---
 
 ## 1. Resumen
 
-El proyecto evolucionó en dos direcciones durante su desarrollo:
+El proyecto pasó por dos direcciones antes de llegar aquí:
 
-- **Versión inicial** (descartada): pantalla de clasificación por toques (tap-to-sort)
-  — se sentía como una app administrativa, no un videojuego.
-- **Dirección actual (vigente):** mundo de juego real construido con **Phaser 4**,
-  con cámara de scroll lateral, física de gravedad/salto, y un personaje que camina
-  físicamente por el escenario.
+1. **Pantalla de clasificación por toques** (tap-to-sort) — descartada por sentirse
+   como una app administrativa.
+2. **Plataformer Phaser 2D** (`feat/mission-clean-room-game`) — cámara lateral,
+   física de salto, funcional y probado, pero seguía sintiéndose como "un
+   personaje caminando sobre una imagen de cuarto", no un mundo explorable.
+3. **Vertical Slice 3D** (esta rama, vigente) — Three.js + React Three Fiber,
+   cámara en tercera persona detrás del personaje, habitación 3D real con
+   muebles, un objeto escondido que hay que buscar, un obstáculo, y un
+   coleccionable opcional.
 
-El estado actual corresponde al *"Phase 1 — Prototype"*: una habitación, un personaje
-jugable, movimiento + salto + cámara, y un objeto con un destino, para validar la
-mecánica antes de invertir en la misión completa de 6 objetos.
+El criterio de aceptación no es si los objetos se pueden clasificar — es si un
+niño puede pasar varios minutos explorando el cuarto y disfrutando controlar al
+personaje. En concreto, el loop que el jugador debe vivir es:
 
-## 2. Decisiones de arquitectura
+```
+ENTER → EXPLORE → DISCOVER → MOVE → JUMP → INTERACT →
+CARRY → SEARCH → DELIVER → REWARD → EXPLORE AGAIN
+```
+
+No simplemente `walk → pickup → drop`. Esa diferencia es exactamente lo que
+separa un juego de una demo técnica — ver §15 para el checklist de aceptación
+completo.
+
+## 2. Por qué existen dos ramas
+
+| Rama | Motor | Estado |
+|---|---|---|
+| `feat/mission-clean-room-game` | Phaser 4 (2D, cámara lateral) | Completa, probada, intacta — fallback si el 3D resulta demasiado pesado en móvil |
+| `feat/3d-mission-clean-room` (esta) | Three.js + React Three Fiber (3D, tercera persona) | Vertical slice en validación |
+
+Ambas ramas comparten la misma capa de dominio (`GameContext`, tipos, `data/*`,
+16 pruebas unitarias) — el motor de renderizado es un detalle de implementación
+intercambiable, tal como pedía la arquitectura original.
+
+## 3. Decisiones de arquitectura de esta rama
 
 | Decisión | Justificación |
 |---|---|
-| Motor de juego: **Phaser 4.2.1** | El repositorio no tenía Canvas/motor de juego previo. Se eligió Phaser (vs. un motor DOM/CSS a medida) por su física Arcade, cámara con seguimiento y gestión de sprites listas para usar. |
-| Separación Ionic ⟷ Phaser | Ionic controla shell, menús, HUD, modales y selección de personaje. Phaser controla el mundo del juego a 60 fps sin re-renderizar React por frame — React solo recibe eventos discretos (objeto recogido/entregado). |
-| Arte de personajes: placeholder → real | Los avatares proporcionados son renders de referencia de una herramienta 3D (wireframe + panel de editor incrustados en la imagen), no assets de juego exportados. Carga con fallback automático: PNG real si existe en `public/assets/characters/`, si no, una cápsula de color generada — sin cambios de código al añadir el arte final. |
-| Estado del juego: `GameContext` + `useReducer` | El reducer centraliza TODA la lógica derivada (puntaje, combo, victoria, game-over) para operar siempre sobre el estado más reciente, evitando bugs de "closure obsoleto". |
-| Nueva rama de Git | `feat/mission-clean-room-game` creada desde `main`, dejando `feat/pushNotifications-module` intacto (su WIP quedó en `git stash`) para no mezclar features no relacionadas. |
+| Motor: **Three.js + React Three Fiber + drei** | Necesario para cámara en tercera persona real, física de salto en 3D y un personaje riggeado — Phaser (2D) no puede dar esta sensación de mundo explorable. |
+| Personaje temporal: `development-character.glb` | Los avatares proporcionados son renders de referencia 3D (con wireframe/panel de editor incrustados), no assets de juego riggeados. Se usa un humanoide riggeado gratuito (CC0, "RobotExpressive" por Tomás Laulhé) con animaciones Idle/Walking/Running/Jump mientras no existan `tiburon_boy.glb` / `dino_boy.glb`. |
+| Abstracción `GameAvatar3D` | El motor nunca conoce qué modelo representa al jugador — solo pide `{modelUrl, scale, animations}` a `world3d/GameAvatar.ts`. Sustituir el placeholder por los modelos finales es un cambio de una línea, sin tocar gameplay. |
+| Física manual (sin motor de físicas) | Un solo personaje contra ~10 cajas de colisión (muebles + paredes) no justifica añadir `@react-three/rapier`; gravedad/salto/colisión AABB a mano son suficientes y más livianas en móvil. |
+| Cámara: distancia/altura fijas + *pull-in* por cajas | Se descartó el raycast contra mallas (falla cuando el jugador ya está pegado a un obstáculo — la ceremonia empezaba dentro de la geometría). En su lugar, la cámara prueba distancias decrecientes a lo largo de la misma línea y usa la más lejana que no caiga dentro de ninguna caja de pared/mueble — mismo primitivo (`THREE.Box3`) que ya usa la colisión del jugador. |
+| `feat/mission-clean-room-game` NO se borra | Sirve de referencia/fallback comparable si el rendimiento 3D en dispositivos móviles modestos no es aceptable. |
+| `MissionDefinition3D` (`world3d/MissionDefinition.ts`) | Las posiciones 3D del objeto/cesta/coleccionable y el texto narrativo ya NO están hardcodeados en `GameWorld3D.tsx` — viven en una definición de misión separada. Una misión 2 (encuentra el conejo) es una entrada nueva en este archivo, no un cambio al motor. |
+| `InteractionKind` ampliado (`pickup \| dropoff \| collectible \| inspect \| open \| talk`) | Solo los tres primeros tienen comportamiento hoy; los otros tres se declaran ahora (costo cero en runtime, son solo tipos) para que abrir un cajón, inspeccionar un juguete o hablar con un NPC en un nivel futuro sea una nueva entrada de `Interactable3D`, no una reescritura de `InteractionManager3D`. |
 
-## 3. Arquitectura
+## 4. Arquitectura
 
 ```
-Ionic React (shell: menú, HUD, modales, selección de personaje)
+Ionic React (shell: menú, HUD/misión, selección de personaje)
         │
         ▼
-  <canvas> ── Phaser.Game (GameWorld.tsx crea/destruye el Game)
+  <canvas> ── React Three Fiber (GameWorld3D.tsx crea la escena)
         │
-   Phaser Scene (GameScene.ts)
-   ├─ PlayerController   (cuerpo físico Arcade: velocidad, gravedad, salto)
-   ├─ CameraController   (seguimiento de cámara, límites del nivel)
-   ├─ characterAsset.ts  (carga PNG real o placeholder generado)
-   └─ Interacción        (radio de recoger/soltar, prompts, popup +100)
+   Suspense (useGLTF suspende mientras carga el modelo)
+   ├─ Room3D            (piso, paredes, muebles — cajas low-poly sin texturas)
+   ├─ Player3D           (cuerpo riggeado, gravedad/salto/colisión manual)
+   ├─ CameraRig           (tercera persona, sigue al yaw del jugador, pull-in anti-clip)
+   ├─ InteractionManager3D (radio de recoger/soltar, consume la pulsación "interactuar")
+   └─ Html (drei)          (prompt "✋ Recoger…" anclado en el mundo 3D)
         │
         ▼  callbacks directos (onItemPicked / onItemDropped)
-   GameContext (React) ← score, combo, progreso, timer, status
+   GameContext (React) ← score, progreso, timer, status (SIN CAMBIOS vs. la rama Phaser)
         │
         ▼
-   GameHUD (React, solo lee el contexto)
+   GameHUD + banner de misión (React, solo lee estado)
 ```
 
-> **Nota técnica:** la comunicación Phaser → React se hace mediante callbacks pasados
-> directamente en el constructor de `GameScene`, no mediante `scene.events`. Phaser
-> instala `scene.events` de forma asíncrona durante el arranque de la escena, después
-> de que `new Phaser.Game()` retorna — suscribirse a `scene.events` inmediatamente
-> desde React genera una carrera y lanza `Cannot read properties of undefined
-> (reading 'on')`. Este bug se detectó y corrigió durante el desarrollo.
+**Regla de rendimiento respetada:** el bucle de juego (posición, velocidad,
+rotación, 60 fps) vive completamente en refs mutables leídos/escritos dentro de
+`useFrame` — nunca en `useState` de React. React solo recibe cambios de estado
+discretos y poco frecuentes (`isCarrying`, `starCollected`, texto de la misión).
 
-## 4. Estructura de archivos
+## 5. Estructura de archivos
 
 ```
-src/pages/game/
-├── MissionCleanRoomPage.tsx        # router shell (~20 líneas), envuelve GameProvider
-├── MissionCleanRoomPage.css
-└── MissionCleanRoom/
-    ├── MissionCleanRoomView.tsx     # switch por status: CharacterSelect / HUD+World / fin
-    ├── MissionCleanRoomTypes.ts     # modelo de dominio (Avatar, GameItem, GameState, ...)
-    ├── MissionCleanRoomConstants.ts # GAME_CONFIG, STAR_THRESHOLDS, WORLD_CONFIG
-    ├── gameRules.ts                 # funciones puras: combo, puntos, precisión, estrellas
-    ├── gameRules.test.ts
-    ├── gameReducer.test.ts
-    │
-    ├── contexts/
-    │   └── GameContext.tsx          # useReducer: única fuente de verdad del estado
-    │
-    ├── hooks/
-    │   ├── useGameEngine.ts         # traduce intents de UI en dispatch()
-    │   └── useGameTimer.ts          # intervalo de 1s robusto, sin fugas ni duplicados
-    │
-    ├── data/
-    │   ├── avatars.ts               # Tiburón Boy, Dino Boy
-    │   ├── items.ts                 # 6 objetos de la misión completa
-    │   ├── containers.ts            # 4 contenedores de destino
-    │   └── levels.ts                # nivel 1: "Cuarto Desordenado"
-    │
-    ├── components/
-    │   ├── CharacterSelect.tsx/css  # selección de personaje (arte real o placeholder)
-    │   ├── GameHUD.tsx/css          # avatar, timer, score, progreso, combo
-    │   └── GameWorld.tsx/css        # crea/destruye Phaser.Game + controles táctiles
-    │
-    └── game/                        # capa Phaser, nunca toca React directamente
-        ├── GameScene.ts             # habitación, física, interacción, recompensas
-        ├── PlayerController.ts      # cuerpo físico, movimiento, salto, estados
-        ├── CameraController.ts      # seguimiento + límites de cámara
-        ├── PlayerTypes.ts           # PlayerState, ControlInput
-        ├── characterAsset.ts        # rutas de arte real + claves de textura
-        └── placeholderCharacter.ts  # genera cápsula de color como fallback
+src/pages/game/MissionCleanRoom/
+├── MissionCleanRoomView.tsx        # switch por status; renderiza GameWorld3D (no GameWorld/Phaser)
+├── MissionCleanRoomTypes.ts        # SIN CAMBIOS — modelo de dominio compartido
+├── MissionCleanRoomConstants.ts    # GAME_CONFIG, STAR_THRESHOLDS (dominio, no 3D)
+├── gameRules.ts / gameReducer.test.ts / gameRules.test.ts  # SIN CAMBIOS, 16 pruebas
+├── contexts/GameContext.tsx        # SIN CAMBIOS — el motor de render es intercambiable
+├── data/                           # SIN CAMBIOS — avatars.ts, items.ts, containers.ts, levels.ts
+│
+├── components/
+│   ├── GameWorld3D.tsx/css         # orquestador: <Canvas>, estado de carrying/collected, controles
+│   ├── CharacterSelect.tsx/css     # SIN CAMBIOS (arte real o placeholder emoji)
+│   ├── GameHUD.tsx/css             # SIN CAMBIOS
+│   └── GameWorld.tsx/css           # Phaser — presente pero NO importado desde esta rama (referencia)
+│
+├── game/                           # capa Phaser — intacta, sin uso en esta rama
+│   └── (GameScene.ts, PlayerController.ts, CameraController.ts, ...)
+│
+└── world3d/                        # capa Three.js/R3F — nueva en esta rama
+    ├── GameAvatar.ts               # interface GameAvatar3D + AVATARS_3D (modelUrl/scale/animations)
+    ├── MissionDefinition.ts        # posiciones 3D + narrativa por misión, separado del motor
+    ├── world3dConstants.ts         # WORLD3D_CONFIG: tamaño de sala, velocidades, cámara
+    ├── ControlTypes.ts             # ControlInput3D { moveX, moveZ, running, jumpPressed, interactPressed }
+    ├── Room3D.tsx                  # geometría de la habitación + getRoomObstacles/getCameraObstacles
+    ├── Player3D.tsx                # carga el GLB, gravedad/salto/colisión, cambia animaciones
+    ├── CameraRig.tsx               # cámara en tercera persona con anti-clip por cajas
+    ├── InteractionManager3D.tsx    # detecta el interactuable más cercano, dispara pickup/drop
+    ├── useKeyboardControls3D.ts    # WASD/flechas + Shift(correr) + Space(saltar) + E(interactuar)
+    └── TouchJoystick.tsx           # joystick táctil arrastrable (excepción justificada a "usa Ionic")
+
+public/assets/
+├── characters/                     # portraits 2D (tiburon_boy.png, dino_boy.png) — pantalla de selección
+└── models/development-character.glb # placeholder riggeado CC0 (Tomás Laulhé), 14 animaciones
 ```
 
-## 5. Modelo de datos (`MissionCleanRoomTypes.ts`)
+## 6. La abstracción de avatar (`world3d/GameAvatar.ts`)
 
-| Tipo | Descripción |
-|---|---|
-| `Avatar` | `id, name, description, image, thumbnail` — un personaje jugable. |
-| `GameItem` | `id, name, category, destinationId, image, position, points` — objeto desordenado con su contenedor correcto. |
-| `GameContainer` | `id, name, category, image, position, acceptsCategories` — un destino válido. |
-| `GameLevel` | `id, name, timeLimitSeconds, items[], containers[]` — un nivel completo. |
-| `GameStats` | `score, correctDrops, incorrectDrops, streak, maxStreak, comboMultiplier`. |
-| `GameResult` | `score, timeRemainingSeconds, accuracy, maxCombo, stars (0–3)` — resumen al terminar. |
-| `GameState` | `status, selectedAvatarId, level, completedItemIds[], timeRemainingSeconds, stats, result`. |
-| `GameAction` | `SELECT_AVATAR · START_GAME · CORRECT_DROP · INCORRECT_DROP · TICK · PAUSE_GAME · RESUME_GAME · RESET_GAME · NEXT_LEVEL`. |
+```ts
+export interface GameAvatarAnimationClips {
+  idle: string; walk: string; run: string; jump: string;
+}
 
-## 6. Configuración central (`MissionCleanRoomConstants.ts`)
+export interface GameAvatar3D {
+  id: string;
+  name: string;
+  modelUrl: string;
+  scale: number;
+  animations: GameAvatarAnimationClips;
+}
+```
 
-Ningún valor de balance de juego está hardcodeado en componentes.
+Hoy, `AVATARS_3D.tiburon_boy` y `AVATARS_3D.dino_boy` apuntan ambos a
+`development-character.glb`. **Para integrar los modelos finales:** cambiar
+`modelUrl` a `/assets/models/tiburon_boy.glb` / `dino_boy.glb` (y ajustar `scale`/
+`animations` si el rig usa otros nombres de clip) — ningún otro archivo cambia.
 
-**`GAME_CONFIG`**
+## 7. El personaje temporal
 
-| Clave | Valor |
-|---|---|
-| `INITIAL_TIME_SECONDS` | 60 |
-| Puntos por objeto correcto | 100 (definido por `item.points`) |
-| `POINTS_INCORRECT` | -20 (el puntaje nunca baja de 0) |
-| `COMBO_LADDER` | `[1, 1.1, 1.2, 1.3, 1.5]` — multiplicador por racha de aciertos consecutivos |
+`public/assets/models/development-character.glb` — "RobotExpressive" por
+[Tomás Laulhé](https://www.patreon.com/quaternius), modificado por Don McCurdy,
+**CC0 1.0** (dominio público, uso libre). Animaciones disponibles: `Idle`,
+`Walking`, `Running`, `Jump`, `Dance`, `Death`, `No`, `Punch`, `Sitting`,
+`Standing`, `ThumbsUp`, `WalkJump`, `Wave`, `Yes`. Se usan `Idle/Walking/Running/
+Jump` — bbox original ≈ 4.79 unidades de alto, escalado a `0.36` (~1.7 unidades,
+proporción humana en una sala de 12×12).
 
-**`WORLD_CONFIG`** (física y cámara)
+**Flujo hacia los modelos finales** (cuando existan):
 
-| Clave | Valor |
-|---|---|
-| `CANVAS_WIDTH` | 400 px |
-| `LEVEL_WIDTH` | 1600 px (cámara con scroll horizontal) |
-| `LEVEL_HEIGHT` | 300 px (= altura del canvas → sin scroll vertical) |
-| `GRAVITY_Y` | 900 |
-| `MOVE_SPEED` | 220 px/s |
-| `JUMP_VELOCITY` | -480 |
-| `INTERACT_RADIUS` | 70 px |
+```
+Tus imágenes de referencia → modelado 3D → rig humanoide →
+animaciones (idle/walk/run/jump/fall/pickup/carry/drop/celebrate) →
+export GLB → colocar en public/assets/models/{tiburon_boy,dino_boy}.glb →
+actualizar GameAvatar.ts
+```
 
-## 7. Motor del juego
+## 8. La habitación y la misión
 
-### 7.1 `GameContext` (`contexts/GameContext.tsx`)
+Una sola habitación (`Room3D.tsx`, 12×12 unidades): cama (con almohada y acento
+de cobija), mesita+lámpara, escritorio+silla con libros/lápiz/lámpara propios,
+un póster sobre la cama, librero, clóset, ventana, alfombra, un par de juguetes
+sueltos en el piso, una planta decorativa, y una caja de juguetes que funciona
+como **obstáculo** (hay que rodearla o saltarla). Todo con geometría de
+cajas/primitivas de color — sin texturas — para que el cuarto tenga identidad
+visual sin dejar de ser barato en GPUs móviles (ver §11 sobre qué piezas
+proyectan sombra y cuáles no).
 
-Reducer puro (`gameReducer`) + `Provider` + hook `useGame()` que lanza error si se usa
-fuera del Provider (mismo patrón que `CartContext`/`UserContext`, con `useReducer` en
-lugar de `useState` por la complejidad genuina de la máquina de estados). El reducer
-resuelve internamente:
+**Loop de la misión** (`MissionDefinition.ts` → `mission_01`, un solo objeto
+por ahora, no los 6 completos), con banner narrativo en vez de un texto
+genérico de instrucción:
 
-- **`CORRECT_DROP`**: calcula racha, multiplicador de combo, puntos otorgados; si es
-  el último objeto del nivel, pasa a `VICTORY` y construye el `GameResult`.
-- **`INCORRECT_DROP`**: resta puntos (sin bajar de 0) y reinicia la racha/combo.
-- **`TICK`**: decrementa el temporizador; al llegar a 0, pasa a `GAME_OVER` con 0 estrellas.
+```
+🔎 "Creo que alguien dejó una pelota azul cerca de la cama..."
+        ↓ EXPLORA
+🔎 la pelota brilla suavemente al acercarte (antes de que aparezca el prompt)
+        ↓ DESCUBRE
+✋ "Recoger Pelota Azul" (solo dentro del radio de interacción)
+        ↓ INTERACTÚA — sparkle burst en el punto de recolección
+🧺 "¡La encontraste! Llévala a la cesta azul." — la pelota flota sobre el personaje
+        ↓ CARGA / BUSCA
+✋ "Soltar en Cesta de Red Azul"
+        ↓ ENTREGA — sparkle burst en la cesta
+🎉 "¡Muy bien! El cuarto está un poco más limpio." + popup "⭐⭐⭐ ¡Muy bien! +100"
+```
 
-16 pruebas unitarias (`gameReducer.test.ts` + `gameRules.test.ts`) cubren estas
-transiciones sin renderizar UI ni Phaser.
+Además, una **estrella ⭐ coleccionable** escondida cerca del clóset —
+completamente opcional, sin requerirse para la misión. Rota y flota
+continuamente, y brilla más fuerte cuanto más cerca está el jugador (mismo
+mecanismo de "llamada" que la pelota) — sirve para validar que la exploración
+por sí sola es entretenida. Su recolección es un estado local del componente 3D
+(no afecta el `score` del `GameContext` todavía).
 
-### 7.2 `useGameEngine` (`hooks/useGameEngine.ts`)
+**Feedback de descubrimiento (sin tutorial):** tanto la pelota como la estrella
+usan una función `glowIntensity()` compartida en `GameWorld3D.tsx` — sin brillo
+más allá de ~4 unidades, brillo creciente entre 4 y el radio de interacción
+(1.5), prompt de acción solo dentro del radio. Así el jugador aprende qué hacer
+por retroalimentación visual, no por texto instructivo.
 
-Traduce intents de la UI en `dispatch()` y expone: `state, avatars, selectedAvatar,
-progress, selectAvatar, startGame, dropItem, pauseGame, resumeGame, restart,
-changeAvatar, nextLevel`. Usa `useGameTimer` para el intervalo de 1 segundo (un único
-`setInterval`, limpieza garantizada, sin duplicados).
+## 9. Controles
 
-### 7.3 `GameScene` (`game/GameScene.ts`)
+| Acción | Escritorio | Táctil |
+|---|---|---|
+| Mover | WASD / flechas | Joystick arrastrable (esquina inferior izquierda) |
+| Correr | mantener Shift | arrastrar el joystick al borde (≥85% del radio) |
+| Saltar | Space | botón ⬆️ |
+| Interactuar | E | botón ✋ |
 
-Construye el piso con física estática, instancia al `PlayerController`, configura la
-cámara, coloca el objeto y el contenedor, y gestiona el bucle
-*explorar → encontrar → recoger → cargar → soltar → recompensa*. Lee teclado
-(flechas/espacio para saltar, `E` para interactuar) y entradas táctiles inyectadas
-desde React vía `setTouchMove()` / `requestJump()` / `requestInteract()`.
+El joystick es un `<div>` con eventos de puntero, no un `IonButton` — excepción
+deliberada a la regla "usa componentes Ionic", documentada en el propio archivo,
+porque Ionic no tiene un primitivo de arrastre continuo equivalente (misma
+lógica que ya se aplicó al `<canvas>` de Phaser).
 
-### 7.4 `PlayerController` y `CameraController`
+## 10. Cámara en tercera persona
 
-`PlayerController` encapsula el cuerpo de física Arcade (velocidad, gravedad, salto) y
-deriva el estado visual (`idle, running, jumping, falling, carrying`).
-`CameraController` fija los límites del mundo y hace que la cámara siga suavemente al
-jugador.
+`CameraRig.tsx`: sigue al `yaw` del jugador con un offset fijo detrás
+(`WORLD3D_CONFIG.CAMERA_DISTANCE`/`CAMERA_HEIGHT`), suavizado con
+`camera.position.lerp` cada frame. Si la posición ideal cae dentro de una pared o
+mueble, prueba distancias menores a lo largo de la misma línea hasta encontrar
+un punto libre (`getCameraObstacles()` = muebles + paredes) — verificado
+manualmente empujando al personaje contra un rincón sin que la cámara quedara
+nunca dentro de la geometría.
 
-## 8. Arte de personajes
+> **Nota sobre la orientación del placeholder:** el modelo temporal tiene su
+> "frente" rigged hacia +Z local, al revés de la convención típica -Z de
+> three.js. El offset de cámara y la rotación del personaje ya están ajustados
+> para este modelo — si el modelo final usa la convención estándar, revisar el
+> signo en `CameraRig.tsx` (comentado en el código).
 
-Pipeline de carga con fallback automático (`characterAsset.ts` + `placeholderCharacter.ts`):
+## 9.1 Sin timer de fallo (todavía)
 
-1. `GameScene.preload()` intenta cargar `/assets/characters/{avatarId}.png` (servido
-   desde `public/`, que Vite no procesa en build — un archivo ausente solo produce un
-   404 en tiempo de ejecución, nunca rompe el build).
-2. Si la carga tiene éxito, `PlayerController` usa esa textura real. Si falla, se
-   genera automáticamente una cápsula de color como placeholder — **nunca un emoji**,
-   según la dirección de producto vigente.
-3. El mismo patrón aplica en `CharacterSelect.tsx`: `<img>` con `onError` que revela
-   el emoji de respaldo.
+El nivel usa `GAME_CONFIG.EXPLORATION_TIME_SECONDS` (una hora) en vez de los 60
+segundos de diseño — la pregunta de este vertical slice es *"¿es divertido
+explorar?"*, no *"¿puedes ganarle al reloj?"*. `GameHUD` recibe
+`showTimer={false}` para no mostrar una cuenta regresiva que no significa nada
+todavía. El timer real vuelve como capa de dificultad en niveles posteriores
+(Nivel 1 = exploración libre, Nivel 2+ = 60s, Nivel 3+ = 60s + obstáculos, …).
 
-**Estado actual:** `public/assets/characters/tiburon_boy.png` y `dino_boy.png` ya
-existen — recortados de los renders de referencia originales (se eliminó el panel del
-editor y las vistas duplicadas). **Limitación conocida:** el grid de wireframe/UV de
-la herramienta 3D sigue horneado en los píxeles del personaje (no es algo que el
-recorte pueda arreglar); para un acabado limpio hace falta volver a exportar cada
-personaje desde la herramienta 3D con el wireframe **apagado** (shading Sólido o
-Renderizado), idealmente con fondo transparente, y sobrescribir los mismos dos
-archivos. No se requiere ningún cambio de código adicional al hacerlo — el pipeline
-de carga con fallback ya descrito arriba recoge el archivo nuevo automáticamente.
+## 11. Rendimiento móvil
 
-## 9. Rutas y permisos
+- Geometría de cajas/primitivas, sin texturas grandes.
+- Una sola luz con sombra (`directionalLight`, `shadow-mapSize={[1024,1024]}`) +
+  una luz ambiental sin sombra — nunca múltiples luces dinámicas.
+- **`castShadow` es opt-in, no el default:** el helper `Box` de `Room3D.tsx`
+  solo proyecta sombra cuando se pasa explícitamente (`castShadow` en el uso,
+  no en el componente) — se activa únicamente en las piezas de mobiliario
+  principales (cama, mesita, escritorio, silla, librero, clóset, caja de
+  juguetes). El detalle decorativo (pósters, libros, lápiz, cobija, juguetes
+  sueltos, planta) nunca proyecta sombra. Esto se corrigió durante esta misma
+  sesión de pulido: agregar `castShadow` a cada pieza nueva de identidad visual
+  (§8) medía una caída de FPS notable en las pruebas — exactamente la regla
+  "sombras dinámicas mínimas" que este proyecto ya pedía.
+- Sin post-procesado.
+- Contador de FPS en pantalla (`game-world-3d__fps`), visible solo con
+  `IS_DEV_BUILD` (reutiliza `src/utils/appEnv.ts`).
+- **Honestidad sobre la medición de FPS:** se confirmaron 60 FPS estables en
+  una sesión de verificación anterior (Chromium/desktop) con la escena base.
+  Durante la verificación de esta sesión de pulido, el mismo contador mostró
+  ~1 FPS de forma persistente — incluso en pestañas nuevas, con la escena en
+  reposo, sin errores de consola, con GPU real confirmada (AMD Radeon Pro
+  5300M vía ANGLE/Metal, sin pérdida de contexto). Todo apunta a
+  *throttling* de `requestAnimationFrame` propio del navegador automatizado de
+  verificación (no compuesto a tasa nativa entre capturas de pantalla), no a
+  una regresión real de rendimiento — pero no es una lectura en la que se deba
+  confiar. **Pendiente:** medir FPS real en `npm run dev` con un navegador de
+  escritorio normal y, más importante, en un Android real de gama media vía
+  Capacitor antes de dar por buena la dirección 3D.
 
-| Elemento | Detalle |
-|---|---|
-| Ruta | `/game/mission-clean-room` — `PrivateRoute` en `src/App.tsx` (requiere sesión iniciada). |
-| Ítem de menú | "Misión: Limpiar el Cuarto" con ícono `gameControllerOutline`, visible cuando `canAccess(roleCode, 'game')` es `true`. |
-| Permiso | Nuevo `UiFeature 'game'` en `src/config/rolePermissions.ts`, habilitado para los 7 roles existentes. |
-
-## 10. Pruebas
+## 12. Pruebas y verificación
 
 ```bash
-npx vitest run src/pages/game/MissionCleanRoom/
+npx vitest run src/pages/game/MissionCleanRoom/   # 16 pruebas, sin cambios — dominio agnóstico al motor
+npx tsc --noEmit
+npm run build
 ```
 
-16 pruebas en 2 archivos, enfocadas en lógica pura (Phaser no es viable de renderizar
-de forma fiable en jsdom):
+Vitest/jsdom no puede renderizar WebGL de forma fiable, así que la escena 3D se
+verificó manualmente: arnés aislado (`preview-game3d.html` + un
+`createRoot(...).render(<GameWorld3D .../>)` temporal, fuera de la app/login) en
+el navegador de desarrollo — moviéndose, saltando, acercándose al objeto,
+viendo aparecer el prompt, recogiendo, cargando, soltando en la cesta, y
+forzando al personaje contra los muebles para confirmar que la cámara nunca
+queda dentro de la geometría. Ambos archivos del arnés se eliminaron después de
+verificar (no forman parte del código de producción).
 
-- **`gameReducer.test.ts`** (10): inicio de nivel, combo/puntaje en aciertos
-  consecutivos, penalización sin bajar de 0, ruptura de combo, victoria al completar
-  todos los objetos, ignorar drops repetidos, cuenta regresiva y game-over,
-  pausa/reanudar, reset conservando avatar.
-- **`gameRules.test.ts`** (6): validación de destino correcto/incorrecto, escalera de
-  multiplicador de combo, cálculo de estrellas.
+## 13. Cómo extender
 
-`npx tsc --noEmit` y `npm run build` pasan sin errores. Se agregó la dependencia
-`"phaser": "^4.2.1"` a `package.json`.
+- **Agregar el segundo objeto/contenedor real (de los 6 totales):** los datos ya
+  existen en `data/items.ts`/`data/containers.ts`; hace falta generalizar
+  `GameWorld3D.tsx` de "un solo par item/container" a iterar sobre
+  `state.level.items`, más posiciones 3D por objeto (hoy hardcodeadas para el
+  único objeto de este slice).
+- **Sustituir el personaje:** ver §6.
+- **Ajustar sensación de movimiento/cámara:** todo vive en
+  `world3d/world3dConstants.ts` (`WORLD3D_CONFIG`) — nunca hardcodear en
+  componentes.
+- **Agregar más muebles/decoración:** `Room3D.tsx`; recordar añadir a
+  `getRoomObstacles()`/`getCameraObstacles()` si debe bloquear el paso.
 
-## 11. Cómo extender
+## 15. Game Feel Acceptance Criteria
 
-- **Agregar un avatar:** añadir entrada en `data/avatars.ts` y, opcionalmente, un
-  color en `CHARACTER_PALETTE` dentro de `placeholderCharacter.ts`.
-- **Agregar un objeto/contenedor:** añadir entradas en `data/items.ts` /
-  `data/containers.ts`, respetando `destinationId` ↔ `container.id` y
-  `acceptsCategories`.
-- **Agregar un nivel:** nueva entrada en `data/levels.ts` (`LEVELS` array);
-  `useGameEngine.nextLevel()` ya sabe avanzar al siguiente nivel de esa lista.
-- **Cambiar tiempos o puntajes:** editar únicamente `MissionCleanRoomConstants.ts`
-  (`GAME_CONFIG` / `WORLD_CONFIG`) — nunca hardcodear en componentes.
-- **Cambiar el arte del personaje:** ver sección 8 (solo requiere colocar el PNG en
-  `public/assets/characters/`).
+The prototype must not feel like a form, dashboard, sorting application, or
+technical 3D demo. It must feel like a small children's adventure game.
 
-## 12. Estado del repositorio
+The evaluator should be able to:
 
-| Elemento | Detalle |
-|---|---|
-| Rama | `feat/mission-clean-room-game` (creada desde `main`) |
-| Commit | `706e5eb7` — "Add Misión: Limpiar el Cuarto game module (Phase 1 prototype)" (31 archivos, +1646/-8) |
-| Remoto | Publicada en `origin` con upstream tracking configurado |
-| Pull Request | https://github.com/montanogilberto/POSVending/pull/new/feat/mission-clean-room-game (aún no abierto) |
-| Otra rama | `feat/pushNotifications-module` conserva su trabajo pendiente en `git stash` ("WIP pushNotifications-module before branching mission-clean-room game"), sin mezclarse con este módulo. |
+```
+✓ Select Tiburón Boy or Dino Boy
+✓ Enter the room
+✓ Understand where the character is
+✓ Move naturally
+✓ Run
+✓ Jump
+✓ Explore without being forced by UI
+✓ Discover the hidden ball
+✓ Receive subtle interaction feedback
+✓ Pick up the ball
+✓ See the ball physically carried by the character
+✓ Explore while carrying it
+✓ Discover the basket
+✓ Deliver the ball
+✓ Receive satisfying visual/audio feedback
+✓ Find an optional hidden star
+✓ Continue exploring after completing the objective
+```
 
-## 13. Próximos pasos (fuera del alcance de esta fase)
+The player should WANT to explore the room.
 
-- Ampliar la habitación a los 6 objetos / 4 contenedores completos (ya definidos en
-  `data/`, listos para usarse).
-- Zonas temáticas del cuarto (juguetes pequeños, cama, deportes, parqueo) con más
-  decorado visual.
-- Animaciones de sprite reales (idle/run/jump/carry) una vez existan hojas de
-  sprites, reemplazando el flip horizontal simple actual.
-- Sistema de audio (`useGameAudio`): efectos de acierto/error/salto/combo/victoria,
-  con mute/unmute.
-- `VictoryModal` y `GameOverModal` con estrellas, confeti y botón "Siguiente nivel".
-- Sistema de combo visual (🔥 xN) y partículas al soltar un objeto correctamente.
-- Coleccionables opcionales (⭐ 🪙 💎) y objetos escondidos para fomentar la
-  exploración.
-- Capa de persistencia/backend (`gameService`, `analyticsService`) — explícitamente
-  fuera del MVP: el juego debe seguir funcionando 100% local/offline primero.
+If the experience feels like *"click object → click destination → score"*, the
+implementation has failed the gameplay objective.
+
+If the experience feels like *"Where is it? Let me look around. Oh! There it
+is. How do I get there? I found it! Now where is the basket?"* — the vertical
+slice has succeeded.
+
+**Estado actual contra este checklist:** todo lo anterior está implementado
+excepto el feedback de *audio* (no hay `useGameAudio` todavía — solo feedback
+visual: glow de descubrimiento, sparkle burst, squash/stretch al saltar, popup
+de recompensa con estrellas). El resto del loop (seleccionar → entrar →
+explorar → descubrir → mover/correr/saltar → interactuar → cargar → buscar →
+entregar → recompensa → seguir explorando con la estrella opcional) está
+construido y fue verificado manualmente en esta sesión (§12) — pendiente que
+tú lo juegues y confirmes si *se siente* como se describe arriba, que es
+finalmente el juicio que importa.
+
+## 16. Próximos pasos (solo si el vertical slice se siente bien)
+
+- Validar rendimiento en dispositivo Android real vía Capacitor.
+- Modelos GLB finales de Tiburón Boy y Dino Boy (rig + animaciones).
+- Los 6 objetos / 4 contenedores completos, con progresión de misión
+  ("Mission 01: encuentra la pelota" → "Mission 02: encuentra el conejo" → …).
+- Wire del coleccionable ⭐ al `GameContext` (puntaje/analítica).
+- Audio (`useGameAudio`), partículas, `VictoryModal`/`GameOverModal` con
+  estrellas.
+- Solo entonces: eliminar la rama/carpeta Phaser si el 3D ya no necesita
+  fallback.

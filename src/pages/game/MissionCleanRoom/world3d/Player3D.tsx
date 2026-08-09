@@ -29,9 +29,13 @@ const Player3D: React.FC<Player3DProps> = ({ avatar, groupRef, inputRef, initial
   const grounded = useRef(true);
   const currentClip = useRef<string | null>(null);
   const currentState = useRef<PlayerState3D>('idle');
+  const squashY = useRef(1);
 
   useEffect(() => {
-    groupRef.current?.position.copy(initialPosition);
+    const node = groupRef.current;
+    if (!node) return;
+    node.position.copy(initialPosition);
+    node.scale.setScalar(avatar.scale);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -51,16 +55,21 @@ const Player3D: React.FC<Player3DProps> = ({ avatar, groupRef, inputRef, initial
     if (input.jumpPressed && grounded.current) {
       velocityY.current = JUMP_VELOCITY;
       grounded.current = false;
+      squashY.current = 1.2; // stretch on takeoff
     }
     input.jumpPressed = false; // edge-triggered: consume this frame's press
 
     let nextY = node.position.y + velocityY.current * delta;
     if (nextY <= 0) {
       nextY = 0;
+      if (velocityY.current < 0) squashY.current = 0.78; // squash on landing
       velocityY.current = 0;
       grounded.current = true;
     }
     node.position.y = nextY;
+
+    squashY.current = THREE.MathUtils.damp(squashY.current, 1, 8, delta);
+    node.scale.set(avatar.scale, avatar.scale * squashY.current, avatar.scale);
 
     const moveVec = new THREE.Vector3(input.moveX, 0, input.moveZ);
     const magnitude = moveVec.length();
@@ -105,7 +114,7 @@ const Player3D: React.FC<Player3DProps> = ({ avatar, groupRef, inputRef, initial
   });
 
   return (
-    <group ref={groupRef} scale={avatar.scale}>
+    <group ref={groupRef}>
       <primitive object={scene} />
       {carriedItem && <group position={[0, 5.2, 0]}>{carriedItem}</group>}
     </group>

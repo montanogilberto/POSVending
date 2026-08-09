@@ -7,7 +7,7 @@ export const LEVELS: GameLevel[] = [
   {
     id: 'level_1',
     name: 'Cuarto Desordenado',
-    timeLimitSeconds: GAME_CONFIG.INITIAL_TIME_SECONDS,
+    timeLimitSeconds: GAME_CONFIG.EXPLORATION_TIME_SECONDS,
     items: ITEMS,
     containers: CONTAINERS,
   },

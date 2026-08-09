@@ -5,14 +5,20 @@ import { WORLD3D_CONFIG } from './world3dConstants';
 const { ROOM_SIZE, WALL_HEIGHT } = WORLD3D_CONFIG;
 const HALF = ROOM_SIZE / 2;
 
-/** A simple low-poly box "prop" — no textures, cheap on mobile GPUs per the project's perf rules. */
+/**
+ * A simple low-poly box "prop" — no textures, cheap on mobile GPUs per the project's perf rules.
+ * `castShadow` defaults to false: only the room's primary furniture silhouettes should cast (see
+ * usage below) — every small decorative prop casting too measurably dropped frame rate in testing,
+ * which is exactly the "minimal dynamic shadows" rule this project calls out.
+ */
 const Box: React.FC<{
   position: [number, number, number];
   size: [number, number, number];
   color: string;
   rotationY?: number;
-}> = ({ position, size, color, rotationY = 0 }) => (
-  <mesh position={position} rotation={[0, rotationY, 0]} castShadow receiveShadow>
+  castShadow?: boolean;
+}> = ({ position, size, color, rotationY = 0, castShadow = false }) => (
+  <mesh position={position} rotation={[0, rotationY, 0]} castShadow={castShadow} receiveShadow>
     <boxGeometry args={size} />
     <meshStandardMaterial color={color} />
   </mesh>
@@ -62,39 +68,62 @@ const Room3D: React.FC = () => (
     {/* window on the back wall */}
     <Box position={[0, 2.3, -HALF + 0.11]} size={[2, 1.4, 0.05]} color="#a8d8ff" />
 
-    {/* bed */}
-    <Box position={[-4, 0.5, -4]} size={[2.2, 0.9, 3.2]} color="#4f7fd6" />
+    {/* bed — mattress, pillow, folded blanket accent for a little color variety */}
+    <Box position={[-4, 0.5, -4]} size={[2.2, 0.9, 3.2]} color="#4f7fd6" castShadow />
     <Box position={[-4, 1.05, -5.3]} size={[2, 0.4, 0.5]} color="#ffffff" />
+    <Box position={[-4, 0.98, -3.1]} size={[2.1, 0.15, 0.5]} color="#f2994a" />
 
     {/* nightstand + lamp */}
-    <Box position={[-2.2, 0.4, -4]} size={[0.6, 0.8, 0.6]} color="#8a5a3b" />
-    <mesh position={[-2.2, 0.95, -4]} castShadow>
+    <Box position={[-2.2, 0.4, -4]} size={[0.6, 0.8, 0.6]} color="#8a5a3b" castShadow />
+    <mesh position={[-2.2, 0.95, -4]}>
       <coneGeometry args={[0.22, 0.3, 12]} />
       <meshStandardMaterial color="#ffe08a" />
     </mesh>
 
-    {/* desk + chair */}
-    <Box position={[4, 0.45, -4.5]} size={[2, 0.9, 1.2]} color="#8a5a3b" />
-    <Box position={[4, 0.45, -3.2]} size={[0.6, 0.9, 0.6]} color="#e07a5f" />
+    {/* wall poster above the bed — a little identity beyond bare walls */}
+    <Box position={[-4, 2.7, -HALF + 0.11]} size={[1.1, 0.8, 0.04]} color="#ffffff" />
+    <Box position={[-4, 2.7, -HALF + 0.13]} size={[0.9, 0.6, 0.02]} color="#e07a5f" />
+
+    {/* desk + chair, with books/lamp/pencil so it reads as "someone's desk" not a brown box */}
+    <Box position={[4, 0.45, -4.5]} size={[2, 0.9, 1.2]} color="#8a5a3b" castShadow />
+    <Box position={[4, 0.45, -3.2]} size={[0.6, 0.9, 0.6]} color="#e07a5f" castShadow />
+    <Box position={[3.5, 0.98, -4.7]} size={[0.35, 0.16, 0.5]} color="#4f7fd6" />
+    <Box position={[3.5, 1.12, -4.7]} size={[0.3, 0.1, 0.45]} color="#f2c14e" />
+    <mesh position={[4.3, 1.2, -4.3]}>
+      <coneGeometry args={[0.16, 0.24, 10]} />
+      <meshStandardMaterial color="#ffe08a" />
+    </mesh>
+    <mesh position={[4.15, 0.94, -4.6]} rotation={[0, 0, Math.PI / 5]}>
+      <cylinderGeometry args={[0.02, 0.02, 0.35, 6]} />
+      <meshStandardMaterial color="#f2994a" />
+    </mesh>
 
     {/* bookshelf */}
-    <Box position={[-5.2, 1.1, 0]} size={[0.8, 2.2, 2.2]} color="#6b4a2f" />
+    <Box position={[-5.2, 1.1, 0]} size={[0.8, 2.2, 2.2]} color="#6b4a2f" castShadow />
     <Box position={[-5.15, 1.6, -0.6]} size={[0.5, 0.3, 0.4]} color="#e07a5f" />
     <Box position={[-5.15, 1.6, 0.1]} size={[0.5, 0.3, 0.4]} color="#4f7fd6" />
     <Box position={[-5.15, 1.6, 0.7]} size={[0.5, 0.3, 0.4]} color="#f2c14e" />
 
     {/* closet */}
-    <Box position={[5.2, 1.6, -4.5]} size={[1.6, 3.2, 1.2]} color="#5c8a5c" />
+    <Box position={[5.2, 1.6, -4.5]} size={[1.6, 3.2, 1.2]} color="#5c8a5c" castShadow />
 
     {/* toy box (obstacle — low enough to jump over, wide enough to require going around too) */}
-    <Box position={[0.6, 0.3, 1]} size={[1.3, 0.6, 1.3]} color="#f2994a" />
+    <Box position={[0.6, 0.3, 1]} size={[1.3, 0.6, 1.3]} color="#f2994a" castShadow />
+
+    {/* small floor toys scattered near the toy box — decorative, no collision, just "someone lives here" clutter */}
+    <Box position={[1.6, 0.12, 1.7]} size={[0.24, 0.24, 0.24]} color="#4f7fd6" rotationY={0.4} />
+    <Box position={[1.3, 0.1, 2.1]} size={[0.2, 0.2, 0.2]} color="#e07a5f" rotationY={-0.3} />
+    <mesh position={[-0.4, 0.15, 1.6]}>
+      <sphereGeometry args={[0.16, 10, 10]} />
+      <meshStandardMaterial color="#f2c14e" />
+    </mesh>
 
     {/* decorative plant */}
-    <mesh position={[5, 0.9, 5]} castShadow>
+    <mesh position={[5, 0.9, 5]}>
       <cylinderGeometry args={[0.15, 0.18, 0.5, 8]} />
       <meshStandardMaterial color="#8a5a3b" />
     </mesh>
-    <mesh position={[5, 1.3, 5]} castShadow>
+    <mesh position={[5, 1.3, 5]}>
       <sphereGeometry args={[0.4, 10, 10]} />
       <meshStandardMaterial color="#5c8a5c" />
     </mesh>

@@ -2,6 +2,12 @@
 
 export const GAME_CONFIG = {
   INITIAL_TIME_SECONDS: 60,
+  /**
+   * The 3D vertical slice's exploration level uses this instead of INITIAL_TIME_SECONDS —
+   * the question right now is "is exploring fun?", not "can you beat the clock?". A real
+   * countdown returns as a difficulty layer once the core loop is validated (see README §9).
+   */
+  EXPLORATION_TIME_SECONDS: 3600,
   POINTS_CORRECT: 100,
   POINTS_INCORRECT: -20,
   /** Combo multiplier by consecutive-correct streak length (1-indexed). Last entry applies to any longer streak. */

@@ -10,6 +10,8 @@ interface GameHUDProps {
   score: number;
   progress: number;
   comboMultiplier: number;
+  /** The 3D exploration vertical slice has no fail-by-time mechanic yet (README §9) — the timer returns as a difficulty layer once the core loop is validated. */
+  showTimer?: boolean;
 }
 
 const formatTime = (totalSeconds: number): string => {
@@ -18,7 +20,7 @@ const formatTime = (totalSeconds: number): string => {
   return `${minutes}:${seconds}`;
 };
 
-const GameHUD: React.FC<GameHUDProps> = ({ avatar, timeRemainingSeconds, score, progress, comboMultiplier }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ avatar, timeRemainingSeconds, score, progress, comboMultiplier, showTimer = true }) => {
   const isLowTime = timeRemainingSeconds <= 10;
 
   return (
@@ -28,10 +30,12 @@ const GameHUD: React.FC<GameHUDProps> = ({ avatar, timeRemainingSeconds, score, 
           <span className="game-hud__avatar" aria-label={avatar.name}>{avatar.thumbnail}</span>
         )}
 
-        <span className={`game-hud__timer${isLowTime ? ' game-hud__timer--low' : ''}`}>
-          <IonIcon icon={timeOutline} aria-hidden="true" />
-          {formatTime(timeRemainingSeconds)}
-        </span>
+        {showTimer && (
+          <span className={`game-hud__timer${isLowTime ? ' game-hud__timer--low' : ''}`}>
+            <IonIcon icon={timeOutline} aria-hidden="true" />
+            {formatTime(timeRemainingSeconds)}
+          </span>
+        )}
 
         <span className="game-hud__score">
           <IonIcon icon={trophyOutline} aria-hidden="true" />

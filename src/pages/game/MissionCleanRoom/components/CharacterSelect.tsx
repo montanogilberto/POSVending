@@ -1,4 +1,4 @@
-import { IonAvatar, IonButton, IonCard, IonCardContent, IonCardTitle } from '@ionic/react';
+import { IonButton, IonCard, IonCardContent, IonCardTitle } from '@ionic/react';
 import React, { useState } from 'react';
 import { getCharacterAssetPath } from '../game/characterAsset';
 import type { Avatar } from '../MissionCleanRoomTypes';
@@ -11,7 +11,14 @@ interface CharacterSelectProps {
   onStart: () => void;
 }
 
-/** Shows real character art when it's been dropped in public/assets/characters/; falls back to the emoji placeholder otherwise. */
+/**
+ * Shows real character art when it's been dropped in public/assets/characters/; falls back to
+ * the emoji placeholder otherwise. Deliberately NOT an IonAvatar: IonAvatar forces a small
+ * circle with object-fit: cover, which zooms into a full-body portrait and crops off the face
+ * and feet — the master spec wants the whole character visible, so this uses a taller frame
+ * with object-fit: contain instead (same "Ionic doesn't fit this shape" exception as the
+ * touch joystick in GameWorld3D).
+ */
 const CharacterPortrait: React.FC<{ avatar: Avatar }> = ({ avatar }) => {
   const assetPath = getCharacterAssetPath(avatar.id);
   const [imageFailed, setImageFailed] = useState(false);
@@ -21,9 +28,9 @@ const CharacterPortrait: React.FC<{ avatar: Avatar }> = ({ avatar }) => {
   }
 
   return (
-    <IonAvatar className="character-card__portrait">
+    <div className="character-card__portrait">
       <img src={assetPath} alt="" onError={() => setImageFailed(true)} />
-    </IonAvatar>
+    </div>
   );
 };
 

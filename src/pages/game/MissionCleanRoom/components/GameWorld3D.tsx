@@ -6,6 +6,7 @@ import React, { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { IS_DEV_BUILD } from '../../../../utils/appEnv';
 import { getAvatar3D } from '../world3d/GameAvatar';
+import { getMission3D } from '../world3d/MissionDefinition';
 import { getCameraObstacles, getRoomObstacles } from '../world3d/Room3D';
 import Room3D from '../world3d/Room3D';
 import Player3D from '../world3d/Player3D';
@@ -27,21 +28,48 @@ interface GameWorld3DProps {
   onItemDropped: (itemId: string) => void;
 }
 
-const PLAYER_SPAWN = new THREE.Vector3(0, 0, 4.5);
-const ITEM_POSITION = new THREE.Vector3(-3.3, 0.3, -3.2);
-const BASKET_POSITION = new THREE.Vector3(3, 0.3, 3.2);
-const STAR_POSITION = new THREE.Vector3(4.6, 0.6, -3.5);
 const ROOM_HALF_SIZE = WORLD3D_CONFIG.ROOM_SIZE / 2;
+/** Objects start hinting (a soft glow) once the player is this close, well before the interact radius. */
+const GLOW_START_DISTANCE = 4;
+const scratchWorldPos = new THREE.Vector3();
 
-const ItemBall: React.FC<{ position: THREE.Vector3 | [number, number, number] }> = ({ position }) => (
-  <mesh position={position} castShadow>
-    <sphereGeometry args={[0.28, 16, 16]} />
-    <meshStandardMaterial color="#2f7bdb" />
-  </mesh>
-);
+const glowIntensity = (playerGroupRef: React.RefObject<THREE.Group | null>, targetWorldPos: THREE.Vector3): number => {
+  const player = playerGroupRef.current;
+  if (!player) return 0;
+  const distance = player.position.distanceTo(targetWorldPos);
+  return THREE.MathUtils.clamp(
+    1 - (distance - WORLD3D_CONFIG.INTERACT_RADIUS) / (GLOW_START_DISTANCE - WORLD3D_CONFIG.INTERACT_RADIUS),
+    0,
+    1,
+  );
+};
 
-const BasketMesh: React.FC = () => (
-  <group position={BASKET_POSITION}>
+interface ItemBallProps {
+  position: THREE.Vector3 | [number, number, number];
+  playerGroupRef?: React.RefObject<THREE.Group | null>;
+}
+
+/** The ball "calls" the player: a soft glow fades in as they approach, well before the pickup prompt appears. */
+const ItemBall: React.FC<ItemBallProps> = ({ position, playerGroupRef }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+
+  useFrame(() => {
+    if (!playerGroupRef || !meshRef.current || !materialRef.current) return;
+    meshRef.current.getWorldPosition(scratchWorldPos);
+    materialRef.current.emissiveIntensity = glowIntensity(playerGroupRef, scratchWorldPos) * 0.7;
+  });
+
+  return (
+    <mesh ref={meshRef} position={position} castShadow>
+      <sphereGeometry args={[0.28, 16, 16]} />
+      <meshStandardMaterial ref={materialRef} color="#2f7bdb" emissive="#8fc4ff" emissiveIntensity={0} />
+    </mesh>
+  );
+};
+
+const BasketMesh: React.FC<{ position: THREE.Vector3 }> = ({ position }) => (
+  <group position={position}>
     <mesh castShadow receiveShadow>
       <cylinderGeometry args={[0.5, 0.4, 0.5, 16, 1, true]} />
       <meshStandardMaterial color="#3f8ee0" side={THREE.DoubleSide} />
@@ -53,12 +81,74 @@ const BasketMesh: React.FC = () => (
   </group>
 );
 
-const StarMesh: React.FC = () => (
-  <mesh position={STAR_POSITION} rotation={[0, 0, Math.PI / 8]} castShadow>
-    <octahedronGeometry args={[0.3, 0]} />
-    <meshStandardMaterial color="#f2c14e" emissive="#f2c14e" emissiveIntensity={0.4} />
-  </mesh>
-);
+interface StarMeshProps {
+  basePosition: THREE.Vector3;
+  playerGroupRef: React.RefObject<THREE.Group | null>;
+}
+
+/** Rotates and bobs continuously, and glows brighter as the player gets close — a small reward for exploring off the direct path. */
+const StarMesh: React.FC<StarMeshProps> = ({ basePosition, playerGroupRef }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+
+  useFrame(({ clock }) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    mesh.rotation.y = clock.elapsedTime * 1.6;
+    mesh.position.set(basePosition.x, basePosition.y + Math.sin(clock.elapsedTime * 2.2) * 0.08, basePosition.z);
+
+    if (materialRef.current) {
+      const t = glowIntensity(playerGroupRef, mesh.position);
+      materialRef.current.emissiveIntensity = 0.35 + t * 0.9;
+      mesh.scale.setScalar(1 + t * 0.2);
+    }
+  });
+
+  return (
+    <mesh ref={meshRef} position={basePosition} rotation={[0, 0, Math.PI / 8]} castShadow>
+      <octahedronGeometry args={[0.3, 0]} />
+      <meshStandardMaterial ref={materialRef} color="#f2c14e" emissive="#f2c14e" emissiveIntensity={0.35} />
+    </mesh>
+  );
+};
+
+const SPARKLE_COUNT = 6;
+const SPARKLE_DURATION = 0.6;
+const sparkleDirections = Array.from({ length: SPARKLE_COUNT }, (_, i) => {
+  const angle = (i / SPARKLE_COUNT) * Math.PI * 2;
+  return new THREE.Vector3(Math.cos(angle), 1.1, Math.sin(angle)).normalize();
+});
+
+/** A handful of small emissive spheres flying outward and fading — no particle library needed for one-off bursts. */
+const SparkleBurst: React.FC<{ position: THREE.Vector3; onComplete: () => void }> = ({ position, onComplete }) => {
+  const groupRef = useRef<THREE.Group>(null);
+  const elapsed = useRef(0);
+
+  useFrame((_, delta) => {
+    elapsed.current += delta;
+    const t = elapsed.current / SPARKLE_DURATION;
+    if (t >= 1) {
+      onComplete();
+      return;
+    }
+    groupRef.current?.children.forEach((child, i) => {
+      child.position.copy(sparkleDirections[i]).multiplyScalar(t * 0.7);
+      const scale = Math.max((1 - t) * 0.13, 0.001);
+      child.scale.setScalar(scale);
+    });
+  });
+
+  return (
+    <group ref={groupRef} position={position}>
+      {sparkleDirections.map((_, i) => (
+        <mesh key={i}>
+          <sphereGeometry args={[1, 6, 6]} />
+          <meshBasicMaterial color="#ffe08a" transparent opacity={0.9} />
+        </mesh>
+      ))}
+    </group>
+  );
+};
 
 const FpsTicker: React.FC<{ onUpdate: (fps: number) => void }> = ({ onUpdate }) => {
   const frames = useRef(0);
@@ -75,9 +165,16 @@ const FpsTicker: React.FC<{ onUpdate: (fps: number) => void }> = ({ onUpdate }) 
   return null;
 };
 
+interface SparkleEvent {
+  id: number;
+  position: THREE.Vector3;
+}
+let sparkleIdSeq = 0;
+
 /** Owns the R3F scene lifecycle, gameplay state (carrying/collected), and the touch/keyboard control surface. */
 const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, onItemPicked, onItemDropped }) => {
   const avatar = useMemo(() => getAvatar3D(avatarId), [avatarId]);
+  const mission = useMemo(() => getMission3D('mission_01'), []);
   const obstacles = useMemo(() => getRoomObstacles(), []);
   const cameraObstacles = useMemo(() => getCameraObstacles(), []);
   const inputRef = useRef<ControlInput3D>({ ...IDLE_INPUT_3D });
@@ -89,34 +186,53 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
   const [starCollected, setStarCollected] = useState(false);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [rewardKey, setRewardKey] = useState<number | null>(null);
+  const [sparkles, setSparkles] = useState<SparkleEvent[]>([]);
 
   useKeyboardControls3D(inputRef);
 
+  const spawnSparkles = useCallback((position: THREE.Vector3) => {
+    sparkleIdSeq += 1;
+    setSparkles((prev) => [...prev, { id: sparkleIdSeq, position: position.clone() }]);
+  }, []);
+
+  const removeSparkle = useCallback((id: number) => {
+    setSparkles((prev) => prev.filter((sparkle) => sparkle.id !== id));
+  }, []);
+
   const interactables = useMemo<Interactable3D[]>(() => [
-    { id: 'item', kind: 'pickup', position: ITEM_POSITION, promptText: `✋ Recoger ${item.name}`, isAvailable: !isCarrying && !delivered },
-    { id: 'basket', kind: 'dropoff', position: BASKET_POSITION, promptText: `✋ Soltar en ${container.name}`, isAvailable: isCarrying },
-    { id: 'star', kind: 'collectible', position: STAR_POSITION, promptText: '✋ Recoger estrella', isAvailable: !starCollected },
-  ], [isCarrying, delivered, starCollected, item.name, container.name]);
+    { id: 'item', kind: 'pickup', position: mission.objective.itemPosition, promptText: `✋ Recoger ${item.name}`, isAvailable: !isCarrying && !delivered },
+    { id: 'basket', kind: 'dropoff', position: mission.objective.containerPosition, promptText: `✋ Soltar en ${container.name}`, isAvailable: isCarrying },
+    ...mission.optionalCollectibles.map((collectible, index) => ({
+      id: `collectible-${index}`,
+      kind: 'collectible' as const,
+      position: collectible.position,
+      promptText: '✋ Recoger estrella',
+      isAvailable: !starCollected,
+    })),
+  ], [mission, isCarrying, delivered, starCollected, item.name, container.name]);
 
   const handleInteract = useCallback((interactable: Interactable3D) => {
     if (interactable.kind === 'pickup') {
       setIsCarrying(true);
+      spawnSparkles(interactable.position);
       onItemPicked?.(item.id);
     } else if (interactable.kind === 'dropoff') {
       setIsCarrying(false);
       setDelivered(true);
+      spawnSparkles(interactable.position);
       onItemDropped(item.id);
       setRewardKey(Date.now());
-    } else {
+    } else if (interactable.kind === 'collectible') {
       setStarCollected(true);
+      spawnSparkles(interactable.position);
     }
-  }, [item.id, onItemPicked, onItemDropped]);
+  }, [item.id, onItemPicked, onItemDropped, spawnSparkles]);
 
   const missionText = !isCarrying && !delivered
-    ? `🧹 Encuentra: ${item.name}`
+    ? mission.narrative.searching
     : isCarrying
-      ? `🧺 Llévala a: ${container.name}`
-      : '🎉 ¡Misión completada!';
+      ? mission.narrative.carrying
+      : mission.narrative.complete;
 
   const handleFpsUpdate = useCallback((fps: number) => {
     if (fpsRef.current) fpsRef.current.textContent = `${fps} FPS`;
@@ -147,7 +263,7 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
               avatar={avatar}
               groupRef={playerGroupRef}
               inputRef={inputRef}
-              initialPosition={PLAYER_SPAWN}
+              initialPosition={mission.playerSpawn}
               roomHalfSize={ROOM_HALF_SIZE}
               obstacles={obstacles}
               carriedItem={isCarrying ? <ItemBall position={[0, 0, 0]} /> : undefined}
@@ -162,9 +278,17 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
               onPromptChange={setPrompt}
             />
 
-            {!isCarrying && !delivered && <ItemBall position={ITEM_POSITION} />}
-            <BasketMesh />
-            {!starCollected && <StarMesh />}
+            {!isCarrying && !delivered && (
+              <ItemBall position={mission.objective.itemPosition} playerGroupRef={playerGroupRef} />
+            )}
+            <BasketMesh position={mission.objective.containerPosition} />
+            {!starCollected && mission.optionalCollectibles.map((collectible, index) => (
+              <StarMesh key={index} basePosition={collectible.position} playerGroupRef={playerGroupRef} />
+            ))}
+
+            {sparkles.map((sparkle) => (
+              <SparkleBurst key={sparkle.id} position={sparkle.position} onComplete={() => removeSparkle(sparkle.id)} />
+            ))}
 
             {prompt && (
               <Html position={prompt.position} center distanceFactor={8} occlude>
@@ -173,8 +297,16 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
             )}
 
             {rewardKey !== null && (
-              <Html key={rewardKey} position={[BASKET_POSITION.x, BASKET_POSITION.y + 1, BASKET_POSITION.z]} center distanceFactor={8}>
-                <div className="game-world-3d__reward" onAnimationEnd={() => setRewardKey(null)}>+100 ✨</div>
+              <Html
+                key={rewardKey}
+                position={[mission.objective.containerPosition.x, mission.objective.containerPosition.y + 1, mission.objective.containerPosition.z]}
+                center
+                distanceFactor={8}
+              >
+                <div className="game-world-3d__reward" onAnimationEnd={() => setRewardKey(null)}>
+                  <span className="game-world-3d__reward-stars">⭐⭐⭐</span>
+                  <span>¡Muy bien! +100</span>
+                </div>
               </Html>
             )}
 

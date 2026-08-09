@@ -4,7 +4,13 @@ import * as THREE from 'three';
 import type { ControlInput3D } from './ControlTypes';
 import { WORLD3D_CONFIG } from './world3dConstants';
 
-export type InteractionKind = 'pickup' | 'dropoff' | 'collectible';
+/**
+ * Only 'pickup' | 'dropoff' | 'collectible' are wired to actual behavior today.
+ * 'inspect' | 'open' | 'talk' are declared now — costs nothing at runtime — so a
+ * future level (open a drawer, inspect a toy, talk to an NPC) is a new
+ * Interactable3D entry, not a rewrite of this InteractionManager.
+ */
+export type InteractionKind = 'pickup' | 'dropoff' | 'collectible' | 'inspect' | 'open' | 'talk';
 
 export interface Interactable3D {
   id: string;
