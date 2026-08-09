@@ -5,20 +5,29 @@ import { WORLD3D_CONFIG } from './world3dConstants';
 
 interface CameraRigProps {
   targetRef: React.RefObject<THREE.Object3D | null>;
-  /** Room geometry to raycast against so the camera pulls in when a wall/furniture piece would block the view. */
-  obstructionRef: React.RefObject<THREE.Object3D | null>;
+  /** Furniture + walls, used to keep the camera from ending up inside solid geometry. */
+  obstacles: THREE.Box3[];
 }
 
 const { CAMERA_HEIGHT, CAMERA_DISTANCE, CAMERA_LOOK_HEIGHT, CAMERA_DAMPING, CAMERA_MIN_DISTANCE } = WORLD3D_CONFIG;
+const PULL_IN_STEP = 0.25;
+const MIN_CAMERA_Y = 0.6;
 
 const idealOffset = new THREE.Vector3();
 const idealLookAt = new THREE.Vector3();
 const currentLookAt = new THREE.Vector3();
-const rayDirection = new THREE.Vector3();
-const raycaster = new THREE.Raycaster();
+const direction = new THREE.Vector3();
+const candidate = new THREE.Vector3();
 
-/** Third-person chase camera: follows behind the player's facing direction, with simple obstruction pull-in. */
-const CameraRig: React.FC<CameraRigProps> = ({ targetRef, obstructionRef }) => {
+const isClear = (point: THREE.Vector3, obstacles: THREE.Box3[]): boolean =>
+  !obstacles.some((box) => box.containsPoint(point));
+
+/**
+ * Third-person chase camera: follows behind the player's facing direction, pulling in along
+ * the same line (rather than raycasting against meshes, which can miss when the player is
+ * already flush against geometry) whenever the ideal spot would land inside a wall/furniture box.
+ */
+const CameraRig: React.FC<CameraRigProps> = ({ targetRef, obstacles }) => {
   const { camera } = useThree();
   const initialized = useRef(false);
 
@@ -27,26 +36,28 @@ const CameraRig: React.FC<CameraRigProps> = ({ targetRef, obstructionRef }) => {
     if (!target) return;
     const delta = Math.min(rawDelta, 1 / 30);
 
-    idealOffset.set(0, CAMERA_HEIGHT, CAMERA_DISTANCE);
+    // The placeholder model's rigged "forward" faces local +Z, so "behind the character" is -Z.
+    idealOffset.set(0, CAMERA_HEIGHT, -CAMERA_DISTANCE);
     idealOffset.applyEuler(new THREE.Euler(0, target.rotation.y, 0));
     idealOffset.add(target.position);
 
     idealLookAt.set(0, CAMERA_LOOK_HEIGHT, 0).add(target.position);
 
-    let desired = idealOffset;
-    const obstruction = obstructionRef.current;
-    if (obstruction) {
-      rayDirection.copy(idealOffset).sub(idealLookAt);
-      const maxDistance = rayDirection.length();
-      rayDirection.normalize();
-      raycaster.set(idealLookAt, rayDirection);
-      raycaster.far = maxDistance;
-      const hit = raycaster.intersectObject(obstruction, true)[0];
-      if (hit) {
-        const pulledDistance = Math.max(CAMERA_MIN_DISTANCE, hit.distance - 0.2);
-        desired = idealLookAt.clone().add(rayDirection.multiplyScalar(pulledDistance));
+    direction.copy(idealOffset).sub(idealLookAt);
+    const maxDistance = direction.length();
+    direction.normalize();
+
+    let safeDistance: number = CAMERA_MIN_DISTANCE;
+    for (let distance = maxDistance; distance >= CAMERA_MIN_DISTANCE; distance -= PULL_IN_STEP) {
+      candidate.copy(idealLookAt).addScaledVector(direction, distance);
+      if (isClear(candidate, obstacles)) {
+        safeDistance = distance;
+        break;
       }
     }
+
+    const desired = idealLookAt.clone().addScaledVector(direction, safeDistance);
+    desired.y = Math.max(desired.y, MIN_CAMERA_Y);
 
     if (!initialized.current) {
       camera.position.copy(desired);

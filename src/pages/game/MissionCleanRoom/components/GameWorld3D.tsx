@@ -6,7 +6,7 @@ import React, { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { IS_DEV_BUILD } from '../../../../utils/appEnv';
 import { getAvatar3D } from '../world3d/GameAvatar';
-import { getRoomObstacles } from '../world3d/Room3D';
+import { getCameraObstacles, getRoomObstacles } from '../world3d/Room3D';
 import Room3D from '../world3d/Room3D';
 import Player3D from '../world3d/Player3D';
 import CameraRig from '../world3d/CameraRig';
@@ -79,9 +79,9 @@ const FpsTicker: React.FC<{ onUpdate: (fps: number) => void }> = ({ onUpdate }) 
 const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, onItemPicked, onItemDropped }) => {
   const avatar = useMemo(() => getAvatar3D(avatarId), [avatarId]);
   const obstacles = useMemo(() => getRoomObstacles(), []);
+  const cameraObstacles = useMemo(() => getCameraObstacles(), []);
   const inputRef = useRef<ControlInput3D>({ ...IDLE_INPUT_3D });
   const playerGroupRef = useRef<THREE.Group>(null);
-  const roomGroupRef = useRef<THREE.Group>(null);
   const fpsRef = useRef<HTMLDivElement>(null);
 
   const [isCarrying, setIsCarrying] = useState(false);
@@ -141,9 +141,7 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
           {/* useGLTF (inside Player3D) suspends while the model loads — everything that depends on
               the player being mounted (camera rig, interaction) lives inside this boundary too. */}
           <Suspense fallback={null}>
-            <group ref={roomGroupRef}>
-              <Room3D />
-            </group>
+            <Room3D />
 
             <Player3D
               avatar={avatar}
@@ -155,7 +153,7 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
               carriedItem={isCarrying ? <ItemBall position={[0, 0, 0]} /> : undefined}
             />
 
-            <CameraRig targetRef={playerGroupRef} obstructionRef={roomGroupRef} />
+            <CameraRig targetRef={playerGroupRef} obstacles={cameraObstacles} />
             <InteractionManager3D
               playerGroupRef={playerGroupRef}
               inputRef={inputRef}

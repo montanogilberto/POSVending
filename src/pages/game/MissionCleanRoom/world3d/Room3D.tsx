@@ -28,6 +28,18 @@ export const getRoomObstacles = (): THREE.Box3[] => [
   new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(0.6, 0.3, 1), new THREE.Vector3(1.3, 0.6, 1.3)), // toy box — the obstacle
 ];
 
+/**
+ * Furniture + walls, for the camera's obstruction check. The player never needs walls in
+ * its own obstacle list (room-bounds clamping already keeps it inside), but the camera
+ * swings out behind the player and can end up beyond/through a wall the player never touched.
+ */
+export const getCameraObstacles = (): THREE.Box3[] => [
+  ...getRoomObstacles(),
+  new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(0, WALL_HEIGHT / 2, -HALF), new THREE.Vector3(ROOM_SIZE, WALL_HEIGHT, 0.2)),
+  new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(-HALF, WALL_HEIGHT / 2, 0), new THREE.Vector3(0.2, WALL_HEIGHT, ROOM_SIZE)),
+  new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(HALF, WALL_HEIGHT / 2, 0), new THREE.Vector3(0.2, WALL_HEIGHT, ROOM_SIZE)),
+];
+
 const Room3D: React.FC = () => (
   <group>
     {/* floor */}
