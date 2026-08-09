@@ -1,0 +1,58 @@
+import type { GameItem } from '../MissionCleanRoomTypes';
+
+export const ITEMS: GameItem[] = [
+  {
+    id: 'ball_blue',
+    name: 'Pelota Azul',
+    category: 'BALL',
+    destinationId: 'blue_net_basket',
+    image: '🔵',
+    position: { x: 30, y: 55 },
+    points: 100,
+  },
+  {
+    id: 'plush_rabbit',
+    name: 'Conejo de Peluche',
+    category: 'PLUSH',
+    destinationId: 'gray_plush_basket',
+    image: '🐰',
+    position: { x: 62, y: 60 },
+    points: 100,
+  },
+  {
+    id: 'dino_blaster',
+    name: 'Lanzador Dino',
+    category: 'LARGE_TOY',
+    destinationId: 'parking_corner',
+    image: '🔫',
+    position: { x: 48, y: 78 },
+    points: 100,
+  },
+  {
+    id: 'scooter',
+    name: 'Scooter',
+    category: 'VEHICLE',
+    destinationId: 'parking_corner',
+    image: '🛴',
+    position: { x: 70, y: 82 },
+    points: 100,
+  },
+  {
+    id: 'car_red',
+    name: 'Carrito Rojo',
+    category: 'SMALL_TOY',
+    destinationId: 'organizer_shelf',
+    image: '🚗',
+    position: { x: 20, y: 45 },
+    points: 100,
+  },
+  {
+    id: 'blocks',
+    name: 'Bloques',
+    category: 'BLOCKS',
+    destinationId: 'organizer_shelf',
+    image: '🧱',
+    position: { x: 40, y: 40 },
+    points: 100,
+  },
+];

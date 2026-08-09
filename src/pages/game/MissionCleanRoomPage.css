@@ -1,0 +1,19 @@
+.mission-clean-room-content {
+  --background: #f4f8ff;
+}
+
+.mission-clean-room__playing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+.mission-clean-room__end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 48px 16px;
+}

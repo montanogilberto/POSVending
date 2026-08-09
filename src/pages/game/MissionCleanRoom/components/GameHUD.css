@@ -1,0 +1,51 @@
+.game-hud {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px;
+  background: #ffffff;
+  box-shadow: var(--header-shadow);
+}
+
+.game-hud__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.game-hud__avatar {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.game-hud__timer,
+.game-hud__score {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.game-hud__timer--low {
+  color: var(--ion-color-danger, #eb445a);
+}
+
+.game-hud__combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.game-hud__progress {
+  height: 10px;
+  border-radius: 6px;
+}
+
+.game-hud__progress-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  align-self: flex-end;
+}
