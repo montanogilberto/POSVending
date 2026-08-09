@@ -1,0 +1,136 @@
+.game-world-3d {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 16px;
+}
+
+.game-world-3d__mission {
+  align-self: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  background: #ffffffcc;
+  border-radius: 999px;
+  padding: 6px 16px;
+}
+
+.game-world-3d__fps {
+  position: absolute;
+  top: 4px;
+  right: 16px;
+  z-index: 5;
+  font: 12px monospace;
+  color: #fff;
+  background: #000000aa;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.game-world-3d__canvas {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+  touch-action: none;
+}
+
+.game-world-3d__canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.game-world-3d__prompt {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: #000000b3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.game-world-3d__reward {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #15803d;
+  text-shadow: 0 1px 2px #ffffffcc;
+  pointer-events: none;
+  animation: game-world-3d-float-up 900ms ease-out forwards;
+}
+
+@keyframes game-world-3d-float-up {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-40px); opacity: 0; }
+}
+
+.game-world-3d__controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.touch-joystick {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: #00000022;
+  border: 2px solid #00000033;
+  touch-action: none;
+}
+
+.touch-joystick__knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  background: var(--dashboard-blue);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.game-world-3d__action-pad {
+  display: flex;
+  gap: 10px;
+}
+
+.game-world-3d__control-button {
+  --border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  font-size: 1.4rem;
+}
+
+.game-world-3d__control-button--jump {
+  --background: var(--dashboard-blue);
+  width: 64px;
+  height: 64px;
+}
+
+@media (min-width: 768px) {
+  .game-world-3d__controls {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-world-3d__reward {
+    animation: none;
+  }
+}

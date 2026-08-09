@@ -2,7 +2,9 @@ import { IonButton } from '@ionic/react';
 import React from 'react';
 import CharacterSelect from './components/CharacterSelect';
 import GameHUD from './components/GameHUD';
-import GameWorld from './components/GameWorld';
+// 3D vertical slice (feat/3d-mission-clean-room) — the Phaser ./components/GameWorld
+// stays in the codebase untouched as the fallback reference until this is validated.
+import GameWorld3D from './components/GameWorld3D';
 import { useGameEngine } from './hooks/useGameEngine';
 
 const MissionCleanRoomView: React.FC = () => {
@@ -52,7 +54,7 @@ const MissionCleanRoomView: React.FC = () => {
         comboMultiplier={state.stats.comboMultiplier}
       />
 
-      <GameWorld
+      <GameWorld3D
         avatarId={state.selectedAvatarId}
         item={item}
         container={container}
