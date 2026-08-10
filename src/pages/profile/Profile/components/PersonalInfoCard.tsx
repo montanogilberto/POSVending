@@ -1,25 +1,28 @@
 import React from 'react';
 import {
-  IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon,
-  IonInput, IonItem, IonLabel, IonSpinner,
+  IonButton, IonCard, IonCardContent, IonIcon, IonInput, IonItem, IonLabel, IonSpinner,
 } from '@ionic/react';
-import { createOutline } from 'ionicons/icons';
+import {
+  callOutline, createOutline, mailOutline, personOutline,
+} from 'ionicons/icons';
 import { ProfileVM } from '../ProfileLogic';
 
-/** Datos personales: nombre, apellido, correo, celular — un solo formulario editable. */
+/** Datos personales: nombre, correo, celular — icon-row style, un formulario editable. */
 const PersonalInfoCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => (
   <IonCard className="profile-card">
-    <IonCardHeader>
-      <div className="profile-card-title-row">
-        <IonCardTitle>Personales</IonCardTitle>
+    <IonCardContent>
+      <div className="profile-section-header">
+        <span className="profile-section-icon profile-icon-blue">
+          <IonIcon icon={personOutline} />
+        </span>
+        <h3>Personales</h3>
         {!vm.editing && (
-          <IonButton fill="clear" size="small" onClick={() => vm.setEditing(true)}>
+          <IonButton fill="clear" size="small" className="profile-edit-btn" onClick={() => vm.setEditing(true)}>
             <IonIcon icon={createOutline} slot="start" /> Editar
           </IonButton>
         )}
       </div>
-    </IonCardHeader>
-    <IonCardContent>
+
       {vm.editing ? (
         <>
           <IonItem>
@@ -52,16 +55,25 @@ const PersonalInfoCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => (
       ) : (
         <div className="profile-info-list">
           <div className="profile-info-row">
-            <span>Nombre</span>
-            <strong>{vm.form.first_name} {vm.form.last_name}</strong>
+            <span className="profile-row-icon profile-icon-blue-soft"><IonIcon icon={personOutline} /></span>
+            <div className="profile-row-text">
+              <span>Nombre</span>
+              <strong>{vm.form.first_name} {vm.form.last_name}</strong>
+            </div>
           </div>
           <div className="profile-info-row">
-            <span>Correo electrónico</span>
-            <strong>{vm.form.email || '—'}</strong>
+            <span className="profile-row-icon profile-icon-blue-soft"><IonIcon icon={mailOutline} /></span>
+            <div className="profile-row-text">
+              <span>Correo electrónico</span>
+              <strong>{vm.form.email || '—'}</strong>
+            </div>
           </div>
           <div className="profile-info-row">
-            <span>Número de celular</span>
-            <strong>{vm.form.cellphone || '—'}</strong>
+            <span className="profile-row-icon profile-icon-blue-soft"><IonIcon icon={callOutline} /></span>
+            <div className="profile-row-text">
+              <span>Número de celular</span>
+              <strong>{vm.form.cellphone || '—'}</strong>
+            </div>
           </div>
         </div>
       )}

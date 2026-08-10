@@ -1,48 +1,64 @@
 import React from 'react';
 import {
-  IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon, IonItem,
-  IonLabel, IonNote, IonToggle,
+  IonBadge, IonCard, IonCardContent, IonIcon, IonToggle,
 } from '@ionic/react';
-import { fingerPrintOutline, keyOutline } from 'ionicons/icons';
+import {
+  chevronForwardOutline, fingerPrintOutline, informationCircleOutline, keyOutline, lockClosedOutline,
+} from 'ionicons/icons';
 import { ProfileVM } from '../ProfileLogic';
 
 /**
  * Seguridad: bloqueo biométrico (real, funcional) + cambiar contraseña.
- * "Cambiar contraseña" NO llama a un backend todavía — ver nota en ProfileView.
+ * "Cambiar contraseña" muestra la verdad — nunca se ha podido cambiar en esta
+ * app, así que "Última actualización: Nunca" es honesto, no un placeholder.
+ * El tap informa que está pendiente en vez de fingir una acción real.
  */
 const SecurityCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => (
   <IonCard className="profile-card">
-    <IonCardHeader><IonCardTitle>Métodos de autenticación</IonCardTitle></IonCardHeader>
     <IonCardContent>
-      <IonItem lines="none" className="profile-security-item">
-        <IonIcon icon={fingerPrintOutline} slot="start" />
-        <IonLabel>
-          <h3>Bloqueo biométrico</h3>
+      <div className="profile-section-header">
+        <span className="profile-section-icon profile-icon-green">
+          <IonIcon icon={lockClosedOutline} />
+        </span>
+        <div className="profile-section-heading">
+          <h3>Métodos de autenticación</h3>
+          <p>Administra cómo accedes a tu cuenta</p>
+        </div>
+      </div>
+
+      <div className="profile-auth-row">
+        <span className="profile-row-icon profile-icon-green-soft"><IonIcon icon={fingerPrintOutline} /></span>
+        <div className="profile-row-text">
+          <strong>Bloqueo biométrico</strong>
           <p>
             {vm.biometricSupported
-              ? 'Usa tu huella o rostro para abrir la app.'
+              ? 'Activa tu huella digital para iniciar sesión.'
               : 'No disponible en este dispositivo.'}
           </p>
-        </IonLabel>
+          {vm.biometricSupported && !vm.biometricEnabled && (
+            <IonBadge className="profile-recommended-badge">Recomendado</IonBadge>
+          )}
+        </div>
         <IonToggle
-          slot="end"
           checked={vm.biometricEnabled}
           disabled={!vm.biometricSupported}
           onIonChange={e => vm.handleBiometricToggle(e.detail.checked)}
         />
-      </IonItem>
+      </div>
 
-      <IonItem lines="none" className="profile-security-item profile-security-disabled">
-        <IonIcon icon={keyOutline} slot="start" color="medium" />
-        <IonLabel color="medium">
-          <h3>Cambiar contraseña</h3>
-          <p>Próximamente</p>
-        </IonLabel>
-      </IonItem>
-      <IonNote className="profile-security-note">
-        Esta opción requiere primero una actualización de seguridad en el
-        backend (el cambio de contraseña actual no está implementado).
-      </IonNote>
+      <div className="profile-auth-row profile-auth-row-button" onClick={vm.handlePasswordTap} role="button" tabIndex={0}>
+        <span className="profile-row-icon profile-icon-purple-soft"><IonIcon icon={keyOutline} /></span>
+        <div className="profile-row-text">
+          <strong>Cambiar contraseña</strong>
+          <p>Última actualización: Nunca</p>
+        </div>
+        <IonIcon icon={chevronForwardOutline} className="profile-auth-chevron" />
+      </div>
+
+      <div className="profile-tip">
+        <IonIcon icon={informationCircleOutline} />
+        <span>Te recomendamos mantener tus métodos de autenticación actualizados para mayor seguridad.</span>
+      </div>
     </IonCardContent>
   </IonCard>
 );

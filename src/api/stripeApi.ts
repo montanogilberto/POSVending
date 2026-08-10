@@ -21,6 +21,31 @@ export interface StripeConnectedAccount {
   tosAcceptedAt?: string | null;
 }
 
+export interface SavedPaymentMethod {
+  stripePaymentMethodId?: string;
+  last4?: string;
+  brand?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+}
+
+// Tarjeta guardada para el cobro automático de cuotas (savedPaymentMethods).
+// Antes vivía como fetch() inline duplicado en ClientDashboardPage y P2P —
+// una sola función reutilizable, misma política que el resto de este archivo.
+export async function getSavedPaymentMethod(
+  clientId: number,
+  companyId: number
+): Promise<SavedPaymentMethod | null> {
+  const res = await fetch(BASE_URL + "/automated-payments/saved-method", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId, companyId }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => ({}));
+  return data?.paymentMethod?.stripePaymentMethodId ? data.paymentMethod : null;
+}
+
 // STATUS -- POST /stripe/connected-accounts/status
 export async function getStripeAccountStatus(
   clientId: number,

@@ -408,6 +408,20 @@ const P2PLendingPage: React.FC = () => {
         expiresAt: expires.toISOString(),
       });
 
+      // Un solo anuncio vivo por prestamista: republicar REEMPLAZA al anterior.
+      // Sin esto las ofertas se acumulaban y el mercado mostraba al mismo
+      // prestamista repetido, sumando más capital del que respalda su billetera
+      // (el chequeo de fondos de arriba solo compara la oferta nueva).
+      // Se desactivan DESPUÉS de crear la nueva para que un fallo al crear no
+      // deje al prestamista sin ninguna oferta publicada.
+      for (const prev of offers.filter(o => o.lenderId === clientId && o.isActive)) {
+        console.log('[P2P] publishOffer: replacing previous offer', prev.offerId);
+        await updateLoanOffer(prev.offerId, companyId, {
+          isActive: false,
+          description: 'Reemplazada por una oferta más reciente',
+        }).catch(e => console.log('[P2P] publishOffer: replace FAILED —', String(e)));
+      }
+
       // 2. Send push notification to ALL borrowers
       const borrowers = clients.filter(c => c.clientType === 'borrower' || c.clientType === 'both');
       const lenderName = myClient ? `${myClient.first_name} ${myClient.last_name}` : 'Prestamista';
@@ -659,20 +673,22 @@ const P2PLendingPage: React.FC = () => {
       }).catch(() => {});
 
       // The lent amount consumes the lender's announced capital — decrement
-      // the active offer(s) and deactivate at $0 so nobody is notified about
-      // money that is no longer available.
+      // the active offer(s) and deactivate the leftover when it drops below
+      // a useful loan size (a $1 residue kept cards alive in the market).
       try {
+        const MIN_OFFER_REMAINDER_MXN = 100;
         let toConsume = requestedAmount;
         for (const o of offers.filter(x => x.lenderId === lenderId && x.isActive)) {
           if (toConsume <= 0) break;
           const take = Math.min(o.availableCapital, toConsume);
           const remaining = o.availableCapital - take;
           toConsume -= take;
-          console.log('[P2P] acceptProposal: offer bookkeeping', JSON.stringify({ offerId: o.offerId, remaining }));
+          const stillUseful = remaining >= MIN_OFFER_REMAINDER_MXN;
+          console.log('[P2P] acceptProposal: offer bookkeeping', JSON.stringify({ offerId: o.offerId, remaining, stillUseful }));
           await updateLoanOffer(o.offerId, companyId, {
             availableCapital: remaining,
-            isActive: remaining > 0,
-            ...(remaining <= 0 ? { description: 'Capital consumido por préstamo (P2P)' } : {}),
+            isActive: stillUseful,
+            ...(!stillUseful ? { description: 'Capital consumido por préstamo (P2P)' } : {}),
           });
         }
       } catch (e) {
