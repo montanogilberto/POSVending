@@ -1,0 +1,26 @@
+.mission-clean-room-content {
+  --background: #f4f8ff;
+}
+
+/* Fills the page below the header instead of scrolling — the game canvas is the
+   dominant element (see GameWorld3D.css), not a small box embedded in a page.
+   Ionic's internal scroll container is `position: absolute; inset: 0` on the
+   ion-content host regardless of scroll settings, so height: 100% here resolves
+   against that (percentage-height resolution isn't blocked by the shadow
+   boundary — only CSS *selectors* are scoped by it, not the box model). */
+.mission-clean-room__playing {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mission-clean-room__end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 48px 16px;
+  position: relative;
+  height: 100%;
+}

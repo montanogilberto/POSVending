@@ -1,0 +1,59 @@
+.game-world {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px 16px;
+}
+
+.game-world__canvas {
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 4 / 3;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+  touch-action: none;
+}
+
+.game-world__canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.game-world__controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 420px;
+}
+
+.game-world__move-pad,
+.game-world__action-pad {
+  display: flex;
+  gap: 10px;
+}
+
+.game-world__control-button {
+  --border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  font-size: 1.4rem;
+}
+
+.game-world__control-button--jump {
+  --background: var(--dashboard-blue);
+  width: 64px;
+  height: 64px;
+}
+
+@media (min-width: 768px) {
+  .game-world__controls {
+    opacity: 0.35;
+  }
+}

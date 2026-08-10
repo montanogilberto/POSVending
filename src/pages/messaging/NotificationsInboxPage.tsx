@@ -15,12 +15,24 @@ import {
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
+import { canAccess } from '../../config/rolePermissions';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import {
   fetchMyNotifications, markNotificationsRead, InboxNotification,
 } from '../../api/myNotificationsApi';
+
+/**
+ * Some backend-issued notifications (e.g. "complete tu registro / cuentas de
+ * pago") still carry a staff-only navigationRoute like /clients — those are
+ * meant for the requester's own profile, not the agent client-list module.
+ * Remap here rather than trusting the stored route blindly for roles that
+ * can't reach it.
+ */
+const STAFF_ONLY_ROUTES: Record<string, string> = {
+  '/clients': '/profile',
+};
 
 const TYPE_ICON: Record<string, string> = {
   Success: checkmarkCircleOutline,
@@ -34,7 +46,7 @@ const TYPE_COLOR: Record<string, string> = {
 
 const NotificationsInboxPage: React.FC = () => {
   const history = useHistory();
-  const { userId } = useUser();
+  const { userId, roleCode } = useUser();
   const [items, setItems] = useState<InboxNotification[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -62,8 +74,13 @@ const NotificationsInboxPage: React.FC = () => {
   useIonViewWillEnter(() => { load(true); }, [load]);
 
   const open = (n: InboxNotification) => {
-    console.log('[Inbox] open →', n.pushNotificationId, n.navigationRoute ?? '(sin ruta)');
-    if (n.navigationRoute) history.push(n.navigationRoute);
+    let route = n.navigationRoute;
+    if (route && STAFF_ONLY_ROUTES[route] && !canAccess(roleCode, 'clients')) {
+      console.log('[Inbox] open: remapping staff-only route', route, '→', STAFF_ONLY_ROUTES[route], 'for role', roleCode);
+      route = STAFF_ONLY_ROUTES[route];
+    }
+    console.log('[Inbox] open →', n.pushNotificationId, route ?? '(sin ruta)');
+    if (route) history.push(route);
   };
 
   return (

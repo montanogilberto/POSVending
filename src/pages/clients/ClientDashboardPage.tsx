@@ -1029,9 +1029,17 @@ const ClientDashboardPage: React.FC = () => {
           <IonCardTitle>Progreso para Préstamo</IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
-          <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
-          {loanCompletionPct < 100 && (
+          {loanCompletionPct === 100 ? (
+            // Steps are already viewable in detail under Mis Datos — once
+            // eligible there's no action left to drive here, so this stays
+            // a status line instead of repeating the full ring + checklist.
+            <div className="loan-progress-complete-row">
+              <IonIcon icon={checkmarkCircle} />
+              Perfil completo — elegible para solicitar préstamo.
+            </div>
+          ) : (
             <>
+              <LoanCompletionRing percentage={loanCompletionPct} size={96} strokeWidth={7} steps={loanSteps} showSteps />
               <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
                 Completa todos los pasos para acceder al crédito.
               </p>
@@ -1043,11 +1051,6 @@ const ClientDashboardPage: React.FC = () => {
                 </IonButton>
               )}
             </>
-          )}
-          {loanCompletionPct === 100 && (
-            <p style={{ fontSize: 12, color: '#059669', marginTop: 12, marginBottom: 0, fontWeight: 600 }}>
-              ✓ Perfil completo — elegible para solicitar préstamo.
-            </p>
           )}
         </IonCardContent>
       </IonCard>

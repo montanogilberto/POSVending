@@ -31,6 +31,20 @@
   color: #0e1a2f;
 }
 
+.loan-progress-complete-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.loan-progress-complete-row ion-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
 .hero-card ion-card-content {
   padding: 20px;
 }

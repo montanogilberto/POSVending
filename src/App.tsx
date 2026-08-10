@@ -61,6 +61,7 @@ import {
   cardOutline,
   pulseOutline,
   personCircleOutline,
+  gameControllerOutline,
 }
   from 'ionicons/icons';
   
@@ -112,6 +113,7 @@ import RewardsPage from './pages/finance/RewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import LoanDetailPage from './pages/loans/LoanDetailPage';
+import MissionCleanRoomPage from './pages/game/MissionCleanRoomPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -590,6 +592,15 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'game') && (
+              <IonItem button routerLink="/game/mission-clean-room" title="Misión: Limpiar el Cuarto">
+                <IonIcon icon={gameControllerOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Misión: Limpiar el Cuarto</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
             {!menuCollapsed && <IonItemDivider>Finanzas P2P</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
@@ -721,6 +732,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
             <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
+            <PrivateRoute exact path="/game/mission-clean-room" component={MissionCleanRoomPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
