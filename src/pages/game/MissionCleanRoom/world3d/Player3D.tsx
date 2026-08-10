@@ -11,6 +11,8 @@ interface Player3DProps {
   /** Owned by the parent (GameWorld3D) so CameraRig/InteractionManager3D can also read position/rotation each frame. */
   groupRef: React.RefObject<THREE.Group | null>;
   inputRef: React.RefObject<ControlInput3D>;
+  /** Same camera orbit angle CameraRig reads — movement is interpreted relative to it (Roblox-style: joystick "up" always means "the direction the camera is currently looking"). */
+  yawRef: React.MutableRefObject<number>;
   initialPosition: THREE.Vector3;
   roomHalfSize: number;
   obstacles: THREE.Box3[];
@@ -20,8 +22,15 @@ interface Player3DProps {
 
 const { WALK_SPEED, RUN_SPEED, RUN_INPUT_THRESHOLD, TURN_DAMPING, GRAVITY, JUMP_VELOCITY, PLAYER_HALF_EXTENT } = WORLD3D_CONFIG;
 
+// Module-level scratch objects — avoid per-frame allocation (same discipline as CameraRig).
+const localForward = new THREE.Vector3(0, 0, 1); // this model's rigged "forward" faces local +Z (see CameraRig)
+const localRight = new THREE.Vector3(1, 0, 0);
+const camForward = new THREE.Vector3();
+const camRight = new THREE.Vector3();
+const worldMove = new THREE.Vector3();
+
 /** Owns the player's movement/gravity/jump and the resulting locomotion animation — manual physics, no physics engine needed for one capsule vs. a handful of room boxes. */
-const Player3D: React.FC<Player3DProps> = ({ avatar, groupRef, inputRef, initialPosition, roomHalfSize, obstacles, carriedItem, onStateChange }) => {
+const Player3D: React.FC<Player3DProps> = ({ avatar, groupRef, inputRef, yawRef, initialPosition, roomHalfSize, obstacles, carriedItem, onStateChange }) => {
   const { scene, animations } = useGLTF(avatar.modelUrl);
   const { actions } = useAnimations(animations, groupRef);
 
@@ -71,17 +80,28 @@ const Player3D: React.FC<Player3DProps> = ({ avatar, groupRef, inputRef, initial
     squashY.current = THREE.MathUtils.damp(squashY.current, 1, 8, delta);
     node.scale.set(avatar.scale, avatar.scale * squashY.current, avatar.scale);
 
-    const moveVec = new THREE.Vector3(input.moveX, 0, input.moveZ);
-    const magnitude = moveVec.length();
+    // Input (moveX = strafe, moveZ = forward/back) is relative to the camera's current orbit
+    // angle, not raw world axes — pushing "up" always means "the direction the camera is
+    // looking", exactly like the joystick/right-stick relationship in Roblox-style games.
+    const magnitude = Math.hypot(input.moveX, input.moveZ);
     const isMoving = magnitude > 0.05;
     const running = input.running && magnitude >= RUN_INPUT_THRESHOLD;
     const speed = running ? RUN_SPEED : WALK_SPEED;
 
     if (isMoving) {
-      moveVec.normalize().multiplyScalar(speed * delta);
+      const camYaw = yawRef.current;
+      camForward.copy(localForward).applyEuler(new THREE.Euler(0, camYaw, 0));
+      camRight.copy(localRight).applyEuler(new THREE.Euler(0, camYaw, 0));
+
+      worldMove.set(0, 0, 0)
+        .addScaledVector(camForward, -input.moveZ)
+        .addScaledVector(camRight, input.moveX)
+        .normalize()
+        .multiplyScalar(speed * delta);
+
       const bound = roomHalfSize - PLAYER_HALF_EXTENT;
-      const nextX = THREE.MathUtils.clamp(node.position.x + moveVec.x, -bound, bound);
-      const nextZ = THREE.MathUtils.clamp(node.position.z + moveVec.z, -bound, bound);
+      const nextX = THREE.MathUtils.clamp(node.position.x + worldMove.x, -bound, bound);
+      const nextZ = THREE.MathUtils.clamp(node.position.z + worldMove.z, -bound, bound);
 
       const testPoint = new THREE.Vector3(nextX, 0.5, nextZ);
       const blocked = grounded.current && obstacles.some((box) => box.containsPoint(testPoint));
@@ -90,7 +110,7 @@ const Player3D: React.FC<Player3DProps> = ({ avatar, groupRef, inputRef, initial
         node.position.z = nextZ;
       }
 
-      const targetYaw = Math.atan2(moveVec.x, moveVec.z);
+      const targetYaw = Math.atan2(worldMove.x, worldMove.z);
       node.rotation.y = THREE.MathUtils.damp(node.rotation.y, targetYaw, TURN_DAMPING, delta);
     }
 

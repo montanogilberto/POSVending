@@ -1,25 +1,35 @@
+/* Fills whatever height MissionCleanRoomPage gives it (see MissionCleanRoomPage.css) —
+   the canvas is the dominant element, everything else overlays on top of it. Previously
+   this sat in a small 480px boxed card with the HUD/controls stacked below it, which read
+   as "an app with a video embedded" rather than a game filling the screen. */
 .game-world-3d {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 0 12px 16px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
 .game-world-3d__mission {
-  align-self: center;
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--text-primary);
-  background: #ffffffcc;
+  background: #ffffffdd;
   border-radius: 999px;
   padding: 6px 16px;
+  max-width: calc(100% - 32px);
+  text-align: center;
+  pointer-events: none;
 }
 
 .game-world-3d__fps {
   position: absolute;
-  top: 4px;
-  right: 16px;
+  top: 10px;
+  right: 52px;
   z-index: 5;
   font: 12px monospace;
   color: #fff;
@@ -28,14 +38,32 @@
   border-radius: 6px;
 }
 
+.game-world-3d__mute-button {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  z-index: 6;
+  --color: var(--text-primary);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.game-world-3d__finish-button {
+  position: absolute;
+  bottom: 128px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  --border-radius: 999px;
+  --background: var(--dashboard-blue);
+  margin: 0;
+}
+
 .game-world-3d__canvas {
-  width: 100%;
-  max-width: 480px;
-  aspect-ratio: 4 / 3;
-  margin: 0 auto;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: var(--shadow-soft);
+  position: absolute;
+  inset: 0;
   touch-action: none;
 }
 
@@ -88,13 +116,21 @@
   100% { transform: scale(1); }
 }
 
+/* The container spans the full width so the joystick/buttons sit at opposite edges, but the
+   empty middle strip must NOT intercept pointer events — that's exactly where a "drag to look
+   around" swipe on the lower half of the screen would land, and it needs to reach the canvas
+   underneath. Only the actual controls opt back into pointer-events. */
 .game-world-3d__controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  z-index: 5;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
+  padding: 0 16px;
+  pointer-events: none;
 }
 
 .touch-joystick {
@@ -105,6 +141,7 @@
   background: #00000022;
   border: 2px solid #00000033;
   touch-action: none;
+  pointer-events: auto;
 }
 
 .touch-joystick__knob {
@@ -123,6 +160,7 @@
 .game-world-3d__action-pad {
   display: flex;
   gap: 10px;
+  pointer-events: auto;
 }
 
 .game-world-3d__control-button {

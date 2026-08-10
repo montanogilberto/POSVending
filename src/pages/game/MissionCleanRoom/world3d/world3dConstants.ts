@@ -14,11 +14,14 @@ export const WORLD3D_CONFIG = {
 
   INTERACT_RADIUS: 1.5,
 
-  // Tuned so the character reads at roughly 15-25% of frame height (third-person
-  // "see the world around you" framing, not a close-up) — verified visually.
-  CAMERA_HEIGHT: 3.6,
-  CAMERA_DISTANCE: 6.8,
+  // CAMERA_DISTANCE must stay well below ROOM_SIZE/2 (6): the anti-clip system pulls
+  // the camera in whenever the ideal spot would land outside a wall, and at any
+  // distance >= the room's half-size that's true EVERYWHERE, even standing still at
+  // the center facing any direction — the camera was collapsing to CAMERA_MIN_DISTANCE
+  // constantly, not just near walls, which read as "I can't see anything while I walk".
+  CAMERA_HEIGHT: 2.6,
+  CAMERA_DISTANCE: 4.2,
   CAMERA_LOOK_HEIGHT: 1.4,
   CAMERA_DAMPING: 6,
-  CAMERA_MIN_DISTANCE: 1.2,
+  CAMERA_MIN_DISTANCE: 1.4,
 } as const;

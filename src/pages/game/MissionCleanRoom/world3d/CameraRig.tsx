@@ -7,6 +7,8 @@ interface CameraRigProps {
   targetRef: React.RefObject<THREE.Object3D | null>;
   /** Furniture + walls, used to keep the camera from ending up inside solid geometry. */
   obstacles: THREE.Box3[];
+  /** Orbit angle around the player, in radians — owned by GameWorld3D, updated by drag gestures. */
+  yawRef: React.MutableRefObject<number>;
 }
 
 const { CAMERA_HEIGHT, CAMERA_DISTANCE, CAMERA_LOOK_HEIGHT, CAMERA_DAMPING, CAMERA_MIN_DISTANCE } = WORLD3D_CONFIG;
@@ -23,11 +25,14 @@ const isClear = (point: THREE.Vector3, obstacles: THREE.Box3[]): boolean =>
   !obstacles.some((box) => box.containsPoint(point));
 
 /**
- * Third-person chase camera: follows behind the player's facing direction, pulling in along
- * the same line (rather than raycasting against meshes, which can miss when the player is
- * already flush against geometry) whenever the ideal spot would land inside a wall/furniture box.
+ * Third-person orbit camera, Roblox-style: the ORBIT ANGLE is independent user input (a drag
+ * gesture, see GameWorld3D), not derived from the player's facing — the player instead turns to
+ * face wherever they move, and movement itself is interpreted relative to this camera angle (see
+ * Player3D). Pulls in along the same line (rather than raycasting against meshes, which can miss
+ * when the player is already flush against geometry) whenever the ideal spot lands inside a wall/
+ * furniture box.
  */
-const CameraRig: React.FC<CameraRigProps> = ({ targetRef, obstacles }) => {
+const CameraRig: React.FC<CameraRigProps> = ({ targetRef, obstacles, yawRef }) => {
   const { camera } = useThree();
   const initialized = useRef(false);
 
@@ -36,9 +41,9 @@ const CameraRig: React.FC<CameraRigProps> = ({ targetRef, obstacles }) => {
     if (!target) return;
     const delta = Math.min(rawDelta, 1 / 30);
 
-    // The placeholder model's rigged "forward" faces local +Z, so "behind the character" is -Z.
+    // The placeholder model's rigged "forward" faces local +Z, so "behind the camera angle" is -Z.
     idealOffset.set(0, CAMERA_HEIGHT, -CAMERA_DISTANCE);
-    idealOffset.applyEuler(new THREE.Euler(0, target.rotation.y, 0));
+    idealOffset.applyEuler(new THREE.Euler(0, yawRef.current, 0));
     idealOffset.add(target.position);
 
     idealLookAt.set(0, CAMERA_LOOK_HEIGHT, 0).add(target.position);

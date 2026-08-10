@@ -1,0 +1,95 @@
+.game-over-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at center, #ffffffcc 0%, #e6e6e6cc 70%, #c9c9c9cc 100%);
+  animation: game-over-modal-fade-in 300ms ease-out;
+}
+
+.game-over-modal__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  max-width: 340px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 28px 24px 24px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  animation: game-over-modal-pop 400ms ease-out;
+}
+
+.game-over-modal__title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.game-over-modal__description {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+}
+
+.game-over-modal__stats {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.game-over-modal__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.game-over-modal__stat-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.game-over-modal__stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.game-over-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.game-over-modal__button {
+  --border-radius: 14px;
+  margin: 0;
+}
+
+.game-over-modal__button--primary {
+  --background: var(--dashboard-blue);
+}
+
+@keyframes game-over-modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes game-over-modal-pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-over-modal,
+  .game-over-modal__card {
+    animation: none;
+  }
+}

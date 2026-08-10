@@ -64,6 +64,9 @@ intercambiable, tal como pedía la arquitectura original.
 | `feat/mission-clean-room-game` NO se borra | Sirve de referencia/fallback comparable si el rendimiento 3D en dispositivos móviles modestos no es aceptable. |
 | `MissionDefinition3D` (`world3d/MissionDefinition.ts`) | Las posiciones 3D del objeto/cesta/coleccionable y el texto narrativo ya NO están hardcodeados en `GameWorld3D.tsx` — viven en una definición de misión separada. Una misión 2 (encuentra el conejo) es una entrada nueva en este archivo, no un cambio al motor. |
 | `InteractionKind` ampliado (`pickup \| dropoff \| collectible \| inspect \| open \| talk`) | Solo los tres primeros tienen comportamiento hoy; los otros tres se declaran ahora (costo cero en runtime, son solo tipos) para que abrir un cajón, inspeccionar un juguete o hablar con un NPC en un nivel futuro sea una nueva entrada de `Interactable3D`, no una reescritura de `InteractionManager3D`. |
+| Yaw de cámara independiente (`useCameraDrag.ts`) | Antes: la rotación del personaje venía del input crudo y la cámara heredaba esa rotación — sin control independiente de la cámara, "adelante" siempre significaba "hacia donde mira el personaje", lo cual se sentía desorientador. Ahora `GameWorld3D` posee un `cameraYawRef` propio, actualizado por arrastre (Pointer Events) sobre el canvas; el input de movimiento se transforma por ese yaw ANTES de mover al personaje, y la orientación del personaje se deriva del vector de movimiento resultante — el mismo patrón joystick/cámara de Roblox. |
+| `useGameAudio.ts` | `play(key)` con fallback silencioso si el MP3 no existe (mismo patrón que los placeholders de arte): construye todos los `<audio>` una vez, marca `unavailable` solo ante el evento `error` del elemento (nunca ante un rechazo de `.play()`, que puede ser un re-trigger no fatal). Expone `muted`/`toggleMute`/`volume`/`setVolume`. |
+| `VictoryModal` / `GameOverModal` como overlay, no `IonModal` | El chrome por defecto de `IonModal` (sheet/diálogo) se lee como un diálogo de app administrativa, no como una pantalla de "¡ganaste!" de juego — misma excepción que el joystick táctil y el canvas de pantalla completa. Entregar el objeto NO abre `VictoryModal` automáticamente: solo un botón explícito "Terminar misión" lo hace, para no cortar la exploración de la estrella opcional (ver §15, el "test de 3 minutos"). |
 
 ## 4. Arquitectura
 
@@ -76,7 +79,7 @@ Ionic React (shell: menú, HUD/misión, selección de personaje)
    Suspense (useGLTF suspende mientras carga el modelo)
    ├─ Room3D            (piso, paredes, muebles — cajas low-poly sin texturas)
    ├─ Player3D           (cuerpo riggeado, gravedad/salto/colisión manual)
-   ├─ CameraRig           (tercera persona, sigue al yaw del jugador, pull-in anti-clip)
+   ├─ CameraRig           (tercera persona, yaw independiente vía arrastre, pull-in anti-clip)
    ├─ InteractionManager3D (radio de recoger/soltar, consume la pulsación "interactuar")
    └─ Html (drei)          (prompt "✋ Recoger…" anclado en el mundo 3D)
         │
@@ -105,6 +108,8 @@ src/pages/game/MissionCleanRoom/
 │
 ├── components/
 │   ├── GameWorld3D.tsx/css         # orquestador: <Canvas>, estado de carrying/collected, controles
+│   ├── VictoryModal.tsx/css        # overlay de victoria (NO IonModal) — estrellas, puntos, jugar de nuevo/salir
+│   ├── GameOverModal.tsx/css       # overlay de fin de tiempo — mismo patrón, defensivo (ver §11)
 │   ├── CharacterSelect.tsx/css     # SIN CAMBIOS (arte real o placeholder emoji)
 │   ├── GameHUD.tsx/css             # SIN CAMBIOS
 │   └── GameWorld.tsx/css           # Phaser — presente pero NO importado desde esta rama (referencia)
@@ -122,6 +127,8 @@ src/pages/game/MissionCleanRoom/
     ├── CameraRig.tsx               # cámara en tercera persona con anti-clip por cajas
     ├── InteractionManager3D.tsx    # detecta el interactuable más cercano, dispara pickup/drop
     ├── useKeyboardControls3D.ts    # WASD/flechas + Shift(correr) + Space(saltar) + E(interactuar)
+    ├── useCameraDrag.ts            # arrastre (Pointer Events) → cameraYawRef, independiente del personaje
+    ├── useGameAudio.ts             # play(jump/land/pickup/drop/collect/success/celebrate), mute, volumen
     └── TouchJoystick.tsx           # joystick táctil arrastrable (excepción justificada a "usa Ionic")
 
 public/assets/
@@ -177,7 +184,7 @@ un póster sobre la cama, librero, clóset, ventana, alfombra, un par de juguete
 sueltos en el piso, una planta decorativa, y una caja de juguetes que funciona
 como **obstáculo** (hay que rodearla o saltarla). Todo con geometría de
 cajas/primitivas de color — sin texturas — para que el cuarto tenga identidad
-visual sin dejar de ser barato en GPUs móviles (ver §11 sobre qué piezas
+visual sin dejar de ser barato en GPUs móviles (ver §12 sobre qué piezas
 proyectan sombra y cuáles no).
 
 **Loop de la misión** (`MissionDefinition.ts` → `mission_01`, un solo objeto
@@ -241,7 +248,7 @@ nunca dentro de la geometría.
 > para este modelo — si el modelo final usa la convención estándar, revisar el
 > signo en `CameraRig.tsx` (comentado en el código).
 
-## 9.1 Sin timer de fallo (todavía)
+## 11. Sin timer de fallo (todavía)
 
 El nivel usa `GAME_CONFIG.EXPLORATION_TIME_SECONDS` (una hora) en vez de los 60
 segundos de diseño — la pregunta de este vertical slice es *"¿es divertido
@@ -250,7 +257,7 @@ explorar?"*, no *"¿puedes ganarle al reloj?"*. `GameHUD` recibe
 todavía. El timer real vuelve como capa de dificultad en niveles posteriores
 (Nivel 1 = exploración libre, Nivel 2+ = 60s, Nivel 3+ = 60s + obstáculos, …).
 
-## 11. Rendimiento móvil
+## 12. Rendimiento móvil
 
 - Geometría de cajas/primitivas, sin texturas grandes.
 - Una sola luz con sombra (`directionalLight`, `shadow-mapSize={[1024,1024]}`) +
@@ -267,20 +274,27 @@ todavía. El timer real vuelve como capa de dificultad en niveles posteriores
 - Sin post-procesado.
 - Contador de FPS en pantalla (`game-world-3d__fps`), visible solo con
   `IS_DEV_BUILD` (reutiliza `src/utils/appEnv.ts`).
-- **Honestidad sobre la medición de FPS:** se confirmaron 60 FPS estables en
-  una sesión de verificación anterior (Chromium/desktop) con la escena base.
-  Durante la verificación de esta sesión de pulido, el mismo contador mostró
-  ~1 FPS de forma persistente — incluso en pestañas nuevas, con la escena en
-  reposo, sin errores de consola, con GPU real confirmada (AMD Radeon Pro
-  5300M vía ANGLE/Metal, sin pérdida de contexto). Todo apunta a
-  *throttling* de `requestAnimationFrame` propio del navegador automatizado de
-  verificación (no compuesto a tasa nativa entre capturas de pantalla), no a
-  una regresión real de rendimiento — pero no es una lectura en la que se deba
-  confiar. **Pendiente:** medir FPS real en `npm run dev` con un navegador de
-  escritorio normal y, más importante, en un Android real de gama media vía
-  Capacitor antes de dar por buena la dirección 3D.
+- **Confirmado: el navegador de verificación automatizada no sostiene un loop
+  de `requestAnimationFrame` real.** Se probó con un contador de `rAF` puro,
+  sin React ni Three.js — `requestAnimationFrame` puro **no disparó ni una
+  sola vez en 12.7 segundos reales** (medido con `performance.now()`). Esto
+  explica de forma concluyente todas las lecturas "0–1 FPS" de sesiones
+  anteriores y por qué el movimiento del personaje no era visible al sostener
+  una tecla en pruebas largas dentro de esa herramienta — el problema es el
+  entorno de prueba automatizado (probablemente no mantiene un compositor/
+  paint loop continuo para pestañas no enfocadas de esta forma), no el
+  código del juego. Interacciones puntuales (recoger, soltar, ver el prompt
+  de proximidad, cambios de cámara tras un evento) sí se verificaron
+  correctamente en sesiones anteriores porque no dependen de una animación
+  sostenida — solo de que dispare *algún* frame en algún momento, lo cual sí
+  ocurre de forma intermitente. **Cualquier cambio que dependa de movimiento
+  sostenido o timing (velocidad de caminar, sensibilidad de la cámara al
+  arrastrar, sensación general de control) no puede verificarse de forma
+  fiable en este entorno — necesita probarse en `npm run dev` con un
+  navegador de escritorio normal y, más importante, en un Android real de
+  gama media vía Capacitor.**
 
-## 12. Pruebas y verificación
+## 13. Pruebas y verificación
 
 ```bash
 npx vitest run src/pages/game/MissionCleanRoom/   # 16 pruebas, sin cambios — dominio agnóstico al motor
@@ -297,7 +311,7 @@ forzando al personaje contra los muebles para confirmar que la cámara nunca
 queda dentro de la geometría. Ambos archivos del arnés se eliminaron después de
 verificar (no forman parte del código de producción).
 
-## 13. Cómo extender
+## 14. Cómo extender
 
 - **Agregar el segundo objeto/contenedor real (de los 6 totales):** los datos ya
   existen en `data/items.ts`/`data/containers.ts`; hace falta generalizar
@@ -347,15 +361,22 @@ If the experience feels like *"Where is it? Let me look around. Oh! There it
 is. How do I get there? I found it! Now where is the basket?"* — the vertical
 slice has succeeded.
 
-**Estado actual contra este checklist:** todo lo anterior está implementado
-excepto el feedback de *audio* (no hay `useGameAudio` todavía — solo feedback
-visual: glow de descubrimiento, sparkle burst, squash/stretch al saltar, popup
-de recompensa con estrellas). El resto del loop (seleccionar → entrar →
-explorar → descubrir → mover/correr/saltar → interactuar → cargar → buscar →
-entregar → recompensa → seguir explorando con la estrella opcional) está
-construido y fue verificado manualmente en esta sesión (§12) — pendiente que
-tú lo juegues y confirmes si *se siente* como se describe arriba, que es
-finalmente el juicio que importa.
+**Estado actual contra este checklist:** todo lo anterior está implementado,
+incluido el feedback de *audio* — `useGameAudio` (`world3d/useGameAudio.ts`)
+reproduce `jump`/`land`/`pickup`/`drop`/`collect`/`success`/`celebrate` desde
+`public/assets/audio/{key}.mp3`; ninguno de esos archivos existe todavía, así
+que hoy `play()` falla en silencio en cada call site (mismo patrón que los
+placeholders de retrato/modelo — cae los MP3 reales ahí y no hace falta tocar
+código). El loop completo (seleccionar → entrar → explorar → descubrir →
+mover/correr/saltar → interactuar → cargar → buscar → entregar → recompensa →
+seguir explorando con la estrella opcional → terminar misión) está construido.
+Entregar el objeto **no** abre la pantalla de victoria automáticamente — solo
+muestra el popup flotante de recompensa y un botón "Terminar misión"; el
+`VictoryModal` de pantalla completa aparece solo cuando el jugador lo pide,
+a propósito, para no cortar la exploración de la estrella opcional justo
+cuando más importa (ver el "test de 3 minutos" arriba). Verificado
+manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes si
+*se siente* como se describe arriba, que es finalmente el juicio que importa.
 
 ## 16. Próximos pasos (solo si el vertical slice se siente bien)
 
@@ -364,7 +385,7 @@ finalmente el juicio que importa.
 - Los 6 objetos / 4 contenedores completos, con progresión de misión
   ("Mission 01: encuentra la pelota" → "Mission 02: encuentra el conejo" → …).
 - Wire del coleccionable ⭐ al `GameContext` (puntaje/analítica).
-- Audio (`useGameAudio`), partículas, `VictoryModal`/`GameOverModal` con
-  estrellas.
+- Archivos de audio reales en `public/assets/audio/` (hoy `useGameAudio` está
+  cableado en todos los call sites pero falla en silencio sin los MP3).
 - Solo entonces: eliminar la rama/carpeta Phaser si el 3D ya no necesita
   fallback.

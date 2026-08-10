@@ -1,0 +1,113 @@
+.victory-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at center, #ffffffcc 0%, #dceeffcc 70%, #a8d8ffcc 100%);
+  animation: victory-modal-fade-in 300ms ease-out;
+}
+
+.victory-modal__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  max-width: 340px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 28px 24px 24px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  animation: victory-modal-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.victory-modal__title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.victory-modal__stars {
+  display: flex;
+  gap: 4px;
+  font-size: 2.2rem;
+  margin-bottom: 4px;
+}
+
+.victory-modal__star {
+  animation: victory-modal-star-pop 450ms ease-out backwards;
+}
+
+.victory-modal__star:nth-child(1) { animation-delay: 150ms; }
+.victory-modal__star:nth-child(2) { animation-delay: 300ms; }
+.victory-modal__star:nth-child(3) { animation-delay: 450ms; }
+
+.victory-modal__star--dim {
+  filter: grayscale(1) opacity(0.35);
+}
+
+.victory-modal__headline {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 4px 0 0;
+}
+
+.victory-modal__description {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+
+.victory-modal__points {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #15803d;
+  margin-bottom: 16px;
+}
+
+.victory-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.victory-modal__button {
+  --border-radius: 14px;
+  margin: 0;
+}
+
+.victory-modal__button--primary {
+  --background: var(--dashboard-blue);
+}
+
+@keyframes victory-modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes victory-modal-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes victory-modal-star-pop {
+  0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+  70% { transform: scale(1.3) rotate(10deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .victory-modal,
+  .victory-modal__card,
+  .victory-modal__star {
+    animation: none;
+  }
+}

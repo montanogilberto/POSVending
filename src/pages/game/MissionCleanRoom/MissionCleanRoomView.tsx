@@ -2,6 +2,7 @@ import { IonButton } from '@ionic/react';
 import React from 'react';
 import CharacterSelect from './components/CharacterSelect';
 import GameHUD from './components/GameHUD';
+import GameOverModal from './components/GameOverModal';
 // 3D vertical slice (feat/3d-mission-clean-room) — the Phaser ./components/GameWorld
 // stays in the codebase untouched as the fallback reference until this is validated.
 import GameWorld3D from './components/GameWorld3D';
@@ -22,10 +23,29 @@ const MissionCleanRoomView: React.FC = () => {
     );
   }
 
-  if (state.status === 'VICTORY' || state.status === 'GAME_OVER') {
+  // Domain-level GAME_OVER is rarely reachable today (the 3D exploration slice has no fail
+  // timer — see GAME_CONFIG.EXPLORATION_TIME_SECONDS), but stays wired for missions that add one.
+  if (state.status === 'GAME_OVER') {
     return (
       <div className="mission-clean-room__end">
-        <h1>{state.status === 'VICTORY' ? '🎉 ¡Cuarto limpio!' : '⏰ ¡Se acabó el tiempo!'}</h1>
+        <GameOverModal
+          score={state.result?.score ?? 0}
+          accuracy={state.result?.accuracy ?? 0}
+          onRetry={vm.restart}
+          onExit={vm.changeAvatar}
+        />
+      </div>
+    );
+  }
+
+  // Domain-level VICTORY needs every level item delivered; the 3D vertical slice only ever
+  // wires up one, so this never fires in practice — the real "you won" moment for this slice
+  // is GameWorld3D's local `delivered` state (see its own VictoryModal). Kept as a defensive
+  // fallback for when a mission's item count actually matches the level.
+  if (state.status === 'VICTORY') {
+    return (
+      <div className="mission-clean-room__end">
+        <h1>🎉 ¡Cuarto limpio!</h1>
         {state.result && (
           <p>
             Puntaje: {state.result.score} · Precisión: {state.result.accuracy}% · Combo máx: x{state.result.maxCombo.toFixed(1)}
@@ -60,6 +80,8 @@ const MissionCleanRoomView: React.FC = () => {
         item={item}
         container={container}
         onItemDropped={(itemId) => vm.dropItem(itemId, container.id)}
+        onPlayAgain={vm.restart}
+        onExit={vm.changeAvatar}
       />
     </div>
   );

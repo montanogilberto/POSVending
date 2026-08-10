@@ -1,7 +1,7 @@
 import { Html } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { IonButton, IonIcon } from '@ionic/react';
-import { arrowUpCircleOutline, handRightOutline } from 'ionicons/icons';
+import { arrowUpCircleOutline, flagOutline, handRightOutline, volumeHighOutline, volumeMuteOutline } from 'ionicons/icons';
 import React, { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { IS_DEV_BUILD } from '../../../../utils/appEnv';
@@ -13,11 +13,14 @@ import Player3D from '../world3d/Player3D';
 import CameraRig from '../world3d/CameraRig';
 import InteractionManager3D from '../world3d/InteractionManager3D';
 import type { Interactable3D, PromptState } from '../world3d/InteractionManager3D';
-import { IDLE_INPUT_3D, type ControlInput3D } from '../world3d/ControlTypes';
+import { IDLE_INPUT_3D, type ControlInput3D, type PlayerState3D } from '../world3d/ControlTypes';
 import { useKeyboardControls3D } from '../world3d/useKeyboardControls3D';
+import { useCameraDrag } from '../world3d/useCameraDrag';
+import { useGameAudio } from '../world3d/useGameAudio';
 import TouchJoystick from '../world3d/TouchJoystick';
 import { WORLD3D_CONFIG } from '../world3d/world3dConstants';
 import type { GameContainer, GameItem } from '../MissionCleanRoomTypes';
+import VictoryModal from './VictoryModal';
 import './GameWorld3D.css';
 
 interface GameWorld3DProps {
@@ -26,6 +29,9 @@ interface GameWorld3DProps {
   container: GameContainer;
   onItemPicked?: (itemId: string) => void;
   onItemDropped: (itemId: string) => void;
+  /** Restart the current mission from CharacterSelect's "startGame" — driven by the local win below, not domain VICTORY (see MissionCleanRoomView). */
+  onPlayAgain: () => void;
+  onExit: () => void;
 }
 
 const ROOM_HALF_SIZE = WORLD3D_CONFIG.ROOM_SIZE / 2;
@@ -172,7 +178,7 @@ interface SparkleEvent {
 let sparkleIdSeq = 0;
 
 /** Owns the R3F scene lifecycle, gameplay state (carrying/collected), and the touch/keyboard control surface. */
-const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, onItemPicked, onItemDropped }) => {
+const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, onItemPicked, onItemDropped, onPlayAgain, onExit }) => {
   const avatar = useMemo(() => getAvatar3D(avatarId), [avatarId]);
   const mission = useMemo(() => getMission3D('mission_01'), []);
   const obstacles = useMemo(() => getRoomObstacles(), []);
@@ -180,6 +186,11 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
   const inputRef = useRef<ControlInput3D>({ ...IDLE_INPUT_3D });
   const playerGroupRef = useRef<THREE.Group>(null);
   const fpsRef = useRef<HTMLDivElement>(null);
+  const canvasHostRef = useRef<HTMLDivElement>(null);
+  /** Camera orbit angle (radians) — independent of the player's facing, driven by drag gestures (see useCameraDrag). Starts aligned with the player's initial facing so the opening shot matches before. */
+  const cameraYawRef = useRef(0);
+  /** Last locomotion state, used only to detect the fall→grounded edge for the landing sound. */
+  const lastPlayerStateRef = useRef<PlayerState3D>('idle');
 
   const [isCarrying, setIsCarrying] = useState(false);
   const [delivered, setDelivered] = useState(false);
@@ -187,8 +198,15 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [rewardKey, setRewardKey] = useState<number | null>(null);
   const [sparkles, setSparkles] = useState<SparkleEvent[]>([]);
+  // Delivering the item doesn't auto-open the victory screen: the star is deliberately optional
+  // and off the direct path, so blocking the scene the instant the main objective is done would
+  // cut off exactly the exploration we want to see (see README §15 — the "3-minute test").
+  const [showVictory, setShowVictory] = useState(false);
+
+  const audio = useGameAudio();
 
   useKeyboardControls3D(inputRef);
+  useCameraDrag(canvasHostRef, cameraYawRef);
 
   const spawnSparkles = useCallback((position: THREE.Vector3) => {
     sparkleIdSeq += 1;
@@ -215,24 +233,42 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
     if (interactable.kind === 'pickup') {
       setIsCarrying(true);
       spawnSparkles(interactable.position);
+      audio.play('pickup');
       onItemPicked?.(item.id);
     } else if (interactable.kind === 'dropoff') {
       setIsCarrying(false);
       setDelivered(true);
       spawnSparkles(interactable.position);
+      audio.play('drop');
+      audio.play('success');
       onItemDropped(item.id);
       setRewardKey(Date.now());
     } else if (interactable.kind === 'collectible') {
       setStarCollected(true);
       spawnSparkles(interactable.position);
+      audio.play('collect');
     }
-  }, [item.id, onItemPicked, onItemDropped, spawnSparkles]);
+  }, [item.id, onItemPicked, onItemDropped, spawnSparkles, audio]);
+
+  const handlePlayerStateChange = useCallback((state: PlayerState3D) => {
+    if (state === 'jump') audio.play('jump');
+    if (lastPlayerStateRef.current === 'fall' && state !== 'fall' && state !== 'jump') audio.play('land');
+    lastPlayerStateRef.current = state;
+  }, [audio]);
+
+  const handleFinishMission = useCallback(() => {
+    setShowVictory(true);
+    audio.play('celebrate');
+  }, [audio]);
 
   const missionText = !isCarrying && !delivered
     ? mission.narrative.searching
     : isCarrying
       ? mission.narrative.carrying
       : mission.narrative.complete;
+
+  const victoryPoints = item.points + (starCollected ? 20 : 0);
+  const victoryStars: 1 | 2 | 3 = starCollected ? 3 : 2;
 
   const handleFpsUpdate = useCallback((fps: number) => {
     if (fpsRef.current) fpsRef.current.textContent = `${fps} FPS`;
@@ -243,7 +279,34 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
       <div className="game-world-3d__mission">{missionText}</div>
       {IS_DEV_BUILD && <div ref={fpsRef} className="game-world-3d__fps">-- FPS</div>}
 
-      <div className="game-world-3d__canvas">
+      <IonButton
+        className="game-world-3d__mute-button"
+        fill="clear"
+        onClick={audio.toggleMute}
+        aria-label={audio.muted ? 'Activar sonido' : 'Silenciar'}
+      >
+        <IonIcon slot="icon-only" icon={audio.muted ? volumeMuteOutline : volumeHighOutline} />
+      </IonButton>
+
+      {delivered && !showVictory && (
+        <IonButton className="game-world-3d__finish-button" onClick={handleFinishMission}>
+          <IonIcon icon={flagOutline} slot="start" />
+          Terminar misión
+        </IonButton>
+      )}
+
+      {showVictory && (
+        <VictoryModal
+          title={mission.title}
+          description={mission.narrative.complete}
+          points={victoryPoints}
+          stars={victoryStars}
+          onPlayAgain={onPlayAgain}
+          onExit={onExit}
+        />
+      )}
+
+      <div className="game-world-3d__canvas" ref={canvasHostRef}>
         <Canvas shadows camera={{ fov: 55, near: 0.1, far: 100, position: [0, 3, 8] }}>
           <color attach="background" args={['#dceeff']} />
           <ambientLight intensity={0.75} />
@@ -263,13 +326,15 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
               avatar={avatar}
               groupRef={playerGroupRef}
               inputRef={inputRef}
+              yawRef={cameraYawRef}
               initialPosition={mission.playerSpawn}
               roomHalfSize={ROOM_HALF_SIZE}
               obstacles={obstacles}
               carriedItem={isCarrying ? <ItemBall position={[0, 0, 0]} /> : undefined}
+              onStateChange={handlePlayerStateChange}
             />
 
-            <CameraRig targetRef={playerGroupRef} obstacles={cameraObstacles} />
+            <CameraRig targetRef={playerGroupRef} obstacles={cameraObstacles} yawRef={cameraYawRef} />
             <InteractionManager3D
               playerGroupRef={playerGroupRef}
               inputRef={inputRef}
@@ -305,7 +370,7 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
               >
                 <div className="game-world-3d__reward" onAnimationEnd={() => setRewardKey(null)}>
                   <span className="game-world-3d__reward-stars">⭐⭐⭐</span>
-                  <span>¡Muy bien! +100</span>
+                  <span>¡Muy bien! +{item.points}</span>
                 </div>
               </Html>
             )}
