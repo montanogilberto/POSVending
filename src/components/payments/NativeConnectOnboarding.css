@@ -28,13 +28,6 @@
   overflow: hidden;
 }
 
-.nco-card-wrap {
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  padding: 14px 12px;
-  background: #fff;
-}
-
 .nco-tos {
   white-space: normal;
   font-size: 13px;

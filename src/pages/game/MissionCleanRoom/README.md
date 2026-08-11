@@ -393,8 +393,10 @@ manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes 
 
 - Validar rendimiento en dispositivo Android real vía Capacitor.
 - ~~Modelos GLB finales de Tiburón Boy y Dino Boy (rig + animaciones).~~ Gilbertito
-  ya tiene un primer rig funcional (§17) — falta decidir si reemplaza el modelo de
-  Tiburón Boy, y repetir el pipeline para Gael/el resto del roster.
+  ya tiene un primer rig funcional (§17) y **ya es seleccionable/jugable en
+  `CharacterSelect`** (`data/avatars.ts`, tercer roster junto a Tiburón Boy/Dino
+  Boy) — falta decidir si termina reemplazando a Tiburón Boy o queda como
+  tercera opción, y repetir el pipeline de rigging para Gael/el resto del roster.
 - ~~Los 6 objetos / 4 contenedores completos, con progresión de misión.~~ Hecho:
   `MISSION_SEQUENCE` (`world3d/MissionDefinition.ts`) tiene 10 misiones
   reutilizando los 6 ítems de dominio, con avance real entre ellas al entregar
@@ -434,9 +436,11 @@ solo mesh + PBR. Para Gilbertito se construyó un rig humanoide simple +
 4 clips (`Idle`/`Walk`/`Run`/`Jump`) completamente por script en Blender
 headless, sin intervención manual en la UI. El resultado vive en
 `public/assets/models/gilbertito-rigged.glb` y está registrado en
-`world3d/GameAvatar.ts` bajo el id `gilbertito` — **no** está conectado a
-`CharacterSelect` todavía (esa decisión — reemplazar a Tiburón Boy o quedar
-aparte — se deja para después de validar en dispositivo real).
+`world3d/GameAvatar.ts` bajo el id `gilbertito`, y **ya está conectado a
+`CharacterSelect`** (`data/avatars.ts`) como tercera opción seleccionable —
+necesario para poder validar caminar/correr/saltar con input real en
+dispositivo (la vista previa estática no bastaba para eso). Si reemplaza a
+Tiburón Boy o queda como tercera opción permanente sigue sin decidirse.
 
 **El pipeline, paso a paso:**
 

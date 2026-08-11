@@ -67,9 +67,8 @@ export const AVATARS_3D: Record<string, GameAvatar3D> = {
     scale: 0.36,
     animations: DEVELOPMENT_ANIMATIONS,
   },
-  // Not wired into CharacterSelect yet (data/avatars.ts only lists tiburon_boy/dino_boy) — this
-  // entry exists purely so GameWorld3D/Player3D can be tested against it via a harness, ahead of
-  // deciding whether it replaces tiburon_boy's placeholder model.
+  // Wired into CharacterSelect (data/avatars.ts) as a real selectable roster entry, alongside the
+  // placeholder-model tiburon_boy/dino_boy — not yet decided whether it replaces one of them.
   gilbertito: {
     id: 'gilbertito',
     name: 'Gilbertito',

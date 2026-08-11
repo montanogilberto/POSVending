@@ -71,26 +71,10 @@ const CharacterSelect: React.FC<CharacterSelectProps> = ({ avatars, selectedAvat
       Empezar
     </IonButton>
 
-    {/* Static display only — Gilbertito has no skin/rig/animation yet (see world3d/GameAvatar.ts
-        TODOs), so it isn't in `avatars` and can't be selected/played. This just previews the
-        model while the rigging work is pending. Model is centered on the origin (not standing
-        on a floor at y=0), same as Tutu below — both come from the same export pipeline. */}
-    <IonCard className="character-preview-card">
-      <IonCardContent className="character-preview-card__content">
-        <div className="character-preview-card__header">
-          <IonCardTitle className="character-preview-card__name">Gilbertito</IonCardTitle>
-          <IonBadge color="medium">Próximamente</IonBadge>
-        </div>
-        <LazyModelPreview
-          modelUrl="/assets/models/gilbertito.glb"
-          cameraPosition={[0, 0.1, 2.6]}
-          cameraTarget={[0, 0, 0]}
-        />
-        <p className="character-preview-card__note">Vista previa 3D — aún sin animaciones, no jugable todavía.</p>
-      </IonCardContent>
-    </IonCard>
+    {/* Gilbertito graduated to a real selectable card above (rigged + 4 animations, see
+        world3d/GameAvatar.ts) — no longer previewed here. */}
 
-    {/* Same static-preview situation as Gilbertito — no rig/animation yet (see world3d/
+    {/* Same static-preview situation Gilbertito used to be in — no rig/animation yet (see world3d/
         GameAvatar.ts TODOs). Worth noting: this model's shirt literally reads "LITTLE DINO",
         so it may end up being the real dino_boy asset once it's rigged, rather than a third
         roster addition. */}
