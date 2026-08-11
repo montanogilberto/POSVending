@@ -248,6 +248,17 @@ nunca dentro de la geometría.
 > para este modelo — si el modelo final usa la convención estándar, revisar el
 > signo en `CameraRig.tsx` (comentado en el código).
 
+> **Bug corregido — izquierda/derecha invertidos:** `Player3D.tsx` construía
+> `camRight` rotando `(1,0,0)` por el yaw de la cámara, asumiendo que esa era
+> la "derecha" real de la cámara. No lo es: `CameraRig` posiciona la cámara
+> con `idealOffset=(0,H,-D)` + `camera.lookAt()`, y three.js deriva el +X local
+> de la cámara (la derecha en pantalla) como `cross(worldUp, cameraBackward)`
+> — con yaw=0 eso da mundo -X, no +X. El resultado: joystick y teclado (A/D)
+> movían al personaje exactamente al lado contrario del que la cámara mostraba
+> como "derecha". Confirmado en dispositivo real, corregido cambiando la
+> constante a `(-1,0,0)` (ver el comentario junto a `localRight` en
+> `Player3D.tsx`).
+
 ## 11. Sin timer de fallo (todavía)
 
 El nivel usa `GAME_CONFIG.EXPLORATION_TIME_SECONDS` (una hora) en vez de los 60
@@ -381,11 +392,111 @@ manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes 
 ## 16. Próximos pasos (solo si el vertical slice se siente bien)
 
 - Validar rendimiento en dispositivo Android real vía Capacitor.
-- Modelos GLB finales de Tiburón Boy y Dino Boy (rig + animaciones).
-- Los 6 objetos / 4 contenedores completos, con progresión de misión
-  ("Mission 01: encuentra la pelota" → "Mission 02: encuentra el conejo" → …).
+- ~~Modelos GLB finales de Tiburón Boy y Dino Boy (rig + animaciones).~~ Gilbertito
+  ya tiene un primer rig funcional (§17) y **ya es seleccionable/jugable en
+  `CharacterSelect`** (`data/avatars.ts`, tercer roster junto a Tiburón Boy/Dino
+  Boy) — falta decidir si termina reemplazando a Tiburón Boy o queda como
+  tercera opción, y repetir el pipeline de rigging para Gael/el resto del roster.
+- ~~Los 6 objetos / 4 contenedores completos, con progresión de misión.~~ Hecho:
+  `MISSION_SEQUENCE` (`world3d/MissionDefinition.ts`) tiene 10 misiones
+  reutilizando los 6 ítems de dominio, con avance real entre ellas al entregar
+  cada objeto (`MissionCleanRoomView.tsx`).
 - Wire del coleccionable ⭐ al `GameContext` (puntaje/analítica).
 - Archivos de audio reales en `public/assets/audio/` (hoy `useGameAudio` está
   cableado en todos los call sites pero falla en silencio sin los MP3).
+- Validar en un dispositivo real que Gilbertito rigged camina/corre/salta bien
+  jugando (ver §17 — la deformación se verificó pose por pose, pero el playback
+  en vivo con `Player3D`'s crossfade no se pudo confirmar en este entorno).
+  **Bloqueante para todo lo de abajo** — hasta confirmar esto en dispositivo,
+  no tiene sentido invertir en más clips.
+- Plan acordado para después de esa validación (no iniciado):
+  1. Autorizar 6 clips de interacción sobre el mismo rig de Gilbertito —
+     `Pickup`, `Carry`, `Drop`, `Place`, `Clean`, `Celebrate` — reusando
+     exactamente el pipeline de §17 (landmarks ya medidos, mismo armature).
+  2. Máquina de estados de animación explícita (`PlayerAnimation` type) en vez
+     de que `GameWorld3D.tsx` acumule condicionales de animación una por una.
+  3. Eventos de animación con timing propio (ej. `Pickup` dispara "adjuntar
+     objeto a la mano" en su frame ~55%, no instantáneamente al presionar E) —
+     así la interacción se siente física, no solo un cambio de posición.
+  4. Repetir el pipeline de rigging para Gael (nuevos landmarks vía
+     `analyze_silhouette.py`, mismo algoritmo — nunca copiar los huesos de
+     Gilbertito directo).
+  - `GameAvatarAnimationClips` (`world3d/GameAvatar.ts`) ya tiene los campos
+    opcionales `pickup`/`carry`/`drop`/`place`/`clean`/`celebrate`/`fall`
+    declarados de antemano — el contrato está listo, `Player3D.tsx` todavía
+    no los lee.
 - Solo entonces: eliminar la rama/carpeta Phaser si el 3D ya no necesita
   fallback.
+
+## 17. Pipeline de rigging automatizado (Gilbertito)
+
+Los tres `.glb` generados por el pipeline de arte (`avatars/gilbertito`,
+`avatars/gael`, `avatars/model_tutu`) llegan sin esqueleto ni animaciones —
+solo mesh + PBR. Para Gilbertito se construyó un rig humanoide simple +
+4 clips (`Idle`/`Walk`/`Run`/`Jump`) completamente por script en Blender
+headless, sin intervención manual en la UI. El resultado vive en
+`public/assets/models/gilbertito-rigged.glb` y está registrado en
+`world3d/GameAvatar.ts` bajo el id `gilbertito`, y **ya está conectado a
+`CharacterSelect`** (`data/avatars.ts`) como tercera opción seleccionable —
+necesario para poder validar caminar/correr/saltar con input real en
+dispositivo (la vista previa estática no bastaba para eso). Si reemplaza a
+Tiburón Boy o queda como tercera opción permanente sigue sin decidirse.
+
+**El pipeline, paso a paso:**
+
+1. **Landmarks de las articulaciones, medidos, no adivinados.** Se cortó la
+   malla en 40 bandas horizontales y se midió el ancho/clusters de vértices por
+   banda — el punto donde el silueta pasa de "1 columna" a "2 columnas" marca
+   la altura de la rodilla/cadera; el punto más ancho del torso marca el hombro;
+   el punto más angosto antes de la cabeza marca el cuello. Esto da una
+   estimación de posición de huesos anclada en la geometría real, no en
+   proporciones humanas genéricas.
+2. **Armature simple** (`Hips → Spine → Chest → Neck → Head`, brazos/piernas
+   colgando de `Chest`/`Hips`), con `align_roll` forzando que el eje local Z de
+   cada hueso apunte a lo largo del mundo +X — así toda animación de "bisagra"
+   (rodilla, codo) rota sobre el mismo eje local, sin pelear con la heurística
+   de roll por defecto de Blender.
+3. **Auto-weighting hecho a mano.** El auto-skinning nativo de Blender
+   (`parent_set(type='ARMATURE_AUTO')`, Bone Heat Weighting) no funciona en
+   `--background`: crea los vertex groups pero asigna **cero** vértices a
+   cualquiera de ellos, sin error visible — mismo patrón que `transform_apply`
+   (ver más abajo). Se reemplazó por un peso manual por distancia (los 4 huesos
+   más cercanos a cada vértice, ponderados por 1/distancia²), calculado
+   directamente vía la API de datos de Blender.
+4. **4 clips procedurales** (`Idle`, `Walk`, `Run`, `Jump`) — keyframes
+   calculados con senoidales para el ciclo de piernas/brazos, no motion capture.
+   Calidad de "prueba de concepto que se ve viva", no animación final pulida.
+5. **Verificación de deformación sin depender del loop de render.** Este
+   entorno de browser automatizado no sostiene un `requestAnimationFrame` real
+   para la escena completa de `GameWorld3D` (mismo hallazgo de §12) — así que
+   en vez de esperar a que el mixer avance solo, se forzó
+   `mixer.setTime(t)` en un harness aislado y se tomaron capturas en poses
+   intermedias de cada clip. Las 4 rodillas/codos deforman limpio, sin
+   desgarros ni pellizcos, con el pantalón arrugando naturalmente en la
+   rodilla.
+
+**Dos bugs de Blender en `--background` mode encontrados y corregidos** (ambos
+son operadores que dependen de contexto de UI y fallan en silencio sin
+ventana/viewport activo — el patrón a recordar para cualquier script futuro):
+
+| Operador | Sín­toma | Fix |
+|---|---|---|
+| `bpy.ops.object.transform_apply()` | No aplica la transformación (coordenadas idénticas antes/después) pero no tira error | Usar `Mesh.transform(matrix)` (API de datos directa) en vez del operador |
+| `bpy.ops.object.parent_set(type='ARMATURE_AUTO')` | Crea vertex groups por nombre pero asigna 0 vértices a cualquiera — el export queda con `JOINTS_0`/`WEIGHTS_0` huérfanos y sin `skins` | Peso manual por distancia + asignar `parent`/modifier `Armature` directamente vía datos |
+
+**Otro detalle no obvio:** la malla de Gilbertito está centrada en el origen
+(pies en Y≈-0.95, no en Y=0), a diferencia del placeholder
+(`development-character.glb`), que asume pies en el origen del grupo — el
+script traslada el objeto Armature completo (`armature_obj.location.z = -Z0`)
+antes de exportar para que calce con la convención que `Player3D.tsx` ya
+asume, sin tocar código de juego.
+
+Los scripts fuente viven en `rigging-scripts/` (`analyze_silhouette.py` +
+`rig_gilbertito.py`, cada uno con instrucciones de uso en su propio header).
+No son una herramienta genérica multi-personaje — los landmarks
+(`HIP_Z`/`KNEE_Z`/`SHOULDER_Z`/…) son específicos de la malla de Gilbertito.
+Para Gael, correr primero `analyze_silhouette.py` sobre su `.glb` para medir
+sus propios landmarks, copiar `rig_gilbertito.py` con esos valores nuevos, y
+mantener igual el `align_roll`, el peso por distancia y el uso de
+`Mesh.transform` en vez de operadores (esas partes sí son independientes de
+la malla).

@@ -24,7 +24,11 @@ const { WALK_SPEED, RUN_SPEED, RUN_INPUT_THRESHOLD, TURN_DAMPING, GRAVITY, JUMP_
 
 // Module-level scratch objects — avoid per-frame allocation (same discipline as CameraRig).
 const localForward = new THREE.Vector3(0, 0, 1); // this model's rigged "forward" faces local +Z (see CameraRig)
-const localRight = new THREE.Vector3(1, 0, 0);
+// -1, not +1: CameraRig positions the camera via idealOffset=(0,H,-D) + camera.lookAt(), and
+// Three.js derives the camera's local +X (screen-right) as cross(worldUp, cameraBackward) — at
+// yaw=0 that works out to world -X, not +X. Using +1 here made joystick/keyboard left-right
+// exactly reversed (confirmed on-device); this constant must mirror the camera's real "right".
+const localRight = new THREE.Vector3(-1, 0, 0);
 const camForward = new THREE.Vector3();
 const camRight = new THREE.Vector3();
 const worldMove = new THREE.Vector3();

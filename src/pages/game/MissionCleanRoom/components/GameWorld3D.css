@@ -9,6 +9,23 @@
   width: 100%;
 }
 
+/* Portaled to <body> (see GameWorld3D.tsx) so it visually covers MissionCleanRoomPage's
+   IonHeader too, not just IonContent — a real fullscreen "watch a movie" feel, matching
+   useFullscreenGameMode's native landscape-lock + status-bar-hide alongside it. z-index is
+   high enough to clear Ionic's own internal stacking (toolbars, page transitions). Safe-area
+   insets matter here specifically because this no longer sits inside IonContent's own
+   safe-area-aware padding — the viewport meta tag already opts into viewport-fit=cover. */
+.game-world-3d--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background: #000;
+}
+
 .game-world-3d__mission {
   position: absolute;
   top: 10px;
@@ -23,6 +40,20 @@
   padding: 6px 16px;
   max-width: calc(100% - 32px);
   text-align: center;
+  pointer-events: none;
+}
+
+.game-world-3d__mission-progress {
+  position: absolute;
+  top: 10px;
+  left: 48px;
+  z-index: 5;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: #ffffffdd;
+  border-radius: 999px;
+  padding: 4px 10px;
   pointer-events: none;
 }
 
@@ -48,6 +79,20 @@
   --padding-end: 8px;
   margin: 0;
   font-size: 1.3rem;
+}
+
+/* Opposite corner from the mute button — the game is now a full-viewport portal (no
+   IonHeader/back-button reachable behind it), so this is the only way out. */
+.game-world-3d__close-button {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  z-index: 6;
+  --color: var(--text-primary);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin: 0;
+  font-size: 1.4rem;
 }
 
 .game-world-3d__finish-button {

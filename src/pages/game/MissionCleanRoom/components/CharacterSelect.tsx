@@ -1,7 +1,8 @@
-import { IonButton, IonCard, IonCardContent, IonCardTitle } from '@ionic/react';
+import { IonBadge, IonButton, IonCard, IonCardContent, IonCardTitle } from '@ionic/react';
 import React, { useState } from 'react';
 import { getCharacterAssetPath } from '../game/characterAsset';
 import type { Avatar } from '../MissionCleanRoomTypes';
+import LazyModelPreview from './LazyModelPreview';
 import './CharacterSelect.css';
 
 interface CharacterSelectProps {
@@ -69,6 +70,47 @@ const CharacterSelect: React.FC<CharacterSelectProps> = ({ avatars, selectedAvat
     >
       Empezar
     </IonButton>
+
+    {/* Gilbertito graduated to a real selectable card above (rigged + 4 animations, see
+        world3d/GameAvatar.ts) — no longer previewed here. */}
+
+    {/* Same static-preview situation Gilbertito used to be in — no rig/animation yet (see world3d/
+        GameAvatar.ts TODOs). Worth noting: this model's shirt literally reads "LITTLE DINO",
+        so it may end up being the real dino_boy asset once it's rigged, rather than a third
+        roster addition. */}
+    <IonCard className="character-preview-card">
+      <IonCardContent className="character-preview-card__content">
+        <div className="character-preview-card__header">
+          <IonCardTitle className="character-preview-card__name">Gael</IonCardTitle>
+          <IonBadge color="medium">Próximamente</IonBadge>
+        </div>
+        <LazyModelPreview
+          modelUrl="/assets/models/gael.glb"
+          cameraPosition={[0, 0.1, 2.6]}
+          cameraTarget={[0, 0, 0]}
+        />
+        <p className="character-preview-card__note">Vista previa 3D — aún sin animaciones, no jugable todavía.</p>
+      </IonCardContent>
+    </IonCard>
+
+    {/* Tutu isn't a playable character at all — it's a teddy bear prop (avatars/model_tutu),
+        already correctly textured/oriented with no rig needed. Previewed here for now; its real
+        home is as room decoration or a mission collectible (see MissionDefinition.ts), not the
+        player roster. */}
+    <IonCard className="character-preview-card">
+      <IonCardContent className="character-preview-card__content">
+        <div className="character-preview-card__header">
+          <IonCardTitle className="character-preview-card__name">Tutu</IonCardTitle>
+          <IonBadge color="tertiary">Mascota</IonBadge>
+        </div>
+        <LazyModelPreview
+          modelUrl="/assets/models/tutu.glb"
+          cameraPosition={[0, 0.15, 2.2]}
+          cameraTarget={[0, 0, 0]}
+        />
+        <p className="character-preview-card__note">Vista previa 3D — es un peluche, no un personaje jugable.</p>
+      </IonCardContent>
+    </IonCard>
   </div>
 );
 
