@@ -1,0 +1,12 @@
+.character-preview-3d {
+  width: 100%;
+  height: 220px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.character-preview-3d canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

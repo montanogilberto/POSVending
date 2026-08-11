@@ -25,6 +25,12 @@ import './GameWorld3D.css';
 
 interface GameWorld3DProps {
   avatarId: string | null;
+  /** Which MissionDefinition3D to load — item/container below must be the domain pair that
+      mission's objective.itemId points to (MissionCleanRoomView is the single place that
+      resolves that lookup); GameWorld3D just trusts they're already consistent. */
+  missionId: string;
+  /** "Misión 3/10" — purely a display label, MissionCleanRoomView owns the actual sequence/index. */
+  missionLabel: string;
   item: GameItem;
   container: GameContainer;
   onItemPicked?: (itemId: string) => void;
@@ -178,9 +184,9 @@ interface SparkleEvent {
 let sparkleIdSeq = 0;
 
 /** Owns the R3F scene lifecycle, gameplay state (carrying/collected), and the touch/keyboard control surface. */
-const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, onItemPicked, onItemDropped, onPlayAgain, onExit }) => {
+const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionLabel, item, container, onItemPicked, onItemDropped, onPlayAgain, onExit }) => {
   const avatar = useMemo(() => getAvatar3D(avatarId), [avatarId]);
-  const mission = useMemo(() => getMission3D('mission_01'), []);
+  const mission = useMemo(() => getMission3D(missionId), [missionId]);
   const obstacles = useMemo(() => getRoomObstacles(), []);
   const cameraObstacles = useMemo(() => getCameraObstacles(), []);
   const inputRef = useRef<ControlInput3D>({ ...IDLE_INPUT_3D });
@@ -276,6 +282,7 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
 
   return (
     <div className="game-world-3d">
+      <div className="game-world-3d__mission-progress">{missionLabel}</div>
       <div className="game-world-3d__mission">{missionText}</div>
       {IS_DEV_BUILD && <div ref={fpsRef} className="game-world-3d__fps">-- FPS</div>}
 
@@ -303,6 +310,7 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, item, container, on
           stars={victoryStars}
           onPlayAgain={onPlayAgain}
           onExit={onExit}
+          playAgainLabel="Siguiente misión"
         />
       )}
 

@@ -103,6 +103,38 @@
   --border-radius: 14px;
 }
 
+.character-preview-card {
+  margin: 24px 0 0;
+  width: 100%;
+  border-radius: 20px;
+  box-shadow: var(--shadow-soft);
+}
+
+.character-preview-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.character-preview-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.character-preview-card__name {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.character-preview-card__note {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .character-card {
     transition: none;

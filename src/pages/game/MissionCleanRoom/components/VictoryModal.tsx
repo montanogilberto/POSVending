@@ -10,6 +10,9 @@ interface VictoryModalProps {
   stars: 1 | 2 | 3;
   onPlayAgain: () => void;
   onExit: () => void;
+  /** Defaults to "Jugar otra vez" — GameWorld3D overrides this to "Siguiente misión" since the
+      button now advances through MISSION_SEQUENCE rather than replaying the same one. */
+  playAgainLabel?: string;
 }
 
 /**
@@ -18,7 +21,7 @@ interface VictoryModalProps {
  * instead — same kind of exception already made for the touch joystick and the fullscreen
  * canvas. The two actions still use IonButton per the project's interactive-element rule.
  */
-const VictoryModal: React.FC<VictoryModalProps> = ({ title, description, points, stars, onPlayAgain, onExit }) => (
+const VictoryModal: React.FC<VictoryModalProps> = ({ title, description, points, stars, onPlayAgain, onExit, playAgainLabel = 'Jugar otra vez' }) => (
   <div className="victory-modal">
     <div className="victory-modal__card">
       <div className="victory-modal__title">🎉 ¡Lo lograste!</div>
@@ -39,7 +42,7 @@ const VictoryModal: React.FC<VictoryModalProps> = ({ title, description, points,
       <div className="victory-modal__actions">
         <IonButton expand="block" className="victory-modal__button victory-modal__button--primary" onClick={onPlayAgain}>
           <IonIcon icon={rocketOutline} slot="start" />
-          Jugar otra vez
+          {playAgainLabel}
         </IonButton>
         <IonButton expand="block" fill="outline" className="victory-modal__button" onClick={onExit}>
           <IonIcon icon={homeOutline} slot="start" />

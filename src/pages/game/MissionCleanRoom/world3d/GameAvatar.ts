@@ -29,6 +29,18 @@ const DEVELOPMENT_ANIMATIONS: GameAvatarAnimationClips = {
   jump: 'Jump',
 };
 
+// Idle/Walk/Run/Jump clip names match exactly (case-sensitive) — same generic-humanoid rig +
+// procedural clips pipeline documented in README (Blender, --background mode, auto-rig +
+// distance-based auto-weight + keyframed clips). Scale derived from matching this model's
+// world-space rest height (1.898) against development-character.glb's (4.901 × 0.36 = 1.764),
+// so both avatars read as the same in-game size.
+const GILBERTITO_ANIMATIONS: GameAvatarAnimationClips = {
+  idle: 'Idle',
+  walk: 'Walk',
+  run: 'Run',
+  jump: 'Jump',
+};
+
 export const AVATARS_3D: Record<string, GameAvatar3D> = {
   tiburon_boy: {
     id: 'tiburon_boy',
@@ -43,6 +55,16 @@ export const AVATARS_3D: Record<string, GameAvatar3D> = {
     modelUrl: DEVELOPMENT_MODEL_URL, // TODO: '/assets/models/dino_boy.glb' once rigged asset exists
     scale: 0.36,
     animations: DEVELOPMENT_ANIMATIONS,
+  },
+  // Not wired into CharacterSelect yet (data/avatars.ts only lists tiburon_boy/dino_boy) — this
+  // entry exists purely so GameWorld3D/Player3D can be tested against it via a harness, ahead of
+  // deciding whether it replaces tiburon_boy's placeholder model.
+  gilbertito: {
+    id: 'gilbertito',
+    name: 'Gilbertito',
+    modelUrl: '/assets/models/gilbertito-rigged.glb',
+    scale: 0.93,
+    animations: GILBERTITO_ANIMATIONS,
   },
 };
 
