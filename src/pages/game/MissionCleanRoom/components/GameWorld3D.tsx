@@ -1,8 +1,9 @@
 import { Html } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { IonButton, IonIcon } from '@ionic/react';
-import { arrowUpCircleOutline, flagOutline, handRightOutline, volumeHighOutline, volumeMuteOutline } from 'ionicons/icons';
+import { arrowUpCircleOutline, closeOutline, flagOutline, handRightOutline, volumeHighOutline, volumeMuteOutline } from 'ionicons/icons';
 import React, { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import { IS_DEV_BUILD } from '../../../../utils/appEnv';
 import { getAvatar3D } from '../world3d/GameAvatar';
@@ -16,6 +17,7 @@ import type { Interactable3D, PromptState } from '../world3d/InteractionManager3
 import { IDLE_INPUT_3D, type ControlInput3D, type PlayerState3D } from '../world3d/ControlTypes';
 import { useKeyboardControls3D } from '../world3d/useKeyboardControls3D';
 import { useCameraDrag } from '../world3d/useCameraDrag';
+import { useFullscreenGameMode } from '../world3d/useFullscreenGameMode';
 import { useGameAudio } from '../world3d/useGameAudio';
 import TouchJoystick from '../world3d/TouchJoystick';
 import { WORLD3D_CONFIG } from '../world3d/world3dConstants';
@@ -213,6 +215,7 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
 
   useKeyboardControls3D(inputRef);
   useCameraDrag(canvasHostRef, cameraYawRef);
+  useFullscreenGameMode();
 
   const spawnSparkles = useCallback((position: THREE.Vector3) => {
     sparkleIdSeq += 1;
@@ -280,11 +283,25 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
     if (fpsRef.current) fpsRef.current.textContent = `${fps} FPS`;
   }, []);
 
-  return (
-    <div className="game-world-3d">
+  // Portaled straight to <body> and CSS-fixed over the whole viewport (see .game-world-3d--
+  // fullscreen) so the game visually covers MissionCleanRoomPage's IonHeader too — the mission
+  // asked for a real fullscreen "watch a movie" feel, not just filling IonContent. useFullscreen
+  // GameMode above additionally locks landscape + hides the native status bar; this portal is
+  // the part that's actually verifiable without a device, since it's pure CSS/DOM.
+  return createPortal(
+    <div className="game-world-3d game-world-3d--fullscreen">
       <div className="game-world-3d__mission-progress">{missionLabel}</div>
       <div className="game-world-3d__mission">{missionText}</div>
       {IS_DEV_BUILD && <div ref={fpsRef} className="game-world-3d__fps">-- FPS</div>}
+
+      <IonButton
+        className="game-world-3d__close-button"
+        fill="clear"
+        onClick={onExit}
+        aria-label="Salir de la misión"
+      >
+        <IonIcon slot="icon-only" icon={closeOutline} />
+      </IonButton>
 
       <IonButton
         className="game-world-3d__mute-button"
@@ -407,7 +424,8 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
           </IonButton>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

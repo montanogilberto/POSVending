@@ -29,6 +29,7 @@
     "@capacitor/local-notifications": "^7.0.6",
     "@capacitor/preferences": "^7.0.4",
     "@capacitor/push-notifications": "^7.0.6",
+    "@capacitor/screen-orientation": "^7.0.4",
     "@capacitor/status-bar": "7.0.1",
     "@ionic/pwa-elements": "^3.4.0",
     "@ionic/react": "^8.5.0",

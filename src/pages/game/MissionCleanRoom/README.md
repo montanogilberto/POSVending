@@ -405,6 +405,24 @@ manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes 
 - Validar en un dispositivo real que Gilbertito rigged camina/corre/salta bien
   jugando (ver §17 — la deformación se verificó pose por pose, pero el playback
   en vivo con `Player3D`'s crossfade no se pudo confirmar en este entorno).
+  **Bloqueante para todo lo de abajo** — hasta confirmar esto en dispositivo,
+  no tiene sentido invertir en más clips.
+- Plan acordado para después de esa validación (no iniciado):
+  1. Autorizar 6 clips de interacción sobre el mismo rig de Gilbertito —
+     `Pickup`, `Carry`, `Drop`, `Place`, `Clean`, `Celebrate` — reusando
+     exactamente el pipeline de §17 (landmarks ya medidos, mismo armature).
+  2. Máquina de estados de animación explícita (`PlayerAnimation` type) en vez
+     de que `GameWorld3D.tsx` acumule condicionales de animación una por una.
+  3. Eventos de animación con timing propio (ej. `Pickup` dispara "adjuntar
+     objeto a la mano" en su frame ~55%, no instantáneamente al presionar E) —
+     así la interacción se siente física, no solo un cambio de posición.
+  4. Repetir el pipeline de rigging para Gael (nuevos landmarks vía
+     `analyze_silhouette.py`, mismo algoritmo — nunca copiar los huesos de
+     Gilbertito directo).
+  - `GameAvatarAnimationClips` (`world3d/GameAvatar.ts`) ya tiene los campos
+    opcionales `pickup`/`carry`/`drop`/`place`/`clean`/`celebrate`/`fall`
+    declarados de antemano — el contrato está listo, `Player3D.tsx` todavía
+    no los lee.
 - Solo entonces: eliminar la rama/carpeta Phaser si el 3D ya no necesita
   fallback.
 

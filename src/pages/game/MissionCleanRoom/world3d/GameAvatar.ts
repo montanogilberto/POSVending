@@ -10,6 +10,17 @@ export interface GameAvatarAnimationClips {
   walk: string;
   run: string;
   jump: string;
+  /** Not read by Player3D yet ('fall' still reuses `jump`, see its clipKey logic) — declared
+      now so avatar definitions and Player3D's animation-selection logic can grow into these one
+      at a time without another contract change. Optional: the development placeholder and
+      today's Gilbertito rig only have the four locomotion clips above. */
+  fall?: string;
+  pickup?: string;
+  carry?: string;
+  drop?: string;
+  place?: string;
+  clean?: string;
+  celebrate?: string;
 }
 
 export interface GameAvatar3D {
