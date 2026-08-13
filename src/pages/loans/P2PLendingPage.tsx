@@ -140,39 +140,8 @@ async function getStripeWallet(clientId: number, companyId: number): Promise<Str
   return data.wallet ?? null;
 }
 
-async function reserveStripeWallet(clientId: number, companyId: number, amountMXN: number): Promise<{ error?: string }> {
-  const res = await fetch(`${API_BASE_URL}/wallet/reserve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN }) });
-  return res.json();
-}
-
-async function releaseStripeWallet(clientId: number, companyId: number, amountMXN: number): Promise<void> {
-  await fetch(`${API_BASE_URL}/wallet/release`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN }) }).catch(() => {});
-}
-
-async function debitStripeWallet(clientId: number, companyId: number, amountMXN: number, type: 'disbursement' | 'withdrawal'): Promise<void> {
-  await fetch(`${API_BASE_URL}/wallet/debit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN, type }) });
-}
-
-async function creditStripeWallet(clientId: number, companyId: number, amountMXN: number, type: 'top_up' | 'repayment_received' | 'disbursement_received'): Promise<void> {
-  await fetch(`${API_BASE_URL}/wallet/credit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amountMXN, type }) });
-}
-
 async function stripeWithdrawToBank(clientId: number, companyId: number, amount: number): Promise<{ status?: string; error?: string }> {
   const res = await fetch(`${API_BASE_URL}/stripe/withdraw`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId, amount }) });
-  return res.json();
-}
-
-async function getStripeAccountStatus(clientId: number, companyId: number): Promise<{ hasExternalAccount?: boolean } | null> {
-  const res = await fetch(`${API_BASE_URL}/stripe/connected-accounts/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, companyId }) });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.account ?? null;
-}
-
-async function stripeDisburseLoan(payload: {
-  companyId: number; loanId?: number; proposalId: number; lenderId: number; borrowerId: number; amount: number;
-}): Promise<{ status?: string; stripeTransferId?: string; error?: string }> {
-  const res = await fetch(`${API_BASE_URL}/stripe/disburse`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   return res.json();
 }
 
@@ -220,6 +189,26 @@ const STATUS_META: Record<ProposalStatus, { label: string }> = {
   expired:   { label: 'Vencida'   },
   cancelled: { label: 'Cancelada' },
 };
+
+// SmartLoans es un conector, no custodio: estas etiquetas describen actividad
+// de préstamo (quién movió qué a quién por SPEI), nunca un balance de wallet.
+// Los registros crudos (entryType) no se tocan — esto es solo capa de presentación.
+const MOVEMENT_LABELS: Record<string, string> = {
+  LOAN_FUNDING:        'Préstamo otorgado',
+  REPAYMENT_PRINCIPAL: 'Capital recibido',
+  REPAYMENT_INTEREST:  'Interés recibido',
+  LOAN_REPAYMENT:      'Pago de préstamo',
+  DEPOSIT:             'Capital declarado',
+  RESERVE:             'Capital reservado',
+  RELEASE:             'Capital liberado',
+  REFUND:              'Reembolso',
+  CAPITAL_DECLARED:    'Capital declarado',
+  CAPITAL_COMMITTED:   'Capital comprometido',
+  CAPITAL_UNDECLARED:  'Capital liberado',
+};
+function movementLabel(entryType: string): string {
+  return MOVEMENT_LABELS[entryType] ?? entryType;
+}
 
 // ── component ─────────────────────────────────────────────────────────────────
 
@@ -558,81 +547,51 @@ const P2PLendingPage: React.FC = () => {
 
       // Funds first, with exact numbers and a way OUT: the alert offers the
       // deposit actions directly instead of a dead-end "Entendido".
-      const totalBalance = speiBalance + stripeBalance;
-      if (requestedAmount > totalBalance) {
-        console.log('[P2P] acceptProposal: BLOCKED — insufficient funds', JSON.stringify({ requestedAmount, speiBalance, stripeBalance }));
+      // SPEI is the ONLY funding rail for loan disbursement — SmartLoans is a
+      // connector, not a custodian: it never holds/moves capital through a
+      // Stripe-backed wallet (see docs/p2p-direct-payments-architecture.md).
+      // Stripe is reserved for direct, one-shot platform charges (e.g. premium
+      // subscription billing), never for funding or holding loan principal.
+      if (requestedAmount > speiBalance) {
+        console.log('[P2P] acceptProposal: BLOCKED — insufficient SPEI funds', JSON.stringify({ requestedAmount, speiBalance }));
         setShowAcceptAlert(false);
         setFundsAlertMsg(
-          `Para fondear ${fmt(requestedAmount)} tu billetera tiene ${fmt(totalBalance)} ` +
-          `(SPEI ${fmt(speiBalance)} · Stripe ${fmt(stripeBalance)}). El capital publicado en tu ` +
-          `oferta es un anuncio, no dinero depositado: el préstamo sale de tu saldo en cartera.`);
+          `Para fondear ${fmt(requestedAmount)} tu saldo SPEI es ${fmt(speiBalance)}. El capital publicado en tu ` +
+          `oferta es un anuncio, no dinero depositado: el préstamo se fondea directamente desde tu saldo SPEI.`);
         setSaving(false);
         return;
       }
 
-      // Preconditions: the borrower needs SOME payout destination — a verified
-      // CLABE (SPEI, primary) or a Stripe connected account with bank on file
-      // (2nd option) — plus a card on file for the automatic monthly cuotas.
-      const [borrowerAccounts, borrowerStripe, borrowerCard] = await Promise.all([
+      // Preconditions: the borrower needs a verified CLABE to receive SPEI,
+      // plus a card on file for the automatic monthly cuotas.
+      const [borrowerAccounts, borrowerCard] = await Promise.all([
         listBankAccounts(companyId, borrowerId),
-        getStripeAccountStatus(borrowerId, companyId),
         getSavedPaymentMethod(borrowerId, companyId),
       ]);
-      const borrowerHasClabe  = borrowerAccounts.some(a => a.isVerified);
-      const borrowerHasStripe = !!borrowerStripe?.hasExternalAccount;
+      const borrowerHasClabe = borrowerAccounts.some(a => a.isVerified);
       console.log('[P2P] acceptProposal: preconditions', JSON.stringify({
-        borrowerHasClabe, borrowerHasStripe,
-        borrowerHasCard: !!borrowerCard?.stripePaymentMethodId,
-        lenderSpei: speiBalance, lenderStripe: stripeBalance,
+        borrowerHasClabe, borrowerHasCard: !!borrowerCard?.stripePaymentMethodId, lenderSpei: speiBalance,
       }));
-      if (!borrowerHasClabe && !borrowerHasStripe) {
-        throw new Error('El prestatario no tiene una cuenta bancaria vinculada (CLABE ni Stripe). No se puede depositar el préstamo.');
+      if (!borrowerHasClabe) {
+        throw new Error('El prestatario no tiene una CLABE verificada. No se puede depositar el préstamo por SPEI.');
       }
       if (!borrowerCard?.stripePaymentMethodId) {
         throw new Error('El prestatario no ha registrado una tarjeta para el cobro automático de las cuotas.');
       }
 
-      // ── Rail 1 — SPEI (primary): one orchestrator call debits the lender's
-      // ledger, sends to the borrower's verified CLABE and auto-reverses on
-      // failure (mock STP hasta contrato).
-      let moneyMoved = false;
-      if (borrowerHasClabe && requestedAmount <= speiBalance) {
-        const disburseResult = await disbursePayment({
-          companyId, lenderId, borrowerId, amountMXN: requestedAmount,
-          purpose: 'loan_disbursement',
-          idempotencyKey: `proposal:${proposalId}:disburse:${Date.now()}`,
-        });
-        console.log('[P2P] acceptProposal: /payments/disburse ←', JSON.stringify(disburseResult));
-        if (!disburseResult.error && disburseResult.status !== 'failed') {
-          console.log('[P2P] acceptProposal: SPEI moved — transferId', disburseResult.transferId, 'CEP', disburseResult.cepUrl);
-          moneyMoved = true;
-        } else {
-          console.log('[P2P] acceptProposal: SPEI FAILED — trying Stripe as 2nd option:', disburseResult.error);
-        }
-      } else {
-        console.log('[P2P] acceptProposal: SPEI not eligible — trying Stripe as 2nd option');
+      // ── SPEI directo (única vía): un solo call al orquestador debita el
+      // ledger del prestamista, envía a la CLABE verificada del prestatario y
+      // se autorrevierte si falla (mock STP hasta que exista el contrato real).
+      const disburseResult = await disbursePayment({
+        companyId, lenderId, borrowerId, amountMXN: requestedAmount,
+        purpose: 'loan_disbursement',
+        idempotencyKey: `proposal:${proposalId}:disburse:${Date.now()}`,
+      });
+      console.log('[P2P] acceptProposal: /payments/disburse ←', JSON.stringify(disburseResult));
+      if (disburseResult.error || disburseResult.status === 'failed') {
+        throw new Error(disburseResult.error || 'No se pudo transferir el capital por SPEI al prestatario.');
       }
-
-      // ── Rail 2 — Stripe (segunda opción): the pre-banking sequence, kept by
-      // user decision: reserve → Connect transfer → old-wallet debit/credit.
-      if (!moneyMoved) {
-        if (!borrowerHasStripe) throw new Error('SPEI no disponible y el prestatario no tiene cuenta Stripe vinculada.');
-        if (requestedAmount > stripeBalance) throw new Error('Saldo insuficiente en tu cartera para fondear este préstamo.');
-
-        const reserveResult = await reserveStripeWallet(lenderId, companyId, requestedAmount);
-        console.log('[P2P] acceptProposal: stripe RESERVE ←', JSON.stringify(reserveResult));
-        if (reserveResult.error) throw new Error(reserveResult.error);
-
-        const stripeResult = await stripeDisburseLoan({ companyId, proposalId, lenderId, borrowerId, amount: requestedAmount });
-        console.log('[P2P] acceptProposal: /stripe/disburse ←', JSON.stringify(stripeResult));
-        if (stripeResult.error || stripeResult.status !== 'succeeded') {
-          await releaseStripeWallet(lenderId, companyId, requestedAmount);
-          throw new Error(stripeResult.error || 'No se pudo transferir el capital al prestatario.');
-        }
-        await debitStripeWallet(lenderId, companyId, requestedAmount, 'disbursement');
-        await creditStripeWallet(borrowerId, companyId, requestedAmount, 'disbursement_received');
-        console.log('[P2P] acceptProposal: STRIPE moved — transfer', stripeResult.stripeTransferId);
-      }
+      console.log('[P2P] acceptProposal: SPEI moved — transferId', disburseResult.transferId, 'CEP', disburseResult.cepUrl);
 
       const disbursementDate = new Date().toISOString();
       const loan = await createLoan({
@@ -1479,48 +1438,39 @@ const P2PLendingPage: React.FC = () => {
         </IonContent>
       </IonModal>
 
-      {/* ── Movements (ledger statement) modal ── */}
+      {/* ── Activity (loan activity, NOT a wallet statement) modal.
+          SmartLoans is a connector/orchestrator — money moves directly
+          lender↔borrower via SPEI/STP, it is never held here. This screen
+          must never show a "saldo en cartera" or imply a platform balance. ── */}
       <IonModal isOpen={showMovements} onDidDismiss={() => setShowMovements(false)}>
         <IonHeader>
           <IonToolbar>
-            <IonTitle>Movimientos</IonTitle>
+            <IonTitle>Actividad</IonTitle>
             <IonButtons slot="end">
               <IonButton onClick={() => setShowMovements(false)}>Cerrar</IonButton>
             </IonButtons>
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
-          {/* Saldo actual + agregar fondos, siempre a la vista */}
-          <div className="p2p-movements-balance">
-            <div>
-              <span>Saldo en cartera</span>
-              <strong>{walletBalance !== null ? fmt(walletBalance) : fmt(0)}</strong>
-            </div>
-            <IonButton size="small" onClick={() => {
-              console.log('[P2P] movements → add funds (top-up tarjeta)');
-              setShowMovements(false);
-              goTopUp();
-            }}>
-              <IonIcon icon={addOutline} slot="start" />
-              Agregar fondos
-            </IonButton>
+          <div className="p2p-movements-header">
+            <h2>Actividad de capital</h2>
+            <p className="p2p-movements-hint">
+              SmartLoans no custodia fondos. Los préstamos y pagos se realizan directamente
+              entre prestamista y acreditado mediante SPEI.
+            </p>
           </div>
-          <p className="p2p-movements-hint">
-            Recarga con tarjeta hoy · depósitos SPEI a tu CLABE virtual disponibles al activar el riel STP.
-          </p>
-          {movements.length === 0 && <p className="p2p-bank-note">Sin movimientos todavía.</p>}
+          {movements.length === 0 && <p className="p2p-bank-note">Sin actividad todavía.</p>}
           <IonList className="p2p-mov-list" lines="none">
             {movements.map(m => (
               <IonItem key={m.entryId} lines="full" className="p2p-mov-item">
                 <IonLabel>
-                  <h3>{m.entryType}</h3>
+                  <h3>{movementLabel(m.entryType)}</h3>
                   <p>{m.note ?? ''} · {new Date(m.created_At).toLocaleString('es-MX')}</p>
                 </IonLabel>
                 <div slot="end" className="p2p-mov-amount">
                   <strong className={m.direction === 'C' ? 'p2p-mov-in' : 'p2p-mov-out'}>
                     {m.direction === 'C' ? '+' : '−'}{fmt(m.amountMXN)}
                   </strong>
-                  {m.balanceAfter !== null && <IonNote>saldo {fmt(m.balanceAfter)}</IonNote>}
                 </div>
               </IonItem>
             ))}
