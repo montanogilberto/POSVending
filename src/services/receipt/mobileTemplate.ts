@@ -4,7 +4,7 @@ import { getPaymentMethodText } from './normalizers';
 const DEFAULT_LOGO_URL = '';
 const GMO_QR_URL = 'https://imageprofile.blob.core.windows.net/profile/qr_gmolavanderia.png';
 const GMO_PROMOS_URL = 'https://www.gmolavanderia.com';
-const GMO_CONTACT_URL = 'https://wa.me/526624737005';
+const GMO_CONTACT_URL = 'https://wa.me/526624688224';
 const GMO_SERVICES_URL = 'https://www.gmolavanderia.com';
 
 function escapeHtml(value: unknown): string {

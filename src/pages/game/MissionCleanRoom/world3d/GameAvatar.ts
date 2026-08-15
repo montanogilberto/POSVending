@@ -50,6 +50,9 @@ const GILBERTITO_ANIMATIONS: GameAvatarAnimationClips = {
   walk: 'Walk',
   run: 'Run',
   jump: 'Jump',
+  pickup: 'Pickup',
+  carry: 'Carry',
+  place: 'Place',
 };
 
 // Same clip-name convention as Gilbertito (same pipeline, same ANIMATED_BONES/action-name scheme
@@ -59,6 +62,9 @@ const GAEL_ANIMATIONS: GameAvatarAnimationClips = {
   walk: 'Walk',
   run: 'Run',
   jump: 'Jump',
+  pickup: 'Pickup',
+  carry: 'Carry',
+  place: 'Place',
 };
 
 const TUTU_ANIMATIONS: GameAvatarAnimationClips = {
@@ -66,6 +72,9 @@ const TUTU_ANIMATIONS: GameAvatarAnimationClips = {
   walk: 'Walk',
   run: 'Run',
   jump: 'Jump',
+  pickup: 'Pickup',
+  carry: 'Carry',
+  place: 'Place',
 };
 
 export const AVATARS_3D: Record<string, GameAvatar3D> = {

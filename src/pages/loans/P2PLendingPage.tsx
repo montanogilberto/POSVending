@@ -74,6 +74,9 @@ interface LoanOffer {
   isActive: boolean;
   expiresAt?: string;
   created_At?: string;
+  // Auditoría del checkbox "Declaro que el capital indicado está disponible…"
+  consentAccepted?: boolean;
+  consentAcceptedAt?: string;
 }
 
 async function getAllLoanProposals(companyId: number, filters?: { lenderId?: number; borrowerId?: number; status?: ProposalStatus }): Promise<LoanProposal[]> {
@@ -266,6 +269,8 @@ const P2PLendingPage: React.FC = () => {
   const [offerCapital,  setOfferCapital]  = useState('');
   const [offerDesc,     setOfferDesc]     = useState('');
   const [offerAgreeVirtual, setOfferAgreeVirtual] = useState(false);
+  // Ticket de confirmación mostrado justo después de publicar capital.
+  const [publishedTicket, setPublishedTicket] = useState<LoanOffer | null>(null);
 
   // ── proposal form ───────────────────────────────────────────────────────
   const [propAmount,   setPropAmount]   = useState('');
@@ -390,41 +395,69 @@ const P2PLendingPage: React.FC = () => {
       const expires = new Date();
       expires.setDate(expires.getDate() + 30);
 
-      // 1. Persist offer — must succeed before notifying anyone. This used to
-      // be .catch(() => {}) ("backend may not have endpoint yet"), which hid a
-      // month of 500s (dbo.loanOffers table missing) behind a success toast.
-      await createLoanOffer({
-        companyId, lenderId: clientId,
-        availableCapital: capital,
-        minRate, maxRate, minTermMonths, maxTermMonths,
-        description: offerDesc,
-        isActive: true,
-        expiresAt: expires.toISOString(),
-      });
+      // "Publicar más capital" es ACUMULATIVO — el botón del dashboard dice
+      // literalmente eso, no "reemplazar". Un solo anuncio vivo por
+      // prestamista sigue aplicando (para no duplicar al prestamista en el
+      // mercado), pero republicar SUMA al capital ya anunciado en vez de
+      // sustituirlo.
+      const existingActiveOffers = offers.filter(o => o.lenderId === clientId && o.isActive);
+      const priorTotal = existingActiveOffers.reduce((s, o) => s + o.availableCapital, 0);
+      const newTotal   = priorTotal + capital;
 
-      // NOTA: NO se escribe un renglón CAPITAL_DECLARED en walletTransactions
-      // aquí — sp_walletTransactions_balance.sql:205-209 calcula el "saldo
-      // disponible" real (el mismo que valida acceptProposal antes de mover
-      // SPEI de verdad) como el balanceAfter de la ÚLTIMA fila de esa tabla,
-      // SIN filtrar por entryType. Cualquier escritura aquí — sin importar
-      // el entryType — se mezcla con el saldo real y lo infla artificialmente.
-      // "Capital publicado" ya vive completo y correcto en loanOffers.availableCapital,
-      // sin tocar el ledger — no hace falta un segundo lugar para lo mismo hasta que
-      // el backend separe explícitamente CAPITAL_* del cálculo de saldo real.
+      let ticketOffer: LoanOffer;
 
-      // Un solo anuncio vivo por prestamista: republicar REEMPLAZA al anterior.
-      // Sin esto las ofertas se acumulaban y el mercado mostraba al mismo
-      // prestamista repetido, sumando más capital del que respalda su billetera
-      // (el chequeo de fondos de arriba solo compara la oferta nueva).
-      // Se desactivan DESPUÉS de crear la nueva para que un fallo al crear no
-      // deje al prestamista sin ninguna oferta publicada.
-      for (const prev of offers.filter(o => o.lenderId === clientId && o.isActive)) {
-        console.log('[P2P] publishOffer: replacing previous offer', prev.offerId);
-        await updateLoanOffer(prev.offerId, companyId, {
-          isActive: false,
-          description: 'Reemplazada por una oferta más reciente',
-        }).catch(e => console.log('[P2P] publishOffer: replace FAILED —', String(e)));
+      if (existingActiveOffers.length > 0) {
+        const target = existingActiveOffers[0];
+        console.log('[P2P] publishOffer: adding to existing offer', JSON.stringify({ offerId: target.offerId, priorTotal, added: capital, newTotal }));
+        await updateLoanOffer(target.offerId, companyId, {
+          availableCapital: newTotal,
+          description: offerDesc || target.description,
+        });
+        // Caso raro (dato legado): más de un anuncio activo a la vez — se
+        // consolidan en el primero y se desactivan los demás.
+        for (const extra of existingActiveOffers.slice(1)) {
+          await updateLoanOffer(extra.offerId, companyId, {
+            isActive: false,
+            description: 'Consolidada en oferta principal',
+          }).catch(e => console.log('[P2P] publishOffer: consolidate FAILED —', String(e)));
+        }
+        ticketOffer = { ...target, availableCapital: newTotal, description: offerDesc || target.description, created_At: new Date().toISOString() };
+      } else {
+        // 1. Persist offer — must succeed before notifying anyone. This used to
+        // be .catch(() => {}) ("backend may not have endpoint yet"), which hid a
+        // month of 500s (dbo.loanOffers table missing) behind a success toast.
+        ticketOffer = await createLoanOffer({
+          companyId, lenderId: clientId,
+          availableCapital: newTotal,
+          minRate, maxRate, minTermMonths, maxTermMonths,
+          description: offerDesc,
+          isActive: true,
+          expiresAt: expires.toISOString(),
+          // offerAgreeVirtual ya se validó arriba (return temprano si es false) —
+          // se manda explícito para que el registro de auditoría no dependa de
+          // esa guarda silenciosamente.
+          consentAccepted: offerAgreeVirtual,
+          consentAcceptedAt: new Date().toISOString(),
+        });
       }
+
+      // Registro de actividad (CAPITAL_DECLARED) — ahora seguro de escribir:
+      // sp_walletTransactions.sql excluye explícitamente CAPITAL_* del saldo
+      // real (@prev en el INSERT y @available en sp_walletTransactions_balance
+      // ya filtran por entryType, balanceAfter queda NULL en estas filas) —
+      // ver incidente + fix en memoria [[non-custodial-pivot]]. Se registra el
+      // INCREMENTO (capital), no el total — loanOffers.availableCapital sigue
+      // siendo la fuente de verdad para "Capital publicado"; esto es solo el
+      // historial de actividad que alimenta las pantallas "Actividad"/
+      // "Actividad reciente". Best-effort: un fallo aquí no debe tumbar la
+      // publicación de la oferta.
+      await postLedgerEntry({
+        companyId, clientId, entryType: 'CAPITAL_DECLARED', direction: 'C', amountMXN: capital,
+        idempotencyKey: `offer:declare:${clientId}:${Date.now()}`,
+        note: existingActiveOffers.length > 0
+          ? `Capital agregado — total publicado ${fmt(newTotal)}`
+          : 'Capital declarado — tasa y plazo a negociar por propuesta',
+      }).catch(e => console.log('[P2P] publishOffer: CAPITAL_DECLARED ledger entry FAILED —', String(e)));
 
       // 2. Send push notification to ALL borrowers
       const borrowers = clients.filter(c => c.clientType === 'borrower' || c.clientType === 'both');
@@ -433,7 +466,7 @@ const P2PLendingPage: React.FC = () => {
       await createPushNotification({
         companyId,
         title: `💰 Capital disponible — ${lenderName}`,
-        message: `${lenderName} tiene ${fmt(capital)} disponibles para préstamo. ¡Propón tus condiciones!`,
+        message: `${lenderName} tiene ${fmt(newTotal)} disponibles para préstamo. ¡Propón tus condiciones!`,
         notificationType: 'Info',
         priority: 'High',
         targetType: 'Company',
@@ -443,16 +476,17 @@ const P2PLendingPage: React.FC = () => {
           type: 'LoanOffer',
           lenderId: clientId,
           lenderName,
-          availableCapital: capital,
+          availableCapital: newTotal,
           minRate, maxRate, minTermMonths, maxTermMonths,
         }),
       });
 
       console.log('[P2P] publishOffer: SUCCESS — notified', borrowers.length, 'borrowers');
-      showToast(`✓ Oferta publicada y notificación enviada a ${borrowers.length} prestatarios`);
+      showToast(`✓ Capital publicado: ${fmt(newTotal)} en total — notificación enviada a ${borrowers.length} prestatarios`);
       notifyDataChanged('offer_published');
       setShowOfferModal(false);
       setOfferCapital(''); setOfferDesc(''); setOfferAgreeVirtual(false);
+      setPublishedTicket(ticketOffer);
       load();
     } catch (e: any) {
       console.log('[P2P] publishOffer: FAILED —', String(e?.message ?? e));
@@ -469,6 +503,13 @@ const P2PLendingPage: React.FC = () => {
     try {
       await deleteLoanOffer(offerToDelete.offerId, companyId);
       console.log('[P2P] removeOffer: SUCCESS — offerId', offerToDelete.offerId);
+      // Registro de actividad — seguro ahora que sp_walletTransactions excluye
+      // CAPITAL_* del saldo real (ver nota en publishOffer más arriba).
+      await postLedgerEntry({
+        companyId, clientId, entryType: 'CAPITAL_UNDECLARED', direction: 'D', amountMXN: offerToDelete.availableCapital,
+        idempotencyKey: `offer:undeclare:${offerToDelete.offerId}:${Date.now()}`,
+        note: `Capital liberado — oferta ${offerToDelete.offerId} eliminada`,
+      }).catch(e => console.log('[P2P] removeOffer: CAPITAL_UNDECLARED ledger entry FAILED —', String(e)));
       showToast('✓ Oferta eliminada');
       notifyDataChanged('offer_removed');
       load();
@@ -1301,6 +1342,58 @@ const P2PLendingPage: React.FC = () => {
             <IonIcon icon={shieldCheckmarkOutline} />
             SmartLoans es una plataforma segura que protege tu información.
           </p>
+        </IonFooter>
+      </IonModal>
+
+      {/* ══════════ Modal: Ticket de confirmación (capital publicado) ══════════ */}
+      <IonModal isOpen={!!publishedTicket} onDidDismiss={() => setPublishedTicket(null)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Capital publicado</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setPublishedTicket(null)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        {publishedTicket && (
+          <IonContent className="ion-padding">
+            <div className="p2p-ticket">
+              <IonIcon icon={checkmarkCircle} className="p2p-ticket-check" />
+              <h2>Tu capital fue publicado</h2>
+              <p className="p2p-ticket-sub">Los solicitantes con perfil completo ya fueron notificados.</p>
+
+              <div className="p2p-ticket-card">
+                <div className="p2p-ticket-row">
+                  <span>Folio</span>
+                  <strong>#{publishedTicket.offerId}</strong>
+                </div>
+                <div className="p2p-ticket-row">
+                  <span>Capital declarado</span>
+                  <strong>{fmt(publishedTicket.availableCapital)}</strong>
+                </div>
+                <div className="p2p-ticket-row">
+                  <span>Fecha</span>
+                  <strong>{new Date(publishedTicket.created_At ?? Date.now()).toLocaleString('es-MX')}</strong>
+                </div>
+                {publishedTicket.description && (
+                  <div className="p2p-ticket-row">
+                    <span>Descripción</span>
+                    <strong>{publishedTicket.description}</strong>
+                  </div>
+                )}
+              </div>
+
+              <p className="p2p-ticket-note">
+                Este es un comprobante de tu declaración de capital, no un movimiento de dinero.
+                SmartLoans no recibe, retiene ni administra estos fondos.
+              </p>
+            </div>
+          </IonContent>
+        )}
+        <IonFooter className="ion-padding p2p-modal-footer">
+          <IonButton expand="block" onClick={() => setPublishedTicket(null)}>
+            Entendido
+          </IonButton>
         </IonFooter>
       </IonModal>
 

@@ -33,9 +33,16 @@ export const statusIcon = (s: string) =>
 
 export const activityIcon = (e: LedgerEntry) => (e.direction === 'C' ? arrowDownOutline : arrowUpOutline);
 
+// SmartLoans es conector, no custodio — estas etiquetas describen actividad
+// de capital/préstamo (ver [[non-custodial-pivot]]), nunca un balance de
+// wallet. Los CAPITAL_* solo aparecen aquí como historial de eventos de
+// declaración; no representan dinero movido por SmartLoans.
 export const activityLabel = (e: LedgerEntry) => ({
   DEPOSIT: 'Depósito SPEI', LOAN_FUNDING: 'Préstamo fondeado',
   REPAYMENT_PRINCIPAL: 'Capital recuperado', REPAYMENT_INTEREST: 'Interés ganado',
   WITHDRAWAL: 'Retiro a banco', REVERSAL: 'Reversa', LOAN_REPAYMENT: 'Pago de cuota',
   DISBURSEMENT_RECEIVED: 'Desembolso recibido',
+  CAPITAL_DECLARED: 'Capital declarado', CAPITAL_COMMITTED: 'Capital comprometido',
+  CAPITAL_UNDECLARED: 'Capital liberado', RESERVE: 'Capital reservado',
+  RELEASE: 'Capital liberado', REFUND: 'Reembolso',
 }[e.entryType] ?? e.entryType);

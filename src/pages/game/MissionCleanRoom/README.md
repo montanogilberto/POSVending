@@ -109,8 +109,9 @@ src/pages/game/MissionCleanRoom/
 ├── components/
 │   ├── GameWorld3D.tsx/css         # orquestador: <Canvas>, estado de carrying/collected, controles
 │   ├── VictoryModal.tsx/css        # overlay de victoria (NO IonModal) — estrellas, puntos, jugar de nuevo/salir
+│   ├── MissionMap.tsx/css          # mapa esquemático 2D del cuarto actual (§21) — mismo patrón, no IonModal
 │   ├── GameOverModal.tsx/css       # overlay de fin de tiempo — mismo patrón, defensivo (ver §11)
-│   ├── CharacterSelect.tsx/css     # SIN CAMBIOS (arte real o placeholder emoji)
+│   ├── CharacterSelect.tsx/css     # 5 personajes seleccionables (arte real o placeholder emoji, §17)
 │   ├── GameHUD.tsx/css             # SIN CAMBIOS
 │   └── GameWorld.tsx/css           # Phaser — presente pero NO importado desde esta rama (referencia)
 │
@@ -122,7 +123,14 @@ src/pages/game/MissionCleanRoom/
     ├── MissionDefinition.ts        # posiciones 3D + narrativa por misión, separado del motor
     ├── world3dConstants.ts         # WORLD3D_CONFIG: tamaño de sala, velocidades, cámara
     ├── ControlTypes.ts             # ControlInput3D { moveX, moveZ, running, jumpPressed, interactPressed }
-    ├── Room3D.tsx                  # geometría de la habitación + getRoomObstacles/getCameraObstacles
+    ├── rooms/                      # 3 cuartos (§18) — cada uno su geometría + getObstacles/getCameraObstacles
+    │   ├── RoomTypes.ts             # interface RoomDefinition3D + RoomId type
+    │   ├── BedroomRoom3D.tsx        # cuarto original
+    │   ├── SalaRoom3D.tsx           # sala — sofá/TV/mesa de centro/librero
+    │   ├── BanoRoom3D.tsx           # baño — tina/lavamanos/repisa/cesta de ropa
+    │   ├── index.ts                 # getRoom3D(roomId) — registro id→{Component, obstacles}
+    │   ├── doors.ts                 # DOORS (grafo entre cuartos, §20) + getEntryPosition()
+    │   └── DoorMarker3D.tsx         # prop de puerta compartido por los 3 cuartos
     ├── Player3D.tsx                # carga el GLB, gravedad/salto/colisión, cambia animaciones
     ├── CameraRig.tsx               # cámara en tercera persona con anti-clip por cajas
     ├── InteractionManager3D.tsx    # detecta el interactuable más cercano, dispara pickup/drop
@@ -405,27 +413,27 @@ manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes 
 - Archivos de audio reales en `public/assets/audio/` (hoy `useGameAudio` está
   cableado en todos los call sites pero falla en silencio sin los MP3).
 - Validar en un dispositivo real que Gilbertito/Gael/Tutu rigged caminan/
-  corren/saltan bien jugando (ver §17 — la deformación se verificó pose por
-  pose, pero el playback en vivo con `Player3D`'s crossfade no se pudo
-  confirmar en este entorno). **Bloqueante para todo lo de abajo** — hasta
-  confirmar esto en dispositivo, no tiene sentido invertir en más clips.
+  corren/saltan/recogen/entregan bien jugando — toda la deformación (locomoción
+  §17, interacción §19) se verificó pose por pose vía `mixer.setTime()`, pero
+  el playback en vivo con los crossfades y el timing real de `Player3D` no se
+  pudo confirmar en este entorno (ver §19 — ni siquiera el temporizador del
+  propio estado de interacción avanzó en el harness de este navegador,
+  `document.hidden` se queda `true` sin importar qué tab esté al frente).
+  **Sigue siendo el bloqueante real** para cualquier ajuste fino de timing.
 - Revisar la escala de Tutu (§17) — hoy copia la de Gilbertito/Gael (0.93,
   render de tamaño niño) porque su bounding box coincide con el de ellos casi
   exactamente, pero eso es casi seguro una convención de exportación del
   pipeline de arte, no su tamaño "real" como oso de peluche.
-- Plan acordado para después de esa validación (no iniciado):
-  1. Autorizar 6 clips de interacción sobre el mismo rig de Gilbertito —
-     `Pickup`, `Carry`, `Drop`, `Place`, `Clean`, `Celebrate` — reusando
-     exactamente el pipeline de §17 (landmarks ya medidos, mismo armature).
-  2. Máquina de estados de animación explícita (`PlayerAnimation` type) en vez
-     de que `GameWorld3D.tsx` acumule condicionales de animación una por una.
-  3. Eventos de animación con timing propio (ej. `Pickup` dispara "adjuntar
-     objeto a la mano" en su frame ~55%, no instantáneamente al presionar E) —
-     así la interacción se siente física, no solo un cambio de posición.
-  - `GameAvatarAnimationClips` (`world3d/GameAvatar.ts`) ya tiene los campos
-    opcionales `pickup`/`carry`/`drop`/`place`/`clean`/`celebrate`/`fall`
-    declarados de antemano — el contrato está listo, `Player3D.tsx` todavía
-    no los lee.
+- ~~Autorizar 6 clips de interacción... Máquina de estados de animación
+  explícita... Eventos de animación con timing propio.~~ Hecho para
+  `Pickup`/`Carry`/`Place` (§19) — `Drop`/`Clean`/`Celebrate` siguen sin
+  clip propio (`Drop` es redundante con `Place` en este juego — solo hay una
+  interacción de entrega, no "soltar sin entregar"; `Celebrate` visual queda
+  pendiente, el audio `celebrate` ya existe).
+  - `GameAvatarAnimationClips` (`world3d/GameAvatar.ts`) tiene además los
+    campos opcionales `drop`/`clean`/`celebrate`/`fall` declarados pero sin
+    clip ni lectura en `Player3D.tsx` — quedan para cuando haga falta esa
+    mecánica específica.
 - Solo entonces: eliminar la rama/carpeta Phaser si el 3D ya no necesita
   fallback.
 
@@ -519,3 +527,245 @@ personaje nuevo: correr `analyze_silhouette.py` sobre su `.glb`, copiar uno
 de los tres `rig_*.py` con los landmarks nuevos, y mantener igual el
 `align_roll`, el peso por distancia y el uso de `Mesh.transform` en vez de
 operadores (esas partes sí son independientes de la malla).
+
+## 18. Múltiples cuartos (`world3d/rooms/`)
+
+Hasta ahora las 10 misiones vivían todas en el mismo cuarto (`Room3D.tsx`
+era un componente único, siempre renderizado). Se dividió en un registro
+`RoomId → RoomDefinition3D` (`world3d/rooms/index.ts`) con tres cuartos hoy:
+`bedroom` (el original, sin cambios de geometría), `sala` (sofá/TV/mesa de
+centro/librero) y `bano` (tina/lavamanos con espejo/repisa de toallas/cesta
+de ropa como obstáculo — cumple el mismo rol que la caja de juguetes del
+cuarto). Cada `RoomDefinition3D` trae su propio componente + `getObstacles()`
++ `getCameraObstacles()`; `MissionDefinition3D` ahora tiene un campo
+`roomId` y `GameWorld3D.tsx` resuelve `getRoom3D(mission.roomId)` en vez de
+importar un `Room3D` fijo — cambiar de cuarto entre misiones es un simple
+re-render condicionado por ese lookup, no un cambio de arquitectura.
+
+Reparto de las 10 misiones: `mission_01`-`04` se quedaron en `bedroom` sin
+tocar sus posiciones (cero riesgo de regresión); `mission_05`-`07` se
+movieron a `sala` y `mission_08`-`10` a `bano`, ambos con posiciones de
+ítem/contenedor/estrella nuevas, verificadas por script (no a ojo) contra
+los `Box3` de cada cuarto para confirmar que ningún punto cae dentro de un
+mueble ni fuera de las paredes. Las tres habitaciones comparten el mismo
+`ROOM_SIZE`/`WALL_HEIGHT`/tuning de cámara (`world3dConstants.ts`) — solo
+cambia el mobiliario y la paleta de color — así que no hizo falta retocar
+`CameraRig`/`Player3D` para el cambio.
+
+Verificación: cada cuarto se cargó por separado vía un harness que renderiza
+`GameWorld3D` directamente (mismo patrón de la §12, evita el agotamiento de
+contextos WebGL de `CharacterSelect`) pasando `missionId` de cada tramo —
+confirmó que el texto de narrativa, el color de piso, y el mobiliario
+cambian correctamente por cuarto, y que no hay overlap de posiciones con las
+cajas de colisión.
+
+## 19. Animaciones de interacción (Pickup / Carry / Place)
+
+Antes: presionar E junto al ítem cambiaba `isCarrying` a `true` en el mismo
+frame — el objeto desaparecía y "aparecía cargado" instantáneamente, sin
+ninguna animación de por medio. Ahora Gilbertito/Gael/Tutu tienen tres clips
+nuevos (`Pickup`, `Carry`, `Place`) y la interacción se siente física: al
+presionar E el personaje se agacha y estira el brazo, el ítem se adjunta a
+su mano a mitad del clip, y se pone de pie ya cargándolo.
+
+**Los clips** (`rigging-scripts/add_interaction_clips.py`, nuevo — reutiliza
+un GLB ya riggeado en vez de re-rigear desde cero):
+- **`Pickup`** — one-shot, 24 frames @30fps: agacharse + estirar el brazo,
+  ponerse de pie ya con el ítem en la mano.
+- **`Carry`** — loop, pose de "cargando algo" (brazos doblados al frente)
+  con un balanceo sutil — sustituye a `Idle` mientras `isCarrying` es true y
+  el jugador está parado quieto. Caminar/correr cargando sigue usando `Walk`/
+  `Run` normales por ahora (el ítem sigue la mano igual, sin un clip
+  "caminar cargando" dedicado — ver pendiente más abajo).
+- **`Place`** — one-shot, espejo de `Pickup`: agacharse desde la pose de
+  cargar, soltar el ítem, regresar a neutral.
+
+**Magnitud de la pose, no solo su dirección, importaba.** El primer intento
+usó ángulos grandes (70-90° en los hombros) para una agachada dramática, pero
+eso acercó el antebrazo lo suficiente al muslo como para que el weighting por
+distancia (§17) mezclara vértices del pantalón con el hueso del brazo —
+se leía como "la pierna se levanta sola". Confirmado con datos, no a ojo:
+se comparó la rotación exportada de `LeftUpperLeg` en `Carry` contra la de
+`Idle` en el mismo frame de reposo — eran idénticas, o sea el hueso de la
+pierna nunca se movió; el glitch era 100% un artefacto de skinning por
+cercanía del brazo, no un bug de animación. Se resolvió reduciendo los
+ángulos de brazo a ~26-28° — menos dramático, pero limpio. Arreglar esto de
+raíz necesitaría un algoritmo de peso consciente de qué hueso "pertenece" a
+qué región de la malla (o pintar influencias a mano), fuera de alcance por
+ahora.
+
+**Dirección de la pose confirmada empíricamente, no asumida.** El eje Z de
+cada hueso de extremidad ya se sabía que es el eje de "bisagra" (align_roll,
+§17), pero el SIGNO que corresponde a "adelante" no era obvio a simple
+vista — un ángulo mal firmado se ve casi igual que uno bien firmado en
+cámara frontal (el brazo se esconde detrás del torso por escorzo). Se
+resolvió con un clip de diagnóstico temporal (`ArmTest`, borrado después)
+que probó +90°/-90° en `UpperArm` y se verificó desde una cámara de perfil
+(lateral), donde adelante/atrás es inequívoco.
+
+**Máquina de estados en `Player3D.tsx`:** `pickupTrigger`/`placeTrigger`
+(números que se incrementan) le piden al jugador que reproduzca el clip
+correspondiente una vez (`THREE.LoopOnce` + `clampWhenFinished`), congelando
+el input de movimiento mientras dura. Al cruzar el 55% del clip (la pose de
+"agarrar", ver frame 13/24 en el script) dispara `onPickupAttach`/
+`onPlaceRelease`; al terminar dispara `onInteractionAnimDone`. Si el avatar
+no tiene el clip declarado (Tiburón Boy/Dino Boy — `GameAvatarAnimationClips`
+`pickup`/`carry`/`place` son opcionales), el callback se dispara al instante
+y no hay animación — comportamiento idéntico al de antes de esta feature
+para esos dos avatares.
+
+**`GameWorld3D.tsx`** ya no muta `isCarrying`/`delivered` de forma síncrona
+al presionar E — dispara el trigger y espera el callback de Player3D para
+hacerlo (`handlePickupAttach`/`handlePlaceRelease`), con un flag
+`interactionLocked` que bloquea los interactuables mientras el clip está
+en curso (si no, presionar E de nuevo a mitad de la agachada reiniciaba la
+animación).
+
+**Ítem adjunto a la mano, no reparentado.** En vez de mover el `Object3D`
+del ítem dentro de la jerarquía del GLB cacheado por `useGLTF` (riesgoso:
+ese `scene` puede reusarse en otro lugar, p. ej. si `CharacterSelect` volviera
+a cargarlo), cada frame se copia la posición/rotación mundial del hueso
+`RightHand` a un grupo hermano fuera del modelo (`carriedItemGroupRef`).
+Sin hueso `RightHand` (Tiburón Boy/Dino Boy usan `Hand.R`/`Hand.L` del
+placeholder CC0) cae de vuelta al offset fijo que ya existía antes.
+
+**Bug real encontrado y corregido:** los tres clips nuevos se authored y
+exportaron correctamente en Blender, pero `world3d/GameAvatar.ts` nunca se
+actualizó para declarar sus nombres — `GILBERTITO_ANIMATIONS` seguía
+solo con `idle`/`walk`/`run`/`jump`. Con `avatar.animations.pickup`
+`undefined`, el código tomaba (correctamente, por diseño) el camino
+"sin clip" — instantáneo, sin agacharse. Se detectó al probar con un
+harness aislado (`Player3D` solo, sin el resto de `GameWorld3D`) y ver que
+"ATTACH"/"ANIM DONE" se disparaban en el mismo frame que el trigger.
+Corregido agregando `pickup: 'Pickup'`, `carry: 'Carry'`, `place: 'Place'`
+a las tres constantes de animaciones (`GILBERTITO_ANIMATIONS`/
+`GAEL_ANIMATIONS`/`TUTU_ANIMATIONS`).
+
+**Límite de verificación de este entorno:** una vez corregido ese bug, el
+mismo harness dejó de disparar el fallback instantáneo (buena señal — el
+código ahora sí intenta reproducir el clip), pero tampoco llegó nunca a
+disparar "ATTACH" en tiempo real, ni siquiera tras varios segundos. La causa:
+`document.hidden` se queda en `true` para esta pestaña sin importar qué tab
+esté "al frente" según las herramientas de este entorno — el navegador
+throttlea/pausa `requestAnimationFrame` para páginas que considera ocultas,
+así que `useFrame` (y por lo tanto el acumulador de tiempo de la animación)
+prácticamente no avanza. Se confirmó que esto es un límite del entorno, no
+un bug: con `delta` limitado a 1/30s por frame (mismo patrón que el resto de
+`Player3D`), si `useFrame` nunca corre, nada avanza — ni siquiera la
+gravedad, que tampoco se observó actuar. La lógica se validó por revisión de
+código + evidencia parcial (el clip correcto se reprodujo al menos una vez,
+el ítem se vio adjunto cerca de la mano), no por observación de principio a
+fin en este navegador — pendiente confirmar en dispositivo real junto con el
+resto de §17/§18.
+
+## 20. Puertas entre cuartos (`world3d/rooms/doors.ts`)
+
+Antes, el único modo de cambiar de cuarto era avanzar de misión (cada misión
+trae su propio `roomId`, §18). Ahora hay puertas físicas: el jugador camina
+hasta una, presiona E, y aparece en el cuarto conectado — exploración libre,
+independiente del progreso de la misión.
+
+**Grafo de puertas** (`DOORS` en `doors.ts`): los 3 cuartos están totalmente
+conectados entre sí (3 pares → 6 props de puerta, dos por cuarto — cada
+cuarto llega directo a los otros dos, sin necesidad de pasillo/hub con solo
+tres cuartos). Cada posición se ubicó a mano contra el mobiliario real de
+cada cuarto (`*Room3D.tsx`) y se verificó por script (mismo patrón que las
+posiciones de ítems en §18) que ninguna cae dentro de una caja de colisión ni
+fuera de las paredes. Todas están en la pared izquierda o derecha (x=±5.8) —
+ninguna en la pared trasera — así que la posición de entrada al cuarto
+destino (`getEntryPosition`) solo necesita jalar hacia adentro sobre el eje X.
+
+**Las habitaciones no son espacialmente contiguas** — cada una es su propia
+caja de 12×12 centrada en el origen (§18), así que una puerta es un portal
+(caminar hasta ella, interactuar, teletransportarse), no una abertura real
+recortada en la pared — mismo criterio que la ventana/póster de cada cuarto
+(cajas planas contra la pared, sin geometría de "hueco" real, evita CSG).
+`DoorMarker3D.tsx` es el componente compartido: un marco + una hoja
+entreabierta (para que se lea como "ábreme", no como una decoración plana) +
+una manija + un tapete-umbral que ayuda a que el punto de interacción se
+sienta natural.
+
+**Estado en `GameWorld3D.tsx`:** `currentRoomId` es nuevo y está desacoplado
+de `mission.roomId` — arranca igual a él, pero un `useEffect` lo resetea
+cada vez que cambia `missionId` (una misión nueva siempre te pone en SU
+cuarto, sin importar dónde te dejó una puerta en la misión anterior).
+`spawnPosition` sigue la misma lógica: `mission.playerSpawn` por defecto,
+o el resultado de `getEntryPosition()` tras cruzar una puerta.
+`Player3D` lleva `key={currentRoomId}` — al cambiar de cuarto se remonta
+entero, lo que resetea limpiamente velocidad/estado de salto sin plumbing
+extra (efecto secundario aceptable: si por alguna razón el jugador cruzara
+una puerta a mitad de una animación de Pickup/Place, esa animación se
+cancela — caso borde, no debería pasar en juego normal ya que
+`interactionLocked` bloquea otras interacciones mientras corre una).
+
+**Bug evitado, no solo corregido:** dado que los tres cuartos comparten el
+mismo espacio de coordenadas (todos son cajas de 12×12 centradas en el
+origen), el ítem/contenedor/estrella de la misión activa se posicionan con
+las MISMAS coordenadas sin importar qué cuarto esté realmente renderizado.
+Sin cuidado, un jugador que cruza una puerta podría terminar de pie sobre la
+coordenada exacta donde vivía el ítem en el cuarto original — y el sistema
+de interacción (que solo revisa distancia, no cuarto) dejaría "recogerlo"
+aunque no hubiera nada visible ahí. Se evitó con una bandera `inMissionRoom`
+(`currentRoomId === mission.roomId`) que:
+1. Oculta la visual del ítem/contenedor/estrella/recompensa fuera del
+   cuarto de la misión.
+2. Vacía la lista de interactuables de misión (`missionInteractables`) por
+   completo fuera de ese cuarto — no solo el render, la posibilidad de
+   interactuar.
+
+**Verificación:** posiciones de puertas contra cajas de colisión de cada
+cuarto por script (igual que §18, no a ojo); render visual de las 6 puertas
+confirmado con un harness de cámara estática apuntando a cada coordenada
+(el arrastre de cámara interactivo no es confiable en este entorno — mismo
+límite de `requestAnimationFrame` de §19). El cambio de cuarto en tiempo
+real (caminar hasta la puerta, presionar E, aparecer en el otro cuarto) no
+se pudo probar de punta a punta en este navegador por la misma razón —
+`tsc`/tests/`build` sí están verdes, y la lógica de estado se revisó a mano
+con el mismo cuidado que la máquina de estados de §19.
+
+## 21. Mapa de misión (`components/MissionMap.tsx`)
+
+Con 3 cuartos y 6 puertas (§20), "¿dónde está mi objeto?" dejó de ser obvio
+para un niño jugando. El botón 🗺️ (junto al de silenciar) abre un esquema
+2D vista-de-pájaro del cuarto donde está parado el jugador — no una foto,
+un dibujo — más una pista siempre visible cuando el objeto de la misión
+está en OTRO cuarto.
+
+**Sin datos nuevos, sin duplicación.** El mapa no tiene su propio plano
+dibujado a mano: usa exactamente los mismos `THREE.Box3` que `Player3D` ya
+usa para colisiones (`room.getObstacles()`), las mismas posiciones de
+puerta (`doors.ts`, §20), y las mismas coordenadas de ítem/contenedor de la
+misión activa. Si mañana se mueve un mueble o una puerta, el mapa cambia
+solo — no hay un segundo lugar que se pueda desincronizar del real.
+
+**Proyección top-down:** el mundo 3D usa X (izquierda/derecha) y Z (adelante/
+atrás) como plano horizontal — el mapa simplemente dibuja X→SVG-x, Z→SVG-y,
+ignorando Y (altura). `SCALE = (SVG_SIZE - PADDING·2) / ROOM_SIZE` deriva la
+escala del mismo `WORLD3D_CONFIG.ROOM_SIZE` que usa el resto del juego, así
+que un cambio de tamaño de cuarto no requiere tocar el mapa.
+
+**Dos modos, según `inMissionRoom` (mismo flag de §20):**
+- **Adentro del cuarto de la misión:** muestra el ítem (🔎) y el contenedor
+  (🧺) como puntos sobre el plano, más leyenda con nombres reales (no solo
+  color) — "mira los puntos abajo".
+- **En otro cuarto:** no hay nada de la misión que mostrar ahí (sería
+  visualmente falso — ver el bug evitado en §20), así que en su lugar
+  muestra un aviso "🔎 [ítem] está en: [cuarto destino]" y resalta con un
+  pulso naranja específicamente la puerta de ESTE cuarto que lleva directo
+  al cuarto de la misión (el grafo está totalmente conectado, §20, así que
+  esa puerta siempre existe).
+
+**Posición del jugador:** se toma una sola vez al abrir el mapa
+(`playerGroupRef.current.position.clone()`), no en vivo — el mapa es un
+overlay tipo "pausa para mirar", no un HUD que se actualiza cuadro a
+cuadro; evitar una suscripción a `useFrame` solo para mover un punto detrás
+de un modal es trabajo sin beneficio real para el jugador.
+
+**Verificación:** a diferencia de §19/§20, este componente es SVG/HTML puro
+sin animación por frame, así que sí se pudo verificar de punta a punta en
+este entorno (no depende de `requestAnimationFrame`) — harness con datos
+reales de `getRoom3D`/`getDoorsForRoom`, confirmado por texto (no solo
+captura de pantalla, para evitar falsos negativos por fuente de emoji) en
+ambos modos: dentro del cuarto de la misión (ítem/contenedor/jugador
+correctos) y fuera de él (aviso + puerta correcta resaltada, sin marcador de
+ítem fantasma).

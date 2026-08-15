@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { RoomId } from './rooms';
 
 /**
  * Where "what happens in this mission" lives, decoupled from GameWorld3D so a
@@ -32,6 +33,9 @@ export interface MissionNarrative {
 export interface MissionDefinition3D {
   id: string;
   title: string;
+  /** Which room (see world3d/rooms/) this mission's item/container/collectible positions are
+      laid out against — GameWorld3D renders this room's geometry and uses its obstacle list. */
+  roomId: RoomId;
   narrative: MissionNarrative;
   playerSpawn: THREE.Vector3;
   objective: MissionObjective3D;
@@ -42,6 +46,7 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
   mission_01: {
     id: 'mission_01',
     title: 'El Cuarto Desordenado',
+    roomId: 'bedroom',
     narrative: {
       searching: '🔎 Creo que alguien dejó una pelota azul cerca de la cama...',
       carrying: '🧺 ¡La encontraste! Llévala a la cesta azul.',
@@ -61,6 +66,7 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
   mission_02: {
     id: 'mission_02',
     title: 'El Conejo Perdido',
+    roomId: 'bedroom',
     narrative: {
       searching: '🔎 Alguien dejó un conejo de peluche en la alfombra...',
       carrying: '🧺 ¡Lo encontraste! Llévalo a la cesta Dream Big.',
@@ -80,6 +86,7 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
   mission_03: {
     id: 'mission_03',
     title: 'El Lanzador Dino',
+    roomId: 'bedroom',
     narrative: {
       searching: '🔎 El lanzador dino quedó tirado en el piso...',
       carrying: '🅿️ ¡Genial! Llévalo a la esquina del parqueo.',
@@ -99,6 +106,7 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
   mission_04: {
     id: 'mission_04',
     title: 'El Scooter Estacionado',
+    roomId: 'bedroom',
     narrative: {
       searching: '🔎 Alguien dejó el scooter atravesado en el cuarto...',
       carrying: '🅿️ ¡Vamos! Llévalo a la esquina del parqueo.',
@@ -118,8 +126,9 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
   mission_05: {
     id: 'mission_05',
     title: 'El Carrito Rojo',
+    roomId: 'sala',
     narrative: {
-      searching: '🔎 El carrito rojo se escapó de su lugar...',
+      searching: '🔎 El carrito rojo se escapó hasta la sala...',
       carrying: '🗄️ ¡Lo encontraste! Llévalo a la estantería.',
       complete: '🎉 ¡El carrito ya está en su lugar!',
     },
@@ -127,18 +136,19 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
     objective: {
       type: 'find-and-deliver',
       itemId: 'car_red',
-      itemPosition: new THREE.Vector3(-1, 0.3, -2),
-      containerPosition: new THREE.Vector3(-4.5, 0.3, -1),
+      itemPosition: new THREE.Vector3(-2, 0.3, 2),
+      containerPosition: new THREE.Vector3(4.5, 0.3, 1),
     },
     optionalCollectibles: [
-      { type: 'collect', position: new THREE.Vector3(2, 0.6, -1) },
+      { type: 'collect', position: new THREE.Vector3(2.5, 0.6, -1.5) },
     ],
   },
   mission_06: {
     id: 'mission_06',
     title: 'Los Bloques Perdidos',
+    roomId: 'sala',
     narrative: {
-      searching: '🔎 Hay bloques regados por todo el piso...',
+      searching: '🔎 Hay bloques regados por toda la sala...',
       carrying: '🗄️ ¡Perfecto! Llévalos a la estantería.',
       complete: '🎉 ¡Los bloques ya están guardados!',
     },
@@ -146,18 +156,19 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
     objective: {
       type: 'find-and-deliver',
       itemId: 'blocks',
-      itemPosition: new THREE.Vector3(1, 0.3, -1.5),
-      containerPosition: new THREE.Vector3(-4.5, 0.3, -1),
+      itemPosition: new THREE.Vector3(1, 0.3, 3),
+      containerPosition: new THREE.Vector3(4.5, 0.3, 1),
     },
     optionalCollectibles: [
-      { type: 'collect', position: new THREE.Vector3(-1, 0.6, -0.5) },
+      { type: 'collect', position: new THREE.Vector3(-3, 0.6, 2.5) },
     ],
   },
   mission_07: {
     id: 'mission_07',
     title: 'La Pelota Rebelde',
+    roomId: 'sala',
     narrative: {
-      searching: '🔎 La pelota azul rodó hasta el otro lado del cuarto...',
+      searching: '🔎 La pelota azul rodó hasta la sala...',
       carrying: '🧺 ¡Otra vez! Llévala a la cesta azul.',
       complete: '🎉 ¡La pelota volvió a su cesta!',
     },
@@ -165,18 +176,19 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
     objective: {
       type: 'find-and-deliver',
       itemId: 'ball_blue',
-      itemPosition: new THREE.Vector3(4.5, 0.3, -2),
-      containerPosition: new THREE.Vector3(3, 0.3, 3.2),
+      itemPosition: new THREE.Vector3(3.5, 0.3, -1.5),
+      containerPosition: new THREE.Vector3(-1, 0.3, 4.5),
     },
     optionalCollectibles: [
-      { type: 'collect', position: new THREE.Vector3(-3, 0.6, 3) },
+      { type: 'collect', position: new THREE.Vector3(-4.8, 0.6, 3) },
     ],
   },
   mission_08: {
     id: 'mission_08',
     title: 'El Conejo, Otra Vez',
+    roomId: 'bano',
     narrative: {
-      searching: '🔎 El conejito de peluche se volvió a esconder...',
+      searching: '🔎 El conejito de peluche se volvió a esconder, ahora en el baño...',
       carrying: '🧺 ¡Ahí estás! Llévalo a la cesta Dream Big.',
       complete: '🎉 ¡El conejito está a salvo en su cesta!',
     },
@@ -184,18 +196,19 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
     objective: {
       type: 'find-and-deliver',
       itemId: 'plush_rabbit',
-      itemPosition: new THREE.Vector3(-2, 0.3, 3.5),
-      containerPosition: new THREE.Vector3(5, 0.3, 2.5),
+      itemPosition: new THREE.Vector3(-1.5, 0.3, -2),
+      containerPosition: new THREE.Vector3(2, 0.3, 3.5),
     },
     optionalCollectibles: [
-      { type: 'collect', position: new THREE.Vector3(0, 0.6, -2.5) },
+      { type: 'collect', position: new THREE.Vector3(4, 0.6, 1) },
     ],
   },
   mission_09: {
     id: 'mission_09',
     title: 'El Lanzador, De Nuevo',
+    roomId: 'bano',
     narrative: {
-      searching: '🔎 El lanzador dino apareció en un rincón distinto...',
+      searching: '🔎 El lanzador dino apareció tirado en el baño...',
       carrying: '🅿️ ¡Bien! Llévalo a la esquina del parqueo.',
       complete: '🎉 ¡El lanzador quedó estacionado de nuevo!',
     },
@@ -203,30 +216,31 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
     objective: {
       type: 'find-and-deliver',
       itemId: 'dino_blaster',
-      itemPosition: new THREE.Vector3(-3, 0.3, 3),
+      itemPosition: new THREE.Vector3(2, 0.3, -1),
       containerPosition: new THREE.Vector3(-4.5, 0.3, 4.5),
     },
     optionalCollectibles: [
-      { type: 'collect', position: new THREE.Vector3(4, 0.6, 3.5) },
+      { type: 'collect', position: new THREE.Vector3(-2.5, 0.6, 2) },
     ],
   },
   mission_10: {
     id: 'mission_10',
     title: '¡El Gran Cuarto Limpio!',
+    roomId: 'bano',
     narrative: {
-      searching: '🔎 Última cosa fuera de lugar: el scooter, al otro lado del cuarto...',
+      searching: '🔎 Última cosa fuera de lugar: el scooter, olvidado en el baño...',
       carrying: '🅿️ ¡Casi terminamos! Llévalo a la esquina del parqueo.',
-      complete: '🏆 ¡El cuarto quedó impecable!',
+      complete: '🏆 ¡La casa quedó impecable!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
     objective: {
       type: 'find-and-deliver',
       itemId: 'scooter',
-      itemPosition: new THREE.Vector3(0, 0.3, -3),
+      itemPosition: new THREE.Vector3(0, 0.3, -2.5),
       containerPosition: new THREE.Vector3(-4.5, 0.3, 4.5),
     },
     optionalCollectibles: [
-      { type: 'collect', position: new THREE.Vector3(4.5, 0.6, 0) },
+      { type: 'collect', position: new THREE.Vector3(3.5, 0.6, 3) },
     ],
   },
 };

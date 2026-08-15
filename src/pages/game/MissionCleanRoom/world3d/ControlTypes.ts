@@ -1,4 +1,8 @@
-export type PlayerState3D = 'idle' | 'walk' | 'run' | 'jump' | 'fall';
+/** 'pickup'/'place' are one-shot, driven by Player3D's own timer rather than movement/grounded
+    state (see world3d/Player3D.tsx) — locomotion resumes once the clip finishes. Only reachable
+    for avatars whose GameAvatarAnimationClips declares those clips (world3d/GameAvatar.ts); other
+    avatars skip straight to the attach/release callback with no animation lock. */
+export type PlayerState3D = 'idle' | 'walk' | 'run' | 'jump' | 'fall' | 'pickup' | 'place';
 
 export interface ControlInput3D {
   /** -1 (left) .. 1 (right), world X axis */

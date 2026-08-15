@@ -39,6 +39,7 @@ import {
   bulb,
   logOutOutline,
   people,
+  locationOutline,
   cube,
   notifications,
   mail,
@@ -78,6 +79,7 @@ import CartPage from './pages/cart/CartPage';
 import MovementsPage from './pages/finance/MovementsPage';
 import LedStatusPage from './pages/iot/LedStatusPage';
 import ClientsPage from './pages/clients/ClientsPage';
+import ClientsMapPage from './pages/clients/ClientsMapPage';
 import ProductsManagementPage from './pages/products/ProductsManagementPage';
 import AlertsPage from './pages/messaging/AlertsPage';
 import EmailsPage from './pages/messaging/EmailsPage';
@@ -472,6 +474,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/clients-map" title="Mapa de clientes">
+                <IonIcon icon={locationOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mapa de clientes</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'clientFaceRecognitions') && (
               <IonItem button routerLink="/clientFaceRecognitions" title="Cliente Reconocimiento Facial">
                 <IonIcon icon={personCircle} slot="start" />
@@ -702,6 +713,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/movements" component={MovementsPage} />
             <PrivateRoute exact path="/led-status" component={LedStatusPage} />
             <PrivateRoute exact path="/clients" component={ClientsPage} />
+            <PrivateRoute exact path="/clients-map" component={ClientsMapPage} />
             <PrivateRoute exact path="/products-management" component={ProductsManagementPage} />
             <PrivateRoute exact path="/categories" component={CategoriesPage} />
             <PrivateRoute exact path="/alerts" component={AlertsPage} />
