@@ -392,11 +392,11 @@ manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes 
 ## 16. Próximos pasos (solo si el vertical slice se siente bien)
 
 - Validar rendimiento en dispositivo Android real vía Capacitor.
-- ~~Modelos GLB finales de Tiburón Boy y Dino Boy (rig + animaciones).~~ Gilbertito
-  ya tiene un primer rig funcional (§17) y **ya es seleccionable/jugable en
-  `CharacterSelect`** (`data/avatars.ts`, tercer roster junto a Tiburón Boy/Dino
-  Boy) — falta decidir si termina reemplazando a Tiburón Boy o queda como
-  tercera opción, y repetir el pipeline de rigging para Gael/el resto del roster.
+- ~~Modelos GLB finales de Tiburón Boy y Dino Boy (rig + animaciones).~~
+  Gilbertito, Gael y Tutu tienen los tres un rig funcional (§17) y **los tres
+  son seleccionables/jugables en `CharacterSelect`** (`data/avatars.ts`, cinco
+  opciones junto a Tiburón Boy/Dino Boy) — falta decidir si alguno termina
+  reemplazando a Tiburón Boy/Dino Boy o el roster final queda con los cinco.
 - ~~Los 6 objetos / 4 contenedores completos, con progresión de misión.~~ Hecho:
   `MISSION_SEQUENCE` (`world3d/MissionDefinition.ts`) tiene 10 misiones
   reutilizando los 6 ítems de dominio, con avance real entre ellas al entregar
@@ -404,11 +404,15 @@ manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes 
 - Wire del coleccionable ⭐ al `GameContext` (puntaje/analítica).
 - Archivos de audio reales en `public/assets/audio/` (hoy `useGameAudio` está
   cableado en todos los call sites pero falla en silencio sin los MP3).
-- Validar en un dispositivo real que Gilbertito rigged camina/corre/salta bien
-  jugando (ver §17 — la deformación se verificó pose por pose, pero el playback
-  en vivo con `Player3D`'s crossfade no se pudo confirmar en este entorno).
-  **Bloqueante para todo lo de abajo** — hasta confirmar esto en dispositivo,
-  no tiene sentido invertir en más clips.
+- Validar en un dispositivo real que Gilbertito/Gael/Tutu rigged caminan/
+  corren/saltan bien jugando (ver §17 — la deformación se verificó pose por
+  pose, pero el playback en vivo con `Player3D`'s crossfade no se pudo
+  confirmar en este entorno). **Bloqueante para todo lo de abajo** — hasta
+  confirmar esto en dispositivo, no tiene sentido invertir en más clips.
+- Revisar la escala de Tutu (§17) — hoy copia la de Gilbertito/Gael (0.93,
+  render de tamaño niño) porque su bounding box coincide con el de ellos casi
+  exactamente, pero eso es casi seguro una convención de exportación del
+  pipeline de arte, no su tamaño "real" como oso de peluche.
 - Plan acordado para después de esa validación (no iniciado):
   1. Autorizar 6 clips de interacción sobre el mismo rig de Gilbertito —
      `Pickup`, `Carry`, `Drop`, `Place`, `Clean`, `Celebrate` — reusando
@@ -418,9 +422,6 @@ manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes 
   3. Eventos de animación con timing propio (ej. `Pickup` dispara "adjuntar
      objeto a la mano" en su frame ~55%, no instantáneamente al presionar E) —
      así la interacción se siente física, no solo un cambio de posición.
-  4. Repetir el pipeline de rigging para Gael (nuevos landmarks vía
-     `analyze_silhouette.py`, mismo algoritmo — nunca copiar los huesos de
-     Gilbertito directo).
   - `GameAvatarAnimationClips` (`world3d/GameAvatar.ts`) ya tiene los campos
     opcionales `pickup`/`carry`/`drop`/`place`/`clean`/`celebrate`/`fall`
     declarados de antemano — el contrato está listo, `Player3D.tsx` todavía
@@ -428,19 +429,37 @@ manualmente en esta sesión (§13) — pendiente que tú lo juegues y confirmes 
 - Solo entonces: eliminar la rama/carpeta Phaser si el 3D ya no necesita
   fallback.
 
-## 17. Pipeline de rigging automatizado (Gilbertito)
+## 17. Pipeline de rigging automatizado (Gilbertito, Gael, Tutu)
 
 Los tres `.glb` generados por el pipeline de arte (`avatars/gilbertito`,
-`avatars/gael`, `avatars/model_tutu`) llegan sin esqueleto ni animaciones —
-solo mesh + PBR. Para Gilbertito se construyó un rig humanoide simple +
-4 clips (`Idle`/`Walk`/`Run`/`Jump`) completamente por script en Blender
-headless, sin intervención manual en la UI. El resultado vive en
-`public/assets/models/gilbertito-rigged.glb` y está registrado en
-`world3d/GameAvatar.ts` bajo el id `gilbertito`, y **ya está conectado a
-`CharacterSelect`** (`data/avatars.ts`) como tercera opción seleccionable —
-necesario para poder validar caminar/correr/saltar con input real en
-dispositivo (la vista previa estática no bastaba para eso). Si reemplaza a
-Tiburón Boy o queda como tercera opción permanente sigue sin decidirse.
+`avatars/gael`, `avatars/model_tutu`) llegaron sin esqueleto ni animaciones —
+solo mesh + PBR. Los tres pasaron por el mismo rig humanoide simple + 4 clips
+(`Idle`/`Walk`/`Run`/`Jump`) construido completamente por script en Blender
+headless, sin intervención manual en la UI. Los tres resultados
+(`gilbertito-rigged.glb`, `gael-rigged.glb`, `tutu-rigged.glb`) están
+registrados en `world3d/GameAvatar.ts` y **conectados a `CharacterSelect`**
+(`data/avatars.ts`) como opciones seleccionables junto a Tiburón Boy/Dino
+Boy — necesario para poder validar caminar/correr/saltar con input real en
+dispositivo (la vista previa estática no bastaba para eso). Las tarjetas de
+vista previa estática ("Próximamente"/"Mascota") que existían para los tres
+ya no existen — `CharacterPreview3D`/`LazyModelPreview` se eliminaron por no
+tener más consumidores. Si alguno reemplaza a Tiburón Boy/Dino Boy o el
+roster final queda con los cinco sigue sin decidirse.
+
+Gael reutilizó el mismo enfoque con landmarks propios (su malla tiene la
+misma altura total que Gilbertito por casualidad — 1.8985 vs 1.8984 — pero
+las piernas se separan del torso más arriba, ~27% vs ~22%). Tutu fue el caso
+más arriesgado: su silueta no es un humanoide limpio (torso mucho más ancho/
+redondo, pose de descanso con brazos separados del cuerpo en vez de colgando,
+probablemente una convención de foto/exportación del asset, no una pose
+levantada real) — se verificó visualmente la deformación en pose de reposo
+antes de confiar en los clips animados, y salió limpia (sin desgarros en
+hombros/cadera). Su escala (`0.93`, igual a los otros dos) es una copia
+directa porque su bounding box coincide con el de ellos casi exactamente
+(~1.899 unidades) — muy probablemente una convención de exportación del
+pipeline de arte, no el tamaño "real" de un oso de peluche, así que hoy
+Tutu se ve del tamaño de un niño en el juego. Vale la pena revisarlo una vez
+que se vea junto a los otros personajes en un dispositivo real.
 
 **El pipeline, paso a paso:**
 
@@ -492,11 +511,11 @@ antes de exportar para que calce con la convención que `Player3D.tsx` ya
 asume, sin tocar código de juego.
 
 Los scripts fuente viven en `rigging-scripts/` (`analyze_silhouette.py` +
-`rig_gilbertito.py`, cada uno con instrucciones de uso en su propio header).
-No son una herramienta genérica multi-personaje — los landmarks
-(`HIP_Z`/`KNEE_Z`/`SHOULDER_Z`/…) son específicos de la malla de Gilbertito.
-Para Gael, correr primero `analyze_silhouette.py` sobre su `.glb` para medir
-sus propios landmarks, copiar `rig_gilbertito.py` con esos valores nuevos, y
-mantener igual el `align_roll`, el peso por distancia y el uso de
-`Mesh.transform` en vez de operadores (esas partes sí son independientes de
-la malla).
+`rig_gilbertito.py`/`rig_gael.py`/`rig_tutu.py`, cada uno con instrucciones
+de uso en su propio header). No son una herramienta genérica multi-personaje
+— los landmarks (`HIP_Z`/`KNEE_Z`/`SHOULDER_Z`/…) son específicos de cada
+malla, medidos independientemente con `analyze_silhouette.py`. Para un
+personaje nuevo: correr `analyze_silhouette.py` sobre su `.glb`, copiar uno
+de los tres `rig_*.py` con los landmarks nuevos, y mantener igual el
+`align_roll`, el peso por distancia y el uso de `Mesh.transform` en vez de
+operadores (esas partes sí son independientes de la malla).

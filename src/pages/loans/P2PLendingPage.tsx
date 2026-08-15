@@ -16,6 +16,7 @@ import {
   IonRefresherContent, IonAlert, IonLabel, IonInput, IonTextarea, IonSelect,
   IonSelectOption, IonProgressBar, IonSegment, IonSegmentButton, IonFooter,
   IonActionSheet, IonCard, IonChip, IonAvatar, IonNote, IonList, IonItem,
+  IonCheckbox,
   useIonViewWillEnter,
 } from '@ionic/react';
 import {
@@ -25,6 +26,7 @@ import {
   cardOutline,
   sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline,
   flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
+  megaphoneOutline, informationCircleOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
@@ -181,6 +183,15 @@ import './P2PLendingPage.css';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+// Tasa/plazo al publicar capital son solo un punto de partida sugerido para el
+// prestatario — la negociación real ocurre en la propuesta (propRate/propTerm
+// son libremente editables ahí), por eso el prestamista ya no los captura al
+// publicar. Ver P2PLendingPage.tsx publishOffer().
+const DEFAULT_OFFER_MIN_RATE = 12;
+const DEFAULT_OFFER_MAX_RATE = 36;
+const DEFAULT_OFFER_MIN_TERM_MONTHS = 3;
+const DEFAULT_OFFER_MAX_TERM_MONTHS = 24;
+
 // Colores por estado en P2PLendingPage.css (.p2p-status-<status>)
 const STATUS_META: Record<ProposalStatus, { label: string }> = {
   pending:   { label: 'Pendiente' },
@@ -252,15 +263,9 @@ const P2PLendingPage: React.FC = () => {
   const [offerToDelete,     setOfferToDelete]     = useState<LoanOffer | null>(null);
 
   // ── offer form ─────────────────────────────────────────────────────────
-  // Rates default to real values (not just placeholders) — gray placeholder
-  // text reads as filled-in, so lenders submitted empty rates and the
-  // validation toast was the only feedback.
   const [offerCapital,  setOfferCapital]  = useState('');
-  const [offerMinRate,  setOfferMinRate]  = useState('12');
-  const [offerMaxRate,  setOfferMaxRate]  = useState('36');
-  const [offerMinTerm,  setOfferMinTerm]  = useState('3');
-  const [offerMaxTerm,  setOfferMaxTerm]  = useState('24');
   const [offerDesc,     setOfferDesc]     = useState('');
+  const [offerAgreeVirtual, setOfferAgreeVirtual] = useState(false);
 
   // ── proposal form ───────────────────────────────────────────────────────
   const [propAmount,   setPropAmount]   = useState('');
@@ -363,22 +368,24 @@ const P2PLendingPage: React.FC = () => {
   // ── Publish a loan offer (lender) ───────────────────────────────────────
   const publishOffer = async () => {
     const capital  = parseFloat(offerCapital);
-    const minRate  = parseFloat(offerMinRate);
-    const maxRate  = parseFloat(offerMaxRate);
-    if (!capital || !minRate || !maxRate) {
-      showToast('Completa todos los campos requeridos'); return;
+    if (!capital) {
+      showToast('Ingresa el capital disponible'); return;
     }
-    // Published capital must be backed by wallet funds (either rail) — an
-    // unfunded offer dies at accept time when the SPEI debit hits insufficient
-    // funds, after the borrower already negotiated in good faith.
-    const totalBalance = speiBalance + stripeBalance;
-    if (capital > totalBalance) {
-      console.log('[P2P] publishOffer: BLOCKED — insufficient funds', JSON.stringify({ capital, speiBalance, stripeBalance }));
-      showToast(`Saldo insuficiente: tienes ${fmt(totalBalance)} en tu billetera y quieres publicar ${fmt(capital)}. Deposita primero.`);
-      return;
+    if (!offerAgreeVirtual) {
+      showToast('Debes confirmar que entiendes que esta operación es virtual'); return;
     }
+    // Tasa/plazo ya no se capturan aquí — son solo un punto de partida
+    // sugerido para el prestatario; la negociación real (rate/term libres)
+    // ocurre en la propuesta, no al publicar capital.
+    const minRate = DEFAULT_OFFER_MIN_RATE, maxRate = DEFAULT_OFFER_MAX_RATE;
+    const minTermMonths = DEFAULT_OFFER_MIN_TERM_MONTHS, maxTermMonths = DEFAULT_OFFER_MAX_TERM_MONTHS;
+    // Publicar capital es una DECLARACIÓN, no un movimiento de dinero — SmartLoans
+    // es conector, no custodio (ver CAPITAL_DECLARED en walletTransactions_entryType,
+    // MD/PR1B_CAPITAL_VOCABULARY_MIGRATION.md). No se exige saldo previo en ninguna
+    // wallet: el dinero real solo se verifica/mueve por SPEI hasta el momento de
+    // aceptar una propuesta (acceptProposal ya valida speiBalance ahí).
     setSaving(true);
-    console.log('[P2P] publishOffer: START', JSON.stringify({ clientId, capital, minRate, maxRate }));
+    console.log('[P2P] publishOffer: START', JSON.stringify({ clientId, capital }));
     try {
       const expires = new Date();
       expires.setDate(expires.getDate() + 30);
@@ -389,13 +396,21 @@ const P2PLendingPage: React.FC = () => {
       await createLoanOffer({
         companyId, lenderId: clientId,
         availableCapital: capital,
-        minRate, maxRate,
-        minTermMonths: parseInt(offerMinTerm),
-        maxTermMonths: parseInt(offerMaxTerm),
+        minRate, maxRate, minTermMonths, maxTermMonths,
         description: offerDesc,
         isActive: true,
         expiresAt: expires.toISOString(),
       });
+
+      // NOTA: NO se escribe un renglón CAPITAL_DECLARED en walletTransactions
+      // aquí — sp_walletTransactions_balance.sql:205-209 calcula el "saldo
+      // disponible" real (el mismo que valida acceptProposal antes de mover
+      // SPEI de verdad) como el balanceAfter de la ÚLTIMA fila de esa tabla,
+      // SIN filtrar por entryType. Cualquier escritura aquí — sin importar
+      // el entryType — se mezcla con el saldo real y lo infla artificialmente.
+      // "Capital publicado" ya vive completo y correcto en loanOffers.availableCapital,
+      // sin tocar el ledger — no hace falta un segundo lugar para lo mismo hasta que
+      // el backend separe explícitamente CAPITAL_* del cálculo de saldo real.
 
       // Un solo anuncio vivo por prestamista: republicar REEMPLAZA al anterior.
       // Sin esto las ofertas se acumulaban y el mercado mostraba al mismo
@@ -418,7 +433,7 @@ const P2PLendingPage: React.FC = () => {
       await createPushNotification({
         companyId,
         title: `💰 Capital disponible — ${lenderName}`,
-        message: `${lenderName} tiene ${fmt(capital)} disponibles para préstamo a tasas del ${minRate}%–${maxRate}% anual. ¡Propón tus condiciones!`,
+        message: `${lenderName} tiene ${fmt(capital)} disponibles para préstamo. ¡Propón tus condiciones!`,
         notificationType: 'Info',
         priority: 'High',
         targetType: 'Company',
@@ -429,9 +444,7 @@ const P2PLendingPage: React.FC = () => {
           lenderId: clientId,
           lenderName,
           availableCapital: capital,
-          minRate, maxRate,
-          minTermMonths: parseInt(offerMinTerm),
-          maxTermMonths: parseInt(offerMaxTerm),
+          minRate, maxRate, minTermMonths, maxTermMonths,
         }),
       });
 
@@ -439,7 +452,7 @@ const P2PLendingPage: React.FC = () => {
       showToast(`✓ Oferta publicada y notificación enviada a ${borrowers.length} prestatarios`);
       notifyDataChanged('offer_published');
       setShowOfferModal(false);
-      setOfferCapital(''); setOfferMinRate('12'); setOfferMaxRate('36'); setOfferDesc('');
+      setOfferCapital(''); setOfferDesc(''); setOfferAgreeVirtual(false);
       load();
     } catch (e: any) {
       console.log('[P2P] publishOffer: FAILED —', String(e?.message ?? e));
@@ -1202,9 +1215,14 @@ const P2PLendingPage: React.FC = () => {
       {/* ══════════ Modal: Publish loan offer (lender) ══════════ */}
       {/* Full-screen modal + fixed footer: as a 0.9 sheet, the submit button
           lived at the bottom of the scroll and the open keyboard hid it. */}
-      <IonModal isOpen={showOfferModal} onDidDismiss={() => setShowOfferModal(false)}>
-        <IonHeader>
+      <IonModal isOpen={showOfferModal} onDidDismiss={() => { setShowOfferModal(false); setOfferAgreeVirtual(false); }}>
+        <IonHeader className="p2p-publish-header">
           <IonToolbar>
+            <IonButtons slot="start">
+              <IonButton onClick={() => setShowOfferModal(false)}>
+                <IonIcon icon={arrowBackOutline} slot="icon-only" />
+              </IonButton>
+            </IonButtons>
             <IonTitle>Publicar capital disponible</IonTitle>
             <IonButtons slot="end">
               <IonButton onClick={() => setShowOfferModal(false)}>Cerrar</IonButton>
@@ -1212,51 +1230,77 @@ const P2PLendingPage: React.FC = () => {
           </IonToolbar>
         </IonHeader>
         <IonContent className="ion-padding">
-          <p className="p2p-modal-desc">
-            Al publicar, se enviará una notificación push a todos los prestatarios con perfil completo invitándolos a proponer condiciones.
-          </p>
+          <div className="p2p-info-card">
+            <div className="p2p-info-row">
+              <div className="p2p-info-icon p2p-info-icon-blue">
+                <IonIcon icon={megaphoneOutline} />
+              </div>
+              <p>
+                <strong>Al publicar tu capital disponible,</strong> SmartLoans notificará a los solicitantes con perfil completo para que puedan presentar propuestas de préstamo.
+              </p>
+            </div>
+            <div className="p2p-info-divider" />
+            <div className="p2p-info-row">
+              <div className="p2p-info-icon p2p-info-icon-green">
+                <IonIcon icon={shieldCheckmarkOutline} />
+              </div>
+              <p>
+                El monto, la tasa de interés y el plazo se acuerdan directamente entre el prestamista y el solicitante.
+                SmartLoans facilita la conexión y el seguimiento de la operación, pero{' '}
+                <strong className="p2p-info-highlight">no recibe, retiene ni administra los fondos del préstamo</strong>.
+              </p>
+            </div>
+          </div>
+
           <div className="p2p-form-group">
             <IonLabel>Capital disponible (MXN) *</IonLabel>
-            <IonInput type="number" placeholder="50000" value={offerCapital}
-              onIonInput={e => setOfferCapital(e.detail.value ?? '')} className="p2p-input" />
-          </div>
-          <div className="p2p-form-row">
-            <div className="p2p-form-group p2p-form-col">
-              <IonLabel>Tasa mín. % anual *</IonLabel>
-              <IonInput type="number" placeholder="12" value={offerMinRate}
-                onIonInput={e => setOfferMinRate(e.detail.value ?? '')} className="p2p-input" />
-            </div>
-            <div className="p2p-form-group p2p-form-col">
-              <IonLabel>Tasa máx. % anual *</IonLabel>
-              <IonInput type="number" placeholder="36" value={offerMaxRate}
-                onIonInput={e => setOfferMaxRate(e.detail.value ?? '')} className="p2p-input" />
+            <div className="p2p-input-with-chip">
+              <IonInput type="number" placeholder="50000" value={offerCapital}
+                onIonInput={e => setOfferCapital(e.detail.value ?? '')} className="p2p-input" />
+              <span className="p2p-input-chip">MXN</span>
             </div>
           </div>
-          <div className="p2p-form-row">
-            <div className="p2p-form-group p2p-form-col">
-              <IonLabel>Plazo mín. (meses)</IonLabel>
-              <IonSelect value={offerMinTerm} onIonChange={e => setOfferMinTerm(e.detail.value)} className="p2p-input">
-                {[1,2,3,6,12].map(v => <IonSelectOption key={v} value={String(v)}>{v} meses</IonSelectOption>)}
-              </IonSelect>
-            </div>
-            <div className="p2p-form-group p2p-form-col">
-              <IonLabel>Plazo máx. (meses)</IonLabel>
-              <IonSelect value={offerMaxTerm} onIonChange={e => setOfferMaxTerm(e.detail.value)} className="p2p-input">
-                {[6,12,18,24,36,48,60].map(v => <IonSelectOption key={v} value={String(v)}>{v} meses</IonSelectOption>)}
-              </IonSelect>
-            </div>
-          </div>
+
           <div className="p2p-form-group">
             <IonLabel>Descripción / condiciones adicionales</IonLabel>
-            <IonTextarea rows={3} placeholder="Ej: Préstamos para negocios, sin aval…" value={offerDesc}
-              onIonInput={e => setOfferDesc(e.detail.value ?? '')} className="p2p-input" />
+            <IonTextarea rows={3} maxlength={250}
+              placeholder="Ej: Préstamos para negocios, sin aval, plazo máximo 12 meses, sector comercio, etc."
+              value={offerDesc} onIonInput={e => setOfferDesc(e.detail.value ?? '')} className="p2p-input" />
+            <div className="p2p-char-counter">{offerDesc.length} / 250</div>
+          </div>
+
+          <div className="p2p-important-box">
+            <IonIcon icon={informationCircleOutline} className="p2p-important-icon" />
+            <div>
+              <strong>Importante:</strong>
+              <p>
+                Publicar este capital no implica transferir, depositar ni bloquear fondos en SmartLoans.
+                El capital declarado representa tu disponibilidad para considerar propuestas de préstamo y
+                deberá estar disponible para respaldar una operación que decidas aceptar.
+              </p>
+            </div>
+          </div>
+
+          <div className="p2p-consent-box">
+            <IonCheckbox
+              checked={offerAgreeVirtual}
+              onIonChange={e => setOfferAgreeVirtual(e.detail.checked)}
+              labelPlacement="end"
+              justify="start"
+            >
+              Declaro que el <strong>capital indicado está disponible</strong> para respaldar las operaciones que decida aceptar.
+            </IonCheckbox>
           </div>
         </IonContent>
         <IonFooter className="ion-padding p2p-modal-footer">
-          <IonButton expand="block" onClick={publishOffer} disabled={saving}>
+          <IonButton expand="block" onClick={publishOffer} disabled={saving || !offerAgreeVirtual}>
             <IonIcon icon={sendOutline} slot="start" />
-            Publicar y notificar prestatarios
+            Publicar capital disponible
           </IonButton>
+          <p className="p2p-footer-trust">
+            <IonIcon icon={shieldCheckmarkOutline} />
+            SmartLoans es una plataforma segura que protege tu información.
+          </p>
         </IonFooter>
       </IonModal>
 

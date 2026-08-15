@@ -52,6 +52,22 @@ const GILBERTITO_ANIMATIONS: GameAvatarAnimationClips = {
   jump: 'Jump',
 };
 
+// Same clip-name convention as Gilbertito (same pipeline, same ANIMATED_BONES/action-name scheme
+// in rig_gael.py) — kept as its own const in case the two rigs' clip names ever diverge.
+const GAEL_ANIMATIONS: GameAvatarAnimationClips = {
+  idle: 'Idle',
+  walk: 'Walk',
+  run: 'Run',
+  jump: 'Jump',
+};
+
+const TUTU_ANIMATIONS: GameAvatarAnimationClips = {
+  idle: 'Idle',
+  walk: 'Walk',
+  run: 'Run',
+  jump: 'Jump',
+};
+
 export const AVATARS_3D: Record<string, GameAvatar3D> = {
   tiburon_boy: {
     id: 'tiburon_boy',
@@ -75,6 +91,31 @@ export const AVATARS_3D: Record<string, GameAvatar3D> = {
     modelUrl: '/assets/models/gilbertito-rigged.glb',
     scale: 0.93,
     animations: GILBERTITO_ANIMATIONS,
+  },
+  // Rigged via the same pipeline (rig_gael.py, landmarks re-measured for this mesh — see README
+  // §17). Gael's rest height (1.8985) matches Gilbertito's (1.8984) almost exactly, so the same
+  // scale applies without re-deriving it.
+  gael: {
+    id: 'gael',
+    name: 'Gael',
+    modelUrl: '/assets/models/gael-rigged.glb',
+    scale: 0.93,
+    animations: GAEL_ANIMATIONS,
+  },
+  // Same pipeline (rig_tutu.py), but Tutu isn't a clean humanoid mesh like the other two — its
+  // rest pose has arms out/legs apart (a photogrammetry-style display pose, not a hanging-arm
+  // T-pose) and a much rounder body. Landmarks were re-measured for this mesh; visually verified
+  // (Idle rest pose + mid-cycle Walk/Run) with no tearing at shoulders/hips. Scale is a straight
+  // copy of Gilbertito/Gael's 0.93 because the source GLB's bounding box happens to match theirs
+  // almost exactly (~1.899 world units) — that's very likely a pipeline export convention, not
+  // Tutu's "real" size as a teddy bear, so this makes him render human-child-sized in-game. Worth
+  // revisiting once he's actually seen next to the other characters on a device.
+  tutu: {
+    id: 'tutu',
+    name: 'Tutu',
+    modelUrl: '/assets/models/tutu-rigged.glb',
+    scale: 0.93,
+    animations: TUTU_ANIMATIONS,
   },
 };
 
