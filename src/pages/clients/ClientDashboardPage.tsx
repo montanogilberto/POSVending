@@ -64,7 +64,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
 import { useUser } from '../../contexts/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
-import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
+import { Loan, getAllLoans } from '../../api/loanApi';
 import { countPendingProposalsForBorrower } from '../../api/loanMarketplaceApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
 import { ledgerBalance, postLedgerEntry } from '../../api/bankingApi';
@@ -226,17 +226,6 @@ const ClientDashboardPage: React.FC = () => {
   // Loans
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loansLoading, setLoansLoading] = useState(false);
-  const [showLoanModal, setShowLoanModal] = useState(false);
-  const [newLoan, setNewLoan] = useState<Partial<Loan>>({
-    principalAmount: 0,
-    interestRate: 0,
-    termMonths: 12,
-    paymentFrequency: 'Monthly',
-    loanStatus: 'Pending',
-    notes: '',
-  });
-
-
   // Face recognition / completion
   const [faceRecord, setFaceRecord] = useState<ClientFaceRecognition | null>(null);
   // Solicitudes P2P propias aún sin respuesta — banner en el home.
@@ -794,28 +783,6 @@ const ClientDashboardPage: React.FC = () => {
     if (totalPrincipal <= 0) return activeLoans[0].interestRate;
     return activeLoans.reduce((sum, l) => sum + l.interestRate * (l.principalAmount || 0), 0) / totalPrincipal;
   })();
-
-  // ── Create loan ───────────────────────────────────────────────────────────
-  const handleCreateLoan = async () => {
-    if (!companyId || !clientId) return;
-    setLoading(true);
-    try {
-      await createLoan({
-        ...newLoan as Omit<Loan, 'loanId' | 'created_At' | 'updated_at'>,
-        companyId,
-        clientId,
-        loanNumber: `LN-${Date.now()}`,
-        loanStatus: 'Pending',
-      });
-      setShowLoanModal(false);
-      setSuccessMsg('Solicitud de préstamo enviada.');
-      await fetchLoans();
-    } catch (err) {
-      setError((err as Error).message ?? 'Error al crear préstamo');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // ── Tab navigation ────────────────────────────────────────────────────────
   const goTab = (tab: Tab) => {
@@ -1691,84 +1658,6 @@ const ClientDashboardPage: React.FC = () => {
     </>
   );
 
-  // ── Loan request modal ────────────────────────────────────────────────────
-  const renderLoanModal = () => (
-    <IonModal isOpen={showLoanModal} onDidDismiss={() => setShowLoanModal(false)}>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Solicitar Préstamo</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={() => setShowLoanModal(false)}>
-              <IonIcon icon={closeOutline} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent className="ion-padding">
-        <div className="cd-loan-form">
-          <div className="cd-form-group">
-            <IonInput
-              label="Monto solicitado ($)" labelPlacement="floating" fill="outline"
-              type="number" value={newLoan.principalAmount} min={0}
-              onIonInput={e => setNewLoan(p => ({ ...p, principalAmount: Number(e.detail.value) }))}
-            />
-          </div>
-          <div className="cd-form-group">
-            <IonInput
-              label="Tasa de interés (%)" labelPlacement="floating" fill="outline"
-              type="number" value={newLoan.interestRate} min={0}
-              onIonInput={e => setNewLoan(p => ({ ...p, interestRate: Number(e.detail.value) }))}
-            />
-          </div>
-          <div className="cd-form-group">
-            <IonInput
-              label="Plazo (meses)" labelPlacement="floating" fill="outline"
-              type="number" value={newLoan.termMonths} min={1}
-              onIonInput={e => setNewLoan(p => ({ ...p, termMonths: Number(e.detail.value) }))}
-            />
-          </div>
-          <div className="cd-form-group">
-            <IonSelect
-              label="Frecuencia de pago" labelPlacement="floating" fill="outline"
-              value={newLoan.paymentFrequency}
-              onIonChange={e => setNewLoan(p => ({ ...p, paymentFrequency: e.detail.value }))}
-            >
-              <IonSelectOption value="Weekly">Semanal</IonSelectOption>
-              <IonSelectOption value="Biweekly">Quincenal</IonSelectOption>
-              <IonSelectOption value="Monthly">Mensual</IonSelectOption>
-            </IonSelect>
-          </div>
-          <div className="cd-form-group">
-            <IonInput
-              label="Notas (opcional)" labelPlacement="floating" fill="outline"
-              value={newLoan.notes}
-              onIonInput={e => setNewLoan(p => ({ ...p, notes: e.detail.value! }))}
-              placeholder="Motivo del préstamo..."
-            />
-          </div>
-
-          {newLoan.principalAmount! > 0 && (
-            <div className="cd-loan-preview">
-              <p><strong>Resumen estimado</strong></p>
-              <p>Monto: ${Number(newLoan.principalAmount).toLocaleString()}</p>
-              <p>Plazo: {newLoan.termMonths} meses</p>
-              <p>Pago aprox/mes: ${(
-                (Number(newLoan.principalAmount) * (1 + Number(newLoan.interestRate) / 100)) /
-                Number(newLoan.termMonths)
-              ).toFixed(2)}</p>
-            </div>
-          )}
-
-          <IonButton expand="block" shape="round" onClick={handleCreateLoan} disabled={loading}
-            className="client-dashboard-action-button" style={{ marginTop: 20 }}>
-            <IonIcon icon={addCircleOutline} slot="start" />
-            Enviar solicitud
-          </IonButton>
-        </div>
-      </IonContent>
-    </IonModal>
-  );
-
   // ── Payment modal ─────────────────────────────────────────────────────────
   const renderPayModal = () => (
     <IonModal isOpen={showPayModal} onDidDismiss={() => { setShowPayModal(false); setPayAmount(''); }}>
@@ -1865,7 +1754,6 @@ const ClientDashboardPage: React.FC = () => {
             clear the old floating pill nav that overlaid the content). */}
         <div style={{ height: 16 }} />
 
-        {renderLoanModal()}
         {renderPayModal()}
       </IonContent>
     </IonPage>

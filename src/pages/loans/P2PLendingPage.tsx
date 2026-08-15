@@ -271,6 +271,8 @@ const P2PLendingPage: React.FC = () => {
   const [offerAgreeVirtual, setOfferAgreeVirtual] = useState(false);
   // Ticket de confirmación mostrado justo después de publicar capital.
   const [publishedTicket, setPublishedTicket] = useState<LoanOffer | null>(null);
+  // Ticket de confirmación mostrado justo después de enviar una solicitud de préstamo.
+  const [proposalTicket, setProposalTicket] = useState<LoanProposal | null>(null);
 
   // ── proposal form ───────────────────────────────────────────────────────
   const [propAmount,   setPropAmount]   = useState('');
@@ -549,7 +551,7 @@ const P2PLendingPage: React.FC = () => {
       // Previously .catch(() => {}) swallowed failures here, so a lender could
       // get a push for a proposal that never existed (same bug publishOffer
       // had: a success toast hiding persistent 500s).
-      await createLoanProposal({
+      const newProposal = await createLoanProposal({
         companyId, lenderId: selectedOffer.lenderId, borrowerId: clientId,
         requestedAmount: amount, proposedRate: rate, termMonths: term,
         status: 'pending',
@@ -579,6 +581,7 @@ const P2PLendingPage: React.FC = () => {
       showToast(`✓ Solicitud enviada a ${lenderClient?.first_name ?? 'prestamista'}`);
       setShowProposalModal(false);
       setPropAmount(''); setPropRate(''); setPropTerm('12'); setPropNote('');
+      setProposalTicket(newProposal);
       load();
     } catch (e: any) {
       console.log('[P2P] submitProposal: FAILED —', String(e?.message ?? e));
@@ -1392,6 +1395,71 @@ const P2PLendingPage: React.FC = () => {
         )}
         <IonFooter className="ion-padding p2p-modal-footer">
           <IonButton expand="block" onClick={() => setPublishedTicket(null)}>
+            Entendido
+          </IonButton>
+        </IonFooter>
+      </IonModal>
+
+      {/* ══════════ Modal: Ticket de confirmación (solicitud enviada) ══════════ */}
+      <IonModal isOpen={!!proposalTicket} onDidDismiss={() => setProposalTicket(null)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Solicitud enviada</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setProposalTicket(null)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        {proposalTicket && (
+          <IonContent className="ion-padding">
+            <div className="p2p-ticket">
+              <IonIcon icon={checkmarkCircle} className="p2p-ticket-check" />
+              <h2>Tu solicitud fue enviada</h2>
+              <p className="p2p-ticket-sub">
+                {clientMap[proposalTicket.lenderId]
+                  ? `${clientMap[proposalTicket.lenderId].first_name} ${clientMap[proposalTicket.lenderId].last_name} ya fue notificado(a).`
+                  : 'El prestamista ya fue notificado.'}
+              </p>
+
+              <div className="p2p-ticket-card">
+                <div className="p2p-ticket-row">
+                  <span>Folio</span>
+                  <strong>#{proposalTicket.proposalId}</strong>
+                </div>
+                <div className="p2p-ticket-row">
+                  <span>Monto solicitado</span>
+                  <strong>{fmt(proposalTicket.requestedAmount)}</strong>
+                </div>
+                <div className="p2p-ticket-row">
+                  <span>Tasa propuesta</span>
+                  <strong>{proposalTicket.proposedRate}% anual</strong>
+                </div>
+                <div className="p2p-ticket-row">
+                  <span>Plazo</span>
+                  <strong>{proposalTicket.termMonths} meses</strong>
+                </div>
+                <div className="p2p-ticket-row">
+                  <span>Fecha</span>
+                  <strong>{new Date(proposalTicket.created_At ?? Date.now()).toLocaleString('es-MX')}</strong>
+                </div>
+                {proposalTicket.borrowerNote && (
+                  <div className="p2p-ticket-row">
+                    <span>Nota</span>
+                    <strong>{proposalTicket.borrowerNote}</strong>
+                  </div>
+                )}
+              </div>
+
+              <p className="p2p-ticket-note">
+                Esta solicitud es una propuesta a negociar — el préstamo solo se concreta si el
+                prestamista la acepta. SmartLoans no recibe, retiene ni administra estos fondos;
+                el dinero se transfiere directamente entre las partes por SPEI.
+              </p>
+            </div>
+          </IonContent>
+        )}
+        <IonFooter className="ion-padding p2p-modal-footer">
+          <IonButton expand="block" onClick={() => setProposalTicket(null)}>
             Entendido
           </IonButton>
         </IonFooter>

@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { ControlInput3D, PlayerState3D } from './ControlTypes';
-import { AVATARS_3D, type GameAvatar3D } from './GameAvatar';
+import { ANIMATION_CONFIGS, AVATARS_3D, resolveClipName, type GameAvatar3D, type InteractionAnimationName } from './GameAvatar';
 import { WORLD3D_CONFIG } from './world3dConstants';
 
 interface Player3DProps {
@@ -18,15 +18,15 @@ interface Player3DProps {
   obstacles: THREE.Box3[];
   isCarrying: boolean;
   carriedItem?: React.ReactNode;
-  /** Bump (any change, e.g. n+1) to request the avatar's one-shot 'pickup' clip. If the avatar has
-      no pickup clip (Tiburón Boy/Dino Boy — see GameAvatarAnimationClips), onPickupAttach fires
-      immediately instead — preserves the old instant pickup behavior for those two. */
+  /** Bump (any change, e.g. n+1) to request the avatar's one-shot Pickup animation. Resolved via
+      resolveClipName (GameAvatar.ts) — an avatar without a real Pickup clip (Tiburón Boy/Dino Boy)
+      plays a brief Idle cycle as a stand-in gesture instead, not an instant no-animation swap. */
   pickupTrigger: number;
   onPickupAttach: () => void;
   placeTrigger: number;
   onPlaceRelease: () => void;
-  /** Fires once the active one-shot (pickup/place) animation finishes, or immediately if the
-      avatar has no such clip — GameWorld3D uses this to re-enable interaction. */
+  /** Fires once the active Pickup/Place action's 'finished' event reaches the mixer — GameWorld3D
+      uses this to re-enable interaction. */
   onInteractionAnimDone: () => void;
   onStateChange?: (state: PlayerState3D) => void;
 }
@@ -65,7 +65,7 @@ const Player3D: React.FC<Player3DProps> = ({
   onStateChange,
 }) => {
   const { scene, animations } = useGLTF(avatar.modelUrl);
-  const { actions } = useAnimations(animations, groupRef);
+  const { actions, mixer } = useAnimations(animations, groupRef);
 
   const velocityY = useRef(0);
   const grounded = useRef(true);
@@ -76,10 +76,8 @@ const Player3D: React.FC<Player3DProps> = ({
   const carriedItemGroupRef = useRef<THREE.Group>(null);
 
   /** Non-null while a one-shot pickup/place clip is playing — freezes locomotion input and
-      overrides the state machine below until the clip's duration elapses. */
+      overrides the state machine below until `mixer`'s 'finished' event fires (see below). */
   const interactionAnim = useRef<'pickup' | 'place' | null>(null);
-  const interactionElapsed = useRef(0);
-  const interactionDuration = useRef(0);
   const interactionEventFired = useRef(false);
   const lastPickupTrigger = useRef(pickupTrigger);
   const lastPlaceTrigger = useRef(placeTrigger);
@@ -102,37 +100,56 @@ const Player3D: React.FC<Player3DProps> = ({
     handBoneRef.current = scene.getObjectByName(HAND_BONE_NAME) ?? null;
   }, [scene]);
 
-  const startInteractionAnim = (kind: 'pickup' | 'place', clipKey: string | undefined, onAttachOrRelease: () => void) => {
-    const action = clipKey ? actions[clipKey] : undefined;
-    if (!action) {
-      // Avatar has no clip for this interaction (e.g. Tiburón Boy/Dino Boy) — instant, as before.
-      onAttachOrRelease();
-      onInteractionAnimDone();
-      return;
-    }
+  // resolveClipName always resolves to at least `idle` (a required field) — so unlike the earlier
+  // version of this function, there's no "avatar has no clip" branch to special-case anymore.
+  // Tiburón Boy/Dino Boy (no real Pickup/Place clips) now play a brief Idle cycle as a stand-in
+  // gesture instead of skipping the animation entirely, same as a fully-rigged avatar would.
+  const startInteractionAnim = (kind: 'pickup' | 'place', animName: InteractionAnimationName) => {
+    const clipKey = resolveClipName(avatar.animations, animName, isCarrying);
+    const action = actions[clipKey];
+    if (!action) return; // defensive only — resolveClipName's own fallback chain shouldn't miss
+
     if (currentClip.current) actions[currentClip.current]?.fadeOut(0.1);
+    const config = ANIMATION_CONFIGS[animName];
     action.reset();
-    action.setLoop(THREE.LoopOnce, 1);
-    action.clampWhenFinished = true;
+    action.setLoop(config.loop ? THREE.LoopRepeat : THREE.LoopOnce, config.loop ? Infinity : 1);
+    if (!config.loop) action.clampWhenFinished = true;
     action.fadeIn(0.1).play();
-    currentClip.current = clipKey!;
+    currentClip.current = clipKey;
     interactionAnim.current = kind;
-    interactionElapsed.current = 0;
     interactionEventFired.current = false;
-    interactionDuration.current = action.getClip().duration;
   };
+
+  // Fires once the active Pickup/Place action actually finishes, per the mixer's own internal
+  // time — not a hand-rolled elapsed-time counter. That distinction matters: this component caps
+  // its own per-frame delta at 1/30s (see useFrame below) for physics stability, but drei's
+  // useAnimations updates the mixer with the RAW frame delta every frame regardless. A separately
+  // accumulated counter using the capped delta would drift behind the mixer's actual time on any
+  // dropped frame (exactly the kind of hiccup this game's mobile targets are prone to), firing the
+  // "done" callback late relative to what's already visually finished. Reading the event straight
+  // from the mixer sidesteps that class of bug entirely.
+  useEffect(() => {
+    const handleFinished = (event: { action: THREE.AnimationAction }) => {
+      if (!interactionAnim.current) return;
+      if (event.action.getClip().name !== currentClip.current) return;
+      interactionAnim.current = null;
+      onInteractionAnimDone();
+    };
+    mixer.addEventListener('finished', handleFinished);
+    return () => mixer.removeEventListener('finished', handleFinished);
+  }, [mixer, onInteractionAnimDone]);
 
   useEffect(() => {
     if (pickupTrigger === lastPickupTrigger.current) return;
     lastPickupTrigger.current = pickupTrigger;
-    startInteractionAnim('pickup', avatar.animations.pickup, onPickupAttach);
+    startInteractionAnim('pickup', 'Pickup');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickupTrigger]);
 
   useEffect(() => {
     if (placeTrigger === lastPlaceTrigger.current) return;
     lastPlaceTrigger.current = placeTrigger;
-    startInteractionAnim('place', avatar.animations.place, onPlaceRelease);
+    startInteractionAnim('place', 'Place');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeTrigger]);
 
@@ -148,15 +165,16 @@ const Player3D: React.FC<Player3DProps> = ({
     if (runningInteractionAnim) {
       // Locked in a one-shot pickup/place animation: no movement/jump input, gravity still applies.
       input.jumpPressed = false;
-      interactionElapsed.current += delta;
-      const frac = interactionDuration.current > 0 ? interactionElapsed.current / interactionDuration.current : 1;
+      // action.time is the mixer's own per-action clock — always in sync with what's actually
+      // rendering (see the 'finished'-listener comment above for why that matters). Completion
+      // itself is handled by that listener, not here; this only watches for the mid-clip "grab"
+      // moment (~55% in, see INTERACTION_EVENT_FRACTION).
+      const action = currentClip.current ? actions[currentClip.current] : undefined;
+      const clipDuration = action?.getClip().duration ?? 0;
+      const frac = action && clipDuration > 0 ? action.time / clipDuration : 0;
       if (!interactionEventFired.current && frac >= INTERACTION_EVENT_FRACTION) {
         interactionEventFired.current = true;
         (runningInteractionAnim === 'pickup' ? onPickupAttach : onPlaceRelease)();
-      }
-      if (frac >= 1) {
-        interactionAnim.current = null;
-        onInteractionAnimDone();
       }
     } else {
       if (input.jumpPressed && grounded.current) {
@@ -225,13 +243,15 @@ const Player3D: React.FC<Player3DProps> = ({
         onStateChange?.(nextState);
       }
 
-      // Standing still while carrying uses the 'carry' hold-pose loop when the avatar has one
-      // (Gilbertito/Gael/Tutu); walking/running while carrying still uses the plain locomotion
-      // clips today — the carried item just tracks the hand bone through them (see below).
+      // Standing still while carrying uses the 'carry' hold-pose loop via resolveClipName (falls
+      // back to idle for avatars without one, e.g. Tiburón Boy/Dino Boy — see GameAvatar.ts).
+      // Walking/running while carrying still uses the plain locomotion clips today — Carry has no
+      // leg cycle by design (README §19), so it only ever substitutes for idle, never walk/run;
+      // the carried item just tracks the hand bone through them regardless (see below).
       const clipKey = nextState === 'fall'
         ? avatar.animations.jump
-        : nextState === 'idle' && isCarrying && avatar.animations.carry
-          ? avatar.animations.carry
+        : nextState === 'idle' && isCarrying
+          ? resolveClipName(avatar.animations, 'Carry', true)
           : avatar.animations[nextState];
       if (clipKey !== currentClip.current) {
         if (currentClip.current) actions[currentClip.current]?.fadeOut(0.15);

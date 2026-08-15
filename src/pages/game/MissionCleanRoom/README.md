@@ -658,6 +658,45 @@ el ítem se vio adjunto cerca de la mano), no por observación de principio a
 fin en este navegador — pendiente confirmar en dispositivo real junto con el
 resto de §17/§18.
 
+**Refactor posterior — `resolveClipName` + `ANIMATION_CONFIGS` +
+`mixer.addEventListener('finished')`.** El usuario propuso una arquitectura
+alternativa (tabla declarativa de loop/one-shot por rol de animación, cadena
+de fallback cuando un avatar no tiene un clip específico, y el evento nativo
+`finished` del mixer en vez de un contador de tiempo hecho a mano). Se
+adoptó, con dos ajustes deliberados sobre la propuesta original:
+
+- El fallback de `Carry` es `idle`, no `walk` — el clip `Carry` es una pose
+  de pie sin ciclo de piernas (a propósito, ver el artefacto de skinning más
+  arriba en esta sección), así que un avatar sin `carry` propio debe caer a
+  "parado quieto", no a "caminando en el lugar".
+- `Carry` sigue sin reemplazar `Walk`/`Run` mientras el jugador se mueve
+  cargando (decisión confirmada explícitamente, no asumida) — mismo motivo:
+  el clip no tiene ciclo de piernas, usarlo en movimiento se vería como
+  deslizar/flotar en vez de caminar. Cargar y moverse sigue usando los clips
+  de locomoción normales; el ítem sigue la mano de todas formas.
+
+**Bug real que expuso adoptar `finished`, no solo una mejora cosmética:** la
+versión anterior acumulaba su propio contador (`interactionElapsed +=
+delta`) usando el `delta` recortado a 1/30s que ya usa el resto de
+`Player3D` para estabilidad de física — pero `useAnimations` (drei) avanza
+el mixer con el delta CRUDO del frame, no ese recortado. En un frame lento
+(exactamente el tipo de bache que le pasa a un dispositivo móvil de gama
+media, el objetivo real de este juego), el contador propio se atrasaba
+respecto al tiempo real del mixer, así que el callback de "animación
+terminada" podía disparar tarde respecto a lo que ya se veía terminado en
+pantalla. Se corrigió leyendo `action.time` directamente (que el mixer sí
+mantiene sincronizado) tanto para el evento de "agarre" a mitad de clip como
+—vía el listener `finished`— para saber cuándo terminó, eliminando la
+necesidad de llevar un contador aparte.
+
+**Efecto secundario intencional:** con `resolveClipName` resolviendo siempre
+a por lo menos `idle` (campo obligatorio), Tiburón Boy/Dino Boy —que no
+tienen clips `Pickup`/`Place` propios— ya no saltan la animación por
+completo al interactuar; ahora reproducen un ciclo breve de `Idle` como
+gesto sustituto, igual que cualquier avatar riggeado. Antes de este cambio,
+esos dos avatares mutaban el estado de forma instantánea, sin ninguna
+animación.
+
 ## 20. Puertas entre cuartos (`world3d/rooms/doors.ts`)
 
 Antes, el único modo de cambiar de cuarto era avanzar de misión (cada misión
