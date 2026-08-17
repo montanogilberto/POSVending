@@ -326,13 +326,13 @@ const P2PLendingPage: React.FC = () => {
   const [showMovements, setShowMovements] = useState(false);
   const [movements, setMovements] = useState<LedgerEntry[]>([]);
   const [showDepositAlert, setShowDepositAlert] = useState(false);
-  // Destino SPEI: la cuenta Principal (isDefault) que el usuario eligió en el
-  // modal de cuentas. Fallback a la primera verificada para no dejar la UI en
-  // blanco si el backend aún no marcó ninguna. Este mismo objeto es el que se
-  // envía como destino en el retiro — lo mostrado y lo cobrado no pueden diferir.
-  const verifiedAccounts = bankAccounts.filter(a => a.isVerified);
-  const hasVerifiedAccount = verifiedAccounts.length > 0;
-  const primaryAccount = verifiedAccounts.find(a => a.isDefault) ?? verifiedAccounts[0] ?? null;
+  // Destino SPEI: SÓLO la cuenta Principal. Sin fallback a "la primera
+  // verificada" — bajo D18 una cuenta ARCHIVED sigue llegando con
+  // isVerified=1, así que ese fallback mostraba historial como si fuera el
+  // destino del dinero. Sin PRIMARY no hay destino válido y el riel SPEI debe
+  // quedar cerrado hasta que el cliente vincule/promueva una cuenta.
+  const primaryAccount = bankAccounts.find(a => a.isVerified && a.isDefault) ?? null;
+  const hasVerifiedAccount = primaryAccount !== null;
 
   // ── load data ───────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -679,15 +679,17 @@ const P2PLendingPage: React.FC = () => {
         listBankAccounts(companyId, borrowerId),
         getSavedPaymentMethod(borrowerId, companyId),
       ]);
-      const borrowerVerified = borrowerAccounts.filter(a => a.isVerified);
-      const borrowerHasClabe = borrowerVerified.length > 0;
-      // Cuenta Principal del prestatario: destino explícito del depósito.
-      const borrowerPrimary = borrowerVerified.find(a => a.isDefault) ?? borrowerVerified[0] ?? null;
+      // Precondición real: el prestatario necesita una cuenta PRIMARY, no sólo
+      // "una verificada". Una cuenta ARCHIVED llega con isVerified=1 y pasaba
+      // este check, pero snapshot_for_loan la excluye (sólo acepta PRIMARY) —
+      // el préstamo se aprobaba y reventaba después, al fondear.
+      const borrowerPrimary = borrowerAccounts.find(a => a.isVerified && a.isDefault) ?? null;
+      const borrowerHasClabe = borrowerPrimary !== null;
       console.log('[P2P] acceptProposal: preconditions', JSON.stringify({
         borrowerHasClabe, borrowerHasCard: !!borrowerCard?.stripePaymentMethodId, lenderSpei: speiBalance,
       }));
       if (!borrowerHasClabe) {
-        throw new Error('El prestatario no tiene una CLABE verificada. No se puede depositar el préstamo por SPEI.');
+        throw new Error('El prestatario no tiene una CLABE principal activa (puede tener cuentas archivadas). No se puede depositar el préstamo por SPEI hasta que vincule una.');
       }
       if (!borrowerCard?.stripePaymentMethodId) {
         throw new Error('El prestatario no ha registrado una tarjeta para el cobro automático de las cuotas.');

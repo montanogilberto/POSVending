@@ -26,6 +26,12 @@ export interface BankAccount {
   isVerified: boolean;
   isDefault: boolean;
   verificationMethod?: string;
+  // Ciclo de vida D18 (RFC-001): PENDING_VERIFICATION → PRIMARY → ARCHIVED.
+  // Opcional porque sp_bankAccounts_all no siempre lo proyecta; cuando falta,
+  // `isDefault` es el único indicador de cuál cuenta es la válida — y una
+  // cuenta ARCHIVED puede llegar con isVerified=1, así que "verificada" NUNCA
+  // basta por sí sola para tratarla como destino de dinero.
+  accountStatus?: 'PRIMARY' | 'PENDING_VERIFICATION' | 'ARCHIVED';
 }
 
 export async function linkBankAccount(payload: {

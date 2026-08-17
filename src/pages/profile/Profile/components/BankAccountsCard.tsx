@@ -10,12 +10,13 @@ import { ProfileVM } from '../ProfileLogic';
  * flujo NativeConnectOnboarding — no se duplica esa UI aquí.
  */
 const BankAccountsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
-  // Misma regla que P2PLendingPage: la Principal verificada manda; si el
-  // backend aún no marca ninguna, la primera verificada; si no hay verificadas,
-  // la que exista (se mostrará como "Pendiente").
-  const defaultClabe = vm.bankAccounts.find(a => a.isVerified && a.isDefault)
-    ?? vm.bankAccounts.find(a => a.isVerified)
-    ?? vm.bankAccounts[0];
+  // Misma regla que P2PLendingPage: sólo la Principal cuenta como cuenta
+  // activa. Sin PRIMARY se cae a la más reciente pero se marca "Pendiente" —
+  // una cuenta ARCHIVED llega con isVerified=1 y no debe presentarse como
+  // verificada (D18).
+  const primaryClabe = vm.bankAccounts.find(a => a.isVerified && a.isDefault);
+  const defaultClabe = primaryClabe ?? vm.bankAccounts[0];
+  const clabeIsActive = !!primaryClabe;
 
   return (
     <IonCard className="profile-card">
@@ -45,8 +46,8 @@ const BankAccountsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
                 </strong>
               </div>
               {defaultClabe && (
-                <IonBadge color={defaultClabe.isVerified ? 'success' : 'medium'}>
-                  {defaultClabe.isVerified ? 'Verificada' : 'Pendiente'}
+                <IonBadge color={clabeIsActive ? 'success' : 'medium'}>
+                  {clabeIsActive ? 'Verificada' : 'Pendiente'}
                 </IonBadge>
               )}
             </div>
