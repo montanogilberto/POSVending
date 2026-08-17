@@ -1,0 +1,58 @@
+/* BankAccountLink — vinculación/verificación de CLABE y selección de la
+   cuenta Principal (destino SPEI). Sin estilos inline (CLAUDE.md §4). */
+
+.bal-error {
+  color: #b91c1c;
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.bal-section {
+  padding: 8px 0;
+}
+
+.bal-note-block {
+  display: block;
+  margin: 6px 0;
+}
+
+.bal-note-mock {
+  display: block;
+  margin-top: 4px;
+}
+
+/* Ícono de estado: verde = verificada, ámbar = por verificar. */
+.bal-icon-verified {
+  color: #059669;
+}
+
+.bal-icon-pending {
+  color: #b45309;
+}
+
+/* Pista de interacción — sólo se muestra cuando hay más de una cuenta
+   verificada, es decir cuando cambiar de Principal es posible. */
+.bal-hint {
+  display: block;
+  margin: 6px 0 2px;
+}
+
+/* ── Hoja de confirmación "Hacer principal" ──────────────────────────────
+   IonActionSheet es scoped (no shadow), así que sus clases internas se
+   estilizan desde este CSS global. El subtítulo lleva el destino completo
+   (banco · ····1234 · titular) y necesita respirar en pantallas chicas. */
+.bal-sheet .action-sheet-title {
+  font-weight: 600;
+  padding-bottom: 4px;
+}
+
+.bal-sheet .action-sheet-sub-title {
+  font-size: 14px;
+  line-height: 1.4;
+  padding-top: 2px;
+}
+
+.bal-sheet .action-sheet-button.bal-sheet-confirm {
+  color: var(--ion-color-primary);
+  font-weight: 600;
+}

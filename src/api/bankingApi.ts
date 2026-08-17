@@ -53,6 +53,21 @@ export async function listBankAccounts(companyId: number, clientId: number): Pro
   return accounts;
 }
 
+// Promueve una CLABE verificada a Principal (isDefault). El SP degrada la
+// anterior en la misma transacción — siempre hay exactamente una principal.
+// RFC-001: la acción está bloqueada server-side mientras existan préstamos
+// activos (el destino ya quedó congelado en el snapshot del préstamo), y ese
+// bloqueo llega aquí como `error` para mostrarlo al usuario.
+export async function setPrimaryBankAccount(payload: {
+  companyId: number; clientId: number; bankAccountId: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  console.log('[Banking] promotePrimary →', JSON.stringify(payload));
+  const r = await post("/bankAccountsLifecycle", { bankAccounts: [{ action: 'promote_primary', ...payload }] });
+  const error = (r as any)?.error ?? (Array.isArray(r) ? r[0]?.error : undefined);
+  console.log('[Banking] promotePrimary ←', JSON.stringify({ bankAccountId: payload.bankAccountId, error }));
+  return { ok: !error, error };
+}
+
 export async function ledgerBalance(companyId: number, clientId: number): Promise<{ availableBalance: number; reservedBalance: number }> {
   const r = await post("/ledger/balance", { companyId, clientId });
   console.log('[Banking] ledgerBalance ←', JSON.stringify(r));
@@ -85,8 +100,12 @@ export async function disbursePayment(payload: {
   companyId: number; amountMXN: number; idempotencyKey: string;
   purpose?: 'loan_disbursement' | 'lender_payout' | 'refund';
   lenderId?: number; borrowerId?: number; clientId?: number; loanId?: number;
+  // Destino explícito: la cuenta Principal que la UI le mostró al usuario. Sin
+  // esto el backend resuelve la CLABE por su cuenta y puede diferir de lo que
+  // el cliente vio en pantalla.
+  bankAccountId?: number;
 }): Promise<any> {
-  console.log('[Banking] disburse →', JSON.stringify({ purpose: payload.purpose ?? 'loan_disbursement', amountMXN: payload.amountMXN, key: payload.idempotencyKey }));
+  console.log('[Banking] disburse →', JSON.stringify({ purpose: payload.purpose ?? 'loan_disbursement', amountMXN: payload.amountMXN, bankAccountId: payload.bankAccountId, key: payload.idempotencyKey }));
   const r = await post("/payments/disburse", payload);
   console.log('[Banking] disburse ←', JSON.stringify({ transferId: r.transferId, status: r.status, providerRef: r.providerRef, mock: r.mock, error: r.error }));
   return r;

@@ -72,11 +72,19 @@ import { ledgerBalance, postLedgerEntry } from '../../api/bankingApi';
 // Muestra el simulador de depósito SPEI (igual que P2PLendingPage) — apagar
 // antes de conectar STP real.
 const SHOW_BANKING_TEST_TOOLS = false;
+
+// Riel Stripe (cuenta conectada + saldo en cartera + retiro): apagado.
+// SmartLoans es conector, no custodio — el dinero va directo prestamista↔
+// prestatario por SPEI, así que no hay "saldo disponible" que mostrar ni
+// fondos que retirar de la plataforma (docs/p2p-direct-payments-architecture.md).
+// El código de Stripe se conserva detrás de este flag por si vuelve a hacer falta.
+const SHOW_STRIPE_RAIL = false;
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/loans/LoanCompletionRing';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
+import BankAccountLink from '../../components/payments/BankAccountLink';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
@@ -1289,7 +1297,30 @@ const ClientDashboardPage: React.FC = () => {
           ]}
         />
 
+        {/* Cuenta bancaria (SPEI) — el destino real del dinero en el modelo
+            no-custodio: aquí el cliente vincula/verifica su CLABE y elige cuál
+            es la Principal. Mismo componente que el modal de P2PLendingPage. */}
+        {clientId && companyId && (
+          <IonCard className="client-dashboard-card">
+            <IonCardHeader>
+              <IonCardTitle>Cuenta bancaria (SPEI)</IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent>
+              <p className="cd-bank-note">
+                Tu CLABE verificada es la cuenta donde recibes tu préstamo y tus pagos.
+                Las transferencias son directas entre las partes — SmartLoans no retiene tu dinero.
+              </p>
+              <BankAccountLink
+                clientId={Number(clientId)}
+                companyId={Number(companyId)}
+                holderName={clientRecord ? `${clientRecord.first_name} ${clientRecord.last_name}` : ''}
+              />
+            </IonCardContent>
+          </IonCard>
+        )}
+
         {/* Stripe account status */}
+        {SHOW_STRIPE_RAIL && (
         <IonCard className="client-dashboard-card cd-stripe-card">
           <IonCardHeader>
             <div className="cd-stripe-header">
@@ -1374,9 +1405,11 @@ const ClientDashboardPage: React.FC = () => {
             )}
           </IonCardContent>
         </IonCard>
+        )}
 
-        {/* Wallet balance / withdraw */}
-        {!stripeLoading && stripeAccount && (
+        {/* Saldo disponible / retiro — sólo existe en el riel Stripe (cartera
+            custodiada). En el modelo no-custodio no hay saldo de plataforma. */}
+        {SHOW_STRIPE_RAIL && !stripeLoading && stripeAccount && (
           <IonCard className="client-dashboard-card cd-stripe-card">
             <IonCardHeader>
               <IonCardTitle>Saldo disponible</IonCardTitle>
@@ -1394,7 +1427,6 @@ const ClientDashboardPage: React.FC = () => {
                 expand="block"
                 fill="outline"
                 className="cd-stripe-cta"
-                style={{ marginTop: 12 }}
                 disabled={!stripeAccount.hasExternalAccount || !walletBalance}
                 onClick={() => setShowWithdrawAlert(true)}
               >
@@ -1817,7 +1849,7 @@ const ClientDashboardPage: React.FC = () => {
         <IonToast isOpen={!!successMsg} message={successMsg} duration={2500} onDidDismiss={() => setSuccessMsg('')} color="success" />
 
         <IonAlert
-          isOpen={showWithdrawAlert}
+          isOpen={SHOW_STRIPE_RAIL && showWithdrawAlert}
           onDidDismiss={() => setShowWithdrawAlert(false)}
           header="Retirar fondos"
           message={`Saldo disponible: $${(walletBalance ?? 0).toFixed(2)} MXN. El monto se transferirá a tu cuenta bancaria o tarjeta de débito vinculada.`}

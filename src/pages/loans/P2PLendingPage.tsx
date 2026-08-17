@@ -26,7 +26,7 @@ import {
   cardOutline,
   sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline,
   flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
-  megaphoneOutline, informationCircleOutline,
+  megaphoneOutline, informationCircleOutline, closeOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
@@ -326,7 +326,13 @@ const P2PLendingPage: React.FC = () => {
   const [showMovements, setShowMovements] = useState(false);
   const [movements, setMovements] = useState<LedgerEntry[]>([]);
   const [showDepositAlert, setShowDepositAlert] = useState(false);
-  const hasVerifiedAccount = bankAccounts.some(a => a.isVerified);
+  // Destino SPEI: la cuenta Principal (isDefault) que el usuario eligió en el
+  // modal de cuentas. Fallback a la primera verificada para no dejar la UI en
+  // blanco si el backend aún no marcó ninguna. Este mismo objeto es el que se
+  // envía como destino en el retiro — lo mostrado y lo cobrado no pueden diferir.
+  const verifiedAccounts = bankAccounts.filter(a => a.isVerified);
+  const hasVerifiedAccount = verifiedAccounts.length > 0;
+  const primaryAccount = verifiedAccounts.find(a => a.isDefault) ?? verifiedAccounts[0] ?? null;
 
   // ── load data ───────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -673,7 +679,10 @@ const P2PLendingPage: React.FC = () => {
         listBankAccounts(companyId, borrowerId),
         getSavedPaymentMethod(borrowerId, companyId),
       ]);
-      const borrowerHasClabe = borrowerAccounts.some(a => a.isVerified);
+      const borrowerVerified = borrowerAccounts.filter(a => a.isVerified);
+      const borrowerHasClabe = borrowerVerified.length > 0;
+      // Cuenta Principal del prestatario: destino explícito del depósito.
+      const borrowerPrimary = borrowerVerified.find(a => a.isDefault) ?? borrowerVerified[0] ?? null;
       console.log('[P2P] acceptProposal: preconditions', JSON.stringify({
         borrowerHasClabe, borrowerHasCard: !!borrowerCard?.stripePaymentMethodId, lenderSpei: speiBalance,
       }));
@@ -777,6 +786,7 @@ const P2PLendingPage: React.FC = () => {
         companyId, lenderId, borrowerId, amountMXN: requestedAmount,
         purpose: 'loan_disbursement',
         idempotencyKey: `proposal:${proposalId}:disburse:${Date.now()}`,
+        bankAccountId: borrowerPrimary?.bankAccountId,
       });
       console.log('[P2P] acceptProposal: /payments/disburse ←', JSON.stringify(disburseResult));
       if (disburseResult.error || disburseResult.status === 'failed') {
@@ -1076,6 +1086,7 @@ const P2PLendingPage: React.FC = () => {
       try {
         const result = await disbursePayment({
           companyId, clientId, purpose: 'lender_payout', amountMXN: amount, idempotencyKey: idemKey,
+          bankAccountId: primaryAccount?.bankAccountId,
         });
         if (result.error || result.status === 'failed') throw new Error(result.error || 'SPEI rechazado');
         console.log('[P2P] withdraw: SPEI SUCCESS — transferId', result.transferId, 'CEP', result.cepUrl);
@@ -1298,7 +1309,7 @@ const P2PLendingPage: React.FC = () => {
               <IonIcon icon={cardOutline} />
               <strong>{hasVerifiedAccount ? 'Cuenta SPEI' : 'Vincular CLABE'}</strong>
               <span>{hasVerifiedAccount
-                ? `···· ${bankAccounts.find(a => a.isVerified && a.isDefault)?.clabeLast4 ?? ''}`
+                ? `···· ${primaryAccount?.clabeLast4 ?? ''}`
                 : 'requerida'}</span>
             </IonCard>
             <IonCard button className="p2p-action-tile" onClick={goTopUp}>
@@ -1328,7 +1339,7 @@ const P2PLendingPage: React.FC = () => {
             <IonButton expand="block" fill="outline" className="p2p-topup-btn" onClick={() => setShowBankModal(true)}>
               <IonIcon icon={cardOutline} slot="start" />
               {hasVerifiedAccount
-                ? `Cuenta para recibir tu préstamo: ${bankAccounts.find(a => a.isVerified && a.isDefault)?.bankName ?? ''} ····${bankAccounts.find(a => a.isVerified && a.isDefault)?.clabeLast4 ?? ''}`
+                ? `Cuenta para recibir tu préstamo: ${primaryAccount?.bankName ?? ''} ····${primaryAccount?.clabeLast4 ?? ''}`
                 : 'Vincular cuenta para recibir tu préstamo (CLABE)'}
             </IonButton>
             {/* Saldo + movimientos también para el borrower (antes lender-only):
@@ -1853,27 +1864,30 @@ const P2PLendingPage: React.FC = () => {
         </IonFooter>
       </IonModal>
 
-      {/* ── Accept alert ── */}
-      <IonAlert
+      {/* ── Accept — hoja inferior (el IonAlert centrado se veía apretado en
+          móvil y partía el monto en varias líneas). ── */}
+      <IonActionSheet
         isOpen={showAcceptAlert}
         onDidDismiss={() => setShowAcceptAlert(false)}
+        cssClass="p2p-confirm-sheet"
         header="Aprobar préstamo"
-        message={selectedProposal
-          ? `¿Aprobar ${fmt(selectedProposal.requestedAmount)} a ${selectedProposal.proposedRate}% anual por ${selectedProposal.termMonths} meses para ${clientLabel(selectedProposal.borrowerId)}?`
-          : ''}
+        subHeader={selectedProposal
+          ? `${fmt(selectedProposal.requestedAmount)} a ${selectedProposal.proposedRate}% anual por ${selectedProposal.termMonths} meses para ${clientLabel(selectedProposal.borrowerId)}.`
+          : undefined}
         buttons={[
-          { text: 'Cancelar', role: 'cancel' },
-          { text: 'Aprobar', handler: acceptProposal, cssClass: 'alert-button-confirm' },
+          { text: 'Aprobar préstamo', icon: checkmarkCircle, cssClass: 'p2p-sheet-confirm', handler: acceptProposal },
+          { text: 'Cancelar', role: 'cancel', icon: closeOutline },
         ]}
       />
 
-      {/* ── Approve-failure alert (blocking, explains the fix) ── */}
-      <IonAlert
+      {/* ── Approve-failure sheet (bloqueante, explica cómo resolverlo) ── */}
+      <IonActionSheet
         isOpen={!!errorAlert}
         onDidDismiss={() => setErrorAlert('')}
+        cssClass="p2p-confirm-sheet"
         header="No se pudo completar"
-        message={errorAlert}
-        buttons={['Entendido']}
+        subHeader={errorAlert}
+        buttons={[{ text: 'Entendido', role: 'cancel', icon: alertCircleOutline }]}
       />
 
       {/* ── Insufficient funds → action sheet with the deposit options ── */}
@@ -1892,15 +1906,16 @@ const P2PLendingPage: React.FC = () => {
         ]}
       />
 
-      {/* ── Reject alert ── */}
-      <IonAlert
+      {/* ── Reject — hoja inferior ── */}
+      <IonActionSheet
         isOpen={showRejectAlert}
         onDidDismiss={() => setShowRejectAlert(false)}
+        cssClass="p2p-confirm-sheet"
         header="Rechazar solicitud"
-        message="¿Rechazar esta solicitud de préstamo? Se notificará al prestatario."
+        subHeader="Se notificará al prestatario y la solicitud se cerrará."
         buttons={[
-          { text: 'Cancelar', role: 'cancel' },
-          { text: 'Rechazar', handler: rejectProposal, cssClass: 'alert-button-danger' },
+          { text: 'Rechazar solicitud', role: 'destructive', icon: closeCircle, handler: rejectProposal },
+          { text: 'Cancelar', role: 'cancel', icon: closeOutline },
         ]}
       />
 
@@ -1961,17 +1976,18 @@ const P2PLendingPage: React.FC = () => {
         </IonFooter>
       </IonModal>
 
-      {/* ── Delete offer alert ── */}
-      <IonAlert
+      {/* ── Delete offer — hoja inferior ── */}
+      <IonActionSheet
         isOpen={!!offerToDelete}
         onDidDismiss={() => setOfferToDelete(null)}
+        cssClass="p2p-confirm-sheet"
         header="Eliminar oferta"
-        message={offerToDelete
-          ? `¿Eliminar tu oferta de ${fmt(offerToDelete.availableCapital)}? Los prestatarios dejarán de verla.`
-          : ''}
+        subHeader={offerToDelete
+          ? `Tu oferta de ${fmt(offerToDelete.availableCapital)} dejará de ser visible para los prestatarios.`
+          : undefined}
         buttons={[
-          { text: 'Cancelar', role: 'cancel' },
-          { text: 'Eliminar', handler: removeOffer, cssClass: 'alert-button-danger' },
+          { text: 'Eliminar oferta', role: 'destructive', icon: trashOutline, handler: removeOffer },
+          { text: 'Cancelar', role: 'cancel', icon: closeOutline },
         ]}
       />
 
@@ -1986,7 +2002,6 @@ const P2PLendingPage: React.FC = () => {
           { text: 'Cancelar', role: 'cancel' },
           {
             text: withdrawing ? 'Procesando...' : 'Retirar',
-            cssClass: 'alert-button-confirm',
             handler: (data) => { handleWithdraw(data.amount); },
           },
         ]}

@@ -792,17 +792,35 @@ ion-card.p2p-kpi::part(native) {
 }
 
 /* Insufficient-funds action sheet: wrap the explanation instead of truncating */
+/* Hojas inferiores de confirmación — reemplazan a los IonAlert centrados, que
+   en móvil quedaban angostos y partían montos y nombres en varias líneas.
+   ion-action-sheet es scoped (no shadow), así que sus clases internas se
+   estilizan desde aquí. */
 .p2p-funds-sheet .action-sheet-title,
-.p2p-funds-sheet .action-sheet-sub-title {
+.p2p-funds-sheet .action-sheet-sub-title,
+.p2p-confirm-sheet .action-sheet-title,
+.p2p-confirm-sheet .action-sheet-sub-title {
   white-space: normal !important;
   text-align: left;
 }
 
-.p2p-funds-sheet .action-sheet-sub-title {
+.p2p-funds-sheet .action-sheet-sub-title,
+.p2p-confirm-sheet .action-sheet-sub-title {
   font-size: 13px;
   line-height: 1.45;
   color: #374151;
   padding-top: 4px;
+}
+
+.p2p-confirm-sheet .action-sheet-title {
+  font-weight: 600;
+  padding-bottom: 2px;
+}
+
+/* Acción afirmativa en verde, igual que el botón APROBAR de la tarjeta. */
+.p2p-confirm-sheet .action-sheet-button.p2p-sheet-confirm {
+  color: var(--ion-color-success, #16a34a);
+  font-weight: 600;
 }
 
 /* ══════════ Rediseño vista Invertir (mockup 2026-07) ══════════ */

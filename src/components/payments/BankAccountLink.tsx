@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   IonButton, IonInput, IonItem, IonLabel, IonList, IonNote, IonIcon, IonSpinner,
-  IonBadge,
+  IonBadge, IonActionSheet, IonToast,
 } from '@ionic/react';
-import { checkmarkCircleOutline, cardOutline, addCircleOutline } from 'ionicons/icons';
+import { checkmarkCircleOutline, cardOutline, addCircleOutline, closeOutline } from 'ionicons/icons';
 import {
   BankAccount, linkBankAccount, verifyBankAccount, listBankAccounts,
+  setPrimaryBankAccount,
 } from '../../api/bankingApi';
+import { useToast } from '../../hooks/useToast';
+import './BankAccountLink.css';
 
 interface Props {
   clientId: number;
@@ -36,6 +39,12 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
   const [verifyingId, setVerifyingId] = useState<number | null>(null);
   const [cents, setCents] = useState('');
   const [mockCents, setMockCents] = useState<number | null>(null);
+
+  // Cuenta que el usuario tocó para hacer Principal (confirmación pendiente) y
+  // la que está siendo promovida ahora mismo (spinner en su fila).
+  const [confirmPrimary, setConfirmPrimary] = useState<BankAccount | null>(null);
+  const [promotingId, setPromotingId] = useState<number | null>(null);
+  const { showToast, toastProps } = useToast();
 
   const load = async () => {
     setLoading(true);
@@ -87,38 +96,93 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
     setBusy(false);
   };
 
+  // Hacer Principal: sólo cuentas verificadas, y sólo si no lo son ya. El SP
+  // degrada la anterior — la UI nunca decide cuál pierde el badge.
+  const promotePrimary = async (account: BankAccount) => {
+    setPromotingId(account.bankAccountId); setError('');
+    try {
+      const r = await setPrimaryBankAccount({ clientId, companyId, bankAccountId: account.bankAccountId });
+      if (!r.ok) throw new Error(r.error ?? 'No se pudo cambiar la cuenta principal.');
+      console.log('[BankAccountLink] promotePrimary ✅', account.bankAccountId);
+      await load();
+      showToast(`✓ ${account.bankName ?? 'Banco'} ····${account.clabeLast4} es tu cuenta principal`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'No se pudo cambiar la cuenta principal.', 'danger');
+    }
+    setPromotingId(null);
+  };
+
   const pending = accounts.find(a => a.bankAccountId === verifyingId && !a.isVerified);
+  const verifiedCount = accounts.filter(a => a.isVerified).length;
+  // La fila es tocable sólo cuando cambiar de Principal tiene sentido.
+  const canPromote = (a: BankAccount) => a.isVerified && !a.isDefault && verifiedCount > 1;
 
   return (
     <div>
-      {error && <p style={{ color: '#b91c1c', fontSize: 13, margin: '4px 0' }}>{error}</p>}
+      {error && <p className="bal-error">{error}</p>}
       {loading && accounts.length === 0 && <IonSpinner name="crescent" />}
 
       {accounts.length > 0 && (
-        <IonList lines="full">
-          {accounts.map(a => (
-            <IonItem key={a.bankAccountId}>
-              <IonIcon icon={a.isVerified ? checkmarkCircleOutline : cardOutline} slot="start"
-                style={{ color: a.isVerified ? '#059669' : '#b45309' }} />
-              <IonLabel>
-                <h3>{a.bankName ?? 'Banco'} ····{a.clabeLast4}</h3>
-                <p>{a.holderName}</p>
-              </IonLabel>
-              {a.isDefault && a.isVerified && <IonBadge color="primary">Principal</IonBadge>}
-              {!a.isVerified && <IonBadge color="warning">Por verificar</IonBadge>}
-            </IonItem>
-          ))}
-        </IonList>
+        <>
+          <IonList lines="full">
+            {accounts.map(a => (
+              <IonItem key={a.bankAccountId}
+                button={canPromote(a)}
+                detail={false}
+                disabled={promotingId !== null}
+                onClick={canPromote(a) ? () => setConfirmPrimary(a) : undefined}>
+                <IonIcon icon={a.isVerified ? checkmarkCircleOutline : cardOutline} slot="start"
+                  className={a.isVerified ? 'bal-icon-verified' : 'bal-icon-pending'} />
+                <IonLabel>
+                  <h3>{a.bankName ?? 'Banco'} ····{a.clabeLast4}</h3>
+                  <p>{a.holderName}</p>
+                </IonLabel>
+                {promotingId === a.bankAccountId && <IonSpinner name="dots" slot="end" />}
+                {a.isDefault && a.isVerified && <IonBadge color="primary">Principal</IonBadge>}
+                {!a.isVerified && <IonBadge color="warning">Por verificar</IonBadge>}
+              </IonItem>
+            ))}
+          </IonList>
+          {verifiedCount > 1 && (
+            <IonNote className="bal-hint">
+              Toca otra cuenta verificada para hacerla tu cuenta principal.
+            </IonNote>
+          )}
+        </>
       )}
 
+      {/* Hoja inferior nativa en móvil (el IonAlert se veía apretado en
+          pantallas chicas). El subHeader nombra el destino exacto para que el
+          usuario confirme viendo banco, últimos 4 y titular. */}
+      <IonActionSheet
+        isOpen={confirmPrimary !== null}
+        onDidDismiss={() => setConfirmPrimary(null)}
+        cssClass="bal-sheet"
+        header="Cuenta principal"
+        subHeader={confirmPrimary
+          ? `Tus retiros por SPEI irán a ${confirmPrimary.bankName ?? 'Banco'} ····${confirmPrimary.clabeLast4} · ${confirmPrimary.holderName}`
+          : undefined}
+        buttons={[
+          {
+            text: 'Hacer principal',
+            icon: checkmarkCircleOutline,
+            cssClass: 'bal-sheet-confirm',
+            handler: () => { if (confirmPrimary) promotePrimary(confirmPrimary); },
+          },
+          { text: 'Cancelar', role: 'cancel', icon: closeOutline },
+        ]}
+      />
+
+      <IonToast {...toastProps} />
+
       {pending && (
-        <div style={{ padding: '8px 0' }}>
+        <div className="bal-section">
           <IonNote>
             Enviamos un micro-depósito de centavos a tu cuenta {pending.bankName} ····{pending.clabeLast4}.
             Ingresa los centavos exactos que recibiste para verificarla.
           </IonNote>
           {mockCents !== null && (
-            <IonNote color="warning" style={{ display: 'block', marginTop: 4 }}>
+            <IonNote color="warning" className="bal-note-mock">
               Modo prueba: usa {mockCents} centavos.
             </IonNote>
           )}
@@ -142,7 +206,7 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
       )}
 
       {showForm && (
-        <div style={{ padding: '8px 0' }}>
+        <div className="bal-section">
           <IonItem>
             <IonLabel position="stacked">CLABE (18 dígitos) *</IonLabel>
             <IonInput type="tel" inputmode="numeric" maxlength={18} value={clabe}
@@ -152,7 +216,7 @@ const BankAccountLink: React.FC<Props> = ({ clientId, companyId, holderName, onC
             <IonLabel position="stacked">Titular *</IonLabel>
             <IonInput value={holder} onIonInput={(e) => setHolder(e.detail.value ?? '')} autocapitalize="words" />
           </IonItem>
-          <IonNote style={{ display: 'block', margin: '6px 0' }}>
+          <IonNote className="bal-note-block">
             Validamos el dígito de control y enviamos un micro-depósito para confirmar que la cuenta es tuya.
           </IonNote>
           <IonButton expand="block" shape="round" disabled={busy} onClick={submitLink}>

@@ -10,7 +10,12 @@ import { ProfileVM } from '../ProfileLogic';
  * flujo NativeConnectOnboarding — no se duplica esa UI aquí.
  */
 const BankAccountsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
-  const defaultClabe = vm.bankAccounts.find(a => a.isDefault) ?? vm.bankAccounts[0];
+  // Misma regla que P2PLendingPage: la Principal verificada manda; si el
+  // backend aún no marca ninguna, la primera verificada; si no hay verificadas,
+  // la que exista (se mostrará como "Pendiente").
+  const defaultClabe = vm.bankAccounts.find(a => a.isVerified && a.isDefault)
+    ?? vm.bankAccounts.find(a => a.isVerified)
+    ?? vm.bankAccounts[0];
 
   return (
     <IonCard className="profile-card">
