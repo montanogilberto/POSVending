@@ -638,14 +638,26 @@ const P2PLendingPage: React.FC = () => {
       const { amount: requestedAmount, rate: proposedRate, term: termMonths } = effectiveTerms(selectedProposal);
       console.log('[P2P] acceptProposal: START', JSON.stringify({ proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths }));
 
-      // Funds first, with exact numbers and a way OUT: the alert offers the
-      // deposit actions directly instead of a dead-end "Entendido".
-      // SPEI is the ONLY funding rail for loan disbursement — SmartLoans is a
-      // connector, not a custodian: it never holds/moves capital through a
-      // Stripe-backed wallet (see docs/p2p-direct-payments-architecture.md).
-      // Stripe is reserved for direct, one-shot platform charges (e.g. premium
-      // subscription billing), never for funding or holding loan principal.
-      if (requestedAmount > speiBalance) {
+      // RFC-002 Phase 1 rollout gate (docs/payments-action-plan.md) — mutually
+      // exclusive per loan: never both paths for the same proposal. Default
+      // false for all real traffic; flip via Azure App Service config. Checked
+      // FIRST, before the funds gate below: the non-custodial flow never
+      // requires a pre-funded SmartLoans balance (the lender sends SPEI from
+      // their own bank), so that check must not run for it at all — it did
+      // for a while (bug), which meant the flag could never even be reached
+      // for a lender with $0 speiBalance.
+      const useNonCustodialFunding = await isNonCustodialFundingEnabled(companyId, lenderId);
+      console.log('[P2P] acceptProposal: featureFlag nonCustodialFunding =', useNonCustodialFunding);
+
+      // Funds first (legacy path only), with exact numbers and a way OUT: the
+      // alert offers the deposit actions directly instead of a dead-end
+      // "Entendido". SPEI is the ONLY funding rail for loan disbursement —
+      // SmartLoans is a connector, not a custodian: it never holds/moves
+      // capital through a Stripe-backed wallet
+      // (see docs/p2p-direct-payments-architecture.md). Stripe is reserved
+      // for direct, one-shot platform charges (e.g. premium subscription
+      // billing), never for funding or holding loan principal.
+      if (!useNonCustodialFunding && requestedAmount > speiBalance) {
         console.log('[P2P] acceptProposal: BLOCKED — insufficient SPEI funds', JSON.stringify({ requestedAmount, speiBalance }));
         setShowAcceptAlert(false);
         setFundsAlertMsg(
@@ -671,12 +683,6 @@ const P2PLendingPage: React.FC = () => {
       if (!borrowerCard?.stripePaymentMethodId) {
         throw new Error('El prestatario no ha registrado una tarjeta para el cobro automático de las cuotas.');
       }
-
-      // RFC-002 Phase 1 rollout gate (docs/payments-action-plan.md) — mutually
-      // exclusive per loan: never both paths for the same proposal. Default
-      // false for all real traffic; flip via Azure App Service config.
-      const useNonCustodialFunding = await isNonCustodialFundingEnabled(companyId, lenderId);
-      console.log('[P2P] acceptProposal: featureFlag nonCustodialFunding =', useNonCustodialFunding);
 
       if (useNonCustodialFunding) {
         // ── Non-custodial declare/confirm flow (RFC-002) ──────────────────
