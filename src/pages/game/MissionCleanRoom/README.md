@@ -808,3 +808,329 @@ captura de pantalla, para evitar falsos negativos por fuente de emoji) en
 ambos modos: dentro del cuarto de la misión (ítem/contenedor/jugador
 correctos) y fuera de él (aviso + puerta correcta resaltada, sin marcador de
 ítem fantasma).
+
+## 22. Sonido (`world3d/useGameAudio.ts` + `world3d/synthSounds.ts`)
+
+Los 7 disparadores de sonido (`jump`/`land`/`pickup`/`drop`/`collect`/
+`success`/`celebrate`) ya vivían enteros en `GameWorld3D.tsx` desde que se
+creó `useGameAudio` (§30 del roadmap original): una sola instancia de
+`useGameAudio()` en el orquestador, y los hijos (`Player3D`,
+`InteractionManager3D`) le avisan de eventos hacia arriba por callbacks que
+ya existían por otras razones (`onStateChange`, `onPickupAttach`,
+`onPlaceRelease`, `onInteract`) — nunca se les pasó el objeto `audio` hacia
+abajo como prop. Se mantiene así a propósito: mantiene a `Player3D`/
+`InteractionManager3D` agnósticos de audio (y de sparkles, recompensas,
+cambio de cuarto — todo lo demás que `GameWorld3D` ya orquesta de la misma
+forma), reusables/testeables sin esa dependencia.
+
+**Lo único que faltaba de verdad:** los archivos. `public/assets/audio/
+{key}.mp3` no existen todavía, así que cada `play()` fallaba en silencio —
+`useGameAudio` atrapaba el rechazo del `<audio>` y no hacía nada más.
+
+**Fallback sintetizado (`synthSounds.ts`):** cuando el archivo real falla
+(evento `'error'` del elemento, o rechazo de `play()` — cubre ambos casos,
+ver nota de entorno abajo), `useGameAudio.play()` cae a `playSynthTone(key,
+volume)`: una `AudioContext` compartida a nivel de módulo, con 1-4 notas por
+clave (osciladores `OscillatorNode` + envolvente `GainNode` con rampas
+lineales para evitar clics) — cada clave tiene un timbre distinguible
+(`jump` un barrido corto, `collect`/`success`/`celebrate` acordes
+ascendentes de 2-4 notas). Es solo un relleno de desarrollo: en cuanto un
+mp3 real cargue con éxito para una clave, su evento `'error'` nunca se
+dispara y ese camino deja de usarse para esa clave — cero cambios de código
+cuando lleguen los archivos definitivos.
+
+**Nota de entorno (dev server):** el servidor de Vite de este proyecto
+sirve `index.html` (200 OK) para cualquier ruta sin archivo real —
+`/assets/audio/jump.mp3` responde 200 en vez del 404 que daría producción.
+Aun así, `<audio>.play()` sigue rechazando (`NotSupportedError`, confirmado
+en consola) porque el contenido no es audio válido, así que el fallback se
+dispara igual — el guard no depende del código de estado HTTP.
+
+**Verificación:** harness aislado (`useGameAudio` + un botón por clave)
+confirmó por consola/red que las 7 claves llaman `play()` sin excepciones y
+caen al sintetizador; y una prueba directa de `AudioContext`/
+`OscillatorNode` en este entorno confirmó que Web Audio sí funciona aquí
+(a diferencia de `requestAnimationFrame`, ver §19 — son APIs independientes,
+el límite de `document.hidden` no aplica a audio). No se pudo verificar
+audible (este entorno no reproduce sonido), solo que se programa sin error.
+
+## 23. Telemetría (`telemetryService.ts` + `src/api/gameEventsApi.ts`)
+
+`GameEvent` (`MissionCleanRoomTypes.ts`): `eventType` (`mission_start` /
+`mission_complete` / `item_picked` / `item_placed` / `room_changed`) +
+`eventId`/`timestamp`/`missionId`/`avatarId`/`durationSeconds?`/
+`metadata?`. Se dispara desde los mismos 5 puntos de `GameWorld3D.tsx` que
+ya disparan audio (§22) — el `useEffect` de reset de misión, `handleInteract`
+(rama `door`), `handlePickupAttach`, `handlePlaceRelease`,
+`handleFinishMission` — nunca desde `gameReducer`/`GameContext.tsx`.
+
+**Por qué no en `GameContext`:** ese reducer es el modelo de dominio
+pre-3D (un solo `GameLevel`, sin noción de cuartos ni de
+`MissionDefinition3D`) y el loop de misiones 3D lo evita a propósito — ver
+el comentario de `MissionCleanRoomView.tsx` sobre `missionIndex`
+("Deliberately not routed through GameContext"). `GameWorld3D` nunca llama
+`useGame()`/`dispatch`; instrumentar el reducer habría dejado pasar cada
+evento real sin registrar.
+
+**Cola en memoria, no hook:** `telemetryService.ts` es un módulo con estado
+a nivel de módulo (no un `useState`/hook) porque `GameWorld3D` se
+desmonta/remonta en cada misión (`key={activeMissionId}` en
+`MissionCleanRoomView.tsx`) — una cola dentro del componente perdería
+cualquier evento sin enviar en cada cambio de misión. `logEvent()` encola;
+se auto-envía (`flush()`) a los 3s de inactividad o al llegar a 20 eventos
+en cola, lo que ocurra primero, más un intento en `pagehide` para no perder
+el `mission_complete` si el jugador cierra la app antes del debounce.
+Fire-and-forget: `flush()` vacía la cola SIEMPRE, incluso si el envío
+falla — la analítica nunca debe crecer sin límite ni bloquear el juego.
+
+**`src/api/gameEventsApi.ts`:** sigue el mismo patrón `@pjsonfile` que el
+resto de `src/api/*Api.ts` (payload `{ gameEvents: [{action: 1, ...event}] }`,
+ver `clientFollowUpApi.ts`) — pero el endpoint `/gameEvents` **no existe
+todavía en el backend**; no hay tabla ni SP. Esto es solo el contrato del
+frontend, listo para cuando se autore un módulo `gameEvents` vía el pipeline
+PRD de posgmo-factory (CLAUDE.md §9) — el swap no necesitará tocar este
+archivo. Hasta entonces cada intento de `flush()` falla con 404 (confirmado
+en verificación) y se descarta en silencio, por diseño.
+
+**Verificación:** harness aislado (`logEvent` × 5 tipos + `flush()`)
+confirmó por consola que los 5 eventos se encolan con la forma correcta, y
+por red que `flush()` sí hace el POST a `smartloansbackend.azurewebsites.net/gameEvents`,
+recibe 404 (el backend real responde, solo que sin esa ruta — no es un
+error de red), y el código lo absorbe sin excepción no capturada.
+
+## 24. `MissionObjective3D` pasó a array (`objectives: MissionObjective3D[]`)
+
+Primer paso hacia el gameplay cooperativo de tareas propuesto por el
+usuario (multi-objetivo, combos, tareas dependientes, objetos grandes de
+2 jugadores, etc. — visión completa sin construir todavía, ver §10 del
+`GAME_OVERVIEW.md`). Diagnóstico antes de tocar nada: **todo** ese roadmap
+asume que una misión puede tener más de una tarea activa a la vez, y el
+modelo de datos solo permitía una (`objective: MissionObjective3D`,
+singular). Sin resolver eso primero, nada de lo demás es construible.
+
+**Alcance deliberadamente angosto — solo el modelo de datos, cero gameplay
+nuevo:** `MissionDefinition3D.objective` → `objectives: MissionObjective3D[]`.
+Las 10 misiones en `MISSIONS_3D` pasaron cada una de `objective: {...}` a
+`objectives: [{...}]` — mismo contenido, ahora envuelto en un array de 1
+elemento. Los 10 puntos de consumo (`MissionCleanRoomView.tsx` × 1,
+`GameWorld3D.tsx` × 9 — pickup/dropoff interactables, sparkles de pickup/
+place, posiciones de `ItemBall`/`BasketMesh`/marco de highlight) pasaron de
+leer `mission.objective.X` a `mission.objectives[0].X`. Es un cambio de
+forma, no de comportamiento: cada misión sigue teniendo exactamente un
+ítem/contenedor activo, el juego se ve y se juega idéntico a antes.
+
+**Lo que esto NO hace todavía** (a propósito — es la parte grande y
+separada del roadmap, no este refactor): `GameWorld3D` sigue teniendo un
+solo `isCarrying`/`delivered`/`pickupTrigger`/`placeTrigger` y un solo
+banner de narrativa — todo asume un único ítem en juego. Renderizar N
+objetivos simultáneos (N prompts de recoger, N contenedores resaltados, un
+HUD tipo lista-de-tareas, narrativa por objetivo) es trabajo aparte, más
+grande, que este cambio deja preparado pero no construye.
+
+**Verificación:** `tsc --noEmit` limpio, 16/16 tests, `npm run build`
+limpio, y smoke test real jugando `mission_01` de principio a inicio en un
+harness que monta `<GameProvider><MissionCleanRoomView/></GameProvider>`
+directo (bypassea el login de la app — la ruta real está detrás de
+`PrivateRoute`): HUD mostró "Misión 1/10", la narrativa coincidió
+exactamente con `MISSIONS_3D.mission_01.narrative.searching`, cero errores
+nuevos en consola, y el evento `mission_start` de telemetría (§23) se
+disparó con `missionId`/`avatarId` correctos — confirma que la cadena
+completa `objectives[0]` → render → interacción → telemetría sigue intacta.
+
+## 25. Primera misión con 2 objetivos simultáneos (`mission_04`)
+
+Segundo paso de la evolución hacia gameplay cooperativo de tareas (§24 fue
+el primero — el modelo de datos). Esta vez sí hay soporte real en
+`GameWorld3D` para N objetivos activos a la vez, construido contra UNA
+misión real (`mission_04`, antes "El Scooter Estacionado" con 1 objetivo,
+ahora "El Scooter y el Carrito" con 2) en vez de campos que nada consumía
+todavía — la alternativa que se descartó explícitamente al decidir el
+alcance de este paso.
+
+**`mission_04.objectives` ahora tiene 2 entradas**, ambas activas desde el
+inicio de la misión, sin orden forzado: `scooter → parking_corner` (la
+original) y `car_red → organizer_shelf` (nueva — posición elegida a mano
+verificando que no se solape con ningún obstáculo de `getBedroomObstacles()`
+ni con el resto de elementos de la misión, mismo método que se usó para las
+puertas en §20).
+
+**Estado por objetivo, no un solo booleano:**
+- `carriedObjectiveIndex: number | null` — cuál de `mission.objectives[]` se
+  está cargando ahora mismo. Un solo índice, no un Set, porque solo se
+  puede cargar un ítem a la vez (una sola mano) — restricción física
+  deliberada, no una limitación técnica; cargar 2 ítems simultáneos sería
+  otra mecánica (ver §17 de la propuesta del usuario sobre objetos que
+  requieren 2 jugadores) que este paso no construye.
+- `deliveredIndices: Set<number>` — qué objetivos ya se entregaron. Es un
+  Set (no un solo booleano) porque, a diferencia de cargar, entregar es
+  irreversible y se acumula durante la misión.
+- `lastDeliveredIndex` — solo para el popup de recompensa: `carriedObjectiveIndex`
+  ya se limpia a `null` en el mismo `handlePlaceRelease` que dispara
+  `setRewardKey`, así que hace falta recordar por separado cuál objetivo
+  fue el que acaba de terminar para mostrar su posición/nombre/puntos.
+
+**`missionInteractables` genera un pickup + un dropoff POR objetivo**, cada
+uno con su propio `isAvailable` calculado (no se puede recoger un segundo
+ítem mientras ya se carga uno; el único dropoff disponible es el del ítem
+que se está cargando ahora) — mismo patrón que ya usaba
+`InteractionManager3D` para elegir el prompt más cercano entre varios
+presentes-pero-inactivos, solo que ahora hay más de dos interactuables
+mission-specific en la lista en vez de exactamente dos.
+
+**`pendingPickupIndexRef`:** el prompt de "recoger" ya no es uno solo — el
+índice de CUÁL objetivo se está recogiendo tiene que viajar desde
+`handleInteract` (que sabe qué tocó el jugador) hasta `handlePickupAttach`
+(que dispara varios frames después, en el frame de "agarre" ~55% del clip
+Pickup — ver §19). Un ref porque es escritura-y-lectura-inmediata dentro de
+la misma interacción, nunca necesita re-render por sí solo. `handlePlaceRelease`
+no necesita el equivalente para dropoff: `carriedObjectiveIndex` (ya en
+estado) ES el objetivo que se está soltando, sin ambigüedad posible porque
+solo puede haber un dropoff `isAvailable` a la vez.
+
+**Lo que NO cambió (a propósito):** la narrativa sigue siendo 1 sola por
+misión (no por objetivo) — "cargando" se activa mientras CUALQUIER objetivo
+esté en mano, sin decir cuál. Un HUD tipo lista-de-tareas que sepa nombrar
+cada objetivo por separado es la evolución natural pero es trabajo de UI
+aparte (la propuesta del usuario lo describe en su punto 4). `MissionMap.tsx`
+tampoco se tocó — sigue mostrando un solo ítem/contenedor, ahora resuelto
+como "el próximo objetivo sin entregar" (`mapObjectiveIndex`) en vez de
+`objectives[0]` fijo, para que siga siendo útil sin rediseñarlo para N
+objetivos todavía.
+
+**Verificación:** `tsc --noEmit` limpio, 16/16 tests, `npm run build`
+limpio. Smoke test con un harness que monta `<GameWorld3D>` directo contra
+`mission_04` (resolviendo `items`/`containers` a mano desde `data/items.ts`/
+`data/containers.ts`, sin pasar por `MissionCleanRoomView`/login): la
+narrativa mostró el texto combinado correcto, y abrir el mapa confirmó que
+`mapObjectiveIndex` resuelve al primer objetivo pendiente (Scooter/Esquina
+del Parqueo) — prueba que el enlace `mission.objectives[i]` ↔ `items[i]` ↔
+`containers[i]` funciona de punta a punta. La interacción física real
+(caminar hasta el ítem, presionar E, ver el clip Pickup) sigue sin poder
+probarse en este entorno de preview por la misma limitación de
+`requestAnimationFrame`/`document.hidden` de siempre (§19) — verificado por
+revisión de código en su lugar.
+
+## 26. Roadmap: gameplay cooperativo de tareas (fusión de las dos propuestas del usuario)
+
+Dos propuestas largas del usuario (inspiración en principios de cooperación
+tipo Overcooked sin copiar su temática, y una arquitectura de
+`ObjectiveSystem` con tipos/prioridad/dependencias/cooperación) se
+fusionan aquí en una sola lista ordenada por dependencias reales — un ítem
+no aparece antes que lo que necesita para tener sentido. `✅` = ya
+construido y verificado; `⬜` = pendiente. Regla que ya se aplicó dos veces
+en este roadmap y sigue aplicando hacia adelante: cada campo/tipo nuevo se
+construye CONTRA una misión real que lo consuma, nunca especulativamente
+(ver §24/§25 — por eso `MissionObjective3D` no tiene todavía `requires`/
+`priority`/`requiredPlayers` aunque la propuesta del usuario los sugiere:
+nada los consume aún).
+
+**A — Fundamentos del modelo**
+1. ✅ `objectives: MissionObjective3D[]` — array desde el día uno (§24).
+2. ✅ Soporte real de N objetivos simultáneos en `GameWorld3D` —
+   `mission_04` (§25).
+3. ⬜ Valores nuevos de `MissionObjectiveType` (`collect`/`clean`/`move`/
+   `sort`/`cooperative`/`sequence` — hoy solo existe `'find-and-deliver'`)
+   — cada uno se agrega junto con su primer consumidor real, no antes
+   (`clean` con #17, `move` con #21).
+4. ⬜ `optional: boolean` por objetivo (distinto de `optionalCollectibles`/⭐,
+   que ya es su propia mecánica) — misiones "principal + opcional" reales.
+5. ⬜ `priority: 'normal' | 'important' | 'urgent'` — necesita el HUD (#7)
+   para ser visible; sin eso es un campo sin efecto observable.
+6. ⬜ `requires: string[]` (dependencias entre objetivos) — habilita #9/#10.
+
+**B — El jugador necesita ver el progreso**
+7. ✅ HUD tipo lista-de-tareas — no en `GameHUD.tsx` (ese componente vive
+   fuera de `GameWorld3D`, en el dominio legado, sin acceso al estado por
+   objetivo — ver §23); se agregó dentro de `GameWorld3D.tsx` mismo, junto
+   al resto de su UI. Detalle: §27.
+8. ⬜ Mapa evolucionado: marcador por estado (🔴 pendiente / 🟡 en progreso
+   / 🟢 completado) en vez de un solo ítem/contenedor fijo — `MissionMap.tsx`
+   ya deriva todo de datos reales (§21), así que esto es principalmente UI.
+
+**C — Cadenas y puzzles** (usan #6)
+9. ⬜ Objetivos encadenados (A→B→C) en una misión real.
+10. ⬜ Puzzle simple: contenedor bloqueado + llave, o "retirar objetos para
+    desbloquear algo debajo".
+
+**D — Reactividad del mundo y sistemas de puntaje**
+11. ⬜ El cuarto se ve más ordenado según el progreso (más allá de que los
+    ítems entregados ya desaparecen del suelo — eso ya funciona, §25).
+12. ⬜ Cleanliness Score (0→100%) por misión/cuarto, alimentando estrellas.
+13. ⬜ Combo de limpieza (Pickup→Place correctos consecutivos sube combo;
+    error lo resetea).
+14. ⬜ Niveles de error (leve: contenedor incorrecto; medio: soltar sin
+    querer resetea combo — fuerte/cooperativo dependen de multiplayer, §G).
+15. ⬜ Tiempo como multiplicador de estrellas, no como fail — reemplaza el
+    esquema actual de `STAR_THRESHOLDS`.
+
+**E — Animaciones nuevas** (pipeline ya existe, ver §17/§19)
+16. ⬜ Clip `Celebrate` (el audio `celebrate` ya existe, §22).
+17. ⬜ Clip `Clean` — junto con el tipo `'clean'` (#3) y su mecánica.
+18. ⬜ Clips `Push`/`Pull` — junto con el tipo `'move'` (#3, #21).
+
+**F — Curva de aprendizaje**
+19. ⬜ Rediseñar las 10 misiones como progresión pedagógica explícita
+    (tabla de la propuesta del usuario) — `mission_04` ya cumple el rol de
+    "objetivos simultáneos"; faltan asignar los roles de prioridad/cadena/
+    objeto grande/combinación a misiones específicas.
+
+**G — Cooperación** (requiere decidir mecanismo primero)
+20. ⬜ "Co-op local lógico": una misión con 2 objetivos que EXIJAN 2
+    personajes dentro de la misma sesión de un jugador — para validar que
+    coordinar se siente bien antes de construir red (la Fase 2 que el
+    propio usuario propuso).
+21. ⬜ Objetos grandes (`type: 'move'`, `requiredPlayers: 2`) — depende de #20.
+22. ⬜ Acciones complementarias (uno sostiene, otro abre) — depende de #20.
+
+**H — Multijugador real** (diferido explícitamente, sesión de arquitectura propia)
+23. ⬜ Decidir tecnología realtime — fuera del pipeline PRD de
+    posgmo-factory, que apunta a "tablas + SPs" (CLAUDE.md §9).
+24. ⬜ Lobby / Game Session / Authoritative Game State.
+25. ⬜ Sincronización de estado en tiempo real de misiones/objetivos.
+26. ⬜ Backend real para `/gameEvents` — frontend ya listo (§23), falta el
+    módulo vía posgmo-factory.
+
+**Recomendación de orden:** A(3-6) siguen correctamente bloqueados por B/C/E
+— no hay campo para agregar sin un consumidor. #7 (HUD de lista de tareas)
+ya está hecho (§27). El siguiente con más valor real y cero dependencias
+pendientes es **#8 (mapa evolucionado)**: mismo tema — progreso visible —
+y `MissionMap.tsx` ya deriva todo de datos reales, así que es
+principalmente pintar `deliveredIndices`/`carriedObjectiveIndex` (que ya
+existen en `GameWorld3D`, §25/§27) como color en vez de agregar estado
+nuevo.
+
+## 27. HUD de lista de tareas (paso 7 del roadmap, §26)
+
+`mission_04` (§25) tenía 2 objetivos activos de verdad pero nada en pantalla
+lo mostraba — el banner de narrativa (`.game-world-3d__mission`) sigue
+siendo un solo texto genérico ("cargando", no "cargando EL SCOOTER"), así
+que un niño jugando no tenía forma de saber "me faltan 2 cosas" sin
+adivinar. Este paso cierra ese hueco.
+
+**No se tocó `GameHUD.tsx`.** Ese componente vive en `MissionCleanRoomView.tsx`,
+fuera de `GameWorld3D`, alimentado por el dominio legado (`state.stats.score`/
+`vm.progress` vía `GameContext` — ver §23, ese dominio no sabe nada de
+objetivos/cuartos/misiones 3D). Meter el checklist ahí habría significado
+sacar `deliveredIndices`/`carriedObjectiveIndex` de `GameWorld3D` hacia
+arriba con nuevas props/callbacks, solo para volver a bajarlos a un
+componente hermano — trabajo real sin beneficio, cuando `GameWorld3D` ya
+renderiza el resto de su propia UI (banner, hint de cuarto, botón de mapa)
+directamente. El checklist se agregó ahí mismo, como un elemento más del
+mismo `createPortal`.
+
+**Solo aparece si `mission.objectives.length > 1`** — para las otras 9
+misiones (1 solo objetivo) un checklist de 1 ítem sería ruido puro, ya lo
+dice el banner de narrativa perfectamente bien.
+
+**Estado por fila, sin estado nuevo:** cada fila lee directamente
+`deliveredIndices`/`carriedObjectiveIndex` (ya existían desde §25) —
+✅ si `deliveredIndices.has(index)`, 🟡 si es el que se está cargando ahora
+(`carriedObjectiveIndex === index`), ◯ si no. No hizo falta ningún estado
+nuevo, solo una vista distinta del mismo estado.
+
+**Verificación:** `tsc --noEmit` limpio, 16/16 tests, `npm run build`
+limpio. Smoke visual con el mismo harness de `GameWorld3D` directo contra
+`mission_04` del §25 (capturado con screenshot, no solo texto, para
+confirmar layout): el checklist "◯ Scooter / ◯ Carrito Rojo" se ve como
+una tarjeta debajo del banner de misión, sin superponerse con el botón de
+mapa/silenciar ni con el contador de FPS.

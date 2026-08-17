@@ -38,7 +38,12 @@ export interface MissionDefinition3D {
   roomId: RoomId;
   narrative: MissionNarrative;
   playerSpawn: THREE.Vector3;
-  objective: MissionObjective3D;
+  /** Array from day one so a mission CAN carry several simultaneous tasks later without another
+      shape change — but every mission today still has exactly one. GameWorld3D/View only ever
+      read `objectives[0]`; rendering/tracking N simultaneous item/container pairs (multiple
+      pickup prompts, a task-list HUD, etc.) is separate, larger work this refactor deliberately
+      doesn't attempt. */
+  objectives: MissionObjective3D[];
   optionalCollectibles: MissionCollectible3D[];
 }
 
@@ -53,12 +58,12 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🎉 ¡Muy bien! El cuarto está un poco más limpio.',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'ball_blue',
       itemPosition: new THREE.Vector3(-3.3, 0.3, -3.2),
       containerPosition: new THREE.Vector3(3, 0.3, 3.2),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(4.6, 0.6, -3.5) },
     ],
@@ -73,12 +78,12 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🎉 ¡Excelente! El conejito ya está en su cesta.',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'plush_rabbit',
       itemPosition: new THREE.Vector3(-3, 0.3, 1.5),
       containerPosition: new THREE.Vector3(5, 0.3, 2.5),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(2, 0.6, 2) },
     ],
@@ -93,32 +98,44 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🎉 ¡El lanzador está estacionado!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'dino_blaster',
       itemPosition: new THREE.Vector3(4, 0.3, 1),
       containerPosition: new THREE.Vector3(-4.5, 0.3, 4.5),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(1.5, 0.6, 4) },
     ],
   },
+  // First mission with >1 simultaneous objective (see README §25) — both are active from the
+  // start, no forced order. Positions were checked against getBedroomObstacles() (BedroomRoom3D.tsx)
+  // and every other element already placed in this mission (spawn, doors, the optional star) to
+  // keep them all clearly separated, same as every other mission's placement.
   mission_04: {
     id: 'mission_04',
-    title: 'El Scooter Estacionado',
+    title: 'El Scooter y el Carrito',
     roomId: 'bedroom',
     narrative: {
-      searching: '🔎 Alguien dejó el scooter atravesado en el cuarto...',
-      carrying: '🅿️ ¡Vamos! Llévalo a la esquina del parqueo.',
-      complete: '🎉 ¡El scooter quedó bien estacionado!',
+      searching: '🔎 El scooter y el carrito rojo quedaron tirados por todo el cuarto...',
+      carrying: '✋ ¡Bien! Llévalo a su lugar.',
+      complete: '🎉 ¡El scooter y el carrito ya están en su lugar!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
-      type: 'find-and-deliver',
-      itemId: 'scooter',
-      itemPosition: new THREE.Vector3(3.5, 0.3, 4),
-      containerPosition: new THREE.Vector3(-4.5, 0.3, 4.5),
-    },
+    objectives: [
+      {
+        type: 'find-and-deliver',
+        itemId: 'scooter',
+        itemPosition: new THREE.Vector3(3.5, 0.3, 4),
+        containerPosition: new THREE.Vector3(-4.5, 0.3, 4.5),
+      },
+      {
+        type: 'find-and-deliver',
+        itemId: 'car_red',
+        itemPosition: new THREE.Vector3(2, 0.3, 2),
+        containerPosition: new THREE.Vector3(-4.3, 0.3, 0.5),
+      },
+    ],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(-1.5, 0.6, 3.5) },
     ],
@@ -133,12 +150,12 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🎉 ¡El carrito ya está en su lugar!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'car_red',
       itemPosition: new THREE.Vector3(-2, 0.3, 2),
       containerPosition: new THREE.Vector3(4.5, 0.3, 1),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(2.5, 0.6, -1.5) },
     ],
@@ -153,12 +170,12 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🎉 ¡Los bloques ya están guardados!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'blocks',
       itemPosition: new THREE.Vector3(1, 0.3, 3),
       containerPosition: new THREE.Vector3(4.5, 0.3, 1),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(-3, 0.6, 2.5) },
     ],
@@ -173,12 +190,12 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🎉 ¡La pelota volvió a su cesta!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'ball_blue',
       itemPosition: new THREE.Vector3(3.5, 0.3, -1.5),
       containerPosition: new THREE.Vector3(-1, 0.3, 4.5),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(-4.8, 0.6, 3) },
     ],
@@ -193,12 +210,12 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🎉 ¡El conejito está a salvo en su cesta!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'plush_rabbit',
       itemPosition: new THREE.Vector3(-1.5, 0.3, -2),
       containerPosition: new THREE.Vector3(2, 0.3, 3.5),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(4, 0.6, 1) },
     ],
@@ -213,12 +230,12 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🎉 ¡El lanzador quedó estacionado de nuevo!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'dino_blaster',
       itemPosition: new THREE.Vector3(2, 0.3, -1),
       containerPosition: new THREE.Vector3(-4.5, 0.3, 4.5),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(-2.5, 0.6, 2) },
     ],
@@ -233,12 +250,12 @@ const MISSIONS_3D: Record<string, MissionDefinition3D> = {
       complete: '🏆 ¡La casa quedó impecable!',
     },
     playerSpawn: new THREE.Vector3(0, 0, 4.5),
-    objective: {
+    objectives: [{
       type: 'find-and-deliver',
       itemId: 'scooter',
       itemPosition: new THREE.Vector3(0, 0.3, -2.5),
       containerPosition: new THREE.Vector3(-4.5, 0.3, 4.5),
-    },
+    }],
     optionalCollectibles: [
       { type: 'collect', position: new THREE.Vector3(3.5, 0.6, 3) },
     ],

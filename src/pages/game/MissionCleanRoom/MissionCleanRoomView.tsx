@@ -75,13 +75,18 @@ const MissionCleanRoomView: React.FC = () => {
 
   if (!state.level) return null;
 
-  // The active mission's objective.itemId is the single source of truth for which domain
-  // item/container pair is in play — never assume "the first item in the level" (that broke
-  // the moment a second mission with a different item existed).
+  // Each mission.objectives[i].itemId is the single source of truth for which domain item is
+  // in play at that index — never assume "the first item in the level" (that broke the moment
+  // a second mission with a different item existed). One GameItem/GameContainer resolved per
+  // objective, same order — GameWorld3D indexes items[i]/containers[i] against objectives[i].
   const mission = getMission3D(activeMissionId);
-  const item = state.level.items.find((candidate) => candidate.id === mission.objective.itemId);
-  const container = item && state.level.containers.find((candidate) => candidate.id === item.destinationId);
-  if (!item || !container) return null;
+  const items = mission.objectives
+    .map((objective) => state.level!.items.find((candidate) => candidate.id === objective.itemId))
+    .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate);
+  const containers = items
+    .map((resolvedItem) => state.level!.containers.find((candidate) => candidate.id === resolvedItem.destinationId))
+    .filter((candidate): candidate is NonNullable<typeof candidate> => !!candidate);
+  if (items.length !== mission.objectives.length || containers.length !== items.length) return null;
 
   return (
     <div className="mission-clean-room__playing">
@@ -99,9 +104,13 @@ const MissionCleanRoomView: React.FC = () => {
         avatarId={state.selectedAvatarId}
         missionId={activeMissionId}
         missionLabel={`Misión ${missionIndex + 1}/${MISSION_SEQUENCE.length}`}
-        item={item}
-        container={container}
-        onItemDropped={(itemId) => vm.dropItem(itemId, container.id)}
+        items={items}
+        containers={containers}
+        onItemDropped={(itemId) => {
+          const index = items.findIndex((candidate) => candidate.id === itemId);
+          if (index === -1) return;
+          vm.dropItem(itemId, containers[index].id);
+        }}
         onPlayAgain={handleNextMission}
         onExit={handleChangeAvatar}
       />

@@ -3,7 +3,7 @@
 Documento de referencia rápida para todo lo que vive bajo `src/pages/game/`.
 El detalle técnico exhaustivo (decisiones de arquitectura, bugs encontrados,
 metodología de rigging, criterios de "game feel") está en
-[`MissionCleanRoom/README.md`](MissionCleanRoom/README.md) — 21 secciones.
+[`MissionCleanRoom/README.md`](MissionCleanRoom/README.md) — 27 secciones.
 Este archivo es el mapa: qué hay, dónde vive, y cómo se conecta.
 
 ## 1. Qué es
@@ -28,9 +28,19 @@ selección de personaje → jugando → victoria).
 | **Phaser (2D)** | Preservada como referencia, **no importada** en esta rama | `game/` |
 
 El dominio (puntaje, reglas de qué ítem va en qué contenedor, máquina de
-estados) es agnóstico al motor de render — vive en `gameReducer.ts` /
-`gameRules.ts` / `contexts/GameContext.tsx` / `data/` y no sabe si el render
-es 2D o 3D. Por eso fue posible migrar de Phaser a R3F sin tocar esa capa.
+estados) es agnóstico al motor de render — vive en `gameRules.ts` /
+`contexts/GameContext.tsx` (el reducer `gameReducer` está definido ahí
+mismo, no en un archivo propio — solo `gameReducer.test.ts` sugiere lo
+contrario) / `data/` y no sabe si el render es 2D o 3D. Por eso fue posible
+migrar de Phaser a R3F sin tocar esa capa.
+
+**Ojo:** ese dominio es el modelo PRE-3D (un solo `GameLevel`/timer/combo) y
+el loop de misiones 3D lo evita a propósito — `GameWorld3D.tsx` nunca llama
+`useGame()`/`dispatch`, mission order vive en `MissionCleanRoomView.tsx`
+como estado de componente plano (ver su propio comentario ahí). Se mantiene
+vivo porque `useGameEngine`/`CharacterSelect`/`GameHUD` siguen leyendo de
+ahí (avatar seleccionado, status CHARACTER_SELECT↔PLAYING) y por los 16 tests
+directos — no porque gobierne la jugabilidad 3D real. Detalle: README §23.
 
 ## 3. Estructura completa
 
@@ -38,7 +48,8 @@ es 2D o 3D. Por eso fue posible migrar de Phaser a R3F sin tocar esa capa.
 src/pages/game/
 ├── MissionCleanRoomPage.tsx/css        # shell de router
 └── MissionCleanRoom/
-    ├── README.md                       # bitácora técnica completa (21 secciones)
+    ├── README.md                       # bitácora técnica completa (27 secciones)
+    ├── telemetryService.ts             # cola GameEvent en memoria + flush() (§10)
     ├── GAME_OVERVIEW.md                # este archivo
     ├── MissionCleanRoomView.tsx        # switch de estado, renderiza GameWorld3D
     ├── MissionCleanRoomTypes.ts        # modelo de dominio compartido (Avatar, GameItem, GameContainer, ...)
@@ -79,6 +90,7 @@ src/pages/game/
     │   ├── useKeyboardControls3D.ts / useCameraDrag.ts / TouchJoystick.tsx
     │   ├── useFullscreenGameMode.ts    # lock de orientación + status bar (nativo)
     │   ├── useGameAudio.ts             # play(jump/land/pickup/drop/collect/success/celebrate)
+    │   ├── synthSounds.ts              # tono sintetizado por clave — fallback mientras no hay MP3 reales
     │   └── rooms/                      # los 3 cuartos jugables + las puertas entre ellos (§5)
     │       ├── RoomTypes.ts             # RoomId + interface RoomDefinition3D (con name/emoji)
     │       ├── BedroomRoom3D.tsx
@@ -175,12 +187,21 @@ existe. Detalle: README §21.
 ## 7. Las 10 misiones (`world3d/MissionDefinition.ts`)
 
 Cada `MissionDefinition3D` trae: `roomId`, narrativa (3 frases: buscando/
-cargando/completo), spawn del jugador, el objetivo (`itemId` + posiciones 3D
-de ítem y contenedor), y coleccionables opcionales (⭐). El ítem/contenedor
-en sí (nombre, categoría, puntos) es dominio puro — viene de `data/items.ts`/
-`data/containers.ts`; `MissionDefinition3D` solo añade "dónde vive en el
-mundo 3D". `MISSION_SEQUENCE` en el mismo archivo define el orden; se avanza
-automáticamente al entregar cada objeto.
+cargando/completo), spawn del jugador, `objectives: MissionObjective3D[]`
+(`itemId` + posiciones 3D de ítem y contenedor), y coleccionables opcionales
+(⭐). El ítem/contenedor en sí (nombre, categoría, puntos) es dominio puro —
+viene de `data/items.ts`/`data/containers.ts`; `MissionDefinition3D` solo
+añade "dónde vive en el mundo 3D". `MISSION_SEQUENCE` en el mismo archivo
+define el orden; se avanza automáticamente al entregar cada objeto.
+
+**`objectives` es array desde ahora** — primer paso (a pedido del usuario)
+hacia el gameplay cooperativo de tareas simultáneas descrito en §10.
+Segundo paso, ya construido: `mission_04` ("El Scooter y el Carrito") tiene
+2 objetivos activos a la vez de verdad, con soporte real en `GameWorld3D`
+(un pickup/dropoff por objetivo, solo se puede cargar un ítem a la vez).
+Las otras 9 misiones siguen con 1 objetivo — el juego se comporta idéntico
+para ellas. Detalle: README §24 (el modelo de datos) y §25 (la primera
+misión multi-objetivo).
 
 ## 8. Controles, cámara, físicas
 
@@ -227,15 +248,25 @@ humanos en un dispositivo.
   redundante con `Place` en el juego actual (no hay "soltar sin entregar");
   `Celebrate` visual queda pendiente (el audio `celebrate` ya existe).
 - Revisar la escala de Tutu una vez validado en dispositivo.
-- Archivos de audio reales en `public/assets/audio/` (hoy `useGameAudio` está
-  cableado pero falla en silencio sin los MP3).
-- `GameEvent` — interfaz de analítica, aún no empezada.
-- **Visión de coop en red** (multijugador en dispositivos distintos,
-  tareas/eventos/recursos compartidos al estilo Overcooked, adaptada a la
-  temática de limpieza) — propuesta por el usuario, con alcance explícitamente
-  grande (backend en tiempo real, sesión/lobby, sincronización de estado —
-  más grande que todo lo construido en este juego hasta ahora). No iniciada;
-  necesita su propia sesión de arquitectura antes de tocar código, y toca una
-  decisión de backend que no es solo de este módulo (ver CLAUDE.md §9 sobre
-  el pipeline PRD de posgmo-factory — un servicio en tiempo real no encaja
-  en ese molde de "tablas + SPs").
+- Archivos de audio reales en `public/assets/audio/` (hoy las 7 claves de
+  `useGameAudio` suenan vía un tono sintetizado — `world3d/synthSounds.ts` —
+  en vez de fallar en silencio; se reemplaza solo por MP3 real en cuanto el
+  archivo exista, cero cambios de código, detalle: README §22).
+- Backend real para `/gameEvents` — no existe todavía (falta autorearlo vía
+  el pipeline PRD de posgmo-factory, CLAUDE.md §9). El lado frontend ya está
+  completo: tipo `GameEvent` (`MissionCleanRoomTypes.ts`), cola en
+  `telemetryService.ts`, envío vía `src/api/gameEventsApi.ts` (mismo patrón
+  `@pjsonfile` que el resto de `src/api/`). Hasta que el endpoint exista,
+  cada envío falla con 404 y se descarta en silencio, por diseño — cero
+  cambios de código cuando se autore. Detalle: README §23.
+- **Roadmap de 26 pasos hacia gameplay cooperativo de tareas** — fusión
+  ordenada por dependencias de las dos propuestas largas del usuario
+  (principios tipo Overcooked sin copiar su temática + arquitectura
+  `ObjectiveSystem` con tipos/prioridad/dependencias/cooperación). Pasos
+  1-2 y 7 ya hechos (`objectives[]` + `mission_04` multi-objetivo + HUD de
+  lista de tareas, §24/§25/§27); el multijugador en red queda al final
+  (pasos 23-26), diferido a su propia sesión de arquitectura — toca una
+  decisión de backend que no es solo de este módulo (CLAUDE.md §9: un
+  servicio en tiempo real no encaja en el molde "tablas + SPs" del
+  pipeline PRD de posgmo-factory). Lista completa con recomendación de
+  siguiente paso: README §26.
