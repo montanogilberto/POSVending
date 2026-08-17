@@ -354,6 +354,18 @@ ion-card.p2p-kpi::part(native) {
 .p2p-status-rejected  { --background: #fee2e2; --color: #b91c1c; }
 .p2p-status-expired,
 .p2p-status-cancelled { --background: #f3f4f6; --color: #6b7280; }
+.p2p-status-countered { --background: #dbeafe; --color: #1d4ed8; }
+
+.p2p-proposal-date {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.p2p-proposal-date-stale {
+  color: #b45309;
+  font-weight: 700;
+}
 
 .p2p-proposal-amounts {
   display: flex;
@@ -399,6 +411,17 @@ ion-card.p2p-kpi::part(native) {
   font-size: 12px;
   color: #6b7280;
   font-style: italic;
+}
+
+.p2p-proposal-note-lender {
+  color: #1d4ed8;
+}
+
+.p2p-proposal-original {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-decoration: line-through;
 }
 
 /* ── My offer card (ion-card) ── */

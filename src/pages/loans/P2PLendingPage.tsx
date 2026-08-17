@@ -41,7 +41,11 @@ const SHOW_BANKING_TEST_TOOLS = false;
 
 // ── Loan Proposal / Offer types & fetchers (single-use, kept inline) ─────────
 
-type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
+// 'countered': el lender propuso otros términos (Monto/Tasa/Plazo) en vez de
+// aprobar/rechazar tal cual — negociación de un solo ciclo (sin loop): el
+// borrower solo puede Aceptar (vuelve a 'pending' con los términos ya
+// actualizados, listo para que el lender apruebe/fondee) o Rechazar (terminal).
+type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled' | 'countered';
 
 interface LoanProposal {
   proposalId: number;
@@ -54,6 +58,13 @@ interface LoanProposal {
   status: ProposalStatus;
   lenderNote?: string;
   borrowerNote?: string;
+  // Contraoferta del lender (Monto/Tasa/Plazo distintos al ask original de
+  // requestedAmount/proposedRate/termMonths, que nunca se sobreescribe —
+  // historial de negociación completo en una sola fila).
+  counteredAmount?: number;
+  counteredRate?: number;
+  counteredTermMonths?: number;
+  counteredAt?: string;
   pushNotificationId?: number;
   respondedAt?: string;
   expiresAt?: string;
@@ -178,7 +189,7 @@ import {
 import BankAccountLink from '../../components/payments/BankAccountLink';
 import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
 import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
-import { fmtMXN as fmt } from '../../utils/format';
+import { fmtMXN as fmt, mxDate } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
 import EmptyState from '../../components/ui/EmptyState';
 import { createLoan } from '../../api/loanApi';
@@ -204,6 +215,7 @@ const STATUS_META: Record<ProposalStatus, { label: string }> = {
   rejected:  { label: 'Rechazada' },
   expired:   { label: 'Vencida'   },
   cancelled: { label: 'Cancelada' },
+  countered: { label: 'Contraoferta' },
 };
 
 // SmartLoans es un conector, no custodio: estas etiquetas describen actividad
@@ -261,6 +273,12 @@ const P2PLendingPage: React.FC = () => {
   const [selectedProposal,  setSelectedProposal]  = useState<LoanProposal | null>(null);
   const [showAcceptAlert,   setShowAcceptAlert]   = useState(false);
   const [showRejectAlert,   setShowRejectAlert]   = useState(false);
+  // Contraoferta (lender cambia Monto/Tasa/Plazo) — negociación de un ciclo.
+  const [showCounterModal,  setShowCounterModal]  = useState(false);
+  const [counterAmount,     setCounterAmount]     = useState('');
+  const [counterRate,       setCounterRate]       = useState('');
+  const [counterTerm,       setCounterTerm]       = useState('');
+  const [counterNote,       setCounterNote]       = useState('');
   // Blocking failure explanation for approve — a toast dies in 3s unseen.
   const [errorAlert,        setErrorAlert]        = useState('');
   // Insufficient-funds variant with deposit actions built in.
@@ -612,7 +630,12 @@ const P2PLendingPage: React.FC = () => {
     if (!selectedProposal) return;
     setSaving(true);
     try {
-      const { proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths } = selectedProposal;
+      const { proposalId, borrowerId, lenderId } = selectedProposal;
+      // Términos efectivos: si hubo contraoferta y el borrower la aceptó, son
+      // los términos negociados, no el ask original — requestedAmount/
+      // proposedRate/termMonths nunca se sobreescriben (quedan como
+      // historial), así que hay que leerlos vía effectiveTerms().
+      const { amount: requestedAmount, rate: proposedRate, term: termMonths } = effectiveTerms(selectedProposal);
       console.log('[P2P] acceptProposal: START', JSON.stringify({ proposalId, borrowerId, lenderId, requestedAmount, proposedRate, termMonths }));
 
       // Funds first, with exact numbers and a way OUT: the alert offers the
@@ -921,6 +944,105 @@ const P2PLendingPage: React.FC = () => {
     setSaving(false);
   };
 
+  // ── Lender propone otros términos (Monto/Tasa/Plazo) ────────────────────
+  const submitCounterOffer = async () => {
+    if (!selectedProposal) return;
+    const amount = Number(counterAmount);
+    const rate = Number(counterRate);
+    const term = Number(counterTerm);
+    if (!amount || amount <= 0 || !rate || rate <= 0 || !term || term <= 0) {
+      showToast('Ingresa monto, tasa y plazo válidos');
+      return;
+    }
+    setSaving(true);
+    console.log('[P2P] submitCounterOffer: START', JSON.stringify({ proposalId: selectedProposal.proposalId, amount, rate, term }));
+    try {
+      await updateLoanProposal(selectedProposal.proposalId, {
+        status: 'countered',
+        counteredAmount: amount, counteredRate: rate, counteredTermMonths: term,
+        lenderNote: counterNote.trim() || undefined,
+        respondedAt: new Date().toISOString(),
+      });
+
+      await createPushNotification({
+        companyId,
+        title: '🔄 Nuevos términos propuestos',
+        message: `El prestamista propone ${fmt(amount)} a ${rate}% anual por ${term} meses. Revisa y responde.`,
+        notificationType: 'Info',
+        priority: 'High',
+        targetType: 'User',
+        targetUserId: selectedProposal.borrowerId,
+        navigationRoute: '/p2p-lending',
+        payloadJson: JSON.stringify({ type: 'ProposalCountered', proposalId: selectedProposal.proposalId }),
+      }).catch(() => {});
+
+      console.log('[P2P] submitCounterOffer: SUCCESS');
+      showToast('✓ Contraoferta enviada — el prestatario debe responder');
+      notifyDataChanged('proposal_countered');
+      setShowCounterModal(false);
+      setSelectedProposal(null);
+      load();
+    } catch (e: any) {
+      console.log('[P2P] submitCounterOffer: FAILED —', String(e?.message ?? e));
+      showToast(e?.message ?? 'No se pudo enviar la contraoferta');
+    }
+    setSaving(false);
+  };
+
+  // ── Borrower responde a la contraoferta del lender (un solo ciclo) ──────
+  const acceptCounterOffer = async (p: LoanProposal) => {
+    console.log('[P2P] acceptCounterOffer: START', JSON.stringify({ proposalId: p.proposalId }));
+    try {
+      // Vuelve a 'pending': counteredAmount/Rate/TermMonths ya quedaron
+      // grabados, así que el lender ve la solicitud de nuevo en su bandeja
+      // con los términos correctos, lista para Aprobar (fondear).
+      await updateLoanProposal(p.proposalId, { status: 'pending', respondedAt: new Date().toISOString() });
+      await createPushNotification({
+        companyId,
+        title: '✅ Términos aceptados',
+        message: `El prestatario aceptó tus nuevos términos (${fmt(p.counteredAmount ?? p.requestedAmount)} · ${p.counteredRate ?? p.proposedRate}% · ${p.counteredTermMonths ?? p.termMonths} m). Apruébalo para fondear.`,
+        notificationType: 'Success',
+        priority: 'High',
+        targetType: 'User',
+        targetUserId: p.lenderId,
+        navigationRoute: '/p2p-lending',
+        payloadJson: JSON.stringify({ type: 'CounterAccepted', proposalId: p.proposalId }),
+      }).catch(() => {});
+      console.log('[P2P] acceptCounterOffer: SUCCESS');
+      showToast('✓ Aceptaste los nuevos términos — el prestamista debe aprobar para fondear');
+      notifyDataChanged('counter_accepted');
+      load();
+    } catch (e: any) {
+      console.log('[P2P] acceptCounterOffer: FAILED —', String(e?.message ?? e));
+      showToast(e?.message ?? 'No se pudo aceptar');
+    }
+  };
+
+  const rejectCounterOffer = async (p: LoanProposal) => {
+    console.log('[P2P] rejectCounterOffer: START', JSON.stringify({ proposalId: p.proposalId }));
+    try {
+      await updateLoanProposal(p.proposalId, { status: 'rejected', respondedAt: new Date().toISOString() });
+      await createPushNotification({
+        companyId,
+        title: '❌ Contraoferta rechazada',
+        message: 'El prestatario rechazó tus nuevos términos.',
+        notificationType: 'Warning',
+        priority: 'Normal',
+        targetType: 'User',
+        targetUserId: p.lenderId,
+        navigationRoute: '/p2p-lending',
+        payloadJson: JSON.stringify({ type: 'CounterRejected', proposalId: p.proposalId }),
+      }).catch(() => {});
+      console.log('[P2P] rejectCounterOffer: SUCCESS');
+      showToast('Contraoferta rechazada');
+      notifyDataChanged('counter_rejected');
+      load();
+    } catch (e: any) {
+      console.log('[P2P] rejectCounterOffer: FAILED —', String(e?.message ?? e));
+      showToast(e?.message ?? 'No se pudo rechazar');
+    }
+  };
+
   // ── Withdraw wallet balance to bank account ─────────────────────────────
   const handleWithdraw = async (amountStr: string) => {
     const amount = Number(amountStr);
@@ -1016,8 +1138,21 @@ const P2PLendingPage: React.FC = () => {
     return c ? `${c.first_name} ${c.last_name}` : `#${id}`;
   };
 
+  // Términos activos: los de la contraoferta si existen, si no el ask
+  // original — requestedAmount/proposedRate/termMonths nunca se sobreescriben
+  // (historial), así que esto es lo único que hay que tocar para que el resto
+  // del flujo (mostrar, aprobar/fondear) use los términos correctos.
+  const effectiveTerms = (p: LoanProposal) => ({
+    amount: p.counteredAmount ?? p.requestedAmount,
+    rate: p.counteredRate ?? p.proposedRate,
+    term: p.counteredTermMonths ?? p.termMonths,
+  });
+
   const ProposalCard: React.FC<{ p: LoanProposal; isLenderView?: boolean }> = ({ p, isLenderView }) => {
     const meta = STATUS_META[p.status];
+    const daysAgo = p.created_At ? Math.floor((Date.now() - new Date(p.created_At).getTime()) / 86400000) : null;
+    const terms = effectiveTerms(p);
+    const wasCountered = p.counteredAt != null;
     return (
       <IonCard className="p2p-proposal-card">
         <div className="p2p-proposal-header">
@@ -1027,18 +1162,33 @@ const P2PLendingPage: React.FC = () => {
           </div>
           <IonBadge className={`p2p-status-chip p2p-status-${p.status}`}>{meta.label}</IonBadge>
         </div>
+        {p.created_At && (
+          <p className="p2p-proposal-date">
+            Solicitado el {mxDate(p.created_At)}
+            {daysAgo !== null && (
+              <span className={daysAgo >= 3 ? 'p2p-proposal-date-stale' : ''}>
+                {' · hace '}{daysAgo === 0 ? 'hoy' : `${daysAgo} ${daysAgo === 1 ? 'día' : 'días'}`}
+              </span>
+            )}
+          </p>
+        )}
+        {wasCountered && (
+          <p className="p2p-proposal-original">
+            Pedido original: {fmt(p.requestedAmount)} · {p.proposedRate}% · {p.termMonths} m
+          </p>
+        )}
         <div className="p2p-proposal-amounts">
           <div className="p2p-amount-item">
             <IonNote className="p2p-amount-label">Monto</IonNote>
-            <span className="p2p-amount-val">{fmt(p.requestedAmount)}</span>
+            <span className="p2p-amount-val">{fmt(terms.amount)}</span>
           </div>
           <div className="p2p-amount-item">
             <IonNote className="p2p-amount-label">Tasa</IonNote>
-            <span className="p2p-amount-val">{p.proposedRate}%</span>
+            <span className="p2p-amount-val">{terms.rate}%</span>
           </div>
           <div className="p2p-amount-item">
             <IonNote className="p2p-amount-label">Plazo</IonNote>
-            <span className="p2p-amount-val">{p.termMonths} m</span>
+            <span className="p2p-amount-val">{terms.term} m</span>
           </div>
         </div>
         {isLenderView && p.status === 'pending' && (
@@ -1047,13 +1197,37 @@ const P2PLendingPage: React.FC = () => {
               onClick={() => { setSelectedProposal(p); setShowRejectAlert(true); }}>
               <IonIcon icon={closeCircle} slot="start" /> Rechazar
             </IonButton>
+            <IonButton size="small" fill="outline"
+              onClick={() => {
+                setSelectedProposal(p);
+                setCounterAmount(String(p.requestedAmount));
+                setCounterRate(String(p.proposedRate));
+                setCounterTerm(String(p.termMonths));
+                setCounterNote('');
+                setShowCounterModal(true);
+              }}>
+              <IonIcon icon={documentTextOutline} slot="start" /> Contraoferta
+            </IonButton>
             <IonButton size="small" color="success"
               onClick={() => { setSelectedProposal(p); setShowAcceptAlert(true); }}>
               <IonIcon icon={checkmarkCircle} slot="start" /> Aprobar
             </IonButton>
           </div>
         )}
+        {!isLenderView && p.status === 'countered' && (
+          <div className="p2p-proposal-actions">
+            <IonButton size="small" color="danger" fill="outline"
+              onClick={() => { setSelectedProposal(p); rejectCounterOffer(p); }}>
+              <IonIcon icon={closeCircle} slot="start" /> Rechazar
+            </IonButton>
+            <IonButton size="small" color="success"
+              onClick={() => { setSelectedProposal(p); acceptCounterOffer(p); }}>
+              <IonIcon icon={checkmarkCircle} slot="start" /> Aceptar nuevos términos
+            </IonButton>
+          </div>
+        )}
         {p.borrowerNote && <p className="p2p-proposal-note">"{p.borrowerNote}"</p>}
+        {p.lenderNote && <p className="p2p-proposal-note p2p-proposal-note-lender">"{p.lenderNote}"</p>}
       </IonCard>
     );
   };
@@ -1720,6 +1894,63 @@ const P2PLendingPage: React.FC = () => {
           { text: 'Rechazar', handler: rejectProposal, cssClass: 'alert-button-danger' },
         ]}
       />
+
+      {/* ══════════ Modal: Contraoferta (lender propone otros términos) ══════════ */}
+      <IonModal isOpen={showCounterModal} onDidDismiss={() => setShowCounterModal(false)}>
+        <IonHeader className="p2p-publish-header">
+          <IonToolbar>
+            <IonTitle>Proponer nuevos términos</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setShowCounterModal(false)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {selectedProposal && (
+            <div className="p2p-info-card">
+              <div className="p2p-info-row">
+                <div className="p2p-info-icon p2p-info-icon-blue">
+                  <IonIcon icon={documentTextOutline} />
+                </div>
+                <p>
+                  Pedido original de {clientLabel(selectedProposal.borrowerId)}: <strong>{fmt(selectedProposal.requestedAmount)}</strong>{' '}
+                  a {selectedProposal.proposedRate}% por {selectedProposal.termMonths} meses. Ajusta lo que necesites — el
+                  prestatario solo podrá aceptar estos nuevos términos o rechazarlos.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="p2p-form-group">
+            <IonLabel>Monto (MXN) *</IonLabel>
+            <div className="p2p-input-with-chip">
+              <IonInput type="number" value={counterAmount}
+                onIonInput={e => setCounterAmount(e.detail.value ?? '')} className="p2p-input" />
+              <span className="p2p-input-chip">MXN</span>
+            </div>
+          </div>
+          <div className="p2p-form-group">
+            <IonLabel>Tasa anual (%) *</IonLabel>
+            <IonInput type="number" value={counterRate}
+              onIonInput={e => setCounterRate(e.detail.value ?? '')} className="p2p-input" />
+          </div>
+          <div className="p2p-form-group">
+            <IonLabel>Plazo (meses) *</IonLabel>
+            <IonInput type="number" value={counterTerm}
+              onIonInput={e => setCounterTerm(e.detail.value ?? '')} className="p2p-input" />
+          </div>
+          <div className="p2p-form-group">
+            <IonLabel>Mensaje para el prestatario</IonLabel>
+            <IonTextarea rows={2} maxlength={250} placeholder="Ej: puedo prestar menos, pero a un plazo más corto"
+              value={counterNote} onIonInput={e => setCounterNote(e.detail.value ?? '')} className="p2p-input" />
+          </div>
+        </IonContent>
+        <IonFooter className="ion-padding p2p-modal-footer">
+          <IonButton expand="block" onClick={submitCounterOffer} disabled={saving}>
+            {saving ? <IonSpinner name="dots" /> : (<><IonIcon icon={sendOutline} slot="start" />Enviar contraoferta</>)}
+          </IonButton>
+        </IonFooter>
+      </IonModal>
 
       {/* ── Delete offer alert ── */}
       <IonAlert
