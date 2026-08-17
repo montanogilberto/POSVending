@@ -3,7 +3,7 @@
 
 const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
 
-export type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
+export type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled' | 'countered';
 
 export interface MarketplaceProposal {
   proposalId: number;
@@ -14,6 +14,13 @@ export interface MarketplaceProposal {
   proposedRate: number;
   termMonths: number;
   status: ProposalStatus;
+  lenderNote?: string;
+  borrowerNote?: string;
+  // Contraoferta del lender — ver P2PLendingPage.tsx effectiveTerms().
+  counteredAmount?: number;
+  counteredRate?: number;
+  counteredTermMonths?: number;
+  counteredAt?: string;
   created_At?: string;
 }
 

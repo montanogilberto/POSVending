@@ -65,7 +65,7 @@ import QRCode from 'qrcode';
 import { useUser } from '../../contexts/UserContext';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans } from '../../api/loanApi';
-import { countPendingProposalsForBorrower } from '../../api/loanMarketplaceApi';
+import { countPendingProposalsForBorrower, fetchLoanProposals, MarketplaceProposal } from '../../api/loanMarketplaceApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
 import { ledgerBalance, postLedgerEntry } from '../../api/bankingApi';
 
@@ -170,6 +170,16 @@ const loanStatusLabel = (status: string) => {
   return map[normLoanStatus(status)] ?? status;
 };
 
+const proposalStatusLabel = (status: string): string => ({
+  pending: 'Pendiente', accepted: 'Aceptada', rejected: 'Rechazada',
+  expired: 'Vencida', cancelled: 'Cancelada', countered: 'Nuevos términos propuestos',
+}[status] ?? status);
+
+const proposalStatusColor = (status: string): string => ({
+  pending: '#b45309', accepted: '#148742', rejected: '#b91c1c',
+  expired: '#6b7280', cancelled: '#6b7280', countered: '#1d4ed8',
+}[status] ?? '#6b7280');
+
 const PAGE_SIZE = 10;
 
 const ClientDashboardPage: React.FC = () => {
@@ -226,6 +236,11 @@ const ClientDashboardPage: React.FC = () => {
   // Loans
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loansLoading, setLoansLoading] = useState(false);
+  // Historial de solicitudes (propuestas) propias — el módulo de préstamos
+  // solo mostraba préstamos ya fondeados; esto cubre pending/countered/
+  // rejected/etc. antes de que exista un Loan.
+  const [proposals, setProposals] = useState<MarketplaceProposal[]>([]);
+  const [proposalsLoading, setProposalsLoading] = useState(false);
   // Face recognition / completion
   const [faceRecord, setFaceRecord] = useState<ClientFaceRecognition | null>(null);
   // Solicitudes P2P propias aún sin respuesta — banner en el home.
@@ -336,6 +351,22 @@ const ClientDashboardPage: React.FC = () => {
       console.error('[ClientDashboard] fetchLoans ❌', err);
     } finally {
       setLoansLoading(false);
+    }
+  };
+
+  // ── Fetch this borrower's proposal history (pending/countered/rejected/…) ─
+  const fetchProposals = async () => {
+    if (!companyId || !clientId) return;
+    setProposalsLoading(true);
+    try {
+      const all = await fetchLoanProposals(companyId);
+      const mine = all.filter(p => p.borrowerId === Number(clientId));
+      console.log('[ClientDashboard] fetchProposals ✅ total:', all.length, '→ mine:', mine.length);
+      setProposals(mine);
+    } catch (err) {
+      console.error('[ClientDashboard] fetchProposals ❌', err);
+    } finally {
+      setProposalsLoading(false);
     }
   };
 
@@ -562,6 +593,7 @@ const ClientDashboardPage: React.FC = () => {
     console.log('[ClientDashboard] initial-load effect: fetching dashboard/loans/stripe/faceRecord for clientId =', clientId, 'companyId =', companyId);
     fetchDashboard();
     fetchLoans();
+    fetchProposals();
     fetchStripe();
     // Solicitudes que este borrower envió y siguen sin respuesta — banner del home.
     if (companyId && clientId) {
@@ -608,6 +640,7 @@ const ClientDashboardPage: React.FC = () => {
       console.log('[ClientDashboard] data-changed →', reason);
       fetchDashboard();
       fetchLoans();
+      fetchProposals();
       fetchStripe();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -621,6 +654,7 @@ const ClientDashboardPage: React.FC = () => {
     console.log('[ClientDashboard] view re-entered → refreshing');
     fetchDashboard();
     fetchLoans();
+    fetchProposals();
     fetchStripe();
     countPendingProposalsForBorrower(companyId, Number(clientId))
       .then(setMyPendingProposals)
@@ -1072,6 +1106,7 @@ const ClientDashboardPage: React.FC = () => {
   );
 
   const renderLoans = () => (
+    <>
     <IonCard className="client-dashboard-card">
       <IonCardHeader>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1134,6 +1169,57 @@ const ClientDashboardPage: React.FC = () => {
         </div>
       </IonCardContent>
     </IonCard>
+
+    {/* Historial de solicitudes — antes invisible en este módulo: una
+        propuesta pending/countered/rejected no es un Loan todavía, así que
+        no aparecía arriba aunque el borrower sí tuviera actividad. */}
+    {(proposalsLoading || proposals.length > 0) && (
+      <IonCard className="client-dashboard-card">
+        <IonCardHeader>
+          <IonCardTitle>Mis Solicitudes</IonCardTitle>
+        </IonCardHeader>
+        <IonCardContent>
+          {proposalsLoading && <p style={{ color: '#74839f', textAlign: 'center' }}>Cargando solicitudes...</p>}
+          <div className="cd-loan-list">
+            {proposals.map(p => {
+              const amount = p.counteredAmount ?? p.requestedAmount;
+              const rate = p.counteredRate ?? p.proposedRate;
+              const term = p.counteredTermMonths ?? p.termMonths;
+              const needsResponse = p.status === 'countered';
+              return (
+                <div key={p.proposalId} className="cd-loan-card" style={{ cursor: 'pointer' }}
+                  onClick={() => { console.log('[ClientDashboard] proposal →', p.proposalId); history.push('/p2p-lending'); }}>
+                  <div className="cd-loan-header">
+                    <span className="cd-loan-number">Solicitud #{p.proposalId}</span>
+                    <span className="cd-loan-status" style={{ color: proposalStatusColor(p.status) }}>
+                      <IonIcon icon={p.status === 'accepted' ? checkmarkCircleOutline : p.status === 'pending' ? ellipseOutline : alertCircleOutline} />
+                      {proposalStatusLabel(p.status)}
+                    </span>
+                  </div>
+                  <div className="cd-loan-amounts">
+                    <div><small>Monto</small><strong>${amount.toLocaleString()}</strong></div>
+                    <div><small>Tasa</small><strong>{rate}%</strong></div>
+                    <div><small>Plazo</small><strong>{term} m</strong></div>
+                  </div>
+                  {p.created_At && (
+                    <div className="cd-loan-meta">
+                      <span><IonIcon icon={timeOutline} /> Solicitado: {toDate(p.created_At)}</span>
+                    </div>
+                  )}
+                  {needsResponse && (
+                    <IonButton size="small" expand="block"
+                      onClick={(e) => { e.stopPropagation(); history.push('/p2p-lending'); }}>
+                      Responder nuevos términos
+                    </IonButton>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </IonCardContent>
+      </IonCard>
+    )}
+    </>
   );
 
   const renderPayments = () => {
