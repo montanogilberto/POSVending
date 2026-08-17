@@ -1150,7 +1150,10 @@ const P2PLendingPage: React.FC = () => {
 
   const ProposalCard: React.FC<{ p: LoanProposal; isLenderView?: boolean }> = ({ p, isLenderView }) => {
     const meta = STATUS_META[p.status];
-    const daysAgo = p.created_At ? Math.floor((Date.now() - new Date(p.created_At).getTime()) / 86400000) : null;
+    // Clamp at 0: pequeño desfase de reloj entre servidor y navegador puede
+    // dar una diferencia negativa de milisegundos para algo creado "ahora
+    // mismo" — Math.floor de eso da -1, no 0 ("hace -1 días" es el bug).
+    const daysAgo = p.created_At ? Math.max(0, Math.floor((Date.now() - new Date(p.created_At).getTime()) / 86400000)) : null;
     const terms = effectiveTerms(p);
     const wasCountered = p.counteredAt != null;
     return (
