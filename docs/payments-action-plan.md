@@ -1,11 +1,11 @@
 # SmartLoans — Payments Migration: Action Plan (Reviewed)
 
-> **Status: reviewed plan, not yet implemented.** Original 3-step plan proposed
-> 2026-08-17; this document is the corrected version after checking it against
-> the actual code (not just the design docs) — `P2PLendingPage.tsx`,
-> `sql/sp_disbursement.sql`, `modules/disbursement.py`. Two real findings
-> changed the order and scope from the original proposal; see §2. For the
-> underlying build status this plan works from, see
+> **Status: decisions resolved, not yet implemented.** Original 3-step plan
+> proposed 2026-08-17; corrected after checking it against the actual code
+> (not just the design docs) — `P2PLendingPage.tsx`, `sql/sp_disbursement.sql`,
+> `modules/disbursement.py` — in §2. The open decisions that correction
+> surfaced (§4) were resolved the same day; §3's phases already reflect the
+> resolutions. For the underlying build status this plan works from, see
 > [payments-build-status.md](./payments-build-status.md); for the full
 > lifecycle this fits into, see [payments-workflow.md](./payments-workflow.md).
 
@@ -109,49 +109,58 @@ funding declaration will succeed at the API level and **do nothing visible**
 4. Wire the two crons `paymentIntents.expire_due` and
    `fundingTransactions.escalate_due` into `main.py`'s `AsyncIOScheduler`
    (pattern already established by `_run_daily_charge_due` etc.).
+5. Build `paymentHistory` (D16) **as part of this phase, not later** — every
+   transition added in steps 1–3 above writes to it in the same transaction.
+   Resolved (§4): deferring this creates an unrecoverable audit gap for the
+   first production loans that go through the new flow, so it can't be a
+   Phase 3 afterthought.
+6. Enforce escalation authorization (`support`/`admin` only) at the
+   FastAPI/Python service layer, in front of
+   `sp_fundingTransactions.resolve_escalation` — resolved (§4): the SP itself
+   stays focused purely on the state update, no role check inside the SP.
 
 ### Phase 2 — Validate end-to-end
-5. Run at least one real loan through the new path: publish → propose →
-   accept → paymentIntent → declare → evidence → confirm → loan active.
-   Confirm pushes fire at each step (currently only `loanDisbursements`'
-   Python module does this — the new path needs its own, or a shared one).
+7. Run at least one real loan through the complete new path: publish →
+   propose → accept → paymentIntent → declare → evidence → confirm → active.
+   Verify push notifications dispatch at every transition (currently only
+   `loanDisbursements`'s Python module does this — the new path needs its own,
+   or a shared one).
 
 ### Phase 3 — Retire legacy, narrowly scoped
-6. Remove `disbursePayment()`'s call sites for **funding** specifically and
-   the `loanDisbursements`/`sp_disbursement` write path — decide explicitly
-   whether the table itself is dropped or frozen as historical record (do not
-   silently keep both writing to production).
-7. Leave `/stripe/withdraw` and the wallet top-up/withdraw UI **untouched**
-   unless a separate, explicit decision is made to redesign withdrawal too —
-   that's outside RFC-002/003's scope as written.
-8. Add `paymentHistory` (D16) — every transition in the new flow should have
-   been writing to it since Phase 1; if deferred that long, backfill is not
-   possible for already-confirmed rows, so this should really move earlier if
-   audit history matters from day one.
+8. **`loanDisbursements` — resolved (§4): freeze, don't drop.** Stop new
+   writes to `loanDisbursements`/`sp_disbursement` once Phase 2 validates the
+   new path; leave the table and its existing rows in place, read-only, as
+   historical/legacy audit record. All new funding operations route
+   exclusively through `fundingTransactions` — no dual-write.
+9. **`/stripe/withdraw` and wallet top-up/withdraw UI — resolved (§4): retain,
+   untouched.** Confirmed as the deliberate Rail-2 fallback for withdrawal,
+   fully decoupled from loan funding. Phase 3 cleanup is restricted strictly
+   to loan-funding endpoints/UI — nothing here changes.
 
 ### Phase 4 — Repayment rail (original step 3, unchanged in spirit)
-9. Design + build `loanPayments` (RFC-003) from scratch — table, SP
-   (`declare`/`confirm`/`reject`/`escalate_due`/`resolve_escalation`/
-   `list_for_loan`), frontend "Pago del mes" + confirmation screens. This is
-   a full build, not a variant of Phase 1 — nothing for the repayment side
-   exists yet (confirmed in `payments-build-status.md` §5).
-10. Retire the legacy repayment rail (`modules/automatedPayments.py`'s daily
+10. Design + build `loanPayments` (RFC-003) from scratch — table, SP
+    (`declare`/`confirm`/`reject`/`escalate_due`/`resolve_escalation`/
+    `list_for_loan`), frontend "Pago del mes" + confirmation screens. This is
+    a full build, not a variant of Phase 1 — nothing for the repayment side
+    exists yet (confirmed in `payments-build-status.md` §5).
+11. Retire the legacy repayment rail (`modules/automatedPayments.py`'s daily
     Stripe off-session charge) only after Phase 4's declare/confirm flow is
     validated with real installments.
 
 ---
 
-## 4. Open decisions this plan surfaces (need an explicit answer, not a default)
+## 4. Resolved decisions
 
-- **`loanDisbursements` fate**: replaced, or kept as a parallel/legacy audit
-  trail? (§2.1)
-- **`/stripe/withdraw`**: still wanted as the deliberate Rail-2 fallback for
-  withdrawal, or up for removal too? (§2.2)
-- **`paymentHistory` timing**: built alongside Phase 1 (recommended, avoids a
-  gap in audit history) or deferred to Phase 3 as originally implied?
-- **Escalation resolution actor**: `sp_fundingTransactions.resolve_escalation`
-  has no role check in the SP itself today — Phase 1 needs to decide where
-  that authorization lives (API layer, or add it to the SP).
+The open questions §2 originally surfaced were answered the same day —
+recorded here so the resolution has a paper trail, not just the phase list
+above:
+
+| Decision | Resolution |
+|---|---|
+| `loanDisbursements` fate | **Freeze as read-only historical/legacy audit data.** Not dropped. All new funding operations route exclusively through `fundingTransactions` — no dual-write, no coexistence going forward. |
+| `/stripe/withdraw` retention | **Retain, untouched, as the deliberate Rail-2 withdrawal fallback.** Fully decoupled from the loan-funding migration — Phase 3 cleanup does not touch it. |
+| `paymentHistory` (D16) timing | **Built into Phase 1**, not deferred — every transition writes to it from the first production loan through the new flow, avoiding an unrecoverable audit gap. |
+| Escalation resolution authorization | **Enforced at the FastAPI/Python service layer**, in front of `resolve_escalation` — the stored procedure itself stays focused purely on the state update, no role check inside the SP. |
 
 ---
 
