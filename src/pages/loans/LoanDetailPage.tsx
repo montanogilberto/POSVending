@@ -10,18 +10,21 @@ import React, { useCallback, useState } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonIcon, IonBadge, IonSpinner, IonToast, IonProgressBar, IonCard,
+  IonIcon, IonBadge, IonSpinner, IonToast, IonProgressBar, IonCard, IonAlert,
   useIonViewWillEnter,
 } from '@ionic/react';
 import {
   arrowBack, cashOutline, trendingUpOutline, timeOutline, personCircleOutline,
   checkmarkCircle, ellipseOutline, arrowDownOutline, arrowUpOutline, refreshOutline,
+  alertCircleOutline, closeCircleOutline,
 } from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
 import { getAllLoans, Loan } from '../../api/loanApi';
 import { getAllClients, Client } from '../../api/clientsApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
-import { ledgerBalance } from '../../api/bankingApi';
+import {
+  ledgerBalance, getFundingByLoan, confirmFunding, rejectFunding, FundingTransaction,
+} from '../../api/bankingApi';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
 import { fmtMXN as fmt, mxDate as toDate } from '../../utils/format';
@@ -43,6 +46,10 @@ const LoanDetailPage: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(false);
   const [payingId, setPayingId] = useState<number | null>(null);
+  // RFC-002 Phase 1: fondeo pendiente de confirmación (no-custodio).
+  const [fundingTx, setFundingTx] = useState<FundingTransaction | null>(null);
+  const [confirmingFunding, setConfirmingFunding] = useState(false);
+  const [showRejectFundingAlert, setShowRejectFundingAlert] = useState(false);
   const { showToast, toastProps } = useToast({ duration: 3500 });
 
   const load = useCallback(async () => {
@@ -74,6 +81,16 @@ const LoanDetailPage: React.FC = () => {
         const bal = await ledgerBalance(companyId, Number(clientId));
         setWalletBalance(bal.availableBalance);
       }
+
+      // RFC-002 Phase 1: si el préstamo está pendiente de fondeo, busca la
+      // declaración del lender para ofrecer confirmar/rechazar.
+      if (l?.loanStatus === 'pending_funding') {
+        const ft = await getFundingByLoan(companyId, loanId).catch(() => null);
+        setFundingTx(ft);
+      } else {
+        setFundingTx(null);
+      }
+
       console.log('[LoanDetail] load ✅', JSON.stringify({
         loanId, found: !!l, cuotas: schedule.length, lenderId: lid,
       }));
@@ -112,6 +129,40 @@ const LoanDetailPage: React.FC = () => {
     console.log('[LoanDetail] pay cuota → SUCCESS', JSON.stringify({ installmentId: c.installmentId, balanceAfter: r.borrowerBalanceAfter }));
     showToast(`✓ Cuota #${c.installmentNumber} pagada por SPEI`);
     notifyDataChanged('installment_paid');
+    load();
+  };
+
+  // ── RFC-002 Phase 1: borrower confirma/rechaza la recepción del fondeo ──
+  // D5: solo una persona confirma dinero — nunca automático.
+  const handleConfirmFunding = async () => {
+    if (!fundingTx || confirmingFunding) return;
+    console.log('[LoanDetail] confirmFunding → START', JSON.stringify({ fundingTransactionId: fundingTx.fundingTransactionId }));
+    setConfirmingFunding(true);
+    const r = await confirmFunding({
+      companyId: Number(companyId), fundingTransactionId: fundingTx.fundingTransactionId,
+      confirmedByClientId: Number(clientId),
+    });
+    setConfirmingFunding(false);
+    if (r.error) { console.log('[LoanDetail] confirmFunding → FAILED', r.error); showToast(r.error, 'danger'); return; }
+    console.log('[LoanDetail] confirmFunding → SUCCESS', JSON.stringify(r));
+    showToast(r.warning ? `✓ Fondeo confirmado — ${r.warning}` : '✓ Fondeo confirmado. ¡Tu préstamo está activo!');
+    notifyDataChanged('funding_confirmed');
+    load();
+  };
+
+  const handleRejectFunding = async (reason: string) => {
+    if (!fundingTx) return;
+    console.log('[LoanDetail] rejectFunding → START', JSON.stringify({ fundingTransactionId: fundingTx.fundingTransactionId, reason }));
+    setConfirmingFunding(true);
+    const r = await rejectFunding({
+      companyId: Number(companyId), fundingTransactionId: fundingTx.fundingTransactionId,
+      rejectedByClientId: Number(clientId), rejectReason: reason || 'No recibí el depósito',
+    });
+    setConfirmingFunding(false);
+    if (r.error) { console.log('[LoanDetail] rejectFunding → FAILED', r.error); showToast(r.error, 'danger'); return; }
+    console.log('[LoanDetail] rejectFunding → SUCCESS', JSON.stringify(r));
+    showToast('Declaración rechazada — soporte revisará el caso.');
+    notifyDataChanged('funding_rejected');
     load();
   };
 
@@ -161,6 +212,27 @@ const LoanDetailPage: React.FC = () => {
                 <span><IonIcon icon={cashOutline} /> Desembolso: {toDate(loan.disbursementDate)}</span>
               </div>
             </IonCard>
+
+            {/* RFC-002 Phase 1: confirmar recepción del fondeo (no-custodio) */}
+            {isBorrowerViewer && fundingTx?.status === 'PENDING_CONFIRMATION' && (
+              <IonCard className="lde-card lde-funding-confirm">
+                <h2><IonIcon icon={alertCircleOutline} /> Confirma tu depósito</h2>
+                <p>
+                  El prestamista declaró haber transferido <strong>{fmt(fundingTx.amountMXN)}</strong> a tu cuenta
+                  por SPEI. Revisa tu banco y confirma solo si el dinero ya está ahí — tu confirmación activa el préstamo.
+                </p>
+                <div className="lde-funding-actions">
+                  <IonButton expand="block" disabled={confirmingFunding} onClick={handleConfirmFunding}>
+                    {confirmingFunding ? <IonSpinner name="dots" /> : 'Sí, ya lo recibí'}
+                  </IonButton>
+                  <IonButton expand="block" fill="outline" color="danger" disabled={confirmingFunding}
+                    onClick={() => setShowRejectFundingAlert(true)}>
+                    <IonIcon icon={closeCircleOutline} slot="start" />
+                    No he recibido nada
+                  </IonButton>
+                </div>
+              </IonCard>
+            )}
 
             {/* Partes */}
             <IonCard className="lde-card">
@@ -238,6 +310,18 @@ const LoanDetailPage: React.FC = () => {
             </IonCard>
           </>
         )}
+
+        <IonAlert
+          isOpen={showRejectFundingAlert}
+          onDidDismiss={() => setShowRejectFundingAlert(false)}
+          header="¿No recibiste el depósito?"
+          message="Cuéntanos qué pasó — un miembro de soporte revisará la declaración."
+          inputs={[{ name: 'reason', type: 'textarea', placeholder: 'Ej: no aparece nada en mi cuenta' }]}
+          buttons={[
+            { text: 'Cancelar', role: 'cancel' },
+            { text: 'Enviar', handler: (data) => handleRejectFunding(data.reason) },
+          ]}
+        />
       </IonContent>
     </IonPage>
   );

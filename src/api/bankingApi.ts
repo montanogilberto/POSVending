@@ -95,3 +95,102 @@ export async function disbursePayment(payload: {
 export async function paymentStatus(companyId: number, ref: { transferId?: number; idempotencyKey?: string }): Promise<any> {
   return post("/payments/status", { companyId, ...ref });
 }
+
+// ── RFC-002 Phase 1: non-custodial funding (paymentIntents / fundingTransactions /
+// transferEvidence, docs/payments-workflow.md) — additive, gated by featureFlags. ──
+
+export async function isNonCustodialFundingEnabled(companyId: number, clientId?: number): Promise<boolean> {
+  const r = await post("/featureFlags", { featureFlags: [{ companyId, clientId }] });
+  return r.nonCustodialFunding === true;
+}
+
+export interface BankAccountSnapshot {
+  snapshotId: number; clientId: number; partyRole: 'borrower' | 'lender';
+  bankName: string; clabeLast4: string; holderName: string;
+}
+
+// D19: freezes both parties' bank+CLABE+titular for a loan — required before
+// creating a paymentIntent (its beneficiarySnapshotId). Idempotent per party.
+export async function snapshotBankAccountsForLoan(payload: {
+  companyId: number; loanId: number; borrowerClientId: number; lenderClientId: number;
+}): Promise<BankAccountSnapshot[]> {
+  console.log('[Banking] snapshotBankAccountsForLoan →', JSON.stringify(payload));
+  const r = await post("/bankAccountsLifecycle", { bankAccounts: [{ action: 'snapshot_for_loan', ...payload }] });
+  const snapshots: BankAccountSnapshot[] = Array.isArray(r) ? r : [];
+  console.log('[Banking] snapshotBankAccountsForLoan ←', snapshots.length, 'snapshot(s)');
+  return snapshots;
+}
+
+export interface PaymentIntent {
+  paymentIntentId: number; companyId: number; loanId: number; installmentId: number | null;
+  intentType: 'FUNDING' | 'INSTALLMENT' | 'PARTIAL' | 'PAYOFF';
+  expectedAmountMXN: number; payerClientId: number; payeeClientId: number;
+  beneficiarySnapshotId: number; suggestedReference: string;
+  expiresAt: string | null; status: 'OPEN' | 'DECLARED' | 'EXPIRED' | 'CANCELLED';
+  created_At: string; error?: string;
+}
+
+export async function createFundingIntent(payload: {
+  companyId: number; loanId: number; expectedAmountMXN: number;
+  payerClientId: number; payeeClientId: number; beneficiarySnapshotId: number;
+  suggestedReference: string; expiresAt?: string;
+}): Promise<PaymentIntent> {
+  console.log('[Banking] createFundingIntent →', JSON.stringify({ loanId: payload.loanId, amount: payload.expectedAmountMXN }));
+  const r = await post("/paymentIntents", { paymentIntents: [{ action: 'create', intentType: 'FUNDING', ...payload }] });
+  console.log('[Banking] createFundingIntent ←', JSON.stringify({ paymentIntentId: r.paymentIntentId, status: r.status, error: r.error }));
+  return r;
+}
+
+export interface FundingTransaction {
+  fundingTransactionId: number; loanId: number; intentId: number;
+  lenderClientId: number; borrowerClientId: number; amountMXN: number;
+  transferDate: string; status: 'PENDING_CONFIRMATION' | 'CONFIRMED' | 'REJECTED' | 'ESCALATED' | 'CANCELLED';
+  declaredAt?: string; confirmedAt?: string; confirmedByClientId?: number;
+  rejectReason?: string; escalatedAt?: string; created_At?: string; error?: string;
+}
+
+export async function declareFunding(payload: {
+  companyId: number; loanId: number; intentId: number; lenderClientId: number;
+  borrowerClientId: number; amountMXN: number; transferDate: string; actorUserId?: number;
+}): Promise<FundingTransaction> {
+  console.log('[Banking] declareFunding →', JSON.stringify({ loanId: payload.loanId, amountMXN: payload.amountMXN }));
+  const r = await post("/fundingTransactions", { fundingTransactions: [{ action: 'declare', ...payload }] });
+  console.log('[Banking] declareFunding ←', JSON.stringify({ fundingTransactionId: r.fundingTransactionId, status: r.status, error: r.error }));
+  return r;
+}
+
+export async function confirmFunding(payload: {
+  companyId: number; fundingTransactionId: number; confirmedByClientId: number; actorUserId?: number;
+}): Promise<{ fundingTransactionId: number; loanId: number; fundingStatus: string; loanStatus: string; warning?: string; error?: string }> {
+  console.log('[Banking] confirmFunding →', JSON.stringify(payload));
+  const r = await post("/fundingTransactions", { fundingTransactions: [{ action: 'confirm', ...payload }] });
+  console.log('[Banking] confirmFunding ←', JSON.stringify(r));
+  return r;
+}
+
+export async function rejectFunding(payload: {
+  companyId: number; fundingTransactionId: number; rejectedByClientId: number;
+  rejectReason: string; actorUserId?: number;
+}): Promise<FundingTransaction> {
+  console.log('[Banking] rejectFunding →', JSON.stringify(payload));
+  const r = await post("/fundingTransactions", { fundingTransactions: [{ action: 'reject', ...payload }] });
+  console.log('[Banking] rejectFunding ←', JSON.stringify(r));
+  return r;
+}
+
+export async function getFundingByLoan(companyId: number, loanId: number): Promise<FundingTransaction | null> {
+  const r = await post("/fundingTransactions", { fundingTransactions: [{ action: 'list', companyId, loanId }] });
+  const list: FundingTransaction[] = Array.isArray(r) ? r : [];
+  return list[0] ?? null;
+}
+
+export async function submitTransferEvidence(payload: {
+  companyId: number; referenceId: number; claveRastreo: string; transferDate: string;
+  bankFrom?: string; amountMXN: number; evidenceFileUrl?: string; evidenceHash?: string;
+  uploadedByClientId: number;
+}): Promise<any> {
+  console.log('[Banking] submitTransferEvidence →', JSON.stringify({ referenceId: payload.referenceId, claveRastreo: payload.claveRastreo }));
+  const r = await post("/transferEvidence", { transferEvidence: [{ action: 'create', referenceType: 'FUNDING', ...payload }] });
+  console.log('[Banking] submitTransferEvidence ←', JSON.stringify({ transferEvidenceId: r.transferEvidenceId, error: r.error }));
+  return r;
+}

@@ -16,7 +16,7 @@ import {
   IonRefresherContent, IonAlert, IonLabel, IonInput, IonTextarea, IonSelect,
   IonSelectOption, IonProgressBar, IonSegment, IonSegmentButton, IonFooter,
   IonActionSheet, IonCard, IonChip, IonAvatar, IonNote, IonList, IonItem,
-  IonCheckbox,
+  IonCheckbox, IonSpinner,
   useIonViewWillEnter,
 } from '@ionic/react';
 import {
@@ -172,6 +172,8 @@ import {
 import {
   BankAccount, listBankAccounts, ledgerBalance, ledgerStatement, LedgerEntry,
   postLedgerEntry, disbursePayment,
+  isNonCustodialFundingEnabled, snapshotBankAccountsForLoan, createFundingIntent,
+  declareFunding, submitTransferEvidence,
 } from '../../api/bankingApi';
 import BankAccountLink from '../../components/payments/BankAccountLink';
 import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
@@ -273,6 +275,17 @@ const P2PLendingPage: React.FC = () => {
   const [publishedTicket, setPublishedTicket] = useState<LoanOffer | null>(null);
   // Ticket de confirmación mostrado justo después de enviar una solicitud de préstamo.
   const [proposalTicket, setProposalTicket] = useState<LoanProposal | null>(null);
+
+  // ── RFC-002 Phase 1: declarar fondeo (no-custodio) ───────────────────────
+  // Abierto justo después de acceptProposal() cuando el feature flag está
+  // activo — el lender ya tiene loanId/paymentIntentId en contexto ahí.
+  const [fundingToDeclare, setFundingToDeclare] = useState<{
+    loanId: number; paymentIntentId: number; amountMXN: number;
+    borrowerHolderName: string; borrowerBankName: string; borrowerClientId: number;
+  } | null>(null);
+  const [declareClaveRastreo, setDeclareClaveRastreo] = useState('');
+  const [declareBankFrom, setDeclareBankFrom] = useState('');
+  const [declaring, setDeclaring] = useState(false);
 
   // ── proposal form ───────────────────────────────────────────────────────
   const [propAmount,   setPropAmount]   = useState('');
@@ -636,6 +649,98 @@ const P2PLendingPage: React.FC = () => {
         throw new Error('El prestatario no ha registrado una tarjeta para el cobro automático de las cuotas.');
       }
 
+      // RFC-002 Phase 1 rollout gate (docs/payments-action-plan.md) — mutually
+      // exclusive per loan: never both paths for the same proposal. Default
+      // false for all real traffic; flip via Azure App Service config.
+      const useNonCustodialFunding = await isNonCustodialFundingEnabled(companyId, lenderId);
+      console.log('[P2P] acceptProposal: featureFlag nonCustodialFunding =', useNonCustodialFunding);
+
+      if (useNonCustodialFunding) {
+        // ── Non-custodial declare/confirm flow (RFC-002) ──────────────────
+        // No disbursePayment() here — the lender sends the SPEI themselves,
+        // outside SmartLoans, then declares it (separate screen). The loan
+        // starts at pending_funding; sp_loans' transition matrix (D6) takes
+        // it to funded→active only once the borrower confirms receipt.
+        const loan = await createLoan({
+          companyId,
+          loanNumber: `P2P-${Date.now()}`,
+          clientId: borrowerId,
+          principalAmount: requestedAmount,
+          interestRate: proposedRate,
+          termMonths,
+          paymentFrequency: 'monthly',
+          loanStatus: 'pending_funding',
+          notes: `Préstamo P2P (no-custodio). Prestamista clientId=${lenderId}`,
+        });
+
+        const snapshots = await snapshotBankAccountsForLoan({
+          companyId, loanId: loan.loanId, borrowerClientId: borrowerId, lenderClientId: lenderId,
+        });
+        const borrowerSnapshot = snapshots.find(s => s.partyRole === 'borrower');
+        if (!borrowerSnapshot) {
+          throw new Error('No se pudo congelar los datos bancarios del prestatario para este préstamo.');
+        }
+
+        const intent = await createFundingIntent({
+          companyId, loanId: loan.loanId, expectedAmountMXN: requestedAmount,
+          payerClientId: lenderId, payeeClientId: borrowerId,
+          beneficiarySnapshotId: borrowerSnapshot.snapshotId,
+          suggestedReference: `SL-${loan.loanId}-1`,
+          expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // D12: 5 días
+        });
+        if (intent.error) throw new Error(intent.error);
+        console.log('[P2P] acceptProposal: non-custodial — paymentIntentId', intent.paymentIntentId);
+
+        await createLoanContract({
+          companyId, loanId: loan.loanId, borrowerClientId: borrowerId, lenderClientId: lenderId,
+          principalAmount: requestedAmount, interestRate: proposedRate, termMonths,
+          notes: `Aceptado desde propuesta ${proposalId} (P2P, no-custodio)`,
+        }).catch((e) => console.log('[P2P] acceptProposal: contract create FAILED —', String(e)));
+
+        await updateLoanProposal(proposalId, {
+          status: 'accepted', respondedAt: new Date().toISOString(),
+        }).catch(() => {});
+
+        const borrowerClientNC = clientMap[borrowerId];
+        await createPushNotification({
+          companyId,
+          title: '✅ ¡Solicitud aprobada!',
+          message: `Tu préstamo de ${fmt(requestedAmount)} a ${proposedRate}% anual fue aprobado. El prestamista debe enviarte el SPEI — te avisaremos para que confirmes la recepción.`,
+          notificationType: 'Success',
+          priority: 'Critical',
+          targetType: 'User',
+          targetUserId: borrowerId,
+          navigationRoute: '/loans',
+          payloadJson: JSON.stringify({ type: 'ProposalAccepted', proposalId }),
+        });
+        await createPushNotification({
+          companyId,
+          title: '💸 Envía el fondeo por SPEI',
+          message: `Transfiere ${fmt(requestedAmount)} a la CLABE del prestatario desde tu banco, luego declara la transferencia en la app.`,
+          notificationType: 'Info',
+          priority: 'Critical',
+          targetType: 'User',
+          targetUserId: lenderId,
+          navigationRoute: '/p2p-lending',
+          payloadJson: JSON.stringify({ type: 'FundingPendingDeclare', loanId: loan.loanId }),
+        }).catch(() => {});
+
+        console.log('[P2P] acceptProposal: SUCCESS (non-custodial) — loan pending_funding, paymentIntent created');
+        notifyDataChanged('proposal_accepted');
+        setShowAcceptAlert(false);
+        setSelectedProposal(null);
+        load();
+        setSaving(false);
+        // Abre directo el modal de "declarar fondeo" — el lender ya está en
+        // el momento correcto para hacer la transferencia y declararla.
+        setFundingToDeclare({
+          loanId: loan.loanId, paymentIntentId: intent.paymentIntentId, amountMXN: requestedAmount,
+          borrowerHolderName: borrowerSnapshot.holderName, borrowerBankName: borrowerSnapshot.bankName,
+          borrowerClientId: borrowerId,
+        });
+        return;
+      }
+
       // ── SPEI directo (única vía): un solo call al orquestador debita el
       // ledger del prestamista, envía a la CLABE verificada del prestatario y
       // se autorrevierte si falla (mock STP hasta que exista el contrato real).
@@ -738,6 +843,47 @@ const P2PLendingPage: React.FC = () => {
       setShowAcceptAlert(false);
     }
     setSaving(false);
+  };
+
+  // ── Lender declara la transferencia SPEI ya enviada (RFC-002 Phase 1) ──
+  // El lender ya transfirió desde su propio banco ANTES de llegar aquí — este
+  // paso solo registra la declaración + evidencia. SmartLoans nunca envía la
+  // transferencia (D5/D1).
+  const submitDeclareFunding = async () => {
+    if (!fundingToDeclare) return;
+    if (!declareClaveRastreo.trim()) {
+      showToast('Ingresa la clave de rastreo de tu transferencia SPEI');
+      return;
+    }
+    setDeclaring(true);
+    try {
+      const transferDate = new Date().toISOString();
+      const declareResult = await declareFunding({
+        companyId, loanId: fundingToDeclare.loanId, intentId: fundingToDeclare.paymentIntentId,
+        lenderClientId: clientId, borrowerClientId: fundingToDeclare.borrowerClientId,
+        amountMXN: fundingToDeclare.amountMXN, transferDate, actorUserId: userId,
+      });
+      if (declareResult.error) throw new Error(declareResult.error);
+
+      await submitTransferEvidence({
+        companyId, referenceId: declareResult.fundingTransactionId,
+        claveRastreo: declareClaveRastreo.trim(), transferDate,
+        bankFrom: declareBankFrom.trim() || undefined, amountMXN: fundingToDeclare.amountMXN,
+        uploadedByClientId: clientId,
+      }).catch((e) => console.log('[P2P] submitDeclareFunding: evidence submit FAILED (non-fatal) —', String(e)));
+
+      console.log('[P2P] submitDeclareFunding: SUCCESS — fundingTransactionId', declareResult.fundingTransactionId);
+      showToast('✓ Transferencia declarada — el prestatario debe confirmar la recepción del depósito');
+      setFundingToDeclare(null);
+      setDeclareClaveRastreo('');
+      setDeclareBankFrom('');
+      notifyDataChanged('funding_declared');
+      load();
+    } catch (e: any) {
+      console.log('[P2P] submitDeclareFunding: FAILED —', String(e?.message ?? e));
+      showToast(e?.message ?? 'No se pudo declarar la transferencia');
+    }
+    setDeclaring(false);
   };
 
   // ── Lender rejects proposal ─────────────────────────────────────────────
@@ -1618,6 +1764,68 @@ const P2PLendingPage: React.FC = () => {
           { text: 'Depositar', handler: (data) => { handleSimulatedDeposit(data.amount); } },
         ]}
       />
+
+      {/* ══════════ Modal: Declarar fondeo SPEI (RFC-002 Phase 1) ══════════ */}
+      <IonModal isOpen={!!fundingToDeclare} onDidDismiss={() => { setFundingToDeclare(null); setDeclareClaveRastreo(''); setDeclareBankFrom(''); }}>
+        <IonHeader className="p2p-publish-header">
+          <IonToolbar>
+            <IonTitle>Declarar transferencia SPEI</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setFundingToDeclare(null)}>Después</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {fundingToDeclare && (
+            <>
+              <div className="p2p-info-card">
+                <div className="p2p-info-row">
+                  <div className="p2p-info-icon p2p-info-icon-blue">
+                    <IonIcon icon={cashOutline} />
+                  </div>
+                  <p>
+                    Transfiere <strong>{fmt(fundingToDeclare.amountMXN)}</strong> desde tu banco a la CLABE del
+                    prestatario. Cuando termines, declara aquí la transferencia — SmartLoans nunca envía el dinero por ti.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p2p-important-box">
+                <IonIcon icon={alertCircleOutline} className="p2p-important-icon" />
+                <div>
+                  <strong>Antes de transferir, verifica que tu banco muestre:</strong>
+                  <p>
+                    Titular: <strong>{fundingToDeclare.borrowerHolderName}</strong> — {fundingToDeclare.borrowerBankName}
+                    <br />
+                    Si aparece otro nombre, <strong>NO transfieras</strong> y repórtalo a soporte.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p2p-form-group">
+                <IonLabel>Clave de rastreo *</IonLabel>
+                <IonInput placeholder="Clave de rastreo de tu banco" value={declareClaveRastreo}
+                  onIonInput={e => setDeclareClaveRastreo(e.detail.value ?? '')} className="p2p-input" />
+              </div>
+
+              <div className="p2p-form-group">
+                <IonLabel>Banco de origen</IonLabel>
+                <IonInput placeholder="Ej: BBVA" value={declareBankFrom}
+                  onIonInput={e => setDeclareBankFrom(e.detail.value ?? '')} className="p2p-input" />
+              </div>
+            </>
+          )}
+        </IonContent>
+        <IonFooter className="ion-padding p2p-modal-footer">
+          <IonButton expand="block" onClick={submitDeclareFunding} disabled={declaring || !declareClaveRastreo.trim()}>
+            {declaring ? <IonSpinner name="dots" /> : (<><IonIcon icon={sendOutline} slot="start" />Ya transferí</>)}
+          </IonButton>
+          <p className="p2p-footer-trust">
+            <IonIcon icon={shieldCheckmarkOutline} />
+            El prestatario debe confirmar la recepción antes de que el préstamo quede activo.
+          </p>
+        </IonFooter>
+      </IonModal>
 
       {/* ── Bank account (CLABE) modal ── */}
       <IonModal isOpen={showBankModal} onDidDismiss={() => setShowBankModal(false)}>
