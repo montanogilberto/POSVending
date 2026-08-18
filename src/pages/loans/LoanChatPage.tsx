@@ -28,8 +28,6 @@ import { fmtNum as fmt, mxChatDate as toDate, mxChatTime as toTime } from '../..
 import { useToast } from '../../hooks/useToast';
 import './LoanChatPage.css';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
-
 // ── Proposal Card ─────────────────────────────────────────────────────────────
 interface ProposalCardProps {
   msg: LoanMessage;
@@ -375,10 +373,22 @@ const LoanChatPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  // Dual-rail disbursement, same policy as P2PLendingPage.acceptProposal:
-  // SPEI orchestrator first (debits the lender's ledger, sends to the
-  // borrower's verified CLABE, auto-reverses on failure — mock STP for now),
-  // Stripe Connect transfer as the 2nd option.
+  // SPEI-only disbursement. Stripe is never a fallback for loan principal —
+  // it's reserved for direct, one-shot platform charges (e.g. premium
+  // subscription billing), per docs/p2p-direct-payments-architecture.md and
+  // the same policy P2PLendingPage.acceptProposal() already enforces. A
+  // Stripe fallback used to sit here; removed rather than "fixed", since
+  // funding a loan through Stripe was the actual policy violation, not a
+  // missing safeguard on it.
+  //
+  // NOTE (known gap, not fixed here): this whole function still only moves
+  // money directly — it doesn't create a loans row, doesn't know about
+  // paymentIntents/fundingTransactions, and never branches into the
+  // non-custodial declare/confirm flow the way P2PLendingPage.acceptProposal()
+  // does. sp_loanChat's accept_proposal action only ever touches
+  // loanConversations/loanMessages, never loans/loanProposals — chat-based
+  // acceptance has never gone through the same loan-creation path as the
+  // Solicitudes tab. Bringing it up to parity is a real, separate task.
   const triggerDisbursement = async (msg: LoanMessage) => {
     if (!conv) return;
     const amount = msg.amount ?? 0;
@@ -392,27 +402,13 @@ const LoanChatPage: React.FC = () => {
         loanId: conv.loanProposalId ?? conv.conversationId,
         idempotencyKey: `chat:${conv.conversationId}:disburse:${Date.now()}`,
       });
-      if (!spei.error && spei.status !== 'failed') {
-        console.log('[ChatUI] disburse: SPEI SUCCESS — transferId', spei.transferId, 'CEP', spei.cepUrl);
-        showToast(`💸 Desembolso enviado por SPEI${spei.mock ? ' (modo prueba)' : ''}`);
-        return;
+      if (spei.error || spei.status === 'failed') {
+        throw new Error(spei.error || 'Desembolso por SPEI rechazado.');
       }
-      console.log('[ChatUI] disburse: SPEI FAILED — trying Stripe as 2nd option:', spei.error);
-      const res = await fetch(`${API_BASE}/stripe/disburse`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId, lenderId: conv.lenderId, borrowerId: conv.borrowerId,
-          amount, loanId: conv.loanProposalId ?? conv.conversationId,
-        }),
-      });
-      const stripeResult = await res.json().catch(() => ({}));
-      console.log('[ChatUI] disburse: /stripe/disburse ←', JSON.stringify(stripeResult));
-      if (stripeResult.error || stripeResult.status !== 'succeeded') {
-        throw new Error(stripeResult.error || spei.error || 'Desembolso rechazado en ambos rieles');
-      }
-      showToast('💸 Desembolso enviado vía Stripe (2ª opción)');
+      console.log('[ChatUI] disburse: SPEI SUCCESS — transferId', spei.transferId, 'CEP', spei.cepUrl);
+      showToast(`💸 Desembolso enviado por SPEI${spei.mock ? ' (modo prueba)' : ''}`);
     } catch (e) {
-      console.log('[ChatUI] disburse: FAILED on both rails —', e instanceof Error ? e.message : String(e));
+      console.log('[ChatUI] disburse: FAILED —', e instanceof Error ? e.message : String(e));
       showToast('Propuesta aceptada, pero el desembolso falló. Revisa saldo/cuenta e intenta desde la plataforma.', 'danger');
     }
   };
