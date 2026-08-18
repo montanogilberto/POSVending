@@ -336,3 +336,53 @@
   0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35); }
   50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
 }
+
+/* ── Ticket de confirmación (préstamo aceptado) ── */
+.lc-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lc-ticket-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+}
+
+.lc-ticket-ok {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.lc-ticket-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.lc-ticket-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.lc-ticket-row strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.lc-ticket-detail {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+}
