@@ -63,7 +63,8 @@ export type UiFeature =
   | 'rewards'
   | 'loanChat'
   | 'p2pLending'
-  | 'game';
+  | 'game'
+  | 'arcade';
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
@@ -74,41 +75,41 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'iot', 'settings',
     'loans', 'clientDashboards', 'clientFaceRecognitions',
     'manufacturing', 'pushNotifications',
-    'rewards', 'loanChat', 'p2pLending', 'game',
+    'rewards', 'loanChat', 'p2pLending', 'game', 'arcade',
   ],
   manager: [
     'laundry', 'pos', 'scannerqr', 'sells',
     'clients', 'products', 'categories', 'suppliers',
     'ingresos', 'egresos',
     'clientDashboards', 'manufacturing',
-    'rewards', 'game',
+    'rewards', 'game', 'arcade',
   ],
   employee: [
     'laundry', 'pos', 'scannerqr', 'sells',
-    'rewards', 'game',
+    'rewards', 'game', 'arcade',
   ],
   borrower: [
     'clientDashboards',
     'loanChat',
     'loans',
     'p2pLending',
-    'game',
+    'game', 'arcade',
   ],
   lender: [
     'clientDashboards',
     'loanChat',
     'p2pLending',
     'loans',
-    'game',
+    'game', 'arcade',
   ],
   business: [
     'pos', 'scannerqr', 'sells',
     'clients', 'products', 'categories',
     'ingresos', 'egresos',
-    'rewards', 'game',
+    'rewards', 'game', 'arcade',
   ],
   viewer: [
-    'ingresos', 'egresos', 'clientDashboards', 'game',
+    'ingresos', 'egresos', 'clientDashboards', 'game', 'arcade',
   ],
 };
 

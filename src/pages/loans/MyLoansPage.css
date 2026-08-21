@@ -1,0 +1,183 @@
+/* MyLoansPage — cartera de préstamos. Mismo lenguaje visual que
+   LoanDetailPage/LenderDashboard: tarjetas blancas, radio 14, sin sombra. */
+
+.ml-content {
+  --background: #f3f4f6;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-bottom: 24px;
+}
+
+/* ── Barra: conteo + actualizar ── */
+.ml-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 4px 2px;
+}
+.ml-count {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 600;
+}
+.ml-toolbar ion-button {
+  --color: #2563eb;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ── Totales ── */
+.ml-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ml-summary-card {
+  margin: 0;
+  padding: 12px 8px;
+  border-radius: 14px;
+  box-shadow: none;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.ml-summary-card ion-icon {
+  font-size: 20px;
+  color: #2563eb;
+}
+.ml-summary-card strong {
+  font-size: 15px;
+  color: #111827;
+  line-height: 1.2;
+}
+.ml-summary-card span {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* ── Filtros y búsqueda ── */
+.ml-filters {
+  margin: 10px 0 4px;
+  --background: #e5e7eb;
+  border-radius: 10px;
+}
+.ml-search {
+  --background: #fff;
+  --box-shadow: none;
+  --border-radius: 12px;
+  padding: 4px 0 8px;
+}
+
+.ml-loading {
+  display: flex;
+  justify-content: center;
+  padding: 28px 0;
+}
+.ml-empty {
+  padding: 28px 12px;
+}
+
+/* ── Tarjeta de préstamo ── */
+.ml-loan-card {
+  margin: 0 0 10px;
+  padding: 12px;
+  border-radius: 14px;
+  box-shadow: none;
+  background: #fff;
+}
+.ml-loan-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ml-loan-avatar {
+  font-size: 34px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+.ml-loan-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.ml-loan-who strong {
+  font-size: 15px;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ml-loan-who span {
+  font-size: 12px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ml-loan-status {
+  flex-shrink: 0;
+}
+
+.ml-loan-terms {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 10px 0 8px;
+  padding: 10px 6px;
+  background: #f9fafb;
+  border-radius: 10px;
+}
+.ml-loan-terms > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.ml-loan-terms small {
+  font-size: 10px;
+  color: #6b7280;
+}
+.ml-loan-terms strong {
+  font-size: 13px;
+  color: #111827;
+}
+
+.ml-loan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #6b7280;
+}
+.ml-loan-meta ion-icon {
+  vertical-align: -2px;
+  margin-right: 2px;
+}
+.ml-loan-open {
+  margin-left: auto;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.ml-loan-attention {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: #fffbeb;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #92400e;
+}
+.ml-loan-attention ion-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}

@@ -60,9 +60,11 @@ import {
   chevronForwardOutline,
   homeOutline,
   cardOutline,
+  documentTextOutline,
   pulseOutline,
   personCircleOutline,
   gameControllerOutline,
+  diamondOutline,
 }
   from 'ionicons/icons';
   
@@ -108,6 +110,7 @@ import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import P2PLendingPage from './pages/loans/P2PLendingPage';
+import MyLoansPage from './pages/loans/MyLoansPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import ManufacturingPage from './pages/manufacturing/ManufacturingPage';
@@ -116,6 +119,10 @@ import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import LoanDetailPage from './pages/loans/LoanDetailPage';
 import MissionCleanRoomPage from './pages/game/MissionCleanRoomPage';
+import ArcadePage from './pages/game/ArcadePage';
+import BlackjackPage from './pages/game/BlackjackPage';
+import MolePage from './pages/game/MolePage';
+import ChipStorePage from './pages/game/ChipStorePage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -142,6 +149,7 @@ import BiometricLockScreen from './components/BiometricLockScreen';
 import ZoomableImage from './components/ui/ZoomableImage';
 import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
 import { getPostLoginRoute } from './utils/postLoginRoute';
+import { myLoansRoute, p2pLendingRoute, withClientId } from './utils/routes';
 
 setupIonicReact();
 
@@ -189,10 +197,12 @@ const AppShell: React.FC = () => {
   const activeLenderTab =
     location.pathname.startsWith('/p2p-lending') ? 'invertir'
       : location.pathname.startsWith('/rewards') ? 'invitar'
+      : location.pathname.startsWith('/my-loans') ? 'prestamos'
       : lenderSection === 'pagos' ? 'pagos'
       : 'inicio';
   const goLenderTab = (tab: string) => {
-    if (tab === 'invertir') return history.push('/p2p-lending');
+    if (tab === 'invertir') return history.push(p2pLendingRoute(clientId));
+    if (tab === 'prestamos') return history.push(myLoansRoute(clientId));
     if (tab === 'invitar') return history.push('/rewards');
     if (tab === 'pagos') return history.push(`/lender-dashboard/${clientId}?section=pagos`);
     return history.push(`/lender-dashboard/${clientId}`); // inicio
@@ -264,7 +274,9 @@ const AppShell: React.FC = () => {
     // navigationRoute (e.g. /loan-chat/12) or fall back to the inbox.
     const openFromNotification = (data: Record<string, any> | undefined, source: string) => {
       const route = typeof data?.navigationRoute === 'string' && data.navigationRoute.startsWith('/')
-        ? data.navigationRoute
+        // El payload trae '/p2p-lending' sin id (el emisor no conoce el
+        // clientId de quien recibe) — se completa con el de esta sesión.
+        ? withClientId(data.navigationRoute, clientId)
         : '/notifications';
       console.log('[Push] tap →', JSON.stringify({ source, route, data }));
       history.push(route);
@@ -610,13 +622,19 @@ const AppShell: React.FC = () => {
                 {!menuCollapsed && <IonLabel>Misión: Limpiar el Cuarto</IonLabel>}
               </IonItem>
               )}
+              {canAccess(roleCode, 'arcade') && (
+              <IonItem button routerLink="/arcade" title="Arcade">
+                <IonIcon icon={diamondOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Arcade</IonLabel>}
+              </IonItem>
+              )}
             </IonMenuToggle>
 
             {!menuCollapsed && <IonItemDivider>Finanzas P2P</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
               {(canAccess(roleCode, 'clients') || canAccess(roleCode, 'p2pLending')) && (
-              <IonItem button routerLink="/p2p-lending" title="SmartLoans">
+              <IonItem button routerLink={p2pLendingRoute(clientId)} title="SmartLoans">
                 <IonIcon icon={walletOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>SmartLoans</IonLabel>}
               </IonItem>
@@ -739,12 +757,25 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
+            {/* Mismo patrón que /client-dashboard/:clientId — el id va en la URL
+                para que la ruta sea compartible y sobreviva un refresh. La
+                variante sin id se conserva (deep links de push viejos y menús
+                sin clientId) y resuelve la identidad desde UserContext. */}
+            <PrivateRoute exact path="/p2p-lending/:clientId" component={P2PLendingPage} />
             <PrivateRoute exact path="/p2p-lending" component={P2PLendingPage} />
+            <PrivateRoute exact path="/my-loans/:clientId" component={MyLoansPage} />
+            <PrivateRoute exact path="/my-loans" component={MyLoansPage} />
             <PrivateRoute exact path="/borrower-onboarding" component={BorrowerOnboardingPage} />
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
             <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
             <PrivateRoute exact path="/game/mission-clean-room" component={MissionCleanRoomPage} />
+            {/* Arcade de fichas virtuales. Los 8 juegos que faltan salen como
+                tiles bloqueados en /arcade, asi que no necesitan ruta todavia. */}
+            <PrivateRoute exact path="/arcade" component={ArcadePage} />
+            <PrivateRoute exact path="/arcade/blackjack" component={BlackjackPage} />
+            <PrivateRoute exact path="/arcade/mole" component={MolePage} />
+            <PrivateRoute exact path="/arcade/tienda" component={ChipStorePage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
@@ -764,6 +795,10 @@ const AppShell: React.FC = () => {
                 <button type="button" className={`cd-tab${activeLenderTab === 'inicio' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('inicio')}>
                   <IonIcon aria-hidden="true" icon={homeOutline} />
                   <span>Inicio</span>
+                </button>
+                <button type="button" className={`cd-tab${activeLenderTab === 'prestamos' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('prestamos')}>
+                  <IonIcon aria-hidden="true" icon={documentTextOutline} />
+                  <span>Préstamos</span>
                 </button>
                 <button type="button" className={`cd-tab${activeLenderTab === 'pagos' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('pagos')}>
                   <IonIcon aria-hidden="true" icon={cardOutline} />

@@ -11,6 +11,7 @@ import {
 } from '../../../api/clientFaceRecognitionApi';
 import { uploadSignatureBlob } from './BorrowerOnboardingApi';
 import { Step } from './BorrowerOnboardingTypes';
+import { p2pLendingRoute } from '../../../utils/routes';
 
 export function useBorrowerOnboarding() {
   const history = useHistory();
@@ -104,7 +105,7 @@ export function useBorrowerOnboarding() {
           contractAcceptedAt: now,
         });
       }
-      history.replace('/p2p-lending');
+      history.replace(p2pLendingRoute(clientId));
     } catch (e: any) {
       setToast(e?.message ?? 'Error al guardar contrato');
     }
@@ -141,6 +142,8 @@ export function useBorrowerOnboarding() {
     goToFaceRecognition,
 
     history,
+    // La View arma /p2p-lending/:clientId al terminar el onboarding.
+    clientId,
 
     record,
   };

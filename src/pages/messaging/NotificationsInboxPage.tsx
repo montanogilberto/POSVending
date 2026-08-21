@@ -22,6 +22,7 @@ import MailPopover from '../../components/popovers/MailPopover';
 import {
   fetchMyNotifications, markNotificationsRead, InboxNotification,
 } from '../../api/myNotificationsApi';
+import { withClientId } from '../../utils/routes';
 
 /**
  * Some backend-issued notifications (e.g. "complete tu registro / cuentas de
@@ -46,7 +47,7 @@ const TYPE_COLOR: Record<string, string> = {
 
 const NotificationsInboxPage: React.FC = () => {
   const history = useHistory();
-  const { userId, roleCode } = useUser();
+  const { userId, roleCode, clientId } = useUser();
   const [items, setItems] = useState<InboxNotification[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -79,6 +80,10 @@ const NotificationsInboxPage: React.FC = () => {
       console.log('[Inbox] open: remapping staff-only route', route, '→', STAFF_ONLY_ROUTES[route], 'for role', roleCode);
       route = STAFF_ONLY_ROUTES[route];
     }
+    // Las rutas guardadas vienen sin clientId (el emisor no lo conoce): se
+    // completa con el del lector para que /p2p-lending/:clientId sea igual de
+    // recargable que el resto de los dashboards.
+    if (route) route = withClientId(route, clientId);
     console.log('[Inbox] open →', n.pushNotificationId, route ?? '(sin ruta)');
     if (route) history.push(route);
   };

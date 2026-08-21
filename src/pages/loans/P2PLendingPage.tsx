@@ -28,7 +28,8 @@ import {
   flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
   megaphoneOutline, informationCircleOutline, closeOutline,
 } from 'ionicons/icons';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useLocation, useParams } from 'react-router-dom';
+import { myLoansRoute, P2PTab } from '../../utils/routes';
 import { useUser } from '../../contexts/UserContext';
 import { getAllClients, Client, ClientType } from '../../api/clientsApi';
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
@@ -242,7 +243,13 @@ function movementLabel(entryType: string): string {
 
 const P2PLendingPage: React.FC = () => {
   const history  = useHistory();
-  const { clientId, companyId, userId, roleCode } = useUser();
+  // /p2p-lending/:clientId (igual que client-dashboard/lender-dashboard). La
+  // variante sin id sigue viva, así que el param solo gana cuando existe y el
+  // contexto de sesión es el fallback.
+  const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
+  const { clientId: contextClientId, companyId, userId, roleCode } = useUser();
+  const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
+  console.log('[P2P] render. clientId =', clientId, '(param:', clientIdParam ?? '—', '/ context:', contextClientId, ') companyId =', companyId);
 
   // Determine the role of the logged-in client
   const [myClient, setMyClient] = useState<Client | null>(null);
@@ -264,7 +271,22 @@ const P2PLendingPage: React.FC = () => {
   const [biometrics, setBiometrics] = useState<ClientFaceRecognition[]>([]);
   const [loading,   setLoading]   = useState(true);
   const { showToast, toastProps } = useToast({ defaultColor: 'primary', duration: 3500 });
-  const [tab,       setTab]       = useState<'offers' | 'proposals' | 'my'>('offers');
+  const [tab,       setTab]       = useState<P2PTab>('offers');
+
+  // Deep-link de pestaña: /p2p-lending/:clientId?tab=my|proposals|offers.
+  // Quien llega desde el aviso "solicitud enviada" del dashboard del
+  // prestatario debe caer en SUS solicitudes, no en el marketplace. 'proposals'
+  // es la bandeja donde se APRUEBA — eso es del prestamista, así que si la pide
+  // un prestatario se degrada a 'my' en vez de enseñarle acciones que no le
+  // tocan. Se re-evalúa cuando isLender llega (clientType se carga async).
+  const location = useLocation();
+  const tabParam = new URLSearchParams(location.search).get('tab');
+  useEffect(() => {
+    if (tabParam !== 'offers' && tabParam !== 'proposals' && tabParam !== 'my') return;
+    const next: P2PTab = tabParam === 'proposals' && !isLender ? 'my' : tabParam;
+    console.log('[P2P] tab from URL →', next, '(param:', tabParam, '· isLender:', isLender, ')');
+    setTab(next);
+  }, [tabParam, isLender]);
 
   // ── modals ─────────────────────────────────────────────────────────────
   const [showOfferModal,    setShowOfferModal]    = useState(false);
@@ -1369,11 +1391,15 @@ const P2PLendingPage: React.FC = () => {
               <span className="p2p-kpi-val">{inboxProposals.length}</span>
               <span className="p2p-kpi-label">Propuestas nuevas</span>
             </div>
-            <div className="p2p-kpi p2p-kpi2">
+            {/* Este KPI era texto muerto: contaba préstamos sin manera de
+                verlos. Ahora entra a la cartera (mismo estilo, IonCard button
+                ya resuelto en .p2p-kpi del CSS). */}
+            <IonCard button className="p2p-kpi p2p-kpi2"
+              onClick={() => { console.log('[P2P] KPI préstamos activos →', myLoansRoute(clientId)); history.push(myLoansRoute(clientId)); }}>
               <span className="p2p-kpi2-icon p2p-kpi2-green"><IonIcon icon={trendingUpOutline} /></span>
               <span className="p2p-kpi-val">{proposals.filter(p => p.lenderId === clientId && p.status === 'accepted').length}</span>
               <span className="p2p-kpi-label">Préstamos activos</span>
-            </div>
+            </IonCard>
           </div>
         )}
 
@@ -1514,15 +1540,19 @@ const P2PLendingPage: React.FC = () => {
               <IonCard className="p2p-support-banner">
                 <span className="p2p-support-icon">🎓</span>
                 <div className="p2p-support-text">
-                  <strong>¿Necesitas ayuda para invertir?</strong>
+                  {/* Copy por rol: a quien viene a PEDIR prestado no se le
+                      ofrece ayuda "para invertir" (ese es el lado prestamista). */}
+                  <strong>{isLender ? '¿Necesitas ayuda para invertir?' : '¿Necesitas ayuda con tu solicitud?'}</strong>
                   <span>Nuestro asistente te guía paso a paso.</span>
                 </div>
                 <IonButton fill="outline" size="small" onClick={async () => {
                   const cfg = await getChatConfig();
-                  console.log('[P2P] support banner → assistant (topic=invest)', cfg.agentClientId);
-                  // topic=invest → el chat auto-envía la pregunta y el agente
-                  // guía de inversión responde con el siguiente paso real.
-                  if (cfg.agentEnabled) history.push(`/loan-chat/new?lenderId=${cfg.agentClientId}&topic=invest`);
+                  // topic=invest → guía de inversión (prestamista). El
+                  // prestatario va a 'account', que es el sub-agente de su
+                  // cuenta/solicitudes — 'invest' le respondería otra cosa.
+                  const topic = isLender ? 'invest' : 'account';
+                  console.log('[P2P] support banner → assistant (topic=' + topic + ')', cfg.agentClientId);
+                  if (cfg.agentEnabled) history.push(`/loan-chat/new?lenderId=${cfg.agentClientId}&topic=${topic}`);
                   else history.push('/loan-chats');
                 }}>
                   <IonIcon icon={chatbubblesOutline} slot="start" />

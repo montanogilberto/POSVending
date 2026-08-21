@@ -30,6 +30,7 @@ import {
 import { useHistory, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { useUser } from '../../contexts/UserContext';
+import { p2pLendingRoute } from '../../utils/routes';
 // ── Stripe / Payment types & fetchers (single-use, kept inline) ──────────────
 
 const _api = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
@@ -619,7 +620,7 @@ const LoanPaymentPage: React.FC = () => {
                 </div>
               </div>
             )}
-            <IonButton expand="block" onClick={() => history.replace(isTopUp ? '/p2p-lending' : '/loans')}>
+            <IonButton expand="block" onClick={() => history.replace(isTopUp ? p2pLendingRoute(clientId) : '/loans')}>
               {isTopUp ? 'Ir a plataforma SmartLoans' : 'Ver mis préstamos'}
             </IonButton>
             <IonButton expand="block" fill="outline" onClick={() => history.replace('/dashboard')}>

@@ -9,6 +9,7 @@ import {
 } from '@ionic/react';
 import { arrowBackOutline } from 'ionicons/icons';
 import { useBorrowerOnboarding } from './BorrowerOnboardingLogic';
+import { p2pLendingRoute } from '../../../utils/routes';
 import StepIndicator from './components/StepIndicator';
 import BiometricStep from './components/BiometricStep';
 import PagareStep from './components/PagareStep';
@@ -56,7 +57,7 @@ const BorrowerOnboardingView: React.FC = () => {
               ✓ Perfil completo — listo para solicitar préstamos
             </IonBadge>
             <br />
-            <IonButton className="ion-margin-top" onClick={() => vm.history.replace('/p2p-lending')}>
+            <IonButton className="ion-margin-top" onClick={() => vm.history.replace(p2pLendingRoute(vm.clientId))}>
               Ir a la plataforma SmartLoans
             </IonButton>
           </div>

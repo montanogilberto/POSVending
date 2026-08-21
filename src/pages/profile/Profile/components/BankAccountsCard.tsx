@@ -2,6 +2,7 @@ import React from 'react';
 import { IonBadge, IonButton, IonCard, IonCardContent, IonIcon, IonSpinner } from '@ionic/react';
 import { cardOutline, chevronForwardOutline, walletOutline } from 'ionicons/icons';
 import { ProfileVM } from '../ProfileLogic';
+import { p2pLendingRoute } from '../../../../utils/routes';
 
 /**
  * Cuentas de pago — resumen de los DOS rieles (CLABE/SPEI vía bankAccounts +
@@ -82,7 +83,7 @@ const BankAccountsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
             </div>
 
             <IonButton fill="outline" expand="block" className="profile-link-btn"
-              onClick={() => vm.history.push('/p2p-lending')}>
+              onClick={() => vm.history.push(p2pLendingRoute(vm.clientId))}>
               Administrar cuentas de pago
               <IonIcon icon={chevronForwardOutline} slot="end" />
             </IonButton>

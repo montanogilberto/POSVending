@@ -17,6 +17,7 @@ import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { loanChatApi, getChatConfig, LoanConversation } from '../../api/loanChatApi';
+import { p2pLendingRoute } from '../../utils/routes';
 import { getAllClients, Client } from '../../api/clientsApi';
 import { onDataChanged } from '../../utils/refreshBus';
 import { usePopovers } from '../../hooks/usePopovers';
@@ -86,7 +87,7 @@ const LoanChatListPage: React.FC = () => {
           <EmptyState className="clst-empty" icon={chatbubblesOutline}
             text="Aún no tienes conversaciones."
             action={
-              <IonButton size="small" onClick={() => history.push('/p2p-lending')}>
+              <IonButton size="small" onClick={() => history.push(p2pLendingRoute(clientId))}>
                 <IonIcon icon={storefrontOutline} slot="start" />
                 {roleCode === 'borrower' ? 'Busca una oferta y chatea' : 'Ir al marketplace'}
               </IonButton>

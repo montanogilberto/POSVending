@@ -102,6 +102,12 @@ const LoanDetailPage: React.FC = () => {
 
   useIonViewWillEnter(() => { load(); }, [load]);
 
+  // Respaldo al montar: si ionViewWillEnter no llega (entrar por URL directa,
+  // o una transición que no termina), la página se quedaba en "Préstamo no
+  // encontrado" para siempre porque load() nunca corría. load() es idempotente,
+  // así que en el camino normal esto sólo repite una carga.
+  React.useEffect(() => { load(); }, [load]);
+
   // Refresco global: pagos de la contraparte (push) recargan el detalle abierto.
   React.useEffect(() => onDataChanged(() => load()), [load]);
 

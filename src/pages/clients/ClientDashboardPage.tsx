@@ -68,6 +68,7 @@ import { Loan, getAllLoans } from '../../api/loanApi';
 import { countPendingProposalsForBorrower, fetchLoanProposals, MarketplaceProposal } from '../../api/loanMarketplaceApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
 import { ledgerBalance, postLedgerEntry } from '../../api/bankingApi';
+import { p2pLendingRoute } from '../../utils/routes';
 
 // Muestra el simulador de depósito SPEI (igual que P2PLendingPage) — apagar
 // antes de conectar STP real.
@@ -888,7 +889,7 @@ const ClientDashboardPage: React.FC = () => {
       {myPendingProposals > 0 && (
         <div
           className="pending-proposals-banner"
-          onClick={() => { console.log('[ClientDashboard] proposals banner → /p2p-lending'); history.push('/p2p-lending'); }}>
+          onClick={() => { console.log('[ClientDashboard] proposals banner →', p2pLendingRoute(clientId, 'my')); history.push(p2pLendingRoute(clientId, 'my')); }}>
           <IonIcon icon={timeOutline} />
           <span>
             Tienes <strong>{myPendingProposals}</strong> {myPendingProposals === 1 ? 'solicitud enviada' : 'solicitudes enviadas'} en espera de respuesta
@@ -1075,7 +1076,7 @@ const ClientDashboardPage: React.FC = () => {
                     solicitud); el flujo directo creaba préstamos 'Pending'
                     huérfanos sin prestamista/dinero/cuotas. */}
                 <IonButton expand="block" shape="round" className="client-dashboard-action-button"
-                  onClick={() => { console.log('[ClientDashboard] Solicitar préstamo → /p2p-lending'); history.push('/p2p-lending'); }}>
+                  onClick={() => { console.log('[ClientDashboard] Solicitar préstamo →', p2pLendingRoute(clientId)); history.push(p2pLendingRoute(clientId)); }}>
                   <IonIcon icon={addCircleOutline} slot="start" /> Solicitar préstamo
                 </IonButton>
               </IonCol>
@@ -1120,7 +1121,7 @@ const ClientDashboardPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <IonCardTitle>Mis Préstamos</IonCardTitle>
           <IonButton fill="clear" size="small"
-            onClick={() => { console.log('[ClientDashboard] Nuevo préstamo → /p2p-lending'); history.push('/p2p-lending'); }}>
+            onClick={() => { console.log('[ClientDashboard] Nuevo préstamo →', p2pLendingRoute(clientId)); history.push(p2pLendingRoute(clientId)); }}>
             <IonIcon icon={addCircleOutline} slot="start" /> Nuevo
           </IonButton>
         </div>
@@ -1132,7 +1133,7 @@ const ClientDashboardPage: React.FC = () => {
             <IonIcon icon={documentTextOutline} />
             <p>No tienes préstamos registrados.</p>
             <IonButton size="small"
-              onClick={() => { console.log('[ClientDashboard] empty-state Solicitar → /p2p-lending'); history.push('/p2p-lending'); }}>
+              onClick={() => { console.log('[ClientDashboard] empty-state Solicitar →', p2pLendingRoute(clientId)); history.push(p2pLendingRoute(clientId)); }}>
               Solicitar préstamo
             </IonButton>
           </div>
@@ -1196,7 +1197,7 @@ const ClientDashboardPage: React.FC = () => {
               const needsResponse = p.status === 'countered';
               return (
                 <div key={p.proposalId} className="cd-loan-card" style={{ cursor: 'pointer' }}
-                  onClick={() => { console.log('[ClientDashboard] proposal →', p.proposalId); history.push('/p2p-lending'); }}>
+                  onClick={() => { console.log('[ClientDashboard] proposal →', p.proposalId, p2pLendingRoute(clientId, 'my')); history.push(p2pLendingRoute(clientId, 'my')); }}>
                   <div className="cd-loan-header">
                     <span className="cd-loan-number">Solicitud #{p.proposalId}</span>
                     <span className="cd-loan-status" style={{ color: proposalStatusColor(p.status) }}>
@@ -1216,7 +1217,7 @@ const ClientDashboardPage: React.FC = () => {
                   )}
                   {needsResponse && (
                     <IonButton size="small" expand="block"
-                      onClick={(e) => { e.stopPropagation(); history.push('/p2p-lending'); }}>
+                      onClick={(e) => { e.stopPropagation(); history.push(p2pLendingRoute(clientId, 'my')); }}>
                       Responder nuevos términos
                     </IonButton>
                   )}

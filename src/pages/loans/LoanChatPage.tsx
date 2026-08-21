@@ -12,7 +12,7 @@ import {
 import {
   arrowBack, sendOutline, cashOutline, checkmarkCircle, closeCircle,
   refreshOutline, createOutline, documentTextOutline, alertCircleOutline,
-  micOutline, volumeHighOutline, volumeMuteOutline,
+  micOutline, volumeHighOutline, volumeMuteOutline, sparklesOutline,
 } from 'ionicons/icons';
 import { useHistory, useParams, useLocation } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
@@ -23,6 +23,7 @@ import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
 import { disbursePayment, isNonCustodialFundingEnabled, ledgerBalance } from '../../api/bankingApi';
+import { analyzeProposal, ProposalAnalysis } from '../../api/loanAnalysisApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
 import { fmtNum as fmt, mxChatDate as toDate, mxChatTime as toTime } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
@@ -36,8 +37,11 @@ interface ProposalCardProps {
   onAccept: (msg: LoanMessage) => void;
   onReject: () => void;
   canRespond: boolean;
+  // Only the lender gets the Smart Score gate — it's the borrower's
+  // creditworthiness being assessed, and only the lender is about to fund it.
+  showSmartScore: boolean;
 }
-const ProposalCard: React.FC<ProposalCardProps> = ({ msg, isOwn, convStatus, onAccept, onReject, canRespond }) => (
+const ProposalCard: React.FC<ProposalCardProps> = ({ msg, isOwn, convStatus, onAccept, onReject, canRespond, showSmartScore }) => (
   <div className={`lc-proposal-card ${isOwn ? 'lc-proposal-own' : 'lc-proposal-other'}`}>
     <div className="lc-proposal-header">
       <IonIcon icon={cashOutline} />
@@ -52,7 +56,8 @@ const ProposalCard: React.FC<ProposalCardProps> = ({ msg, isOwn, convStatus, onA
     {!isOwn && canRespond && convStatus === 'open' && (
       <div className="lc-proposal-actions">
         <IonButton size="small" shape="round" color="success" onClick={() => onAccept(msg)}>
-          <IonIcon icon={checkmarkCircle} slot="start" /> Aceptar
+          <IonIcon icon={showSmartScore ? sparklesOutline : checkmarkCircle} slot="start" />
+          {showSmartScore ? 'Ver Smart Score y aceptar' : 'Aceptar'}
         </IonButton>
         <IonButton size="small" shape="round" color="danger" fill="outline" onClick={onReject}>
           <IonIcon icon={closeCircle} slot="start" /> Rechazar
@@ -99,6 +104,11 @@ const LoanChatPage: React.FC = () => {
     role: 'lender' | 'borrower'; disbursed: boolean; disbursementDetail: string; acceptedAt: string;
   } | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  // Smart Score gate — lender sees the borrower's score + loan history + the
+  // Risk/Recommendation agents' read on THIS proposal before accepting.
+  const [analyzingProposal, setAnalyzingProposal] = useState<LoanMessage | null>(null);
+  const [analysis, setAnalysis] = useState<ProposalAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const { showToast, toastProps } = useToast();
 
   const [text, setText]         = useState('');
@@ -347,6 +357,20 @@ const LoanChatPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
+  // Opens the Smart Score modal instead of accepting immediately — the
+  // lender needs to see the borrower's score/history before funding. The
+  // modal's own "Aceptar" button is what actually calls handleAccept(msg).
+  const openProposalAnalysis = (msg: LoanMessage) => {
+    if (!conv) return;
+    setAnalyzingProposal(msg);
+    setAnalysis(null);
+    setAnalysisLoading(true);
+    analyzeProposal({
+      borrowerId: conv.borrowerId, companyId: companyId!,
+      requestedAmount: msg.amount ?? 0, requestedRate: msg.rate ?? 0, requestedTermMonths: msg.termMonths ?? 0,
+    }).then(setAnalysis).finally(() => setAnalysisLoading(false));
+  };
+
   const handleAccept = async (msg: LoanMessage) => {
     if (!conv) return;
     setLoading(true);
@@ -516,8 +540,10 @@ const LoanChatPage: React.FC = () => {
             <ProposalCard
               msg={msg} isOwn={isOwn}
               convStatus={conv?.status ?? 'open'}
-              onAccept={handleAccept} onReject={handleReject}
+              onAccept={myRole === 'lender' ? openProposalAnalysis : handleAccept}
+              onReject={handleReject}
               canRespond={conv?.status === 'open'}
+              showSmartScore={myRole === 'lender'}
             />
             <span className="lc-time">{toTime(msg.created_At)}</span>
           </div>
@@ -625,6 +651,87 @@ const LoanChatPage: React.FC = () => {
             { text: 'Cancelar', role: 'cancel' },
           ]}
         />
+
+        {/* Smart Score — el agente analiza ESTA propuesta (score real, historial
+            de préstamos, y la lectura de Risk/Recommendation) antes de que el
+            lender acepte y comprometa capital. */}
+        <IonModal isOpen={!!analyzingProposal} onDidDismiss={() => { setAnalyzingProposal(null); setAnalysis(null); }}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Smart Score del prestatario</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => { setAnalyzingProposal(null); setAnalysis(null); }}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            {analysisLoading && (
+              <div className="lc-analysis-loading">
+                <IonSpinner name="dots" />
+                <p>El agente está analizando la propuesta…</p>
+              </div>
+            )}
+            {!analysisLoading && !analysis && (
+              <p className="lc-analysis-error">
+                No se pudo obtener el Smart Score en este momento. Puedes aceptar de todas formas.
+              </p>
+            )}
+            {!analysisLoading && analysis && (
+              <div className="lc-analysis">
+                <div className={`lc-score-card lc-score-${(analysis.riskAssessment.riskTier || 'unknown').toLowerCase()}`}>
+                  <div className="lc-score-value">{analysis.riskAssessment.score ?? '—'}</div>
+                  <div className="lc-score-label">{analysis.riskAssessment.label || 'Sin calificación'}</div>
+                  <IonChip className="lc-risk-chip">{analysis.riskAssessment.riskTier}</IonChip>
+                </div>
+                {analysis.riskAssessment.reasoning && (
+                  <p className="lc-analysis-reasoning">{analysis.riskAssessment.reasoning}</p>
+                )}
+
+                {analysis.recommendation?.rationale && (
+                  <div className="lc-recommendation">
+                    <strong><IonIcon icon={sparklesOutline} /> Recomendación del agente</strong>
+                    <p>{analysis.recommendation.rationale}</p>
+                    {analysis.recommendation.suggestedAmount != null && (
+                      <div className="lc-rec-terms">
+                        ${fmt(analysis.recommendation.suggestedAmount)} · {analysis.recommendation.suggestedRate}% ·{' '}
+                        {analysis.recommendation.suggestedTermMonths} meses
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="lc-loan-history">
+                  <strong>Historial de préstamos</strong>
+                  {analysis.loanHistory.length === 0 ? (
+                    <p className="lc-empty-history">Sin préstamos previos en la plataforma.</p>
+                  ) : (
+                    analysis.loanHistory.map((l, idx) => (
+                      <div className="lc-history-row" key={l.loanId ?? idx}>
+                        <span>${fmt(l.principalAmount ?? 0)}</span>
+                        <span>{l.loanStatus ?? '—'}</span>
+                        <span>{l.myRole === 'lender' ? 'Prestamista' : 'Prestatario'}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </IonContent>
+          <IonFooter className="ion-padding lc-modal-footer">
+            <IonButton expand="block" shape="round" color="success" disabled={loading}
+              onClick={() => {
+                const m = analyzingProposal;
+                setAnalyzingProposal(null); setAnalysis(null);
+                if (m) handleAccept(m);
+              }}>
+              <IonIcon icon={checkmarkCircle} slot="start" /> Aceptar préstamo
+            </IonButton>
+            <IonButton expand="block" fill="outline" shape="round" color="medium"
+              onClick={() => { setAnalyzingProposal(null); setAnalysis(null); }}>
+              Cancelar
+            </IonButton>
+          </IonFooter>
+        </IonModal>
 
         {/* Ticket de confirmación — mismo patrón que P2PLendingPage.tsx tras
             publicar capital / enviar solicitud, pero para el préstamo aceptado. */}
