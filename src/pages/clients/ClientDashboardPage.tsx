@@ -63,6 +63,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
 import { useUser } from '../../contexts/UserContext';
+import BenefitPicker from '../../components/rewards/BenefitPicker';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans } from '../../api/loanApi';
 import { countPendingProposalsForBorrower, fetchLoanProposals, MarketplaceProposal } from '../../api/loanMarketplaceApi';
@@ -1116,6 +1117,11 @@ const ClientDashboardPage: React.FC = () => {
 
   const renderLoans = () => (
     <>
+    {/* Los PUNTOS (ganados pagando a tiempo) se canjean por un descuento en el
+        próximo préstamo. Va aquí, antes de "Nuevo", porque el beneficio se
+        aparta ANTES de solicitar y luego se amarra al crédito creado. */}
+    <BenefitPicker companyId={companyId} clientId={clientId} />
+
     <IonCard className="client-dashboard-card">
       <IonCardHeader>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

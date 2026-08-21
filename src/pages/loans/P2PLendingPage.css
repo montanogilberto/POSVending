@@ -634,6 +634,12 @@ ion-card.p2p-kpi::part(native) {
   line-height: 1.5;
 }
 
+.p2p-clabe {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.5px;
+  font-size: 13.5px;
+}
+
 /* Consentimiento: declaración de capital disponible */
 .p2p-consent-box {
   background: #f9fafb;

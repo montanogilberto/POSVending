@@ -9,9 +9,10 @@ import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
 import { onDataChanged, notifyDataChanged } from '../../../utils/refreshBus';
 import {
-  getArcadeGames, getArcadeWallet, getArcadeRounds, claimDailyBonus,
+  getArcadeGames, getArcadeWallet, getArcadeRounds, claimDailyBonus, getLiveWins,
   ArcadeError,
 } from '../../../api/arcadeApi';
+import type { LiveWin } from '../../../api/arcadeApi';
 import type { ArcadeGame, ArcadeWallet, ArcadeRound, ArcadeTile, GameCategory } from './ArcadeTypes';
 import { GAME_ROUTES, CATEGORY_ORDER } from './ArcadeConstants';
 
@@ -30,6 +31,7 @@ export function useArcade() {
   const [games, setGames] = useState<ArcadeGame[]>([]);
   const [wallet, setWallet] = useState<ArcadeWallet | null>(null);
   const [rounds, setRounds] = useState<ArcadeRound[]>([]);
+  const [liveWins, setLiveWins] = useState<LiveWin[]>([]);
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);
 
@@ -39,14 +41,16 @@ export function useArcade() {
       return;
     }
     try {
-      const [catalog, purse, recent] = await Promise.all([
+      const [catalog, purse, recent, wins] = await Promise.all([
         getArcadeGames(companyId),
         getArcadeWallet(companyId, clientId),
-        getArcadeRounds(companyId, clientId, 10),
+        getArcadeRounds(companyId, clientId, 20),
+        getLiveWins(companyId, 20),
       ]);
       setGames(catalog);
       setWallet(purse);
       setRounds(recent);
+      setLiveWins(wins);
     } catch (err) {
       console.log('[Arcade] no se pudo cargar', err);
       showToast('No se pudo cargar el arcade', 'danger');
@@ -116,9 +120,26 @@ export function useArcade() {
   const openCategories = byCategory.filter(g => g.playable > 0);
   const lockedCategories = byCategory.filter(g => g.playable === 0);
 
+  /** Todo lo jugable, para la fila "Originales" — los diez son propios. */
+  const originals = tiles.filter(t => t.playable);
+
+  /**
+   * "Seguir jugando": los juegos que ESTE jugador toco mas recientemente,
+   * derivados de su historial. No hace falta endpoint nuevo — las rondas ya
+   * vienen ordenadas por fecha.
+   */
+  const recentlyPlayed: ArcadeTile[] = [];
+  for (const round of rounds) {
+    if (recentlyPlayed.some(t => t.gameKey === round.gameKey)) continue;
+    const tile = tiles.find(t => t.gameKey === round.gameKey && t.playable);
+    if (tile) recentlyPlayed.push(tile);
+    if (recentlyPlayed.length >= 6) break;
+  }
+
   return {
     history, loading, claiming,
-    games, tiles, wallet, rounds,
+    games, tiles, wallet, rounds, liveWins,
+    originals, recentlyPlayed,
     coinBalance, netLifetime, playableCount,
     openCategories, lockedCategories,
     claimBonus, openGame, reload: load,

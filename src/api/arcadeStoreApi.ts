@@ -38,6 +38,11 @@ export interface ChipPack {
 
 export interface ChipPurchase {
   purchaseId: number;
+  /** Folio del ticket (AR-000123). */
+  folio?: string;
+  /** HTML del ticket en ADLS; el mismo enlace que va en el correo. */
+  receiptUrl?: string;
+  receiptSentAt?: string;
   packKey: string;
   platform: 'ios' | 'android';
   chipsCredited: number;

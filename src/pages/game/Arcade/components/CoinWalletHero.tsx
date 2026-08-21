@@ -68,7 +68,7 @@ const CoinWalletHero: React.FC<{ vm: ArcadeVM }> = ({ vm }) => {
               </IonButton>
 
               <IonButton className="arc-hero__buy" expand="block" fill="outline"
-                onClick={() => vm.history.push('/arcade/tienda')}>
+                onClick={e => { e.currentTarget.blur(); vm.history.push('/arcade/tienda'); }}>
                 <IonIcon icon={addOutline} slot="start" />
                 Comprar fichas
               </IonButton>

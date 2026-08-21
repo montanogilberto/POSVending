@@ -123,6 +123,14 @@ import ArcadePage from './pages/game/ArcadePage';
 import BlackjackPage from './pages/game/BlackjackPage';
 import MolePage from './pages/game/MolePage';
 import ChipStorePage from './pages/game/ChipStorePage';
+import CoinflipPage from './pages/game/CoinflipPage';
+import DicePage from './pages/game/DicePage';
+import WheelPage from './pages/game/WheelPage';
+import ScratchPage from './pages/game/ScratchPage';
+import HigherLowerPage from './pages/game/HigherLowerPage';
+import MinesPage from './pages/game/MinesPage';
+import PenaltyPage from './pages/game/PenaltyPage';
+import BowlingPage from './pages/game/BowlingPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -776,6 +784,14 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/arcade/blackjack" component={BlackjackPage} />
             <PrivateRoute exact path="/arcade/mole" component={MolePage} />
             <PrivateRoute exact path="/arcade/tienda" component={ChipStorePage} />
+            <PrivateRoute exact path="/arcade/volado" component={CoinflipPage} />
+            <PrivateRoute exact path="/arcade/dados" component={DicePage} />
+            <PrivateRoute exact path="/arcade/ruleta" component={WheelPage} />
+            <PrivateRoute exact path="/arcade/raspadito" component={ScratchPage} />
+            <PrivateRoute exact path="/arcade/mayor-menor" component={HigherLowerPage} />
+            <PrivateRoute exact path="/arcade/minas" component={MinesPage} />
+            <PrivateRoute exact path="/arcade/penales" component={PenaltyPage} />
+            <PrivateRoute exact path="/arcade/boliche" component={BowlingPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />

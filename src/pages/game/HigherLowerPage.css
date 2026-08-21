@@ -1,0 +1,15 @@
+/* Mayor o Menor — carta actual. */
+.hl-card {
+  width: 92px;
+  height: 130px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.8rem;
+  font-weight: 800;
+  color: #1c1c1e;
+}

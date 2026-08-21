@@ -18,6 +18,8 @@ import { useArcade } from './ArcadeLogic';
 import { CATEGORY_LABELS } from './ArcadeConstants';
 import CoinWalletHero from './components/CoinWalletHero';
 import GameTile from './components/GameTile';
+import GameRail from './components/GameRail';
+import LiveWinsTicker from './components/LiveWinsTicker';
 
 const ArcadeView: React.FC = () => {
   const vm = useArcade();
@@ -53,6 +55,22 @@ const ArcadeView: React.FC = () => {
               <IonIcon icon={informationCircle} />
               <p>Las fichas son solo para jugar. No son dinero y no se canjean.</p>
             </div>
+
+            <LiveWinsTicker wins={vm.liveWins} />
+
+            <GameRail
+              title="Seguir jugando"
+              subtitle={`${vm.recentlyPlayed.length}`}
+              tiles={vm.recentlyPlayed}
+              onOpen={vm.openGame}
+            />
+
+            <GameRail
+              title="Originales"
+              subtitle={`${vm.originals.length} juegos`}
+              tiles={vm.originals}
+              onOpen={vm.openGame}
+            />
 
             {vm.tiles.length === 0 ? (
               <EmptyState

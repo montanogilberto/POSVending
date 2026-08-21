@@ -5,15 +5,17 @@ import { chevronForwardOutline, lockClosedOutline } from 'ionicons/icons';
 import { fmtInt } from '../../../../utils/format';
 import type { ArcadeTile } from '../ArcadeTypes';
 import { CUSTOM_GAME_GLYPHS } from './gameIcons';
+import { GAME_ART } from '../../shared/GameArt';
 
 interface GameTileProps {
   tile: ArcadeTile;
   onOpen: (tile: ArcadeTile) => void;
   /**
-   * 'featured' = fila ancha con chevron, para categorias que ya tienen algo
-   * jugable. 'compact' = tile de rejilla, para las que estan todas bloqueadas.
+   * 'art'      = tarjeta ilustrada (filas con carrusel).
+   * 'featured' = fila ancha con chevron.
+   * 'compact'  = tile de rejilla, para categorias todas bloqueadas.
    */
-  variant: 'featured' | 'compact';
+  variant: 'art' | 'featured' | 'compact';
 }
 
 /**
@@ -42,6 +44,30 @@ const GameTile: React.FC<GameTileProps> = ({ tile, onOpen, variant }) => {
   // en linea); el .css resuelve el par tinte/tinta con custom properties.
   const iconClass = `arc-ico--${tile.gameKey}`;
   const locked = !tile.playable;
+
+  if (variant === 'art') {
+    const Art = GAME_ART[tile.gameKey] ?? GAME_ART.blackjack;
+    return (
+      <button
+        type="button"
+        className={`arc-art${locked ? ' arc-locked' : ''}`}
+        onClick={e => { e.currentTarget.blur(); onOpen(tile); }}
+      >
+        <span className="arc-art__frame">
+          <Art className="arc-art__img" />
+          {locked && (
+            <span className="arc-art__lock">
+              <IonIcon icon={lockClosedOutline} />
+            </span>
+          )}
+        </span>
+        <span className="arc-art__name">{tile.name}</span>
+        <span className="arc-art__meta">
+          {locked ? 'Próximamente' : `RTP ${(tile.rtp * 100).toFixed(1)}%`}
+        </span>
+      </button>
+    );
+  }
 
   if (variant === 'featured') {
     return (

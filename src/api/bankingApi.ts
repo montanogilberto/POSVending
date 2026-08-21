@@ -166,6 +166,39 @@ export async function createFundingIntent(payload: {
   return r;
 }
 
+// Every intent ever opened for a loan, newest first — used to recover an
+// already-OPEN FUNDING intent (e.g. re-entering the declare step after
+// leaving the accept flow) without re-calling create, which errors on the
+// unique-OPEN-FUNDING-per-loan index.
+export async function listFundingIntents(companyId: number, loanId: number): Promise<PaymentIntent[]> {
+  const r = await post("/paymentIntents", { paymentIntents: [{ action: 'list', companyId, loanId }] });
+  return Array.isArray(r) ? r : [];
+}
+
+export interface RevealedBankAccount {
+  partyRole: 'borrower' | 'lender';
+  bankName: string;
+  clabe: string;
+  holderName: string;
+  advertencia?: string;
+  error?: string;
+}
+
+// D4: the ONLY sanctioned way to reveal a counterparty's FULL CLABE — the
+// snapshot taken at signing (snapshotBankAccountsForLoan) only ever exposes
+// clabeLast4, which isn't enough to actually send a SPEI. This calls the one
+// backend path that returns the full clabe, and only for someone who is
+// genuinely a party to this loan; every call is audit-logged server-side.
+export async function revealCounterpartyBankAccount(payload: {
+  companyId: number; loanId: number; requesterClientId: number; requesterUserId?: number;
+}): Promise<RevealedBankAccount | null> {
+  console.log('[Banking] revealCounterpartyBankAccount →', JSON.stringify({ loanId: payload.loanId }));
+  const r = await post("/bankAccountsLifecycle", { bankAccounts: [{ action: 'reveal_counterparty', ...payload }] });
+  if (r?.error) { console.log('[Banking] revealCounterpartyBankAccount ← error', r.error); return null; }
+  console.log('[Banking] revealCounterpartyBankAccount ← OK', JSON.stringify({ partyRole: r?.partyRole, bankName: r?.bankName }));
+  return r;
+}
+
 export interface FundingTransaction {
   fundingTransactionId: number; loanId: number; intentId: number;
   lenderClientId: number; borrowerClientId: number; amountMXN: number;

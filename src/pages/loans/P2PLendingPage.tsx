@@ -185,7 +185,7 @@ import {
   BankAccount, listBankAccounts, ledgerBalance, ledgerStatement, LedgerEntry,
   postLedgerEntry, disbursePayment,
   isNonCustodialFundingEnabled, snapshotBankAccountsForLoan, createFundingIntent,
-  declareFunding, submitTransferEvidence,
+  declareFunding, submitTransferEvidence, revealCounterpartyBankAccount, RevealedBankAccount,
 } from '../../api/bankingApi';
 import BankAccountLink from '../../components/payments/BankAccountLink';
 import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
@@ -326,6 +326,10 @@ const P2PLendingPage: React.FC = () => {
   const [declareClaveRastreo, setDeclareClaveRastreo] = useState('');
   const [declareBankFrom, setDeclareBankFrom] = useState('');
   const [declaring, setDeclaring] = useState(false);
+  // Full CLABE (D4: only reveal_counterparty ever returns it — the snapshot
+  // taken at accept only carries clabeLast4, not enough to actually send a SPEI).
+  const [revealedClabe, setRevealedClabe] = useState<RevealedBankAccount | null>(null);
+  const [revealingClabe, setRevealingClabe] = useState(false);
 
   // ── proposal form ───────────────────────────────────────────────────────
   const [propAmount,   setPropAmount]   = useState('');
@@ -800,6 +804,11 @@ const P2PLendingPage: React.FC = () => {
           borrowerHolderName: borrowerSnapshot.holderName, borrowerBankName: borrowerSnapshot.bankName,
           borrowerClientId: borrowerId,
         });
+        setRevealedClabe(null);
+        setRevealingClabe(true);
+        revealCounterpartyBankAccount({ companyId, loanId: loan.loanId, requesterClientId: lenderId, requesterUserId: userId })
+          .then(setRevealedClabe)
+          .finally(() => setRevealingClabe(false));
         return;
       }
 
@@ -2053,7 +2062,7 @@ const P2PLendingPage: React.FC = () => {
       />
 
       {/* ══════════ Modal: Declarar fondeo SPEI (RFC-002 Phase 1) ══════════ */}
-      <IonModal isOpen={!!fundingToDeclare} onDidDismiss={() => { setFundingToDeclare(null); setDeclareClaveRastreo(''); setDeclareBankFrom(''); }}>
+      <IonModal isOpen={!!fundingToDeclare} onDidDismiss={() => { setFundingToDeclare(null); setDeclareClaveRastreo(''); setDeclareBankFrom(''); setRevealedClabe(null); }}>
         <IonHeader className="p2p-publish-header">
           <IonToolbar>
             <IonTitle>Declarar transferencia SPEI</IonTitle>
@@ -2080,12 +2089,23 @@ const P2PLendingPage: React.FC = () => {
               <div className="p2p-important-box">
                 <IonIcon icon={alertCircleOutline} className="p2p-important-icon" />
                 <div>
-                  <strong>Antes de transferir, verifica que tu banco muestre:</strong>
-                  <p>
-                    Titular: <strong>{fundingToDeclare.borrowerHolderName}</strong> — {fundingToDeclare.borrowerBankName}
-                    <br />
-                    Si aparece otro nombre, <strong>NO transfieras</strong> y repórtalo a soporte.
-                  </p>
+                  <strong>Datos para tu transferencia SPEI:</strong>
+                  {revealingClabe ? (
+                    <p><IonSpinner name="dots" /> Obteniendo CLABE…</p>
+                  ) : revealedClabe?.clabe ? (
+                    <p>
+                      CLABE: <strong className="p2p-clabe">{revealedClabe.clabe}</strong>
+                      <br />
+                      Titular: <strong>{revealedClabe.holderName}</strong> — {revealedClabe.bankName}
+                      <br />
+                      Si tu banco muestra otro nombre, <strong>NO transfieras</strong> y repórtalo a soporte.
+                    </p>
+                  ) : (
+                    <p>
+                      No se pudo obtener la CLABE completa. Titular: <strong>{fundingToDeclare.borrowerHolderName}</strong>
+                      {' '}— {fundingToDeclare.borrowerBankName}. Ciérrala y vuelve a intentar desde "Mis préstamos".
+                    </p>
+                  )}
                 </div>
               </div>
 

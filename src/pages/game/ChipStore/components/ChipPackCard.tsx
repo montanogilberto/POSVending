@@ -39,7 +39,7 @@ const ChipPackCard: React.FC<ChipPackCardProps> = ({
         className="cs-pack__buy"
         expand="block"
         disabled={disabled || busy}
-        onClick={() => onBuy(pack)}
+        onClick={e => { e.currentTarget.blur(); onBuy(pack); }}
       >
         {busy ? <IonSpinner name="dots" /> : (storePrice ?? `$${fmtInt(pack.priceMXN)}`)}
       </IonButton>

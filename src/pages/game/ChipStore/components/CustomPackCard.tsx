@@ -59,7 +59,7 @@ const CustomPackCard: React.FC<CustomPackCardProps> = ({ pack, busy, disabled, o
         className="cs-pack__buy"
         expand="block"
         disabled={disabled || busy}
-        onClick={() => onBuy(pack, chips)}
+        onClick={e => { e.currentTarget.blur(); onBuy(pack, chips); }}
       >
         {busy ? <IonSpinner name="dots" /> : `$${fmtNum(customPrice(pack, chips))}`}
       </IonButton>

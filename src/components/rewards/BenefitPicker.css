@@ -1,0 +1,96 @@
+/* Canje de puntos por beneficios de préstamo. */
+
+.bp {
+  margin: 12px 0;
+}
+
+.bp-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.bp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ion-color-medium-shade, #6b7280);
+}
+
+.bp-head ion-icon {
+  font-size: 18px;
+  color: var(--ion-color-primary);
+}
+
+.bp-head ion-badge {
+  margin-left: auto;
+}
+
+.bp-list ion-card,
+.bp-reserved {
+  margin: 8px 12px;
+  border-radius: 14px;
+}
+
+.bp-item__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bp-item__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bp-item__text strong {
+  display: block;
+  font-size: 0.94rem;
+}
+
+.bp-item__text p {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--ion-color-medium);
+}
+
+.bp-item__body ion-button {
+  --border-radius: 10px;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+/* Bloqueado por puntos: se atenúa el texto pero la tarjeta sigue visible,
+   para que el cliente vea a qué puede aspirar. */
+.bp-item--locked .bp-item__text strong {
+  opacity: 0.6;
+}
+
+.bp-reserved ion-card-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bp-reserved__icon {
+  font-size: 28px;
+  color: var(--ion-color-success);
+  flex-shrink: 0;
+}
+
+.bp-reserved p {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+}
+
+.bp-note {
+  display: block;
+  margin: 10px 16px 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}

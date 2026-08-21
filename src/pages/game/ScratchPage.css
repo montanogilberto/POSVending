@@ -1,0 +1,28 @@
+/* Raspadito — cuadrícula de nueve casillas. */
+.sc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 260px;
+}
+
+.sc-cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.9rem;
+  /* Sin raspar: gris plata, como la película de una tarjeta real. */
+  background: linear-gradient(135deg, #c9ccd6, #aab0be);
+}
+
+.sc-cell--open {
+  background: var(--ion-color-step-100, #eef0f6);
+}
+
+.sc-cell--win {
+  background: var(--arc-green-soft, #dcfce7);
+  box-shadow: inset 0 0 0 2px var(--arc-green, #16a34a);
+}

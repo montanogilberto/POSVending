@@ -10,7 +10,7 @@ import React, { useCallback, useState } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonIcon, IonBadge, IonSpinner, IonToast, IonProgressBar, IonCard, IonAlert,
+  IonIcon, IonBadge, IonSpinner, IonToast, IonProgressBar, IonCard, IonAlert, IonInput,
   useIonViewWillEnter,
 } from '@ionic/react';
 import {
@@ -24,6 +24,8 @@ import { getAllClients, Client } from '../../api/clientsApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
 import {
   ledgerBalance, getFundingByLoan, confirmFunding, rejectFunding, FundingTransaction,
+  listFundingIntents, PaymentIntent, revealCounterpartyBankAccount, RevealedBankAccount,
+  declareFunding, submitTransferEvidence,
 } from '../../api/bankingApi';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
@@ -37,7 +39,7 @@ const LoanDetailPage: React.FC = () => {
   const { loanId: loanIdParam } = useParams<{ loanId: string }>();
   const loanId = Number(loanIdParam);
   const history = useHistory();
-  const { companyId, clientId, roleCode } = useUser();
+  const { companyId, clientId, userId, roleCode } = useUser();
 
   const [loan, setLoan] = useState<Loan | null>(null);
   const [cuotas, setCuotas] = useState<Installment[]>([]);
@@ -50,6 +52,17 @@ const LoanDetailPage: React.FC = () => {
   const [fundingTx, setFundingTx] = useState<FundingTransaction | null>(null);
   const [confirmingFunding, setConfirmingFunding] = useState(false);
   const [showRejectFundingAlert, setShowRejectFundingAlert] = useState(false);
+  // Lender-side re-entry into the declare step (RFC-002 Phase 1 only ever
+  // opened this at the moment of accepting a proposal in P2PLendingPage — a
+  // lender who closed that modal, or accepted from a different entry point,
+  // had no way back to it. This recovers the still-OPEN paymentIntent and
+  // lets them see the CLABE and declare from here instead.
+  const [openFundingIntent, setOpenFundingIntent] = useState<PaymentIntent | null>(null);
+  const [revealedClabe, setRevealedClabe] = useState<RevealedBankAccount | null>(null);
+  const [revealingClabe, setRevealingClabe] = useState(false);
+  const [declareClaveRastreo, setDeclareClaveRastreo] = useState('');
+  const [declareBankFrom, setDeclareBankFrom] = useState('');
+  const [declaringFunding, setDeclaringFunding] = useState(false);
   const { showToast, toastProps } = useToast({ duration: 3500 });
 
   const load = useCallback(async () => {
@@ -83,12 +96,21 @@ const LoanDetailPage: React.FC = () => {
       }
 
       // RFC-002 Phase 1: si el préstamo está pendiente de fondeo, busca la
-      // declaración del lender para ofrecer confirmar/rechazar.
+      // declaración del lender para ofrecer confirmar/rechazar (borrower) o,
+      // si el lender aún no ha declarado nada, el intent OPEN que le permite
+      // hacerlo desde aquí.
       if (l?.loanStatus === 'pending_funding') {
         const ft = await getFundingByLoan(companyId, loanId).catch(() => null);
         setFundingTx(ft);
+        if (!ft && Number(clientId) === lid) {
+          const intents = await listFundingIntents(companyId, loanId).catch(() => []);
+          setOpenFundingIntent(intents.find(i => i.intentType === 'FUNDING' && i.status === 'OPEN') ?? null);
+        } else {
+          setOpenFundingIntent(null);
+        }
       } else {
         setFundingTx(null);
+        setOpenFundingIntent(null);
       }
 
       console.log('[LoanDetail] load ✅', JSON.stringify({
@@ -172,6 +194,49 @@ const LoanDetailPage: React.FC = () => {
     load();
   };
 
+  // ── Lender re-entry: ver CLABE del prestatario y declarar el fondeo ──
+  // D4: reveal_counterparty es la ÚNICA vía a la CLABE completa ajena — el
+  // snapshot tomado al firmar solo trae clabeLast4. Cada llamada queda
+  // auditada server-side.
+  const handleRevealClabe = async () => {
+    if (!companyId || !loanId || revealingClabe) return;
+    setRevealingClabe(true);
+    const r = await revealCounterpartyBankAccount({
+      companyId, loanId, requesterClientId: Number(clientId), requesterUserId: userId ?? undefined,
+    });
+    setRevealedClabe(r);
+    setRevealingClabe(false);
+    if (!r) showToast('No se pudo obtener la CLABE. Intenta de nuevo o contacta soporte.', 'danger');
+  };
+
+  const handleDeclareFunding = async () => {
+    if (!loan || !openFundingIntent || declaringFunding) return;
+    if (!declareClaveRastreo.trim()) { showToast('Ingresa la clave de rastreo de tu transferencia SPEI', 'danger'); return; }
+    setDeclaringFunding(true);
+    try {
+      const transferDate = new Date().toISOString();
+      const result = await declareFunding({
+        companyId: Number(companyId), loanId, intentId: openFundingIntent.paymentIntentId,
+        lenderClientId: Number(clientId), borrowerClientId: loan.clientId,
+        amountMXN: loan.principalAmount, transferDate, actorUserId: userId ?? undefined,
+      });
+      if (result.error) throw new Error(result.error);
+      await submitTransferEvidence({
+        companyId: Number(companyId), referenceId: result.fundingTransactionId,
+        claveRastreo: declareClaveRastreo.trim(), transferDate,
+        bankFrom: declareBankFrom.trim() || undefined, amountMXN: loan.principalAmount,
+        uploadedByClientId: Number(clientId),
+      }).catch(() => {});
+      showToast('✓ Transferencia declarada — el prestatario debe confirmar la recepción');
+      notifyDataChanged('funding_declared');
+      setDeclareClaveRastreo(''); setDeclareBankFrom(''); setRevealedClabe(null);
+      load();
+    } catch (e: any) {
+      showToast(e?.message ?? 'No se pudo declarar la transferencia', 'danger');
+    }
+    setDeclaringFunding(false);
+  };
+
   // Historial cronológico: desembolso + cuotas pagadas.
   const historyEvents = [
     ...(loan?.disbursementDate ? [{
@@ -237,6 +302,50 @@ const LoanDetailPage: React.FC = () => {
                     No he recibido nada
                   </IonButton>
                 </div>
+              </IonCard>
+            )}
+
+            {/* RFC-002 Phase 1: el lender ve la CLABE del prestatario y declara
+                el fondeo — re-entrada al paso que P2PLendingPage solo abre una
+                vez, justo al aceptar la propuesta. */}
+            {Number(clientId) === lenderId && loan.loanStatus === 'pending_funding' && !fundingTx && (
+              <IonCard className="lde-card lde-funding-confirm">
+                <h2><IonIcon icon={cashOutline} /> Fondea este préstamo</h2>
+                <p>
+                  Transfiere <strong>{fmt(loan.principalAmount)}</strong> desde tu banco a la CLABE del prestatario,
+                  luego declara la transferencia aquí. SmartLoans nunca envía el dinero por ti.
+                </p>
+                {!openFundingIntent ? (
+                  <p className="lde-empty">No hay una intención de fondeo abierta para este préstamo. Contacta soporte.</p>
+                ) : (
+                  <>
+                    <IonButton expand="block" fill="outline" disabled={revealingClabe} onClick={handleRevealClabe}>
+                      {revealingClabe ? <IonSpinner name="dots" /> : 'Ver CLABE del prestatario'}
+                    </IonButton>
+                    {revealedClabe?.clabe && (
+                      <div className="lde-clabe-box">
+                        <IonIcon icon={alertCircleOutline} />
+                        <div>
+                          <strong>Verifica que tu banco muestre este titular antes de transferir:</strong>
+                          <p>
+                            CLABE: <strong className="lde-clabe">{revealedClabe.clabe}</strong><br />
+                            Titular: <strong>{revealedClabe.holderName}</strong> — {revealedClabe.bankName}<br />
+                            Si aparece otro nombre, <strong>NO transfieras</strong> y repórtalo a soporte.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="lde-declare-form">
+                      <IonInput fill="outline" label="Clave de rastreo *" labelPlacement="floating"
+                        value={declareClaveRastreo} onIonInput={e => setDeclareClaveRastreo(e.detail.value ?? '')} />
+                      <IonInput fill="outline" label="Banco de origen" labelPlacement="floating"
+                        value={declareBankFrom} onIonInput={e => setDeclareBankFrom(e.detail.value ?? '')} />
+                    </div>
+                    <IonButton expand="block" disabled={declaringFunding || !declareClaveRastreo.trim()} onClick={handleDeclareFunding}>
+                      {declaringFunding ? <IonSpinner name="dots" /> : 'Ya transferí'}
+                    </IonButton>
+                  </>
+                )}
               </IonCard>
             )}
 

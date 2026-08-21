@@ -1,0 +1,33 @@
+/* Penales — portería de cinco zonas. */
+.pk-goal {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  width: 100%;
+  max-width: 300px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--arc-green-soft, #dcfce7);
+  border: 3px solid #fff;
+  box-shadow: inset 0 0 0 2px var(--ion-color-step-200, #d6dae6);
+}
+
+.pk-zone {
+  aspect-ratio: 3 / 4;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  font-size: 1.3rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.pk-zone--picked {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px var(--arc-violet, #6d4aff);
+}
+
+.pk-zone--keeper {
+  background: var(--arc-red-soft, #ffe4e6);
+}

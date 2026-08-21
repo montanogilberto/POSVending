@@ -102,6 +102,54 @@ export interface MoleState {
   totalSpawns: number;
 }
 
+/** Volado. `result` solo llega cuando la ronda ya se liquido. */
+export interface CoinflipState { pick: string; result: string | null }
+
+export interface DiceState {
+  target: number;
+  direction: 'under' | 'over';
+  winChance: number;
+  payout: number;
+  roll: number | null;
+}
+
+export interface WheelState { segments: number[]; index: number | null }
+
+export interface ScratchState { cells: string[] | null; size: number }
+
+export interface HigherLowerState {
+  current: number;
+  multiplier: number;
+  streak: number;
+  cardsLeft: number;
+  higherPays: number;
+  lowerPays: number;
+  canCashOut: boolean;
+  last?: { from: number; to: number; guess: string };
+}
+
+export interface MinesState {
+  tiles: number;
+  mines: number;
+  revealed: number[];
+  multiplier: number;
+  nextMultiplier: number;
+  canCashOut: boolean;
+  /** Solo al terminar; antes revelaria donde estan. */
+  mineTiles: number[] | null;
+}
+
+/** Penales y boliche comparten motor: racha con retiro. */
+export interface StreakState {
+  streak: number;
+  multiplier: number;
+  nextMultiplier: number;
+  successChance: number;
+  zones: number;
+  canCashOut: boolean;
+  last?: { keeper?: number; scored?: boolean; strike?: boolean };
+}
+
 export interface RoundResult {
   outcome: RoundOutcome;
   multiplier: number;
@@ -197,10 +245,13 @@ export async function claimDailyBonus(companyId: number, clientId: number): Prom
  * que impide que el servidor elija el resultado despues de ver la jugada.
  */
 export async function openRound<S>(
-  companyId: number, clientId: number, gameKey: GameKey, betAmount: number, clientSeed?: string,
+  companyId: number, clientId: number, gameKey: GameKey, betAmount: number,
+  options?: Record<string, unknown>, clientSeed?: string,
 ): Promise<OpenRoundResponse<S>> {
   return post<OpenRoundResponse<S>>('/arcade/bet', {
-    arcadeRounds: [{ companyId, clientId, gameKey, betAmount, clientSeed }],
+    // `options` son las decisiones que el jugador toma ANTES de conocer el
+    // resultado (número, águila o sol, cuántas minas). El backend las valida.
+    arcadeRounds: [{ companyId, clientId, gameKey, betAmount, options, clientSeed }],
   });
 }
 
@@ -259,4 +310,28 @@ export async function getArcadeTransactions(companyId: number, clientId: number,
     arcadeTransactions: [{ companyId, clientId, top }],
   });
   return data.arcadeTransactions ?? [];
+}
+
+
+/** Ganancia reciente para el ticker. ANONIMA: sin clientId ni nombre. */
+export interface LiveWin {
+  roundId: number;
+  gameKey: GameKey;
+  gameName: string;
+  betAmount: number;
+  payoutAmount: number;
+  multiplier: number;
+  settledAt: string;
+}
+
+export async function getLiveWins(companyId: number, top = 20): Promise<LiveWin[]> {
+  try {
+    const data = await post<{ arcadeRounds: LiveWin[] }>('/arcade/liveWins', {
+      arcadeRounds: [{ companyId, top }],
+    });
+    return data.arcadeRounds ?? [];
+  } catch {
+    // El ticker es decorativo: si falla, el dashboard sigue funcionando.
+    return [];
+  }
 }
