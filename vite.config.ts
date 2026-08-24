@@ -3,17 +3,9 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// https://vitejs.dev/config/
+// vite.config.ts
 export default defineConfig({
-  plugins: [
-    react(),
-    // Removed legacy() plugin to stop generating duplicate -legacy-* chunks (~6.4MB saved)
-  ],
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/setupTests.ts',
-  },
+  plugins: [react()],
   base: './',
   build: {
     target: 'esnext',
@@ -22,19 +14,25 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('@ionic') || id.includes('ionicons')) {
-              return 'vendor-ionic';
+            // Keep React, Ionic, and core node_modules together to prevent instance duplication
+            if (
+              id.includes('react') ||
+              id.includes('react-dom') ||
+              id.includes('react-router') ||
+              id.includes('@ionic')
+            ) {
+              return 'vendor-app-core';
             }
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'vendor-react';
-            }
+            // Separate standalone heavy utilities
             if (id.includes('html2canvas') || id.includes('dompurify')) {
               return 'vendor-helpers';
             }
-            return 'vendor-core';
+            if (id.includes('three') || id.includes('@react-three')) {
+              return 'vendor-three';
+            }
           }
         },
       },
     },
   },
-})
+});
