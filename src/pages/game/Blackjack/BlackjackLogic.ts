@@ -17,6 +17,7 @@ import {
 import type {
   ArcadeGame, ArcadeWallet, BlackjackState, RoundResult,
 } from '../../../api/arcadeApi';
+import { gameLog, gameNow, gameMs } from '../shared/gameLog';
 
 const GAME_KEY = 'blackjack' as const;
 
@@ -57,8 +58,11 @@ export function useBlackjack() {
       // Si la app se fue a segundo plano a media mano, la ronda sigue abierta
       // y el backend rechaza repartir otra. La mano se retoma tal cual estaba:
       // el estado autoritativo nunca estuvo aqui, siempre estuvo en el servidor.
+      gameLog(GAME_KEY, 'load', { rtp: found?.rtp, coinBalance: purse?.coinBalance });
+
       const stale = await findOpenRound<BlackjackState>(companyId, clientId, GAME_KEY);
       if (stale?.state) {
+        gameLog(GAME_KEY, 'resume', { roundId: stale.roundId, betAmount: stale.betAmount });
         setRoundId(stale.roundId);
         setState(stale.state);
         setBet(stale.betAmount);
@@ -66,9 +70,11 @@ export function useBlackjack() {
           serverSeedHash: stale.serverSeedHash, serverSeed: stale.serverSeed,
           clientSeed: stale.clientSeed, nonce: stale.nonce,
         });
+      } else {
+        gameLog(GAME_KEY, 'resume:none');
       }
     } catch (err) {
-      console.log('[Blackjack] no se pudo cargar', err);
+      gameLog(GAME_KEY, 'load:error', err);
       showToast('No se pudo cargar la mesa', 'danger');
     }
     setLoading(false);
@@ -86,6 +92,8 @@ export function useBlackjack() {
     if (!clientId || !companyId || pending) return;
     setPending('deal');
     setResult(null);
+    const t0 = gameNow();
+    gameLog(GAME_KEY, 'bet', { bet });
     try {
       const res = await openRound<BlackjackState>(companyId, clientId, GAME_KEY, bet);
       setRoundId(res.roundId);
@@ -98,12 +106,22 @@ export function useBlackjack() {
 
       // Un natural cierra la mano en el mismo viaje: no hay turno que jugar.
       if (res.roundStatus === 'settled' && res.result) {
+        gameLog(GAME_KEY, 'bet:settled', {
+          roundId: res.roundId, ms: gameMs(t0), outcome: res.result.outcome,
+          multiplier: res.result.multiplier, coinBalance: res.coinBalance,
+        });
         setResult(res.result);
         setRoundId(null);
         notifyDataChanged('arcade-round');
         await load();
+      } else {
+        gameLog(GAME_KEY, 'bet:open', {
+          roundId: res.roundId, ms: gameMs(t0),
+          player: res.state?.playerTotal, dealer: res.state?.dealerTotal,
+        });
       }
     } catch (err) {
+      gameLog(GAME_KEY, 'bet:error', err);
       failWith(err, 'No se pudo repartir');
     }
     setPending(null);
@@ -112,10 +130,16 @@ export function useBlackjack() {
   const act = async (action: 'hit' | 'stand' | 'double') => {
     if (!roundId || !clientId || pending) return;
     setPending(action);
+    const t0 = gameNow();
+    gameLog(GAME_KEY, 'action', { roundId, action });
     try {
       const res = await playAction<BlackjackState>(roundId, clientId, action);
       setState(res.state);
       if (res.roundStatus === 'settled') {
+        gameLog(GAME_KEY, 'action:settled', {
+          roundId, action, ms: gameMs(t0), outcome: res.result?.outcome,
+          multiplier: res.result?.multiplier, coinBalance: res.coinBalance,
+        });
         setResult(res.result ?? null);
         setRoundId(null);
         setFair(f => ({ ...f, serverSeed: res.serverSeed, serverSeedHash: res.serverSeedHash ?? f.serverSeedHash }));
@@ -124,8 +148,14 @@ export function useBlackjack() {
         }
         notifyDataChanged('arcade-round');
         await load();
+      } else {
+        gameLog(GAME_KEY, 'action:open', {
+          roundId, action, ms: gameMs(t0),
+          player: res.state?.playerTotal, canHit: res.state?.canHit,
+        });
       }
     } catch (err) {
+      gameLog(GAME_KEY, 'action:error', err);
       failWith(err, 'No se pudo jugar esa acción');
     }
     setPending(null);

@@ -242,13 +242,47 @@ export async function getFundingByLoan(companyId: number, loanId: number): Promi
   return list[0] ?? null;
 }
 
+export interface TransferEvidence {
+  transferEvidenceId: number; companyId: number; referenceType: string; referenceId: number;
+  claveRastreo?: string; transferDate?: string; bankFrom?: string; amountMXN?: number;
+  evidenceFileUrl?: string; evidenceHash?: string; uploadedByClientId?: number;
+  validationStatus: 'PENDING' | 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+  aiConfidence?: number; aiReasoning?: string; aiMismatches?: string; aiValidatedAt?: string;
+  created_At?: string; error?: string;
+}
+
 export async function submitTransferEvidence(payload: {
   companyId: number; referenceId: number; claveRastreo: string; transferDate: string;
   bankFrom?: string; amountMXN: number; evidenceFileUrl?: string; evidenceHash?: string;
   uploadedByClientId: number;
-}): Promise<any> {
+}): Promise<TransferEvidence> {
   console.log('[Banking] submitTransferEvidence →', JSON.stringify({ referenceId: payload.referenceId, claveRastreo: payload.claveRastreo }));
   const r = await post("/transferEvidence", { transferEvidence: [{ action: 'create', referenceType: 'FUNDING', ...payload }] });
   console.log('[Banking] submitTransferEvidence ←', JSON.stringify({ transferEvidenceId: r.transferEvidenceId, error: r.error }));
+  return r;
+}
+
+// Uploads just the bytes — pair with submitTransferEvidence(evidenceFileUrl)
+// to persist the URL. Same shape as clientFaceRecognitionApi's image upload.
+export async function uploadTransferEvidenceImage(payload: {
+  companyId: number; clientId: number; imageBase64: string;
+}): Promise<{ blobUrl?: string; error?: string }> {
+  console.log('[Banking] uploadTransferEvidenceImage → START');
+  const r = await post("/transferEvidence/upload-image", payload);
+  console.log('[Banking] uploadTransferEvidenceImage ←', JSON.stringify({ hasUrl: !!r?.blobUrl, error: r?.error }));
+  return r;
+}
+
+// Persists the evidence_validation_agent's verdict onto the evidence row —
+// advisory only, never touches fundingTransactions/loans status (the
+// borrower's own confirmFunding still activates the loan).
+export async function validateTransferEvidence(payload: {
+  companyId: number; transferEvidenceId: number;
+  validationStatus: 'VALID' | 'NEEDS_REVIEW' | 'INVALID';
+  aiConfidence?: number; aiReasoning?: string; aiMismatches?: string;
+}): Promise<TransferEvidence> {
+  console.log('[Banking] validateTransferEvidence →', JSON.stringify({ transferEvidenceId: payload.transferEvidenceId, validationStatus: payload.validationStatus }));
+  const r = await post("/transferEvidence", { transferEvidence: [{ action: 'validate', ...payload }] });
+  console.log('[Banking] validateTransferEvidence ←', JSON.stringify({ transferEvidenceId: r.transferEvidenceId, error: r.error }));
   return r;
 }

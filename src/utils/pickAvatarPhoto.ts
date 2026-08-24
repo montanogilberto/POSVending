@@ -27,3 +27,25 @@ export async function pickAvatarPhoto(): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Selección de foto de comprobante de transferencia SPEI (evidencia de
+ * fondeo) — mismo patrón que pickAvatarPhoto, con etiquetas propias para no
+ * confundir al usuario ("Foto de perfil" no aplica aquí).
+ */
+export async function pickEvidencePhoto(): Promise<string | null> {
+  try {
+    const photo = await Camera.getPhoto({
+      resultType: CameraResultType.DataUrl,
+      source: CameraSource.Prompt,
+      quality: 80,
+      promptLabelHeader: 'Comprobante de transferencia',
+      promptLabelPhoto: 'Elegir de galería',
+      promptLabelPicture: 'Tomar foto',
+    });
+    return photo.dataUrl ?? null;
+  } catch (e) {
+    console.log('[pickEvidencePhoto] cancelado o sin permiso:', String(e));
+    return null;
+  }
+}

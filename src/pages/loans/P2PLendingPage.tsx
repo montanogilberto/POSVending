@@ -16,7 +16,7 @@ import {
   IonRefresherContent, IonAlert, IonLabel, IonInput, IonTextarea, IonSelect,
   IonSelectOption, IonProgressBar, IonSegment, IonSegmentButton, IonFooter,
   IonActionSheet, IonCard, IonChip, IonAvatar, IonNote, IonList, IonItem,
-  IonCheckbox, IonSpinner,
+  IonCheckbox, IonSpinner, IonImg,
   useIonViewWillEnter,
 } from '@ionic/react';
 import {
@@ -27,6 +27,7 @@ import {
   sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline,
   flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
   megaphoneOutline, informationCircleOutline, closeOutline,
+  cameraOutline, sparklesOutline,
 } from 'ionicons/icons';
 import { useHistory, useLocation, useParams } from 'react-router-dom';
 import { myLoansRoute, P2PTab } from '../../utils/routes';
@@ -186,7 +187,12 @@ import {
   postLedgerEntry, disbursePayment,
   isNonCustodialFundingEnabled, snapshotBankAccountsForLoan, createFundingIntent,
   declareFunding, submitTransferEvidence, revealCounterpartyBankAccount, RevealedBankAccount,
+  uploadTransferEvidenceImage, validateTransferEvidence as persistEvidenceValidation,
 } from '../../api/bankingApi';
+import {
+  validateTransferEvidence as validateEvidenceWithAgent, TransferEvidenceVerdict,
+} from '../../api/transferEvidenceAgentApi';
+import { pickEvidencePhoto } from '../../utils/pickAvatarPhoto';
 import BankAccountLink from '../../components/payments/BankAccountLink';
 import { createPushNotification, getAllPushNotifications, PushNotification } from '../../api/pushNotificationsApi';
 import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
@@ -330,6 +336,14 @@ const P2PLendingPage: React.FC = () => {
   // taken at accept only carries clabeLast4, not enough to actually send a SPEI).
   const [revealedClabe, setRevealedClabe] = useState<RevealedBankAccount | null>(null);
   const [revealingClabe, setRevealingClabe] = useState(false);
+  // Comprobante (evidence photo) — optional attach-and-validate step, same
+  // flow as LoanDetailPage.tsx's lender re-entry card.
+  const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
+  const [evidenceBusyLabel, setEvidenceBusyLabel] = useState('');
+  const [evidenceTicket, setEvidenceTicket] = useState<{
+    transferEvidenceId: number; amount: number; transferDate: string;
+    bankFrom: string; beneficiary: string; confidence: number; assessment: string;
+  } | null>(null);
 
   // ── proposal form ───────────────────────────────────────────────────────
   const [propAmount,   setPropAmount]   = useState('');
@@ -921,6 +935,81 @@ const P2PLendingPage: React.FC = () => {
   // El lender ya transfirió desde su propio banco ANTES de llegar aquí — este
   // paso solo registra la declaración + evidencia. SmartLoans nunca envía la
   // transferencia (D5/D1).
+  const handlePickEvidence = async () => {
+    const dataUrl = await pickEvidencePhoto();
+    if (dataUrl) setEvidencePhoto(dataUrl);
+  };
+
+  // Uploads the comprobante + runs the evidence_validation_agent against the
+  // declared terms. Non-fatal to the declare itself (already succeeded by
+  // the time this runs) — same shape as LoanDetailPage.tsx's lender re-entry
+  // card, kept here too since this is the primary (first-run) entry point.
+  const runEvidenceValidation = async (fundingTransactionId: number, transferDate: string) => {
+    if (!fundingToDeclare || !evidencePhoto) return;
+    try {
+      setEvidenceBusyLabel('Subiendo comprobante…');
+      const upload = await uploadTransferEvidenceImage({
+        companyId, clientId, imageBase64: evidencePhoto,
+      });
+      if (upload.error || !upload.blobUrl) {
+        console.log('[P2P] evidence upload FAILED (non-fatal) —', upload.error);
+        return;
+      }
+
+      const evidence = await submitTransferEvidence({
+        companyId, referenceId: fundingTransactionId,
+        claveRastreo: declareClaveRastreo.trim(), transferDate,
+        bankFrom: declareBankFrom.trim() || undefined, amountMXN: fundingToDeclare.amountMXN,
+        evidenceFileUrl: upload.blobUrl, uploadedByClientId: clientId,
+      });
+      if (evidence.error || !evidence.transferEvidenceId) {
+        console.log('[P2P] evidence create FAILED (non-fatal) —', evidence.error);
+        return;
+      }
+
+      setEvidenceBusyLabel('Validando comprobante con IA…');
+      const verdict: TransferEvidenceVerdict | null = await validateEvidenceWithAgent({
+        evidenceUrl: upload.blobUrl,
+        expectedAmountMXN: fundingToDeclare.amountMXN,
+        expectedTransferDate: transferDate,
+        expectedBankFrom: declareBankFrom.trim() || undefined,
+        expectedBeneficiaryName: fundingToDeclare.borrowerHolderName,
+        expectedClaveRastreo: declareClaveRastreo.trim(),
+      });
+      const validationStatus =
+        !verdict ? 'NEEDS_REVIEW' :
+        verdict.recommendedAction === 'APPROVE' ? 'VALID' :
+        verdict.recommendedAction === 'REJECT' ? 'INVALID' : 'NEEDS_REVIEW';
+
+      await persistEvidenceValidation({
+        companyId, transferEvidenceId: evidence.transferEvidenceId,
+        validationStatus, aiConfidence: verdict?.confidence,
+        aiReasoning: verdict?.overallAssessment, aiMismatches: verdict?.mismatches?.join('; '),
+      }).catch(() => {});
+
+      if (validationStatus === 'VALID') {
+        setEvidenceTicket({
+          transferEvidenceId: evidence.transferEvidenceId, amount: fundingToDeclare.amountMXN, transferDate,
+          bankFrom: declareBankFrom.trim(), beneficiary: fundingToDeclare.borrowerHolderName,
+          confidence: verdict?.confidence ?? 0, assessment: verdict?.overallAssessment ?? '',
+        });
+      } else {
+        showToast('Comprobante subido — la revisión automática encontró diferencias y quedó pendiente de revisión manual.');
+        await createPushNotification({
+          companyId,
+          title: '🔎 Revisa el comprobante de fondeo',
+          message: `El comprobante subido para el préstamo de ${fmt(fundingToDeclare.amountMXN)} necesita revisión antes de confirmar la recepción.${verdict?.overallAssessment ? ' ' + verdict.overallAssessment : ''}`,
+          notificationType: 'Warning', priority: 'High', targetType: 'User', targetUserId: fundingToDeclare.borrowerClientId,
+          navigationRoute: `/loan-detail/${fundingToDeclare.loanId}`,
+          payloadJson: JSON.stringify({ type: 'FundingEvidenceNeedsReview', loanId: fundingToDeclare.loanId, transferEvidenceId: evidence.transferEvidenceId }),
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.log('[P2P] evidence validation FAILED (non-fatal) —', String(e));
+    }
+    setEvidenceBusyLabel('');
+  };
+
   const submitDeclareFunding = async () => {
     if (!fundingToDeclare) return;
     if (!declareClaveRastreo.trim()) {
@@ -937,18 +1026,23 @@ const P2PLendingPage: React.FC = () => {
       });
       if (declareResult.error) throw new Error(declareResult.error);
 
-      await submitTransferEvidence({
-        companyId, referenceId: declareResult.fundingTransactionId,
-        claveRastreo: declareClaveRastreo.trim(), transferDate,
-        bankFrom: declareBankFrom.trim() || undefined, amountMXN: fundingToDeclare.amountMXN,
-        uploadedByClientId: clientId,
-      }).catch((e) => console.log('[P2P] submitDeclareFunding: evidence submit FAILED (non-fatal) —', String(e)));
+      if (evidencePhoto) {
+        await runEvidenceValidation(declareResult.fundingTransactionId, transferDate);
+      } else {
+        await submitTransferEvidence({
+          companyId, referenceId: declareResult.fundingTransactionId,
+          claveRastreo: declareClaveRastreo.trim(), transferDate,
+          bankFrom: declareBankFrom.trim() || undefined, amountMXN: fundingToDeclare.amountMXN,
+          uploadedByClientId: clientId,
+        }).catch((e) => console.log('[P2P] submitDeclareFunding: evidence submit FAILED (non-fatal) —', String(e)));
+      }
 
       console.log('[P2P] submitDeclareFunding: SUCCESS — fundingTransactionId', declareResult.fundingTransactionId);
       showToast('✓ Transferencia declarada — el prestatario debe confirmar la recepción del depósito');
       setFundingToDeclare(null);
       setDeclareClaveRastreo('');
       setDeclareBankFrom('');
+      setEvidencePhoto(null);
       notifyDataChanged('funding_declared');
       load();
     } catch (e: any) {
@@ -2062,7 +2156,7 @@ const P2PLendingPage: React.FC = () => {
       />
 
       {/* ══════════ Modal: Declarar fondeo SPEI (RFC-002 Phase 1) ══════════ */}
-      <IonModal isOpen={!!fundingToDeclare} onDidDismiss={() => { setFundingToDeclare(null); setDeclareClaveRastreo(''); setDeclareBankFrom(''); setRevealedClabe(null); }}>
+      <IonModal isOpen={!!fundingToDeclare} onDidDismiss={() => { setFundingToDeclare(null); setDeclareClaveRastreo(''); setDeclareBankFrom(''); setRevealedClabe(null); setEvidencePhoto(null); }}>
         <IonHeader className="p2p-publish-header">
           <IonToolbar>
             <IonTitle>Declarar transferencia SPEI</IonTitle>
@@ -2120,18 +2214,60 @@ const P2PLendingPage: React.FC = () => {
                 <IonInput placeholder="Ej: BBVA" value={declareBankFrom}
                   onIonInput={e => setDeclareBankFrom(e.detail.value ?? '')} className="p2p-input" />
               </div>
+
+              <IonButton expand="block" fill="outline" disabled={declaring} onClick={handlePickEvidence}>
+                <IonIcon icon={cameraOutline} slot="start" />
+                {evidencePhoto ? 'Cambiar comprobante' : 'Adjuntar foto del comprobante (opcional)'}
+              </IonButton>
+              {evidencePhoto && <IonImg src={evidencePhoto} className="p2p-evidence-preview" />}
             </>
           )}
         </IonContent>
         <IonFooter className="ion-padding p2p-modal-footer">
           <IonButton expand="block" onClick={submitDeclareFunding} disabled={declaring || !declareClaveRastreo.trim()}>
-            {declaring ? <IonSpinner name="dots" /> : (<><IonIcon icon={sendOutline} slot="start" />Ya transferí</>)}
+            {declaring
+              ? <><IonSpinner name="dots" /> {evidenceBusyLabel || undefined}</>
+              : (<><IonIcon icon={sendOutline} slot="start" />Ya transferí</>)}
           </IonButton>
           <p className="p2p-footer-trust">
             <IonIcon icon={shieldCheckmarkOutline} />
             El prestatario debe confirmar la recepción antes de que el préstamo quede activo.
           </p>
         </IonFooter>
+      </IonModal>
+
+      {/* Ticket de comprobante validado — se genera solo cuando el agente de
+          IA aprueba el comprobante (evidence_validation_agent); el registro
+          persistido (validationStatus='VALID' en transferEvidence) es lo
+          durable, este modal solo lo muestra. */}
+      <IonModal isOpen={!!evidenceTicket} onDidDismiss={() => setEvidenceTicket(null)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Comprobante validado</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={() => setEvidenceTicket(null)}>Cerrar</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          {evidenceTicket && (
+            <div className="p2p-ticket">
+              <div className="p2p-ticket-status">
+                <IonIcon icon={sparklesOutline} />
+                Validado automáticamente
+              </div>
+              <div className="p2p-ticket-row"><span>Folio</span><strong>#{evidenceTicket.transferEvidenceId}</strong></div>
+              <div className="p2p-ticket-row"><span>Monto</span><strong>{fmt(evidenceTicket.amount)}</strong></div>
+              <div className="p2p-ticket-row"><span>Fecha</span><strong>{mxDate(evidenceTicket.transferDate)}</strong></div>
+              {evidenceTicket.bankFrom && (
+                <div className="p2p-ticket-row"><span>Banco de origen</span><strong>{evidenceTicket.bankFrom}</strong></div>
+              )}
+              <div className="p2p-ticket-row"><span>Beneficiario</span><strong>{evidenceTicket.beneficiary}</strong></div>
+              <div className="p2p-ticket-row"><span>Confianza del agente</span><strong>{Math.round(evidenceTicket.confidence * 100)}%</strong></div>
+              {evidenceTicket.assessment && <div className="p2p-ticket-detail">{evidenceTicket.assessment}</div>}
+            </div>
+          )}
+        </IonContent>
       </IonModal>
 
       {/* ── Bank account (CLABE) modal ── */}

@@ -22,6 +22,7 @@ import {
 import type {
   ArcadeGame, ArcadeWallet, GameKey, RoundResult,
 } from '../../../api/arcadeApi';
+import { gameLog, gameNow, gameMs } from './gameLog';
 
 export function useArcadeGame<S>(gameKey: GameKey) {
   const history = useHistory();
@@ -59,8 +60,14 @@ export function useArcadeGame<S>(gameKey: GameKey) {
       // Si la app se fue a segundo plano a media ronda, el backend rechaza
       // abrir otra (round_in_progress). Se retoma en vez de dejar al jugador
       // encerrado fuera del juego.
+      gameLog(gameKey, 'load', {
+        rtp: found?.rtp, minBet: found?.minBet, maxBet: found?.maxBet,
+        coinBalance: purse?.coinBalance,
+      });
+
       const stale = await findOpenRound<S>(companyId, clientId, gameKey);
       if (stale?.state) {
+        gameLog(gameKey, 'resume', { roundId: stale.roundId, betAmount: stale.betAmount });
         setRoundId(stale.roundId);
         setState(stale.state);
         setBet(stale.betAmount);
@@ -68,9 +75,11 @@ export function useArcadeGame<S>(gameKey: GameKey) {
           serverSeedHash: stale.serverSeedHash, serverSeed: stale.serverSeed,
           clientSeed: stale.clientSeed, nonce: stale.nonce,
         });
+      } else {
+        gameLog(gameKey, 'resume:none');
       }
     } catch (err) {
-      console.log(`[${gameKey}] no se pudo cargar`, err);
+      gameLog(gameKey, 'load:error', err);
       showToast('No se pudo cargar el juego', 'danger');
     }
     setLoading(false);
@@ -87,6 +96,8 @@ export function useArcadeGame<S>(gameKey: GameKey) {
     if (!clientId || !companyId || pending) return;
     setPending('bet');
     setResult(null);
+    const t0 = gameNow();
+    gameLog(gameKey, 'bet', { bet, options });
     try {
       const res = await openRound<S>(companyId, clientId, gameKey, bet, options);
       setFair({
@@ -98,14 +109,24 @@ export function useArcadeGame<S>(gameKey: GameKey) {
 
       // Los juegos de un tiro se liquidan en la misma respuesta.
       if (res.roundStatus === 'settled') {
+        gameLog(gameKey, 'bet:settled', {
+          roundId: res.roundId, ms: gameMs(t0),
+          outcome: res.result?.outcome, multiplier: res.result?.multiplier,
+          net: res.result?.netAmount, coinBalance: res.coinBalance,
+        });
         setResult(res.result ?? null);
         setRoundId(null);
         notifyDataChanged('arcade-round');
         await load();
       } else {
+        gameLog(gameKey, 'bet:open', {
+          roundId: res.roundId, ms: gameMs(t0),
+          coinBalance: res.coinBalance, state: res.state,
+        });
         setRoundId(res.roundId);
       }
     } catch (err) {
+      gameLog(gameKey, 'bet:error', err);
       fail(err, 'No se pudo abrir la ronda');
     }
     setPending(null);
@@ -114,10 +135,17 @@ export function useArcadeGame<S>(gameKey: GameKey) {
   const act = async (action: string, payload?: unknown) => {
     if (!roundId || !clientId || pending) return;
     setPending(action);
+    const t0 = gameNow();
+    gameLog(gameKey, 'action', { roundId, action, payload });
     try {
       const res = await playAction<S>(roundId, clientId, action, payload);
       setState(res.state);
       if (res.roundStatus === 'settled') {
+        gameLog(gameKey, 'action:settled', {
+          roundId, action, ms: gameMs(t0),
+          outcome: res.result?.outcome, multiplier: res.result?.multiplier,
+          net: res.result?.netAmount, coinBalance: res.coinBalance,
+        });
         setResult(res.result ?? null);
         setRoundId(null);
         setFair(f => ({ ...f, serverSeed: res.serverSeed, serverSeedHash: res.serverSeedHash ?? f.serverSeedHash }));
@@ -126,8 +154,11 @@ export function useArcadeGame<S>(gameKey: GameKey) {
         }
         notifyDataChanged('arcade-round');
         await load();
+      } else {
+        gameLog(gameKey, 'action:open', { roundId, action, ms: gameMs(t0), state: res.state });
       }
     } catch (err) {
+      gameLog(gameKey, 'action:error', err);
       fail(err, 'No se pudo jugar esa acción');
     }
     setPending(null);

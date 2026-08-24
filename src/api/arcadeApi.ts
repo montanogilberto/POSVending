@@ -122,6 +122,15 @@ export interface HigherLowerState {
   multiplier: number;
   streak: number;
   cardsLeft: number;
+  /**
+   * Probabilidades REALES con las cartas que quedan, calculadas por el
+   * servidor. Nunca aproximarlas en el frontend: un número que contradiga al
+   * backend es peor que no mostrar ninguno.
+   */
+  higherChance: number;
+  lowerChance: number;
+  /** El empate PIERDE. */
+  tieChance: number;
   higherPays: number;
   lowerPays: number;
   canCashOut: boolean;

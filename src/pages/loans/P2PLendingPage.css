@@ -640,6 +640,56 @@ ion-card.p2p-kpi::part(native) {
   font-size: 13.5px;
 }
 
+.p2p-evidence-preview {
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  margin: 10px 0;
+}
+
+/* ── Ticket de comprobante validado ── */
+.p2p-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p2p-ticket-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.p2p-ticket-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.p2p-ticket-row strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.p2p-ticket-detail {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
 /* Consentimiento: declaración de capital disponible */
 .p2p-consent-box {
   background: #f9fafb;

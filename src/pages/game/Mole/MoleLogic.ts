@@ -20,6 +20,7 @@ import {
 import type {
   ArcadeGame, ArcadeWallet, MoleState, RoundResult,
 } from '../../../api/arcadeApi';
+import { gameLog, gameNow, gameMs } from '../shared/gameLog';
 
 const GAME_KEY = 'mole' as const;
 
@@ -74,12 +75,14 @@ export function useMole() {
       setGame(found);
       setWallet(purse);
       if (found) setBet(b => Math.min(Math.max(b, found.minBet), found.maxBet));
+      gameLog(GAME_KEY, 'load', { rtp: found?.rtp, coinBalance: purse?.coinBalance });
 
       // Una ronda de reflejos no se puede retomar: la ventana de 20 s ya paso.
       // Se cierra con los golpes que haya (ninguno) para que el jugador no
       // quede encerrado fuera del juego por round_in_progress.
       const stale = await findOpenRound<MoleState>(companyId, clientId, GAME_KEY);
       if (stale) {
+        gameLog(GAME_KEY, 'resume', { roundId: stale.roundId, note: 'se cierra: la ventana ya paso' });
         try {
           await playAction<MoleState>(stale.roundId, clientId, 'finish', { hits: [] });
           showToast('Se cerró una ronda que dejaste a medias', 'warning');
@@ -92,7 +95,7 @@ export function useMole() {
         }
       }
     } catch (err) {
-      console.log('[Mole] no se pudo cargar', err);
+      gameLog(GAME_KEY, 'load:error', err);
       showToast('No se pudo cargar el juego', 'danger');
     }
     setLoading(false);
@@ -110,9 +113,21 @@ export function useMole() {
   const finish = useCallback(async (currentRoundId: number) => {
     stopLoop();
     setSettling(true);
+    const t0 = gameNow();
+    gameLog(GAME_KEY, 'action', {
+      roundId: currentRoundId, action: 'finish', hits: hitsRef.current.length,
+    });
     try {
       const res = await playAction<MoleState>(currentRoundId, clientId, 'finish', {
         hits: hitsRef.current,
+      });
+      // rejectedHits del servidor: si sale > 0 con juego normal, algo esta mal
+      // en el registro de golpes del cliente.
+      gameLog(GAME_KEY, 'action:settled', {
+        roundId: currentRoundId, ms: gameMs(t0),
+        reportados: hitsRef.current.length,
+        validos: res.result?.score, rechazados: res.result?.rejectedHits,
+        multiplier: res.result?.multiplier, coinBalance: res.coinBalance,
       });
       setResult(res.result ?? null);
       setRoundId(null);
@@ -124,6 +139,7 @@ export function useMole() {
       notifyDataChanged('arcade-round');
       await load();
     } catch (err) {
+      gameLog(GAME_KEY, 'action:error', err);
       const message = err instanceof ArcadeError ? err.message : 'No se pudo cerrar la ronda';
       showToast(message, 'danger');
     }
@@ -165,8 +181,15 @@ export function useMole() {
     hitIndexRef.current = new Set();
     setLocalScore(0);
     setElapsed(0);
+    const t0 = gameNow();
+    gameLog(GAME_KEY, 'bet', { bet });
     try {
       const res = await openRound<MoleState>(companyId, clientId, GAME_KEY, bet);
+      gameLog(GAME_KEY, 'bet:open', {
+        roundId: res.roundId, ms: gameMs(t0),
+        topos: res.state?.totalSpawns, roundMs: res.state?.roundMs,
+        coinBalance: res.coinBalance,
+      });
       setRoundId(res.roundId);
       setSchedule(res.state);
       setFair({
@@ -176,6 +199,7 @@ export function useMole() {
       setWallet(w => (w ? { ...w, coinBalance: res.coinBalance } : w));
       runLoop(res.state, res.roundId);
     } catch (err) {
+      gameLog(GAME_KEY, 'bet:error', err);
       const message = err instanceof ArcadeError ? err.message : 'No se pudo iniciar la ronda';
       showToast(message, 'danger');
     }
