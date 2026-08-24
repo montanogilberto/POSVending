@@ -4,6 +4,7 @@ import {
 } from '@ionic/react';
 import { activityIcon, activityLabel, toDate } from '../LenderDashboardConstants';
 import { LenderDashboardVM } from '../LenderDashboardLogic';
+import { p2pLendingRoute } from '../../../../utils/routes';
 
 /** Actividad reciente — últimos 5 movimientos reales del ledger. */
 const RecentActivityCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
@@ -12,7 +13,7 @@ const RecentActivityCard: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
       <div className="ldx-card-title-row">
         <IonCardTitle>Actividad reciente</IonCardTitle>
         {vm.statement.length > 0 && (
-          <IonButton fill="clear" size="small" onClick={() => vm.history.push('/p2p-lending')}>Ver todo</IonButton>
+          <IonButton fill="clear" size="small" onClick={() => vm.history.push(p2pLendingRoute(vm.lenderClientId))}>Ver todo</IonButton>
         )}
       </div>
     </IonCardHeader>

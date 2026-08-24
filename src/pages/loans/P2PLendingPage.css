@@ -354,6 +354,18 @@ ion-card.p2p-kpi::part(native) {
 .p2p-status-rejected  { --background: #fee2e2; --color: #b91c1c; }
 .p2p-status-expired,
 .p2p-status-cancelled { --background: #f3f4f6; --color: #6b7280; }
+.p2p-status-countered { --background: #dbeafe; --color: #1d4ed8; }
+
+.p2p-proposal-date {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.p2p-proposal-date-stale {
+  color: #b45309;
+  font-weight: 700;
+}
 
 .p2p-proposal-amounts {
   display: flex;
@@ -399,6 +411,17 @@ ion-card.p2p-kpi::part(native) {
   font-size: 12px;
   color: #6b7280;
   font-style: italic;
+}
+
+.p2p-proposal-note-lender {
+  color: #1d4ed8;
+}
+
+.p2p-proposal-original {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-decoration: line-through;
 }
 
 /* ── My offer card (ion-card) ── */
@@ -473,19 +496,294 @@ ion-card.p2p-kpi::part(native) {
   font-size: 14px;
 }
 
-/* ── Modal form ── */
-.p2p-modal-desc {
+/* ── Modal form: header con flecha atrás + subrayado ── */
+.p2p-publish-header ion-toolbar {
+  --border-width: 0;
+  position: relative;
+}
+
+.p2p-publish-header::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  bottom: 0;
+  width: 48px;
+  height: 3px;
+  background: var(--ion-color-primary, #3b82f6);
+  border-radius: 2px;
+}
+
+/* Tarjeta informativa: qué implica publicar capital */
+.p2p-info-card {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.p2p-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.p2p-info-row p {
   font-size: 13px;
-  color: #4b5563;
-  background: #f0f9ff;
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 14px;
-  border: 1px solid #bae6fd;
+  line-height: 1.5;
+  color: #1e3a5f;
+  margin: 4px 0 0;
+}
+
+.p2p-info-icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.p2p-info-icon-blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.p2p-info-icon-green {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.p2p-info-highlight {
+  color: #047857;
+}
+
+.p2p-info-divider {
+  height: 1px;
+  background: #bfdbfe;
+  margin: 12px 0;
 }
 
 .p2p-form-group {
   margin-bottom: 14px;
+}
+
+/* Chip "MXN" dentro del input de capital */
+.p2p-input-with-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.p2p-input-with-chip .p2p-input {
+  flex: 1;
+}
+
+.p2p-input-chip {
+  position: absolute;
+  right: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 3px 8px;
+  pointer-events: none;
+}
+
+.p2p-char-counter {
+  text-align: right;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+/* Caja "Importante": informativa, sin checkbox */
+.p2p-important-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.p2p-important-icon {
+  flex: 0 0 auto;
+  font-size: 22px;
+  color: #d97706;
+  margin-top: 1px;
+}
+
+.p2p-important-box strong {
+  display: block;
+  font-size: 13px;
+  color: #b45309;
+  margin-bottom: 4px;
+}
+
+.p2p-important-box p {
+  font-size: 12.5px;
+  color: #78350f;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.p2p-clabe {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.5px;
+  font-size: 13.5px;
+}
+
+.p2p-evidence-preview {
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  margin: 10px 0;
+}
+
+/* ── Ticket de comprobante validado ── */
+.p2p-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p2p-ticket-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.p2p-ticket-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.p2p-ticket-row strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.p2p-ticket-detail {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Consentimiento: declaración de capital disponible */
+.p2p-consent-box {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.p2p-consent-box ion-checkbox {
+  --size: 20px;
+  font-size: 13.5px;
+  color: #374151;
+}
+
+/* Ticket de confirmación tras publicar capital */
+.p2p-ticket {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
+.p2p-ticket-check {
+  font-size: 56px;
+  color: #059669;
+  margin-bottom: 8px;
+}
+
+.p2p-ticket h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: #111827;
+}
+
+.p2p-ticket-sub {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 18px;
+}
+
+.p2p-ticket-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  margin-bottom: 16px;
+}
+
+.p2p-ticket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.p2p-ticket-row:last-child {
+  border-bottom: none;
+}
+
+.p2p-ticket-row span {
+  font-size: 12.5px;
+  color: #6b7280;
+}
+
+.p2p-ticket-row strong {
+  font-size: 13.5px;
+  color: #111827;
+  text-align: right;
+}
+
+.p2p-ticket-note {
+  font-size: 11.5px;
+  color: #9ca3af;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Texto de confianza bajo el botón de publicar */
+.p2p-footer-trust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #9ca3af;
+  margin: 8px 0 0;
+}
+
+.p2p-footer-trust ion-icon {
+  font-size: 14px;
+  color: #059669;
 }
 
 .p2p-form-group ion-label {
@@ -550,17 +848,35 @@ ion-card.p2p-kpi::part(native) {
 }
 
 /* Insufficient-funds action sheet: wrap the explanation instead of truncating */
+/* Hojas inferiores de confirmación — reemplazan a los IonAlert centrados, que
+   en móvil quedaban angostos y partían montos y nombres en varias líneas.
+   ion-action-sheet es scoped (no shadow), así que sus clases internas se
+   estilizan desde aquí. */
 .p2p-funds-sheet .action-sheet-title,
-.p2p-funds-sheet .action-sheet-sub-title {
+.p2p-funds-sheet .action-sheet-sub-title,
+.p2p-confirm-sheet .action-sheet-title,
+.p2p-confirm-sheet .action-sheet-sub-title {
   white-space: normal !important;
   text-align: left;
 }
 
-.p2p-funds-sheet .action-sheet-sub-title {
+.p2p-funds-sheet .action-sheet-sub-title,
+.p2p-confirm-sheet .action-sheet-sub-title {
   font-size: 13px;
   line-height: 1.45;
   color: #374151;
   padding-top: 4px;
+}
+
+.p2p-confirm-sheet .action-sheet-title {
+  font-weight: 600;
+  padding-bottom: 2px;
+}
+
+/* Acción afirmativa en verde, igual que el botón APROBAR de la tarjeta. */
+.p2p-confirm-sheet .action-sheet-button.p2p-sheet-confirm {
+  color: var(--ion-color-success, #16a34a);
+  font-weight: 600;
 }
 
 /* ══════════ Rediseño vista Invertir (mockup 2026-07) ══════════ */
@@ -767,37 +1083,22 @@ ion-card.p2p-kpi::part(native) {
   color: #6b7280;
 }
 
-/* Modal de movimientos: saldo + agregar fondos */
-.p2p-movements-balance {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 12px;
-  padding: 10px 14px;
+/* Modal de actividad: sin saldo de wallet, solo actividad de préstamos */
+.p2p-movements-header {
+  margin-bottom: 12px;
 }
 
-.p2p-movements-balance > div {
-  display: flex;
-  flex-direction: column;
-}
-
-.p2p-movements-balance span {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.p2p-movements-balance strong {
-  font-size: 20px;
-  color: #1e3a8a;
+.p2p-movements-header h2 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 4px;
 }
 
 .p2p-movements-hint {
   font-size: 11.5px;
   color: #9ca3af;
-  margin: 6px 2px 12px;
+  margin: 0 2px 12px;
 }
 
 /* ── Utilidades (antes estilos inline) ── */

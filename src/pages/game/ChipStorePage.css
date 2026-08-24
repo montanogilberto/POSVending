@@ -1,0 +1,268 @@
+/* Tienda de fichas — paquetes comprables por IAP. */
+
+.cs-content {
+  --padding-bottom: 32px;
+  --background: var(--ion-color-step-50, #f7f7fb);
+}
+
+.cs-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.cs-balance {
+  display: flex;
+  justify-content: center;
+  padding: 14px 16px 4px;
+}
+
+.cs-balance ion-chip {
+  margin: 0;
+}
+
+.cs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 12px;
+  padding: 8px 12px;
+}
+
+/* ── Tarjeta de paquete ───────────────────────────────────── */
+
+.cs-pack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 18px 12px 14px;
+  border-radius: 18px;
+  background: var(--ion-background-color, #fff);
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.08);
+}
+
+/* El paquete destacado se distingue por borde, no por tamano: cambiar la
+   altura rompia la rejilla en filas desiguales. */
+.cs-pack--featured {
+  border: 2px solid var(--arc-violet, #6d4aff);
+}
+
+.cs-pack__badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--arc-violet, #6d4aff);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cs-pack__coins {
+  width: 66px;
+  height: auto;
+  margin-bottom: 6px;
+}
+
+.cs-pack__amount {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Aire minimo antes del boton, ahora que este se empuja al fondo. */
+.cs-pack__unit,
+.cs-pack__bonus {
+  margin-bottom: 12px;
+}
+
+.cs-pack__unit {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ion-color-medium);
+}
+
+.cs-pack__bonus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--arc-green-soft, #dcfce7);
+  color: var(--arc-green, #16a34a);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cs-pack__buy {
+  --border-radius: 12px;
+  width: 100%;
+  height: 42px;
+  /* auto y no un valor fijo: los paquetes sin bono tienen una fila menos y el
+     boton quedaba flotando a media tarjeta en vez de alinearse con los demas. */
+  margin-top: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Aviso legal ──────────────────────────────────────────── */
+
+.cs-legal {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 12px 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--ion-color-step-100, #eef0f6);
+  color: var(--ion-color-medium-shade, #6b7280);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.cs-legal ion-icon {
+  flex-shrink: 0;
+  font-size: 19px;
+  color: var(--arc-blue, #2563eb);
+}
+
+.cs-legal p {
+  margin: 0;
+}
+
+.cs-empty {
+  padding: 40px 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cs-content {
+    --background: #131419;
+  }
+
+  .cs-pack {
+    background: #1c1d24;
+    box-shadow: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .cs-pack--featured {
+    border-color: var(--arc-violet, #6d4aff);
+  }
+
+  .cs-legal {
+    background: #1c1d24;
+  }
+}
+
+/* ── Aviso de tarjeta guardada ────────────────────────────── */
+
+.cs-card-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 12px 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--arc-violet-soft, #ece7ff);
+  color: var(--arc-violet, #6d4aff);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.cs-card-hint ion-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ── Hoja de pago con tarjeta ─────────────────────────────── */
+
+.cs-sheet {
+  --padding-start: 18px;
+  --padding-end: 18px;
+  --padding-top: 16px;
+  --padding-bottom: 24px;
+}
+
+.cs-sheet__summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ion-color-step-150, rgba(0, 0, 0, 0.08));
+  font-size: 0.92rem;
+  color: var(--ion-color-medium);
+}
+
+.cs-sheet__summary strong {
+  font-size: 1.05rem;
+  color: var(--ion-text-color, #1f2333);
+}
+
+.cs-sheet__error {
+  display: block;
+  margin-top: 12px;
+  font-size: 0.84rem;
+}
+
+.cs-sheet__pay {
+  --border-radius: 12px;
+  height: 48px;
+  margin-top: 20px;
+  font-weight: 700;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cs-card-hint {
+    background: rgba(109, 74, 255, 0.18);
+    color: #b9a6ff;
+  }
+}
+
+/* ── Monto libre ──────────────────────────────────────────── */
+
+/* A lo ancho y fuera de la rejilla: dentro de una columna el deslizador
+   quedaba demasiado angosto para apuntarle con el dedo. */
+.cs-pack--custom {
+  margin: 16px 12px 0;
+  border: 2px dashed var(--arc-violet, #6d4aff);
+}
+
+.cs-pack__badge--custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cs-pack__badge--custom ion-icon {
+  font-size: 13px;
+}
+
+.cs-custom__range {
+  width: 100%;
+  padding: 8px 4px 0;
+  --bar-background: var(--ion-color-step-200, #e2e4ee);
+  --bar-background-active: var(--arc-violet, #6d4aff);
+  --knob-background: var(--arc-violet, #6d4aff);
+  --bar-height: 5px;
+  --knob-size: 26px;
+}
+
+.cs-custom__limits {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 6px;
+  margin-top: -4px;
+  font-size: 0.72rem;
+  color: var(--ion-color-medium);
+  font-variant-numeric: tabular-nums;
+}

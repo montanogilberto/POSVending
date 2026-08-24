@@ -131,4 +131,7 @@ export const loanChatApi = {
 
   getConversation: (conversationId: number) =>
     sp({ action: 'get_conversation', conversationId }),
+
+  closeConversation: (conversationId: number) =>
+    sp({ action: 'close_conversation', conversationId }),
 };

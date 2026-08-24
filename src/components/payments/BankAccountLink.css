@@ -1,0 +1,102 @@
+/* BankAccountLink — reemplazo versionado de CLABE (D18): cuenta principal,
+   cuenta en verificación e historial archivado. Sin estilos inline (§4). */
+
+.bal-error {
+  color: #b91c1c;
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.bal-section {
+  padding: 8px 0;
+}
+
+.bal-note-block {
+  display: block;
+  margin: 6px 0;
+}
+
+.bal-note-mock {
+  display: block;
+  margin-top: 4px;
+}
+
+/* Ícono de estado: verde = verificada, ámbar = por verificar. */
+.bal-icon-verified {
+  color: #059669;
+}
+
+.bal-icon-pending {
+  color: #b45309;
+}
+
+.bal-icon-archived {
+  color: #9ca3af;
+}
+
+/* Sin cuenta principal: estado explícito, no una lista vacía. */
+.bal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 0;
+  text-align: center;
+  color: #74839f;
+}
+
+.bal-empty-icon {
+  font-size: 2.2rem;
+  color: #c7d2e8;
+}
+
+.bal-empty p {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Bloque "en verificación" — separado visualmente de la principal para que no
+   se lean como dos cuentas equivalentes (bajo D18 nunca lo son). */
+.bal-pending-list {
+  margin-top: 8px;
+}
+
+.bal-activate-btn {
+  margin-top: 8px;
+}
+
+/* Historial archivado: presente pero claramente secundario. */
+.bal-history-title {
+  display: block;
+  margin: 4px 0;
+  font-weight: 600;
+}
+
+.bal-history-list {
+  opacity: 0.65;
+}
+
+.bal-history-item::part(native) {
+  --min-height: 44px;
+  padding-left: 0;
+}
+
+/* ── Hoja de confirmación "Activar como principal" ───────────────────────
+   IonActionSheet es scoped (no shadow), así que sus clases internas se
+   estilizan desde este CSS global. El subtítulo lleva el destino completo
+   (banco · ····1234 · titular) y necesita respirar en pantallas chicas. */
+.bal-sheet .action-sheet-title {
+  font-weight: 600;
+  padding-bottom: 4px;
+}
+
+.bal-sheet .action-sheet-sub-title {
+  font-size: 14px;
+  line-height: 1.4;
+  padding-top: 2px;
+}
+
+.bal-sheet .action-sheet-button.bal-sheet-confirm {
+  color: var(--ion-color-primary);
+  font-weight: 600;
+}

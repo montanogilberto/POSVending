@@ -30,4 +30,18 @@ export const AVATARS: Avatar[] = [
     image: '🧒',
     thumbnail: '🧒',
   },
+  {
+    id: 'gael',
+    name: 'Gael',
+    description: '¡Vamos a ordenar!',
+    image: '🧑',
+    thumbnail: '🧑',
+  },
+  {
+    id: 'tutu',
+    name: 'Tutu',
+    description: '¡Grr, a limpiar!',
+    image: '🧸',
+    thumbnail: '🧸',
+  },
 ];

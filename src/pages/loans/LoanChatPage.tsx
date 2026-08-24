@@ -7,12 +7,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonFooter,
   IonButtons, IonButton, IonIcon, IonToast, IonLoading, IonSpinner,
-  IonModal, IonInput, IonBadge, IonChip, IonLabel,
+  IonModal, IonInput, IonBadge, IonChip, IonLabel, IonActionSheet,
 } from '@ionic/react';
 import {
   arrowBack, sendOutline, cashOutline, checkmarkCircle, closeCircle,
   refreshOutline, createOutline, documentTextOutline, alertCircleOutline,
-  micOutline, volumeHighOutline, volumeMuteOutline,
+  micOutline, volumeHighOutline, volumeMuteOutline, sparklesOutline,
 } from 'ionicons/icons';
 import { useHistory, useParams, useLocation } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
@@ -22,13 +22,12 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
-import { disbursePayment } from '../../api/bankingApi';
+import { disbursePayment, isNonCustodialFundingEnabled, ledgerBalance } from '../../api/bankingApi';
+import { analyzeProposal, ProposalAnalysis } from '../../api/loanAnalysisApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
 import { fmtNum as fmt, mxChatDate as toDate, mxChatTime as toTime } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
 import './LoanChatPage.css';
-
-const API_BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
 
 // ── Proposal Card ─────────────────────────────────────────────────────────────
 interface ProposalCardProps {
@@ -38,8 +37,11 @@ interface ProposalCardProps {
   onAccept: (msg: LoanMessage) => void;
   onReject: () => void;
   canRespond: boolean;
+  // Only the lender gets the Smart Score gate — it's the borrower's
+  // creditworthiness being assessed, and only the lender is about to fund it.
+  showSmartScore: boolean;
 }
-const ProposalCard: React.FC<ProposalCardProps> = ({ msg, isOwn, convStatus, onAccept, onReject, canRespond }) => (
+const ProposalCard: React.FC<ProposalCardProps> = ({ msg, isOwn, convStatus, onAccept, onReject, canRespond, showSmartScore }) => (
   <div className={`lc-proposal-card ${isOwn ? 'lc-proposal-own' : 'lc-proposal-other'}`}>
     <div className="lc-proposal-header">
       <IonIcon icon={cashOutline} />
@@ -54,7 +56,8 @@ const ProposalCard: React.FC<ProposalCardProps> = ({ msg, isOwn, convStatus, onA
     {!isOwn && canRespond && convStatus === 'open' && (
       <div className="lc-proposal-actions">
         <IonButton size="small" shape="round" color="success" onClick={() => onAccept(msg)}>
-          <IonIcon icon={checkmarkCircle} slot="start" /> Aceptar
+          <IonIcon icon={showSmartScore ? sparklesOutline : checkmarkCircle} slot="start" />
+          {showSmartScore ? 'Ver Smart Score y aceptar' : 'Aceptar'}
         </IonButton>
         <IonButton size="small" shape="round" color="danger" fill="outline" onClick={onReject}>
           <IonIcon icon={closeCircle} slot="start" /> Rechazar
@@ -91,6 +94,21 @@ const LoanChatPage: React.FC = () => {
   const [conv, setConv]         = useState<LoanConversation | null>(null);
   const [messages, setMessages] = useState<LoanMessage[]>([]);
   const [loading, setLoading]   = useState(false);
+  // Fondos insuficientes al aceptar — misma hoja con salida (recargar) que P2P,
+  // no un toast que se va solo.
+  const [fundsAlertMsg, setFundsAlertMsg] = useState('');
+  // Ticket de confirmación mostrado justo después de aceptar una propuesta —
+  // mismo patrón que publishedTicket/proposalTicket en P2PLendingPage.tsx.
+  const [acceptedTicket, setAcceptedTicket] = useState<{
+    conversationId: number; amount: number; rate: number; termMonths: number;
+    role: 'lender' | 'borrower'; disbursed: boolean; disbursementDetail: string; acceptedAt: string;
+  } | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  // Smart Score gate — lender sees the borrower's score + loan history + the
+  // Risk/Recommendation agents' read on THIS proposal before accepting.
+  const [analyzingProposal, setAnalyzingProposal] = useState<LoanMessage | null>(null);
+  const [analysis, setAnalysis] = useState<ProposalAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const { showToast, toastProps } = useToast();
 
   const [text, setText]         = useState('');
@@ -339,10 +357,71 @@ const LoanChatPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
+  // Opens the Smart Score modal instead of accepting immediately — the
+  // lender needs to see the borrower's score/history before funding. The
+  // modal's own "Aceptar" button is what actually calls handleAccept(msg).
+  const openProposalAnalysis = (msg: LoanMessage) => {
+    if (!conv) return;
+    setAnalyzingProposal(msg);
+    setAnalysis(null);
+    setAnalysisLoading(true);
+    analyzeProposal({
+      borrowerId: conv.borrowerId, companyId: companyId!,
+      requestedAmount: msg.amount ?? 0, requestedRate: msg.rate ?? 0, requestedTermMonths: msg.termMonths ?? 0,
+    }).then(setAnalysis).finally(() => setAnalysisLoading(false));
+  };
+
   const handleAccept = async (msg: LoanMessage) => {
     if (!conv) return;
     setLoading(true);
     try {
+      // Misma política de fondos que P2PLendingPage.acceptProposal — este
+      // camino no la tenía, así que un lender sin saldo aceptaba igual: la
+      // propuesta quedaba 'accepted' y con el push "¡Solicitud aprobada!"
+      // enviado, y el desembolso reventaba después en los DOS rieles
+      // (/payments/disburse "Saldo insuficiente" + /stripe/disburse
+      // "Insufficient funds") dejando un préstamo aprobado y sin fondear.
+      // El gate corre ANTES de acceptProposal para que nada se marque ni se
+      // notifique si el dinero no puede salir.
+      //
+      // Sólo aplica a quien pone el capital (el lender): si el prestatario
+      // acepta una contraoferta, su saldo no es el que fondea — y su saldo
+      // tampoco es el que hay que revisar.
+      const amount = msg.amount ?? 0;
+      if (myRole === 'lender') {
+        // Flag primero, igual que en P2P: el flujo no-custodio nunca exige
+        // saldo pre-fondeado en SmartLoans (el lender manda SPEI desde su
+        // propio banco), así que el gate de fondos no debe correr para él.
+        const useNonCustodialFunding = await isNonCustodialFundingEnabled(companyId!, conv.lenderId);
+        console.log('[ChatUI] accept: featureFlag nonCustodialFunding =', useNonCustodialFunding);
+        if (useNonCustodialFunding) {
+          // Stopgap (no la solución completa): el chat todavía no sabe crear
+          // el préstamo/paymentIntent/pantalla de declarar del flujo
+          // no-custodio — eso vive solo en P2PLendingPage.acceptProposal().
+          // Sin este bloqueo, aceptar aquí marcaba la conversación
+          // 'accepted' (con push "¡Solicitud aprobada!" real) y luego
+          // triggerDisbursement() intentaba disbursePayment() igual, que
+          // siempre falla con "Saldo insuficiente" porque un lender
+          // no-custodio nunca tiene saldo pre-fondeado — dejando la
+          // conversación aceptada-y-sin-fondear cada vez (pasó en vivo,
+          // conversationId 16). Bloquear es más seguro que fondear mal.
+          console.log('[ChatUI] accept: BLOCKED — non-custodial flow not supported in chat yet');
+          setFundsAlertMsg(
+            'Este préstamo debe fondearse por el flujo directo prestamista↔prestatario, que el chat aún no soporta. ' +
+            'Acepta esta propuesta desde la pestaña "Solicitudes" en P2P Lending.');
+          return;
+        }
+        const bal = await ledgerBalance(companyId!, conv.lenderId).catch(() => ({ availableBalance: 0, reservedBalance: 0 }));
+        const speiBalance = bal.availableBalance ?? 0;
+        if (amount > speiBalance) {
+          console.log('[ChatUI] accept: BLOCKED — insufficient SPEI funds', JSON.stringify({ amount, speiBalance }));
+          setFundsAlertMsg(
+            `Para fondear $${fmt(amount)} tu saldo SPEI es $${fmt(speiBalance)}. El capital publicado en tu ` +
+            `oferta es un anuncio, no dinero depositado: el préstamo se fondea directamente desde tu saldo SPEI.`);
+          return;
+        }
+        console.log('[ChatUI] accept: funds OK', JSON.stringify({ amount, speiBalance }));
+      }
       const res = await loanChatApi.acceptProposal({
         companyId: companyId!, conversationId: conv.conversationId,
         senderId: mySenderId, senderRole: myRole, userId: userId ?? undefined,
@@ -352,9 +431,15 @@ const LoanChatPage: React.FC = () => {
       setConv(prev => prev ? { ...prev, status: 'accepted', agreedAmount: msg.amount, agreedRate: msg.rate, agreedTermMonths: msg.termMonths } : prev);
       showToast('✅ Propuesta aceptada — iniciando préstamo...');
       fetchMessages(conv.conversationId);
-      // Trigger loan disbursement via Stripe
-      await triggerDisbursement(msg);
+      const disburseResult = myRole === 'lender'
+        ? await triggerDisbursement(msg)
+        : { ok: false, detail: 'Pendiente — el prestamista aún no ha desembolsado.' };
       notifyDataChanged('chat_proposal_accepted');
+      setAcceptedTicket({
+        conversationId: conv.conversationId, amount, rate: msg.rate ?? 0, termMonths: msg.termMonths ?? 0,
+        role: myRole, disbursed: disburseResult.ok, disbursementDetail: disburseResult.detail,
+        acceptedAt: new Date().toISOString(),
+      });
     } catch { showToast('Error al aceptar', 'danger'); }
     finally { setLoading(false); }
   };
@@ -375,12 +460,36 @@ const LoanChatPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  // Dual-rail disbursement, same policy as P2PLendingPage.acceptProposal:
-  // SPEI orchestrator first (debits the lender's ledger, sends to the
-  // borrower's verified CLABE, auto-reverses on failure — mock STP for now),
-  // Stripe Connect transfer as the 2nd option.
-  const triggerDisbursement = async (msg: LoanMessage) => {
+  const handleCloseConversation = async () => {
     if (!conv) return;
+    setLoading(true);
+    try {
+      await loanChatApi.closeConversation(conv.conversationId);
+      showToast('Conversación cerrada');
+      notifyDataChanged('chat_conversation_closed');
+      history.goBack();
+    } catch { showToast('No se pudo cerrar la conversación', 'danger'); }
+    finally { setLoading(false); setShowCloseConfirm(false); }
+  };
+
+  // SPEI-only disbursement. Stripe is never a fallback for loan principal —
+  // it's reserved for direct, one-shot platform charges (e.g. premium
+  // subscription billing), per docs/p2p-direct-payments-architecture.md and
+  // the same policy P2PLendingPage.acceptProposal() already enforces. A
+  // Stripe fallback used to sit here; removed rather than "fixed", since
+  // funding a loan through Stripe was the actual policy violation, not a
+  // missing safeguard on it.
+  //
+  // NOTE (known gap, not fixed here): this whole function still only moves
+  // money directly — it doesn't create a loans row, doesn't know about
+  // paymentIntents/fundingTransactions, and never branches into the
+  // non-custodial declare/confirm flow the way P2PLendingPage.acceptProposal()
+  // does. sp_loanChat's accept_proposal action only ever touches
+  // loanConversations/loanMessages, never loans/loanProposals — chat-based
+  // acceptance has never gone through the same loan-creation path as the
+  // Solicitudes tab. Bringing it up to parity is a real, separate task.
+  const triggerDisbursement = async (msg: LoanMessage): Promise<{ ok: boolean; detail: string; transferId?: number }> => {
+    if (!conv) return { ok: false, detail: 'Sin conversación activa.' };
     const amount = msg.amount ?? 0;
     console.log('[ChatUI] disburse: START', JSON.stringify({
       conversationId: conv.conversationId, lenderId: conv.lenderId, borrowerId: conv.borrowerId, amount,
@@ -392,28 +501,17 @@ const LoanChatPage: React.FC = () => {
         loanId: conv.loanProposalId ?? conv.conversationId,
         idempotencyKey: `chat:${conv.conversationId}:disburse:${Date.now()}`,
       });
-      if (!spei.error && spei.status !== 'failed') {
-        console.log('[ChatUI] disburse: SPEI SUCCESS — transferId', spei.transferId, 'CEP', spei.cepUrl);
-        showToast(`💸 Desembolso enviado por SPEI${spei.mock ? ' (modo prueba)' : ''}`);
-        return;
+      if (spei.error || spei.status === 'failed') {
+        throw new Error(spei.error || 'Desembolso por SPEI rechazado.');
       }
-      console.log('[ChatUI] disburse: SPEI FAILED — trying Stripe as 2nd option:', spei.error);
-      const res = await fetch(`${API_BASE}/stripe/disburse`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId, lenderId: conv.lenderId, borrowerId: conv.borrowerId,
-          amount, loanId: conv.loanProposalId ?? conv.conversationId,
-        }),
-      });
-      const stripeResult = await res.json().catch(() => ({}));
-      console.log('[ChatUI] disburse: /stripe/disburse ←', JSON.stringify(stripeResult));
-      if (stripeResult.error || stripeResult.status !== 'succeeded') {
-        throw new Error(stripeResult.error || spei.error || 'Desembolso rechazado en ambos rieles');
-      }
-      showToast('💸 Desembolso enviado vía Stripe (2ª opción)');
+      console.log('[ChatUI] disburse: SPEI SUCCESS — transferId', spei.transferId, 'CEP', spei.cepUrl);
+      showToast(`💸 Desembolso enviado por SPEI${spei.mock ? ' (modo prueba)' : ''}`);
+      return { ok: true, detail: `Fondeado por SPEI${spei.mock ? ' (modo prueba)' : ''}`, transferId: spei.transferId };
     } catch (e) {
-      console.log('[ChatUI] disburse: FAILED on both rails —', e instanceof Error ? e.message : String(e));
+      const detail = e instanceof Error ? e.message : String(e);
+      console.log('[ChatUI] disburse: FAILED —', detail);
       showToast('Propuesta aceptada, pero el desembolso falló. Revisa saldo/cuenta e intenta desde la plataforma.', 'danger');
+      return { ok: false, detail };
     }
   };
 
@@ -442,8 +540,10 @@ const LoanChatPage: React.FC = () => {
             <ProposalCard
               msg={msg} isOwn={isOwn}
               convStatus={conv?.status ?? 'open'}
-              onAccept={handleAccept} onReject={handleReject}
+              onAccept={myRole === 'lender' ? openProposalAnalysis : handleAccept}
+              onReject={handleReject}
               canRespond={conv?.status === 'open'}
+              showSmartScore={myRole === 'lender'}
             />
             <span className="lc-time">{toTime(msg.created_At)}</span>
           </div>
@@ -502,6 +602,11 @@ const LoanChatPage: React.FC = () => {
             <IonButton onClick={() => conv && fetchMessages(conv.conversationId)}>
               <IonIcon icon={refreshOutline} slot="icon-only" />
             </IonButton>
+            {conv && !isAssistantChat && conv.status !== 'closed' && (
+              <IonButton onClick={() => setShowCloseConfirm(true)}>
+                <IonIcon icon={closeCircle} slot="icon-only" />
+              </IonButton>
+            )}
           </IonButtons>
         </IonToolbar>
         {isAssistantChat && (
@@ -521,6 +626,142 @@ const LoanChatPage: React.FC = () => {
       <IonContent ref={contentRef} className="lc-content">
         <IonLoading isOpen={loading} message="..." />
         <IonToast {...toastProps} />
+
+        {/* Fondos insuficientes → la misma salida que ofrece P2P: recargar,
+            en vez de dejar al lender sin siguiente paso. */}
+        <IonActionSheet
+          isOpen={!!fundsAlertMsg}
+          onDidDismiss={() => setFundsAlertMsg('')}
+          header="Fondos insuficientes"
+          subHeader={fundsAlertMsg}
+          buttons={[
+            { text: '💳 Recargar con tarjeta', handler: () => { setFundsAlertMsg(''); history.push('/payment?mode=top_up'); } },
+            { text: 'Cancelar', role: 'cancel' },
+          ]}
+        />
+
+        {/* Cerrar conversación — archiva el hilo, no toca el préstamo. */}
+        <IonActionSheet
+          isOpen={showCloseConfirm}
+          onDidDismiss={() => setShowCloseConfirm(false)}
+          header="Cerrar conversación"
+          subHeader="El hilo se archiva. Esto no cancela ni modifica el préstamo si ya fue aceptado."
+          buttons={[
+            { text: 'Cerrar conversación', role: 'destructive', icon: closeCircle, handler: handleCloseConversation },
+            { text: 'Cancelar', role: 'cancel' },
+          ]}
+        />
+
+        {/* Smart Score — el agente analiza ESTA propuesta (score real, historial
+            de préstamos, y la lectura de Risk/Recommendation) antes de que el
+            lender acepte y comprometa capital. */}
+        <IonModal isOpen={!!analyzingProposal} onDidDismiss={() => { setAnalyzingProposal(null); setAnalysis(null); }}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>Smart Score del prestatario</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => { setAnalyzingProposal(null); setAnalysis(null); }}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            {analysisLoading && (
+              <div className="lc-analysis-loading">
+                <IonSpinner name="dots" />
+                <p>El agente está analizando la propuesta…</p>
+              </div>
+            )}
+            {!analysisLoading && !analysis && (
+              <p className="lc-analysis-error">
+                No se pudo obtener el Smart Score en este momento. Puedes aceptar de todas formas.
+              </p>
+            )}
+            {!analysisLoading && analysis && (
+              <div className="lc-analysis">
+                <div className={`lc-score-card lc-score-${(analysis.riskAssessment.riskTier || 'unknown').toLowerCase()}`}>
+                  <div className="lc-score-value">{analysis.riskAssessment.score ?? '—'}</div>
+                  <div className="lc-score-label">{analysis.riskAssessment.label || 'Sin calificación'}</div>
+                  <IonChip className="lc-risk-chip">{analysis.riskAssessment.riskTier}</IonChip>
+                </div>
+                {analysis.riskAssessment.reasoning && (
+                  <p className="lc-analysis-reasoning">{analysis.riskAssessment.reasoning}</p>
+                )}
+
+                {analysis.recommendation?.rationale && (
+                  <div className="lc-recommendation">
+                    <strong><IonIcon icon={sparklesOutline} /> Recomendación del agente</strong>
+                    <p>{analysis.recommendation.rationale}</p>
+                    {analysis.recommendation.suggestedAmount != null && (
+                      <div className="lc-rec-terms">
+                        ${fmt(analysis.recommendation.suggestedAmount)} · {analysis.recommendation.suggestedRate}% ·{' '}
+                        {analysis.recommendation.suggestedTermMonths} meses
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="lc-loan-history">
+                  <strong>Historial de préstamos</strong>
+                  {analysis.loanHistory.length === 0 ? (
+                    <p className="lc-empty-history">Sin préstamos previos en la plataforma.</p>
+                  ) : (
+                    analysis.loanHistory.map((l, idx) => (
+                      <div className="lc-history-row" key={l.loanId ?? idx}>
+                        <span>${fmt(l.principalAmount ?? 0)}</span>
+                        <span>{l.loanStatus ?? '—'}</span>
+                        <span>{l.myRole === 'lender' ? 'Prestamista' : 'Prestatario'}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </IonContent>
+          <IonFooter className="ion-padding lc-modal-footer">
+            <IonButton expand="block" shape="round" color="success" disabled={loading}
+              onClick={() => {
+                const m = analyzingProposal;
+                setAnalyzingProposal(null); setAnalysis(null);
+                if (m) handleAccept(m);
+              }}>
+              <IonIcon icon={checkmarkCircle} slot="start" /> Aceptar préstamo
+            </IonButton>
+            <IonButton expand="block" fill="outline" shape="round" color="medium"
+              onClick={() => { setAnalyzingProposal(null); setAnalysis(null); }}>
+              Cancelar
+            </IonButton>
+          </IonFooter>
+        </IonModal>
+
+        {/* Ticket de confirmación — mismo patrón que P2PLendingPage.tsx tras
+            publicar capital / enviar solicitud, pero para el préstamo aceptado. */}
+        <IonModal isOpen={!!acceptedTicket} onDidDismiss={() => setAcceptedTicket(null)}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>{acceptedTicket?.disbursed ? 'Préstamo fondeado' : 'Préstamo creado'}</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setAcceptedTicket(null)}>Cerrar</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            {acceptedTicket && (
+              <div className="lc-ticket">
+                <div className={`lc-ticket-status ${acceptedTicket.disbursed ? 'lc-ticket-ok' : 'lc-ticket-pending'}`}>
+                  <IonIcon icon={acceptedTicket.disbursed ? checkmarkCircle : alertCircleOutline} />
+                  {acceptedTicket.disbursed ? 'Fondeado' : 'Aceptado — pendiente'}
+                </div>
+                <div className="lc-ticket-row"><span>Folio</span><strong>#{acceptedTicket.conversationId}</strong></div>
+                <div className="lc-ticket-row"><span>Monto</span><strong>${fmt(acceptedTicket.amount)}</strong></div>
+                <div className="lc-ticket-row"><span>Tasa anual</span><strong>{acceptedTicket.rate}%</strong></div>
+                <div className="lc-ticket-row"><span>Plazo</span><strong>{acceptedTicket.termMonths} meses</strong></div>
+                <div className="lc-ticket-row"><span>Fecha</span><strong>{toDate(acceptedTicket.acceptedAt)}</strong></div>
+                <div className="lc-ticket-row"><span>Tu rol</span><strong>{acceptedTicket.role === 'lender' ? 'Prestamista' : 'Prestatario'}</strong></div>
+                <div className="lc-ticket-detail">{acceptedTicket.disbursementDetail}</div>
+              </div>
+            )}
+          </IonContent>
+        </IonModal>
 
         {messages.length === 0 && !loading && (
           <div className="lc-empty">

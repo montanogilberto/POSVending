@@ -1,0 +1,695 @@
+/* Dashboard del arcade — hero de fichas, secciones por categoria y tiles. */
+
+.arc-content {
+  --padding-bottom: 32px;
+}
+
+.arc-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+/* Insignia junto al titulo en la barra superior. */
+.arc-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-right: 10px;
+  border-radius: 12px;
+  background: var(--arc-violet-soft);
+  color: var(--arc-violet);
+  font-size: 19px;
+  vertical-align: middle;
+}
+
+/* ── Paleta del arcade ─────────────────────────────────────
+   Tokens propios (no los de Ionic) porque el arcade es una zona de juego con
+   identidad aparte del resto de la app financiera.
+   Van en :root y no en .arc-content porque .arc-badge vive en el ion-header,
+   que NO es descendiente del contenido — ahi los tokens no heredaban. */
+:root {
+  --arc-violet: #6d4aff;
+  --arc-violet-soft: #ece7ff;
+  --arc-green: #16a34a;
+  --arc-green-soft: #dcfce7;
+  --arc-blue: #2563eb;
+  --arc-blue-soft: #dbeafe;
+  --arc-red: #e11d48;
+  --arc-red-soft: #ffe4e6;
+  --arc-amber: #ea580c;
+  --arc-amber-soft: #ffedd5;
+  --arc-pink: #db2777;
+  --arc-pink-soft: #fce7f3;
+  --arc-card: var(--ion-background-color, #fff);
+}
+
+.arc-content {
+  --background: var(--ion-color-step-50, #f7f7fb);
+}
+
+/* ── Hero de fichas ───────────────────────────────────────── */
+
+.arc-hero {
+  margin: 12px;
+  border-radius: 20px;
+  /* El degradado va aqui y no en un ion-card para poder pintar texto
+     blanco sobre el sin pelear con los tokens de Ionic. */
+  background: linear-gradient(115deg, #3b5bfd 0%, #6d4aff 55%, #8b46f0 100%);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(80, 60, 200, 0.28);
+  overflow: hidden;
+}
+
+.arc-hero__body {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  padding: 20px;
+}
+
+.arc-hero__left {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.arc-hero__label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.82;
+}
+
+.arc-hero__balance {
+  font-size: 2.9rem;
+  font-weight: 800;
+  line-height: 1.05;
+  margin: 2px 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.arc-hero__stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.arc-hero__net {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--arc-green);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.arc-hero__net--down {
+  color: var(--ion-color-danger, #d33);
+}
+
+.arc-hero__rounds {
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+
+.arc-hero__coins {
+  flex-shrink: 0;
+  align-self: center;
+  width: 96px;
+  height: auto;
+}
+
+/* Columna derecha: limite diario + bono. La separa una regla vertical. */
+.arc-hero__right {
+  flex: 0 0 42%;
+  max-width: 320px;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.arc-hero__limit-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.arc-hero__limit-value small {
+  font-size: 0.76rem;
+  font-weight: 500;
+  opacity: 0.85;
+  margin-left: 4px;
+}
+
+/* La barra mide lo que QUEDA del limite, no lo gastado. Se tematiza por
+   partes de Ionic para poder pintarla en blanco sobre el degradado. */
+.arc-hero__bar {
+  --background: rgba(255, 255, 255, 0.28);
+  --progress-background: #fff;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.arc-hero__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Comprar es la accion secundaria: el bono es gratis y va primero. El
+   contorno translucido la separa sin competir con el boton blanco macizo. */
+.arc-hero__buy {
+  --border-radius: 12px;
+  --border-color: rgba(255, 255, 255, 0.55);
+  --color: #fff;
+  --background-hover: rgba(255, 255, 255, 0.12);
+  --background-activated: rgba(255, 255, 255, 0.2);
+  height: 42px;
+  margin: 0;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.arc-hero__bonus {
+  --background: #fff;
+  --background-activated: #f1f1f8;
+  --background-hover: #f7f7fd;
+  --color: var(--arc-violet);
+  --border-radius: 12px;
+  --box-shadow: none;
+  height: 44px;
+  margin: 0;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* En movil el hero se apila: la regla vertical pasa a horizontal. */
+@media (max-width: 719px) {
+  .arc-hero__body {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .arc-hero__right {
+    flex: 1 1 auto;
+    max-width: none;
+    padding-left: 0;
+    padding-top: 14px;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.28);
+  }
+
+  .arc-hero__coins {
+    width: 74px;
+  }
+}
+
+/* ── Aviso de fichas ──────────────────────────────────────── */
+
+.arc-disclaimer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--ion-color-step-100, #eef0f6);
+  color: var(--ion-color-medium-shade, #6b7280);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.arc-disclaimer ion-icon {
+  flex-shrink: 0;
+  font-size: 20px;
+  color: var(--arc-blue);
+}
+
+.arc-disclaimer p {
+  margin: 0;
+}
+
+/* ── Secciones ────────────────────────────────────────────── */
+
+.arc-section {
+  margin: 22px 12px 0;
+}
+
+.arc-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 4px 10px;
+}
+
+.arc-section__title {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ion-text-color, #1f2333);
+}
+
+.arc-section__count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ion-color-medium);
+}
+
+/* ── Tiles: dos variantes ─────────────────────────────────────
+   'featured' (fila ancha con chevron) para las categorias que YA tienen
+   algo jugable, y 'compact' (rejilla) para las que estan todas bloqueadas.
+   La prominencia sigue a lo que se puede jugar, que es lo que el jugador
+   viene a buscar; no es decoracion arbitraria. */
+
+.arc-featured {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 720px) {
+  .arc-featured {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.arc-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--arc-card);
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.07);
+  text-align: start;
+}
+
+.arc-row__icon {
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: var(--arc-tint, var(--arc-violet-soft));
+  color: var(--arc-ink, var(--arc-violet));
+}
+
+.arc-row__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.arc-row__name {
+  margin: 0 0 2px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ion-text-color, #1f2333);
+}
+
+.arc-row__tagline {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ion-color-medium);
+}
+
+.arc-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.arc-row__limits {
+  font-size: 0.78rem;
+  color: var(--ion-color-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.arc-rtp {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--arc-green-soft);
+  color: var(--arc-green);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.arc-row__chevron {
+  flex-shrink: 0;
+  font-size: 20px;
+  color: var(--ion-color-medium);
+}
+
+/* ── Tile compacto ────────────────────────────────────────── */
+
+.arc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+}
+
+/* En escritorio las categorias todas-bloqueadas se acomodan a dos columnas:
+   una seccion de 2 tiles dejaba tres huecos vacios a lo ancho. */
+@media (min-width: 720px) {
+  .arc-locked-zone {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 12px;
+    align-items: start;
+  }
+
+  .arc-locked-zone .arc-section {
+    margin-inline: 0;
+  }
+
+  .arc-locked-zone .arc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  }
+}
+
+.arc-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin: 0;
+  padding: 16px 10px 14px;
+  border-radius: 16px;
+  background: var(--arc-card);
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.07);
+  height: 100%;
+}
+
+.arc-tile__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 23px;
+  margin-bottom: 9px;
+  background: var(--arc-tint, var(--arc-violet-soft));
+  color: var(--arc-ink, var(--arc-violet));
+}
+
+.arc-tile__name {
+  margin: 0 0 3px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ion-text-color, #1f2333);
+}
+
+.arc-tile__tagline {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--ion-color-medium);
+  flex-grow: 1;
+}
+
+.arc-tile__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.arc-tile__limits {
+  font-size: 0.72rem;
+  color: var(--ion-color-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Bloqueado ────────────────────────────────────────────── */
+
+.arc-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #2f3545;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.arc-soon ion-icon {
+  font-size: 12px;
+}
+
+/* Apaga solo el icono y el titulo: el tile sigue tocable para poder
+   explicar por que esta bloqueado en vez de ignorar el toque. */
+.arc-locked .arc-row__icon,
+.arc-locked .arc-tile__icon,
+.arc-locked .arc-row__name,
+.arc-locked .arc-tile__name {
+  opacity: 0.55;
+}
+
+/* ── Acentos por juego ────────────────────────────────────────
+   Clase por gameKey en vez de estilo en linea (CLAUDE.md §4.2). Un juego
+   sin acento propio hereda el violeta por defecto del tile. */
+.arc-ico--blackjack   { --arc-tint: var(--arc-violet-soft); --arc-ink: var(--arc-violet); }
+.arc-ico--higherlower { --arc-tint: var(--arc-blue-soft);   --arc-ink: var(--arc-blue);   }
+.arc-ico--mole        { --arc-tint: var(--arc-green-soft);  --arc-ink: var(--arc-green);  }
+.arc-ico--bowling     { --arc-tint: var(--arc-violet-soft); --arc-ink: var(--arc-violet); }
+.arc-ico--penalty     { --arc-tint: var(--arc-red-soft);    --arc-ink: var(--arc-red);    }
+.arc-ico--dice        { --arc-tint: var(--arc-blue-soft);   --arc-ink: var(--arc-blue);   }
+.arc-ico--coinflip    { --arc-tint: var(--arc-green-soft);  --arc-ink: var(--arc-green);  }
+.arc-ico--mines       { --arc-tint: var(--arc-amber-soft);  --arc-ink: var(--arc-amber);  }
+.arc-ico--wheel       { --arc-tint: var(--arc-amber-soft);  --arc-ink: var(--arc-amber);  }
+.arc-ico--scratch     { --arc-tint: var(--arc-pink-soft);   --arc-ink: var(--arc-pink);   }
+
+/* ── Historial ────────────────────────────────────────────── */
+
+.arc-history {
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--arc-card);
+}
+
+.arc-history h3 {
+  text-transform: capitalize;
+  font-weight: 700;
+}
+
+.arc-history__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.arc-note {
+  display: block;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--arc-card);
+  font-size: 0.84rem;
+  color: var(--ion-color-medium);
+}
+
+.arc-empty {
+  padding: 32px 16px;
+}
+
+/* ── Modo oscuro ──────────────────────────────────────────────
+   El degradado del hero ya es oscuro, asi que solo cambian los fondos
+   planos; sin esto las tarjetas quedaban blancas sobre fondo negro. */
+@media (prefers-color-scheme: dark) {
+  .arc-content {
+    --arc-card: #1c1d24;
+    --background: #131419;
+  }
+
+  .arc-disclaimer {
+    background: #1c1d24;
+  }
+
+  .arc-row,
+  .arc-tile {
+    box-shadow: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  /* En claro el chip oscuro contrasta contra la tarjeta blanca; en oscuro
+     quedaba gris sobre gris, asi que se invierte. */
+  .arc-soon {
+    background: rgba(255, 255, 255, 0.14);
+    color: #e7e8ee;
+  }
+}
+
+/* ── Ganancias en vivo ────────────────────────────────────── */
+
+.arc-live {
+  margin: 18px 0 0;
+}
+
+.arc-live__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 16px 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ion-text-color, #1f2333);
+}
+
+.arc-live__dot {
+  font-size: 12px;
+  color: var(--arc-green);
+}
+
+/* Riel con scroll nativo + snap: el gesto correcto en móvil sin librería. */
+.arc-live__rail,
+.arc-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding: 2px 12px 6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.arc-live__rail::-webkit-scrollbar,
+.arc-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.arc-live__card {
+  flex: 0 0 auto;
+  width: 104px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 8px;
+  border-radius: 14px;
+  background: var(--arc-card);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.07);
+}
+
+.arc-live__art {
+  width: 100%;
+  height: 62px;
+  display: block;
+}
+
+.arc-live__game {
+  margin-top: 6px;
+  font-size: 0.68rem;
+  color: var(--ion-color-medium);
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arc-live__amount {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--arc-green);
+  font-variant-numeric: tabular-nums;
+}
+
+.arc-live__mult {
+  font-size: 0.68rem;
+  color: var(--ion-color-medium);
+}
+
+/* ── Tarjeta ilustrada ────────────────────────────────────── */
+
+.arc-rail__item {
+  flex: 0 0 auto;
+  width: 136px;
+  scroll-snap-align: start;
+}
+
+.arc-art {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0 0 10px;
+  border: none;
+  border-radius: 14px;
+  background: var(--arc-card);
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.07);
+  text-align: start;
+  cursor: pointer;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.arc-art__frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+}
+
+.arc-art__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.arc-art__lock {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 16, 22, 0.55);
+  color: #fff;
+  font-size: 22px;
+}
+
+.arc-art__name {
+  margin: 8px 10px 2px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--ion-text-color, #1f2333);
+  line-height: 1.25;
+}
+
+.arc-art__meta {
+  margin: 0 10px;
+  font-size: 0.7rem;
+  color: var(--ion-color-medium);
+}
+
+.arc-art.arc-locked .arc-art__name {
+  opacity: 0.6;
+}

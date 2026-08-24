@@ -43,6 +43,68 @@
   pointer-events: none;
 }
 
+/* Shown only when the player wandered (via a door) out of the mission's own room — see the
+   inMissionRoom guard in GameWorld3D.tsx/§20. Sits just under the mission banner so it reads as
+   "here's where to actually go", not a second competing headline. */
+.game-world-3d__room-hint {
+  position: absolute;
+  top: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #b8560c;
+  background: #fff3e6dd;
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Only rendered for missions with >1 objective (see the guard in GameWorld3D.tsx, README §26
+   step 7) — sits below the mission banner and room-hint, both of which are pill-shaped single
+   lines; this is a small card since it needs to stack N rows. */
+.game-world-3d__task-list {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: #ffffffdd;
+  border-radius: 14px;
+  padding: 8px 14px;
+  min-width: 160px;
+  pointer-events: none;
+}
+
+.game-world-3d__task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.game-world-3d__task--active {
+  color: var(--text-primary);
+}
+
+.game-world-3d__task--done {
+  color: #15803d;
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.game-world-3d__task-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 .game-world-3d__mission-progress {
   position: absolute;
   top: 10px;
@@ -60,7 +122,7 @@
 .game-world-3d__fps {
   position: absolute;
   top: 10px;
-  right: 52px;
+  right: 96px;
   z-index: 5;
   font: 12px monospace;
   color: #fff;
@@ -73,6 +135,19 @@
   position: absolute;
   top: 2px;
   right: 4px;
+  z-index: 6;
+  --color: var(--text-primary);
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+/* Left of the mute button, same row — opens MissionMap.tsx. */
+.game-world-3d__map-button {
+  position: absolute;
+  top: 2px;
+  right: 44px;
   z-index: 6;
   --color: var(--text-primary);
   --padding-start: 8px;

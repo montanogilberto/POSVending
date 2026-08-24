@@ -336,3 +336,160 @@
   0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35); }
   50% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
 }
+
+/* ── Ticket de confirmación (préstamo aceptado) ── */
+.lc-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lc-ticket-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+}
+
+.lc-ticket-ok {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.lc-ticket-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.lc-ticket-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.lc-ticket-row strong {
+  color: #111827;
+  font-size: 14px;
+}
+
+.lc-ticket-detail {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* ── Smart Score (análisis de propuesta antes de aceptar) ── */
+.lc-analysis-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 0;
+  color: #6b7280;
+}
+
+.lc-analysis-error {
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.lc-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lc-score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 14px;
+  border-radius: 14px;
+  background: #f3f4f6;
+}
+
+.lc-score-value {
+  font-size: 36px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1;
+}
+
+.lc-score-label {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.lc-risk-chip {
+  margin-top: 6px;
+  --background: #e5e7eb;
+  --color: #374151;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.lc-score-low .lc-risk-chip { --background: #dcfce7; --color: #15803d; }
+.lc-score-medium .lc-risk-chip { --background: #fef3c7; --color: #92400e; }
+.lc-score-high .lc-risk-chip { --background: #fee2e2; --color: #b91c1c; }
+
+.lc-analysis-reasoning {
+  font-size: 13px;
+  color: #4b5563;
+  margin: 0;
+}
+
+.lc-recommendation {
+  background: #eef2ff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #3730a3;
+}
+
+.lc-recommendation strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.lc-rec-terms {
+  margin-top: 6px;
+  font-weight: 700;
+  color: #1e1b4b;
+}
+
+.lc-loan-history strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #111827;
+}
+
+.lc-empty-history {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.lc-history-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #4b5563;
+}

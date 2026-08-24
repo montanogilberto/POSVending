@@ -105,3 +105,27 @@ export type GameAction =
   | { type: 'RESUME_GAME' }
   | { type: 'RESET_GAME' }
   | { type: 'NEXT_LEVEL'; level: GameLevel };
+
+/**
+ * Analytics-only — never read back by gameplay logic. Raised straight from GameWorld3D's own
+ * callbacks (mission_start/item_picked/item_placed/room_changed/mission_complete), NOT from
+ * gameReducer/GameContext: that reducer is the legacy pre-3D single-level domain, deliberately
+ * bypassed by the live 3D mission loop (see MissionCleanRoomView.tsx's own comment on
+ * `missionIndex`) — it has no concept of rooms or MissionDefinition3D to instrument.
+ */
+export type GameEventType =
+  | 'mission_start'
+  | 'mission_complete'
+  | 'item_picked'
+  | 'item_placed'
+  | 'room_changed';
+
+export interface GameEvent {
+  eventId: string;
+  eventType: GameEventType;
+  timestamp: number;
+  missionId: string;
+  avatarId: string | null;
+  durationSeconds?: number;
+  metadata?: Record<string, unknown>;
+}

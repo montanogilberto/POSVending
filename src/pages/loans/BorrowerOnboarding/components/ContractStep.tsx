@@ -4,6 +4,7 @@ import { arrowBackOutline, checkmarkCircle, shieldCheckmarkOutline } from 'ionic
 import { CONTRACT_TEXT } from '../documents/contract';
 import { BorrowerOnboardingVM } from '../BorrowerOnboardingLogic';
 import DoneCard from './DoneCard';
+import { p2pLendingRoute } from '../../../../utils/routes';
 
 /** Paso 2 — Contrato de Crédito P2P: lectura y aceptación final. */
 const ContractStep: React.FC<{ vm: BorrowerOnboardingVM }> = ({ vm }) => (
@@ -47,7 +48,7 @@ const ContractStep: React.FC<{ vm: BorrowerOnboardingVM }> = ({ vm }) => (
       </IonButton>
       <IonButton
         color="success"
-        onClick={vm.contractDone ? () => vm.history.replace('/p2p-lending') : vm.saveContract}
+        onClick={vm.contractDone ? () => vm.history.replace(p2pLendingRoute(vm.clientId)) : vm.saveContract}
         disabled={!vm.contractDone && !vm.contractAccepted}
       >
         {vm.contractDone ? 'Ir a la plataforma' : 'Aceptar y activar cuenta'}

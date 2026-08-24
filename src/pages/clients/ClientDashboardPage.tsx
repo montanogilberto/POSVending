@@ -63,20 +63,30 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
 import { useUser } from '../../contexts/UserContext';
+import BenefitPicker from '../../components/rewards/BenefitPicker';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
-import { Loan, getAllLoans, createLoan } from '../../api/loanApi';
-import { countPendingProposalsForBorrower } from '../../api/loanMarketplaceApi';
+import { Loan, getAllLoans } from '../../api/loanApi';
+import { countPendingProposalsForBorrower, fetchLoanProposals, MarketplaceProposal } from '../../api/loanMarketplaceApi';
 import { fetchInstallmentSchedule, payInstallmentSpei, Installment } from '../../api/installmentsApi';
 import { ledgerBalance, postLedgerEntry } from '../../api/bankingApi';
+import { p2pLendingRoute } from '../../utils/routes';
 
 // Muestra el simulador de depósito SPEI (igual que P2PLendingPage) — apagar
 // antes de conectar STP real.
 const SHOW_BANKING_TEST_TOOLS = false;
+
+// Riel Stripe (cuenta conectada + saldo en cartera + retiro): apagado.
+// SmartLoans es conector, no custodio — el dinero va directo prestamista↔
+// prestatario por SPEI, así que no hay "saldo disponible" que mostrar ni
+// fondos que retirar de la plataforma (docs/p2p-direct-payments-architecture.md).
+// El código de Stripe se conserva detrás de este flag por si vuelve a hacer falta.
+const SHOW_STRIPE_RAIL = false;
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
 import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/loans/LoanCompletionRing';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
+import BankAccountLink from '../../components/payments/BankAccountLink';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
@@ -170,6 +180,16 @@ const loanStatusLabel = (status: string) => {
   return map[normLoanStatus(status)] ?? status;
 };
 
+const proposalStatusLabel = (status: string): string => ({
+  pending: 'Pendiente', accepted: 'Aceptada', rejected: 'Rechazada',
+  expired: 'Vencida', cancelled: 'Cancelada', countered: 'Nuevos términos propuestos',
+}[status] ?? status);
+
+const proposalStatusColor = (status: string): string => ({
+  pending: '#b45309', accepted: '#148742', rejected: '#b91c1c',
+  expired: '#6b7280', cancelled: '#6b7280', countered: '#1d4ed8',
+}[status] ?? '#6b7280');
+
 const PAGE_SIZE = 10;
 
 const ClientDashboardPage: React.FC = () => {
@@ -226,17 +246,11 @@ const ClientDashboardPage: React.FC = () => {
   // Loans
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loansLoading, setLoansLoading] = useState(false);
-  const [showLoanModal, setShowLoanModal] = useState(false);
-  const [newLoan, setNewLoan] = useState<Partial<Loan>>({
-    principalAmount: 0,
-    interestRate: 0,
-    termMonths: 12,
-    paymentFrequency: 'Monthly',
-    loanStatus: 'Pending',
-    notes: '',
-  });
-
-
+  // Historial de solicitudes (propuestas) propias — el módulo de préstamos
+  // solo mostraba préstamos ya fondeados; esto cubre pending/countered/
+  // rejected/etc. antes de que exista un Loan.
+  const [proposals, setProposals] = useState<MarketplaceProposal[]>([]);
+  const [proposalsLoading, setProposalsLoading] = useState(false);
   // Face recognition / completion
   const [faceRecord, setFaceRecord] = useState<ClientFaceRecognition | null>(null);
   // Solicitudes P2P propias aún sin respuesta — banner en el home.
@@ -347,6 +361,22 @@ const ClientDashboardPage: React.FC = () => {
       console.error('[ClientDashboard] fetchLoans ❌', err);
     } finally {
       setLoansLoading(false);
+    }
+  };
+
+  // ── Fetch this borrower's proposal history (pending/countered/rejected/…) ─
+  const fetchProposals = async () => {
+    if (!companyId || !clientId) return;
+    setProposalsLoading(true);
+    try {
+      const all = await fetchLoanProposals(companyId);
+      const mine = all.filter(p => p.borrowerId === Number(clientId));
+      console.log('[ClientDashboard] fetchProposals ✅ total:', all.length, '→ mine:', mine.length);
+      setProposals(mine);
+    } catch (err) {
+      console.error('[ClientDashboard] fetchProposals ❌', err);
+    } finally {
+      setProposalsLoading(false);
     }
   };
 
@@ -573,6 +603,7 @@ const ClientDashboardPage: React.FC = () => {
     console.log('[ClientDashboard] initial-load effect: fetching dashboard/loans/stripe/faceRecord for clientId =', clientId, 'companyId =', companyId);
     fetchDashboard();
     fetchLoans();
+    fetchProposals();
     fetchStripe();
     // Solicitudes que este borrower envió y siguen sin respuesta — banner del home.
     if (companyId && clientId) {
@@ -619,6 +650,7 @@ const ClientDashboardPage: React.FC = () => {
       console.log('[ClientDashboard] data-changed →', reason);
       fetchDashboard();
       fetchLoans();
+      fetchProposals();
       fetchStripe();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -632,6 +664,7 @@ const ClientDashboardPage: React.FC = () => {
     console.log('[ClientDashboard] view re-entered → refreshing');
     fetchDashboard();
     fetchLoans();
+    fetchProposals();
     fetchStripe();
     countPendingProposalsForBorrower(companyId, Number(clientId))
       .then(setMyPendingProposals)
@@ -795,28 +828,6 @@ const ClientDashboardPage: React.FC = () => {
     return activeLoans.reduce((sum, l) => sum + l.interestRate * (l.principalAmount || 0), 0) / totalPrincipal;
   })();
 
-  // ── Create loan ───────────────────────────────────────────────────────────
-  const handleCreateLoan = async () => {
-    if (!companyId || !clientId) return;
-    setLoading(true);
-    try {
-      await createLoan({
-        ...newLoan as Omit<Loan, 'loanId' | 'created_At' | 'updated_at'>,
-        companyId,
-        clientId,
-        loanNumber: `LN-${Date.now()}`,
-        loanStatus: 'Pending',
-      });
-      setShowLoanModal(false);
-      setSuccessMsg('Solicitud de préstamo enviada.');
-      await fetchLoans();
-    } catch (err) {
-      setError((err as Error).message ?? 'Error al crear préstamo');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // ── Tab navigation ────────────────────────────────────────────────────────
   const goTab = (tab: Tab) => {
     setActiveTab(tab);
@@ -879,7 +890,7 @@ const ClientDashboardPage: React.FC = () => {
       {myPendingProposals > 0 && (
         <div
           className="pending-proposals-banner"
-          onClick={() => { console.log('[ClientDashboard] proposals banner → /p2p-lending'); history.push('/p2p-lending'); }}>
+          onClick={() => { console.log('[ClientDashboard] proposals banner →', p2pLendingRoute(clientId, 'my')); history.push(p2pLendingRoute(clientId, 'my')); }}>
           <IonIcon icon={timeOutline} />
           <span>
             Tienes <strong>{myPendingProposals}</strong> {myPendingProposals === 1 ? 'solicitud enviada' : 'solicitudes enviadas'} en espera de respuesta
@@ -1066,7 +1077,7 @@ const ClientDashboardPage: React.FC = () => {
                     solicitud); el flujo directo creaba préstamos 'Pending'
                     huérfanos sin prestamista/dinero/cuotas. */}
                 <IonButton expand="block" shape="round" className="client-dashboard-action-button"
-                  onClick={() => { console.log('[ClientDashboard] Solicitar préstamo → /p2p-lending'); history.push('/p2p-lending'); }}>
+                  onClick={() => { console.log('[ClientDashboard] Solicitar préstamo →', p2pLendingRoute(clientId)); history.push(p2pLendingRoute(clientId)); }}>
                   <IonIcon icon={addCircleOutline} slot="start" /> Solicitar préstamo
                 </IonButton>
               </IonCol>
@@ -1105,12 +1116,18 @@ const ClientDashboardPage: React.FC = () => {
   );
 
   const renderLoans = () => (
+    <>
+    {/* Los PUNTOS (ganados pagando a tiempo) se canjean por un descuento en el
+        próximo préstamo. Va aquí, antes de "Nuevo", porque el beneficio se
+        aparta ANTES de solicitar y luego se amarra al crédito creado. */}
+    <BenefitPicker companyId={companyId} clientId={clientId} />
+
     <IonCard className="client-dashboard-card">
       <IonCardHeader>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <IonCardTitle>Mis Préstamos</IonCardTitle>
           <IonButton fill="clear" size="small"
-            onClick={() => { console.log('[ClientDashboard] Nuevo préstamo → /p2p-lending'); history.push('/p2p-lending'); }}>
+            onClick={() => { console.log('[ClientDashboard] Nuevo préstamo →', p2pLendingRoute(clientId)); history.push(p2pLendingRoute(clientId)); }}>
             <IonIcon icon={addCircleOutline} slot="start" /> Nuevo
           </IonButton>
         </div>
@@ -1122,7 +1139,7 @@ const ClientDashboardPage: React.FC = () => {
             <IonIcon icon={documentTextOutline} />
             <p>No tienes préstamos registrados.</p>
             <IonButton size="small"
-              onClick={() => { console.log('[ClientDashboard] empty-state Solicitar → /p2p-lending'); history.push('/p2p-lending'); }}>
+              onClick={() => { console.log('[ClientDashboard] empty-state Solicitar →', p2pLendingRoute(clientId)); history.push(p2pLendingRoute(clientId)); }}>
               Solicitar préstamo
             </IonButton>
           </div>
@@ -1167,6 +1184,57 @@ const ClientDashboardPage: React.FC = () => {
         </div>
       </IonCardContent>
     </IonCard>
+
+    {/* Historial de solicitudes — antes invisible en este módulo: una
+        propuesta pending/countered/rejected no es un Loan todavía, así que
+        no aparecía arriba aunque el borrower sí tuviera actividad. */}
+    {(proposalsLoading || proposals.length > 0) && (
+      <IonCard className="client-dashboard-card">
+        <IonCardHeader>
+          <IonCardTitle>Mis Solicitudes</IonCardTitle>
+        </IonCardHeader>
+        <IonCardContent>
+          {proposalsLoading && <p style={{ color: '#74839f', textAlign: 'center' }}>Cargando solicitudes...</p>}
+          <div className="cd-loan-list">
+            {proposals.map(p => {
+              const amount = p.counteredAmount ?? p.requestedAmount;
+              const rate = p.counteredRate ?? p.proposedRate;
+              const term = p.counteredTermMonths ?? p.termMonths;
+              const needsResponse = p.status === 'countered';
+              return (
+                <div key={p.proposalId} className="cd-loan-card" style={{ cursor: 'pointer' }}
+                  onClick={() => { console.log('[ClientDashboard] proposal →', p.proposalId, p2pLendingRoute(clientId, 'my')); history.push(p2pLendingRoute(clientId, 'my')); }}>
+                  <div className="cd-loan-header">
+                    <span className="cd-loan-number">Solicitud #{p.proposalId}</span>
+                    <span className="cd-loan-status" style={{ color: proposalStatusColor(p.status) }}>
+                      <IonIcon icon={p.status === 'accepted' ? checkmarkCircleOutline : p.status === 'pending' ? ellipseOutline : alertCircleOutline} />
+                      {proposalStatusLabel(p.status)}
+                    </span>
+                  </div>
+                  <div className="cd-loan-amounts">
+                    <div><small>Monto</small><strong>${amount.toLocaleString()}</strong></div>
+                    <div><small>Tasa</small><strong>{rate}%</strong></div>
+                    <div><small>Plazo</small><strong>{term} m</strong></div>
+                  </div>
+                  {p.created_At && (
+                    <div className="cd-loan-meta">
+                      <span><IonIcon icon={timeOutline} /> Solicitado: {toDate(p.created_At)}</span>
+                    </div>
+                  )}
+                  {needsResponse && (
+                    <IonButton size="small" expand="block"
+                      onClick={(e) => { e.stopPropagation(); history.push(p2pLendingRoute(clientId, 'my')); }}>
+                      Responder nuevos términos
+                    </IonButton>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </IonCardContent>
+      </IonCard>
+    )}
+    </>
   );
 
   const renderPayments = () => {
@@ -1236,7 +1304,30 @@ const ClientDashboardPage: React.FC = () => {
           ]}
         />
 
+        {/* Cuenta bancaria (SPEI) — el destino real del dinero en el modelo
+            no-custodio: aquí el cliente vincula/verifica su CLABE y elige cuál
+            es la Principal. Mismo componente que el modal de P2PLendingPage. */}
+        {clientId && companyId && (
+          <IonCard className="client-dashboard-card">
+            <IonCardHeader>
+              <IonCardTitle>Cuenta bancaria (SPEI)</IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent>
+              <p className="cd-bank-note">
+                Tu CLABE verificada es la cuenta donde recibes tu préstamo y tus pagos.
+                Las transferencias son directas entre las partes — SmartLoans no retiene tu dinero.
+              </p>
+              <BankAccountLink
+                clientId={Number(clientId)}
+                companyId={Number(companyId)}
+                holderName={clientRecord ? `${clientRecord.first_name} ${clientRecord.last_name}` : ''}
+              />
+            </IonCardContent>
+          </IonCard>
+        )}
+
         {/* Stripe account status */}
+        {SHOW_STRIPE_RAIL && (
         <IonCard className="client-dashboard-card cd-stripe-card">
           <IonCardHeader>
             <div className="cd-stripe-header">
@@ -1321,9 +1412,11 @@ const ClientDashboardPage: React.FC = () => {
             )}
           </IonCardContent>
         </IonCard>
+        )}
 
-        {/* Wallet balance / withdraw */}
-        {!stripeLoading && stripeAccount && (
+        {/* Saldo disponible / retiro — sólo existe en el riel Stripe (cartera
+            custodiada). En el modelo no-custodio no hay saldo de plataforma. */}
+        {SHOW_STRIPE_RAIL && !stripeLoading && stripeAccount && (
           <IonCard className="client-dashboard-card cd-stripe-card">
             <IonCardHeader>
               <IonCardTitle>Saldo disponible</IonCardTitle>
@@ -1341,7 +1434,6 @@ const ClientDashboardPage: React.FC = () => {
                 expand="block"
                 fill="outline"
                 className="cd-stripe-cta"
-                style={{ marginTop: 12 }}
                 disabled={!stripeAccount.hasExternalAccount || !walletBalance}
                 onClick={() => setShowWithdrawAlert(true)}
               >
@@ -1691,84 +1783,6 @@ const ClientDashboardPage: React.FC = () => {
     </>
   );
 
-  // ── Loan request modal ────────────────────────────────────────────────────
-  const renderLoanModal = () => (
-    <IonModal isOpen={showLoanModal} onDidDismiss={() => setShowLoanModal(false)}>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Solicitar Préstamo</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={() => setShowLoanModal(false)}>
-              <IonIcon icon={closeOutline} slot="icon-only" />
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent className="ion-padding">
-        <div className="cd-loan-form">
-          <div className="cd-form-group">
-            <IonInput
-              label="Monto solicitado ($)" labelPlacement="floating" fill="outline"
-              type="number" value={newLoan.principalAmount} min={0}
-              onIonInput={e => setNewLoan(p => ({ ...p, principalAmount: Number(e.detail.value) }))}
-            />
-          </div>
-          <div className="cd-form-group">
-            <IonInput
-              label="Tasa de interés (%)" labelPlacement="floating" fill="outline"
-              type="number" value={newLoan.interestRate} min={0}
-              onIonInput={e => setNewLoan(p => ({ ...p, interestRate: Number(e.detail.value) }))}
-            />
-          </div>
-          <div className="cd-form-group">
-            <IonInput
-              label="Plazo (meses)" labelPlacement="floating" fill="outline"
-              type="number" value={newLoan.termMonths} min={1}
-              onIonInput={e => setNewLoan(p => ({ ...p, termMonths: Number(e.detail.value) }))}
-            />
-          </div>
-          <div className="cd-form-group">
-            <IonSelect
-              label="Frecuencia de pago" labelPlacement="floating" fill="outline"
-              value={newLoan.paymentFrequency}
-              onIonChange={e => setNewLoan(p => ({ ...p, paymentFrequency: e.detail.value }))}
-            >
-              <IonSelectOption value="Weekly">Semanal</IonSelectOption>
-              <IonSelectOption value="Biweekly">Quincenal</IonSelectOption>
-              <IonSelectOption value="Monthly">Mensual</IonSelectOption>
-            </IonSelect>
-          </div>
-          <div className="cd-form-group">
-            <IonInput
-              label="Notas (opcional)" labelPlacement="floating" fill="outline"
-              value={newLoan.notes}
-              onIonInput={e => setNewLoan(p => ({ ...p, notes: e.detail.value! }))}
-              placeholder="Motivo del préstamo..."
-            />
-          </div>
-
-          {newLoan.principalAmount! > 0 && (
-            <div className="cd-loan-preview">
-              <p><strong>Resumen estimado</strong></p>
-              <p>Monto: ${Number(newLoan.principalAmount).toLocaleString()}</p>
-              <p>Plazo: {newLoan.termMonths} meses</p>
-              <p>Pago aprox/mes: ${(
-                (Number(newLoan.principalAmount) * (1 + Number(newLoan.interestRate) / 100)) /
-                Number(newLoan.termMonths)
-              ).toFixed(2)}</p>
-            </div>
-          )}
-
-          <IonButton expand="block" shape="round" onClick={handleCreateLoan} disabled={loading}
-            className="client-dashboard-action-button" style={{ marginTop: 20 }}>
-            <IonIcon icon={addCircleOutline} slot="start" />
-            Enviar solicitud
-          </IonButton>
-        </div>
-      </IonContent>
-    </IonModal>
-  );
-
   // ── Payment modal ─────────────────────────────────────────────────────────
   const renderPayModal = () => (
     <IonModal isOpen={showPayModal} onDidDismiss={() => { setShowPayModal(false); setPayAmount(''); }}>
@@ -1842,7 +1856,7 @@ const ClientDashboardPage: React.FC = () => {
         <IonToast isOpen={!!successMsg} message={successMsg} duration={2500} onDidDismiss={() => setSuccessMsg('')} color="success" />
 
         <IonAlert
-          isOpen={showWithdrawAlert}
+          isOpen={SHOW_STRIPE_RAIL && showWithdrawAlert}
           onDidDismiss={() => setShowWithdrawAlert(false)}
           header="Retirar fondos"
           message={`Saldo disponible: $${(walletBalance ?? 0).toFixed(2)} MXN. El monto se transferirá a tu cuenta bancaria o tarjeta de débito vinculada.`}
@@ -1865,7 +1879,6 @@ const ClientDashboardPage: React.FC = () => {
             clear the old floating pill nav that overlaid the content). */}
         <div style={{ height: 16 }} />
 
-        {renderLoanModal()}
         {renderPayModal()}
       </IonContent>
     </IonPage>

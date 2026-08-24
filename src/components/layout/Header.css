@@ -36,9 +36,14 @@
   }
 }
 
-/* Force end buttons to stay within container bounds */
-.dashboard-header ion-toolbar ion-buttons[slot="end"] {
-  max-width: 50%;
+/* Force end buttons to stay within container bounds — solo aplica cuando el
+   título convive con los botones (≥792px). En mobile .screen-title está
+   oculto, así que el 50% no tiene nada que respetar y solo recorta íconos
+   (ej. mail queda fuera de pantalla en devices angostos). */
+@media (min-width: 792px) {
+  .dashboard-header ion-toolbar ion-buttons[slot="end"] {
+    max-width: 50%;
+  }
 }
 
 /* Hide title on mobile */
@@ -72,6 +77,22 @@
 
 .header-action-button ion-icon {
   font-size: 28px;
+}
+
+/* Mobile angosto: hasta 5 íconos (sparkles/chat, bell, mail, help) deben
+   caber sin recortarse — reduce touch target e ícono un poco. */
+@media (max-width: 400px) {
+  .header-action-button {
+    min-height: 40px;
+    min-width: 40px;
+    margin: 2px;
+    --padding-start: 6px;
+    --padding-end: 6px;
+  }
+
+  .header-action-button ion-icon {
+    font-size: 22px;
+  }
 }
 
 .header-action-button:hover {

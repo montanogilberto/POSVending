@@ -1,0 +1,59 @@
+.pf-content {
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 8px;
+  --padding-bottom: 24px;
+}
+
+.pf-intro {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.pf-intro__icon {
+  font-size: 28px;
+  color: var(--ion-color-success);
+  flex-shrink: 0;
+}
+
+.pf-intro p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.pf-field {
+  margin-bottom: 14px;
+}
+
+.pf-field__label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ion-color-medium);
+  margin-bottom: 4px;
+}
+
+.pf-field__value {
+  display: block;
+  font-size: 0.74rem;
+  word-break: break-all;
+  background: var(--ion-color-light);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.pf-note {
+  display: block;
+  margin-top: 16px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.pf-note--warn {
+  margin-top: 8px;
+  color: var(--ion-color-medium);
+}

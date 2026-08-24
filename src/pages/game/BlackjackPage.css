@@ -1,0 +1,140 @@
+/* Mesa de blackjack — cartas, manos y acciones. */
+
+.bj-content {
+  --padding-bottom: 24px;
+}
+
+.bj-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.bj-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px 0;
+}
+
+.bj-topbar ion-chip {
+  margin: 0;
+}
+
+/* ── Mesa ─────────────────────────────────────────────────── */
+
+.bj-table {
+  margin: 12px;
+  padding: 18px 14px;
+  border-radius: 16px;
+  background: var(--ion-color-light);
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.bj-table__divider {
+  height: 1px;
+  background: var(--ion-color-step-200, rgba(0, 0, 0, 0.1));
+  margin: 6px 0;
+}
+
+.bj-table__idle {
+  text-align: center;
+  color: var(--ion-color-medium);
+}
+
+.bj-table__idle p {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.bj-table__idle span {
+  font-size: 0.8rem;
+}
+
+/* ── Mano ─────────────────────────────────────────────────── */
+
+.bj-hand__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.bj-hand__label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ion-color-medium);
+}
+
+.bj-hand__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── Carta ────────────────────────────────────────────────── */
+
+.bj-card {
+  width: 46px;
+  height: 66px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #1c1c1e;
+  flex-shrink: 0;
+}
+
+.bj-card__rank {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bj-card__suit {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.bj-card--red {
+  color: var(--ion-color-danger);
+}
+
+/* Reverso: patron diagonal para que se lea como carta boca abajo. */
+.bj-card--back {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--ion-color-primary),
+    var(--ion-color-primary) 5px,
+    var(--ion-color-primary-shade) 5px,
+    var(--ion-color-primary-shade) 10px
+  );
+  border-color: var(--ion-color-primary-shade);
+}
+
+/* ── Acciones ─────────────────────────────────────────────── */
+
+.bj-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 4px 16px 8px;
+}
+
+.bj-actions ion-button {
+  --border-radius: 12px;
+  height: 46px;
+  margin: 0;
+  font-weight: 600;
+}

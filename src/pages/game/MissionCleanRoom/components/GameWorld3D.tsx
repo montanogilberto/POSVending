@@ -1,15 +1,16 @@
 import { Html } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { IonButton, IonIcon } from '@ionic/react';
-import { arrowUpCircleOutline, closeOutline, flagOutline, handRightOutline, volumeHighOutline, volumeMuteOutline } from 'ionicons/icons';
-import React, { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { arrowUpCircleOutline, closeOutline, flagOutline, handRightOutline, mapOutline, volumeHighOutline, volumeMuteOutline } from 'ionicons/icons';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import { IS_DEV_BUILD } from '../../../../utils/appEnv';
 import { getAvatar3D } from '../world3d/GameAvatar';
 import { getMission3D } from '../world3d/MissionDefinition';
-import { getCameraObstacles, getRoomObstacles } from '../world3d/Room3D';
-import Room3D from '../world3d/Room3D';
+import { getRoom3D, type RoomId } from '../world3d/rooms';
+import { DOORS, getDoorsForRoom, getEntryPosition } from '../world3d/rooms/doors';
+import DoorMarker3D from '../world3d/rooms/DoorMarker3D';
 import Player3D from '../world3d/Player3D';
 import CameraRig from '../world3d/CameraRig';
 import InteractionManager3D from '../world3d/InteractionManager3D';
@@ -22,19 +23,22 @@ import { useGameAudio } from '../world3d/useGameAudio';
 import TouchJoystick from '../world3d/TouchJoystick';
 import { WORLD3D_CONFIG } from '../world3d/world3dConstants';
 import type { GameContainer, GameItem } from '../MissionCleanRoomTypes';
+import { logEvent } from '../telemetryService';
 import VictoryModal from './VictoryModal';
+import MissionMap from './MissionMap';
 import './GameWorld3D.css';
 
 interface GameWorld3DProps {
   avatarId: string | null;
-  /** Which MissionDefinition3D to load — item/container below must be the domain pair that
-      mission's objective.itemId points to (MissionCleanRoomView is the single place that
-      resolves that lookup); GameWorld3D just trusts they're already consistent. */
+  /** Which MissionDefinition3D to load — items[i]/containers[i] below must be the domain pair
+      that mission.objectives[i].itemId points to, same order (MissionCleanRoomView is the
+      single place that resolves that lookup); GameWorld3D just trusts they're already
+      consistent and same length as mission.objectives. */
   missionId: string;
   /** "Misión 3/10" — purely a display label, MissionCleanRoomView owns the actual sequence/index. */
   missionLabel: string;
-  item: GameItem;
-  container: GameContainer;
+  items: GameItem[];
+  containers: GameContainer[];
   onItemPicked?: (itemId: string) => void;
   onItemDropped: (itemId: string) => void;
   /** Restart the current mission from CharacterSelect's "startGame" — driven by the local win below, not domain VICTORY (see MissionCleanRoomView). */
@@ -186,11 +190,35 @@ interface SparkleEvent {
 let sparkleIdSeq = 0;
 
 /** Owns the R3F scene lifecycle, gameplay state (carrying/collected), and the touch/keyboard control surface. */
-const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionLabel, item, container, onItemPicked, onItemDropped, onPlayAgain, onExit }) => {
+const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionLabel, items, containers, onItemPicked, onItemDropped, onPlayAgain, onExit }) => {
   const avatar = useMemo(() => getAvatar3D(avatarId), [avatarId]);
   const mission = useMemo(() => getMission3D(missionId), [missionId]);
-  const obstacles = useMemo(() => getRoomObstacles(), []);
-  const cameraObstacles = useMemo(() => getCameraObstacles(), []);
+  // Which room is actually rendered — decoupled from mission.roomId once doors exist: walking
+  // through a door moves the player between rooms independent of mission progress. Resets to the
+  // mission's own room whenever the mission changes (see the effect below), so a fresh mission
+  // always starts you where its item/container actually are, regardless of where a door left you
+  // in the previous one.
+  const [currentRoomId, setCurrentRoomId] = useState<RoomId>(mission.roomId);
+  const [spawnPosition, setSpawnPosition] = useState<THREE.Vector3>(mission.playerSpawn);
+  const inMissionRoom = currentRoomId === mission.roomId;
+  const room = useMemo(() => getRoom3D(currentRoomId), [currentRoomId]);
+  const obstacles = useMemo(() => room.getObstacles(), [room]);
+  const cameraObstacles = useMemo(() => room.getCameraObstacles(), [room]);
+  const RoomComponent = room.Component;
+  const doors = useMemo(() => getDoorsForRoom(currentRoomId), [currentRoomId]);
+  const missionRoom = useMemo(() => getRoom3D(mission.roomId), [mission.roomId]);
+
+  /** Set on mount and on every mission change (same effect as the room/spawn reset below) — read
+      back by handleFinishMission to report mission_complete's durationSeconds. */
+  const missionStartRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    setCurrentRoomId(mission.roomId);
+    setSpawnPosition(mission.playerSpawn);
+    missionStartRef.current = Date.now();
+    logEvent('mission_start', { missionId, avatarId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missionId]);
   const inputRef = useRef<ControlInput3D>({ ...IDLE_INPUT_3D });
   const playerGroupRef = useRef<THREE.Group>(null);
   const fpsRef = useRef<HTMLDivElement>(null);
@@ -200,12 +228,37 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
   /** Last locomotion state, used only to detect the fall→grounded edge for the landing sound. */
   const lastPlayerStateRef = useRef<PlayerState3D>('idle');
 
-  const [isCarrying, setIsCarrying] = useState(false);
-  const [delivered, setDelivered] = useState(false);
+  // Which of mission.objectives[] is currently held — at most one at a time (one pair of hands),
+  // so a single index (not a Set) is enough. null = not carrying anything.
+  const [carriedObjectiveIndex, setCarriedObjectiveIndex] = useState<number | null>(null);
+  // Which objective indices have already been delivered — a Set since, unlike carrying, multiple
+  // objectives finish over the mission's lifetime and none of them go back to "not delivered".
+  const [deliveredIndices, setDeliveredIndices] = useState<Set<number>>(() => new Set());
+  // Which objective the reward popup (below) is currently showing — carriedObjectiveIndex is
+  // already cleared by the time handlePlaceRelease fires setRewardKey, so this remembers which
+  // one just finished long enough to render its container position/item name/points.
+  const [lastDeliveredIndex, setLastDeliveredIndex] = useState<number | null>(null);
   const [starCollected, setStarCollected] = useState(false);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [rewardKey, setRewardKey] = useState<number | null>(null);
   const [sparkles, setSparkles] = useState<SparkleEvent[]>([]);
+  // Pickup/dropoff no longer mutate carry/delivered state synchronously — pressing E bumps one of
+  // these triggers, Player3D plays the avatar's Pickup/Place one-shot clip (or, for avatars
+  // without one, calls the attach/release callback immediately — see Player3D.tsx), and the
+  // callback below does what handleInteract used to do inline. interactionLocked blocks a second
+  // press from re-triggering the animation while one is still playing.
+  const [pickupTrigger, setPickupTrigger] = useState(0);
+  const [placeTrigger, setPlaceTrigger] = useState(0);
+  const [interactionLocked, setInteractionLocked] = useState(false);
+  // Set right before bumping pickupTrigger, read (and cleared) by handlePickupAttach once the
+  // clip's grab frame actually fires — a ref, not state, since it's write-then-immediately-read
+  // within the same interaction and never needs to trigger a render on its own.
+  const pendingPickupIndexRef = useRef<number | null>(null);
+  // Snapshotted (not live-tracked) at the moment the map opens — the map is a paused-feeling
+  // overlay, not a HUD element rendered every frame, so there's no need to subscribe it to
+  // useFrame just to keep a dot moving behind a modal the player is looking at, not the game.
+  const [showMap, setShowMap] = useState(false);
+  const [mapPlayerPosition, setMapPlayerPosition] = useState<THREE.Vector3 | null>(null);
   // Delivering the item doesn't auto-open the victory screen: the star is deliberately optional
   // and off the direct path, so blocking the scene the instant the main objective is done would
   // cut off exactly the exploration we want to see (see README §15 — the "3-minute test").
@@ -226,38 +279,109 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
     setSparkles((prev) => prev.filter((sparkle) => sparkle.id !== id));
   }, []);
 
-  const interactables = useMemo<Interactable3D[]>(() => [
-    { id: 'item', kind: 'pickup', position: mission.objective.itemPosition, promptText: `✋ Recoger ${item.name}`, isAvailable: !isCarrying && !delivered },
-    { id: 'basket', kind: 'dropoff', position: mission.objective.containerPosition, promptText: `✋ Soltar en ${container.name}`, isAvailable: isCarrying },
-    ...mission.optionalCollectibles.map((collectible, index) => ({
-      id: `collectible-${index}`,
-      kind: 'collectible' as const,
-      position: collectible.position,
-      promptText: '✋ Recoger estrella',
-      isAvailable: !starCollected,
-    })),
-  ], [mission, isCarrying, delivered, starCollected, item.name, container.name]);
+  // Empty outside the mission's own room — item/container/collectible positions only make sense
+  // in mission.roomId's coordinate space, and every room shares the same origin/bounds (rooms are
+  // independent boxes, not spatially adjacent — see rooms/doors.ts), so without this guard a
+  // player who walked through a door could "pick up" an invisible item by standing at whatever
+  // local coordinate happened to match it in a completely different room.
+  const missionInteractables = useMemo<Interactable3D[]>(() => {
+    if (!inMissionRoom) return [];
+    // One pickup/dropoff pair PER objective — only the relevant ones are `isAvailable` at any
+    // moment (can't pick up a second item while already carrying one; can't drop off anywhere
+    // but the container for the one actually being carried), same pattern InteractionManager3D
+    // already uses to pick the nearest AVAILABLE prompt among several present-but-inactive ones.
+    const pickups: Interactable3D[] = mission.objectives.map((objective, index) => ({
+      id: `item-${index}`,
+      kind: 'pickup',
+      position: objective.itemPosition,
+      promptText: `✋ Recoger ${items[index].name}`,
+      isAvailable: carriedObjectiveIndex === null && !deliveredIndices.has(index) && !interactionLocked,
+    }));
+    const dropoffs: Interactable3D[] = mission.objectives.map((objective, index) => ({
+      id: `basket-${index}`,
+      kind: 'dropoff',
+      position: objective.containerPosition,
+      promptText: `✋ Soltar en ${containers[index].name}`,
+      isAvailable: carriedObjectiveIndex === index && !interactionLocked,
+    }));
+    return [
+      ...pickups,
+      ...dropoffs,
+      ...mission.optionalCollectibles.map((collectible, index) => ({
+        id: `collectible-${index}`,
+        kind: 'collectible' as const,
+        position: collectible.position,
+        promptText: '✋ Recoger estrella',
+        isAvailable: !starCollected,
+      })),
+    ];
+  }, [inMissionRoom, mission, carriedObjectiveIndex, deliveredIndices, interactionLocked, starCollected, items, containers]);
+
+  const doorInteractables = useMemo<Interactable3D[]>(() => doors.map((door) => ({
+    id: door.id,
+    kind: 'door' as const,
+    position: door.position,
+    promptText: `🚪 ${door.label}`,
+    isAvailable: true,
+  })), [doors]);
+
+  const interactables = useMemo(() => [...missionInteractables, ...doorInteractables], [missionInteractables, doorInteractables]);
 
   const handleInteract = useCallback((interactable: Interactable3D) => {
     if (interactable.kind === 'pickup') {
-      setIsCarrying(true);
-      spawnSparkles(interactable.position);
-      audio.play('pickup');
-      onItemPicked?.(item.id);
+      pendingPickupIndexRef.current = Number(interactable.id.slice('item-'.length));
+      setInteractionLocked(true);
+      setPickupTrigger((n) => n + 1);
     } else if (interactable.kind === 'dropoff') {
-      setIsCarrying(false);
-      setDelivered(true);
-      spawnSparkles(interactable.position);
-      audio.play('drop');
-      audio.play('success');
-      onItemDropped(item.id);
-      setRewardKey(Date.now());
+      // No index to parse here — carriedObjectiveIndex (already set) IS the objective being
+      // dropped off, and missionInteractables only ever makes ITS dropoff isAvailable.
+      setInteractionLocked(true);
+      setPlaceTrigger((n) => n + 1);
     } else if (interactable.kind === 'collectible') {
       setStarCollected(true);
       spawnSparkles(interactable.position);
       audio.play('collect');
+    } else if (interactable.kind === 'door') {
+      const door = DOORS.find((d) => d.id === interactable.id);
+      if (!door) return;
+      setCurrentRoomId(door.toRoom);
+      setSpawnPosition(getEntryPosition(door.toRoom, door.fromRoom));
+      setPrompt(null); // stale prompt referenced a position in the room we just left
+      logEvent('room_changed', { missionId, avatarId, metadata: { fromRoom: door.fromRoom, toRoom: door.toRoom } });
     }
-  }, [item.id, onItemPicked, onItemDropped, spawnSparkles, audio]);
+  }, [spawnSparkles, audio, missionId, avatarId]);
+
+  // Fires at the Pickup clip's ~55% "grab" frame (or immediately for avatars with no Pickup clip
+  // — see Player3D.tsx) — this is what used to run synchronously inside handleInteract.
+  const handlePickupAttach = useCallback(() => {
+    const index = pendingPickupIndexRef.current;
+    if (index === null) return;
+    pendingPickupIndexRef.current = null;
+    setCarriedObjectiveIndex(index);
+    spawnSparkles(mission.objectives[index].itemPosition);
+    audio.play('pickup');
+    onItemPicked?.(items[index].id);
+    logEvent('item_picked', { missionId, avatarId, metadata: { itemId: items[index].id, objectiveIndex: index } });
+  }, [mission, items, onItemPicked, spawnSparkles, audio, missionId, avatarId]);
+
+  // Fires at the Place clip's ~55% "release" frame (or immediately with no Place clip).
+  const handlePlaceRelease = useCallback(() => {
+    const index = carriedObjectiveIndex;
+    if (index === null) return;
+    setCarriedObjectiveIndex(null);
+    setDeliveredIndices((prev) => new Set(prev).add(index));
+    setLastDeliveredIndex(index);
+    spawnSparkles(mission.objectives[index].containerPosition);
+    audio.play('drop');
+    audio.play('success');
+    onItemDropped(items[index].id);
+    setRewardKey(Date.now());
+    logEvent('item_placed', { missionId, avatarId, metadata: { itemId: items[index].id, containerId: containers[index].id, objectiveIndex: index } });
+  }, [mission, items, containers, carriedObjectiveIndex, onItemDropped, spawnSparkles, audio, missionId, avatarId]);
+
+  const handleInteractionAnimDone = useCallback(() => {
+    setInteractionLocked(false);
+  }, []);
 
   const handlePlayerStateChange = useCallback((state: PlayerState3D) => {
     if (state === 'jump') audio.play('jump');
@@ -268,16 +392,33 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
   const handleFinishMission = useCallback(() => {
     setShowVictory(true);
     audio.play('celebrate');
-  }, [audio]);
+    const durationSeconds = (Date.now() - missionStartRef.current) / 1000;
+    logEvent('mission_complete', { missionId, avatarId, durationSeconds });
+  }, [audio, missionId, avatarId]);
 
-  const missionText = !isCarrying && !delivered
-    ? mission.narrative.searching
-    : isCarrying
-      ? mission.narrative.carrying
-      : mission.narrative.complete;
+  const handleOpenMap = useCallback(() => {
+    setMapPlayerPosition(playerGroupRef.current?.position.clone() ?? null);
+    setShowMap(true);
+  }, []);
 
-  const victoryPoints = item.points + (starCollected ? 20 : 0);
+  const handleCloseMap = useCallback(() => setShowMap(false), []);
+
+  const allDelivered = deliveredIndices.size === mission.objectives.length;
+  // One shared narrative per mission (not per-objective — that's a bigger HUD redesign, see
+  // README §25) — carrying wins whenever ANY objective is held, regardless of which.
+  const missionText = carriedObjectiveIndex !== null
+    ? mission.narrative.carrying
+    : allDelivered
+      ? mission.narrative.complete
+      : mission.narrative.searching;
+
+  const victoryPoints = items.reduce((sum, i) => sum + i.points, 0) + (starCollected ? 20 : 0);
   const victoryStars: 1 | 2 | 3 = starCollected ? 3 : 2;
+
+  // MissionMap (§21) still renders one item/container pair, not N — show whichever objective is
+  // next to deliver so the map stays useful without redesigning it for multi-objective yet.
+  const nextPendingIndex = mission.objectives.findIndex((_, index) => !deliveredIndices.has(index));
+  const mapObjectiveIndex = nextPendingIndex === -1 ? 0 : nextPendingIndex;
 
   const handleFpsUpdate = useCallback((fps: number) => {
     if (fpsRef.current) fpsRef.current.textContent = `${fps} FPS`;
@@ -292,6 +433,32 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
     <div className="game-world-3d game-world-3d--fullscreen">
       <div className="game-world-3d__mission-progress">{missionLabel}</div>
       <div className="game-world-3d__mission">{missionText}</div>
+      {!inMissionRoom && (
+        <div className="game-world-3d__room-hint">
+          {missionRoom.emoji} Ve a: {missionRoom.name}
+        </div>
+      )}
+      {/* Only worth showing once there's more than one thing to track — a 1-item checklist
+          would just repeat the narrative banner above for the other 9 missions. See README §26
+          step 7: this is what mission_04's 2 simultaneous objectives were missing to actually
+          read as "2 tasks" instead of just working correctly under the hood. */}
+      {mission.objectives.length > 1 && (
+        <div className="game-world-3d__task-list" aria-label="Lista de tareas de la misión">
+          {mission.objectives.map((_, index) => {
+            const isDone = deliveredIndices.has(index);
+            const isActive = carriedObjectiveIndex === index;
+            return (
+              <div
+                key={index}
+                className={`game-world-3d__task${isDone ? ' game-world-3d__task--done' : ''}${isActive ? ' game-world-3d__task--active' : ''}`}
+              >
+                <span className="game-world-3d__task-icon" aria-hidden="true">{isDone ? '✅' : isActive ? '🟡' : '◯'}</span>
+                <span className="game-world-3d__task-name">{items[index].name}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {IS_DEV_BUILD && <div ref={fpsRef} className="game-world-3d__fps">-- FPS</div>}
 
       <IonButton
@@ -312,7 +479,32 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
         <IonIcon slot="icon-only" icon={audio.muted ? volumeMuteOutline : volumeHighOutline} />
       </IonButton>
 
-      {delivered && !showVictory && (
+      <IonButton
+        className="game-world-3d__map-button"
+        fill="clear"
+        onClick={handleOpenMap}
+        aria-label="Ver mapa"
+      >
+        <IonIcon slot="icon-only" icon={mapOutline} />
+      </IonButton>
+
+      {showMap && (
+        <MissionMap
+          currentRoom={room}
+          obstacles={obstacles}
+          doors={doors}
+          missionRoom={missionRoom}
+          inMissionRoom={inMissionRoom}
+          itemPosition={mission.objectives[mapObjectiveIndex].itemPosition}
+          containerPosition={mission.objectives[mapObjectiveIndex].containerPosition}
+          itemName={items[mapObjectiveIndex].name}
+          containerName={containers[mapObjectiveIndex].name}
+          playerPosition={mapPlayerPosition}
+          onClose={handleCloseMap}
+        />
+      )}
+
+      {allDelivered && !showVictory && (
         <IonButton className="game-world-3d__finish-button" onClick={handleFinishMission}>
           <IonIcon icon={flagOutline} slot="start" />
           Terminar misión
@@ -345,17 +537,28 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
           {/* useGLTF (inside Player3D) suspends while the model loads — everything that depends on
               the player being mounted (camera rig, interaction) lives inside this boundary too. */}
           <Suspense fallback={null}>
-            <Room3D />
+            <RoomComponent />
+
+            {doors.map((door) => (
+              <DoorMarker3D key={door.id} position={[door.position.x, door.position.y, door.position.z]} facing={door.facing} />
+            ))}
 
             <Player3D
+              key={currentRoomId}
               avatar={avatar}
               groupRef={playerGroupRef}
               inputRef={inputRef}
               yawRef={cameraYawRef}
-              initialPosition={mission.playerSpawn}
+              initialPosition={spawnPosition}
               roomHalfSize={ROOM_HALF_SIZE}
               obstacles={obstacles}
-              carriedItem={isCarrying ? <ItemBall position={[0, 0, 0]} /> : undefined}
+              isCarrying={carriedObjectiveIndex !== null}
+              carriedItem={carriedObjectiveIndex !== null ? <ItemBall position={[0, 0, 0]} /> : undefined}
+              pickupTrigger={pickupTrigger}
+              onPickupAttach={handlePickupAttach}
+              placeTrigger={placeTrigger}
+              onPlaceRelease={handlePlaceRelease}
+              onInteractionAnimDone={handleInteractionAnimDone}
               onStateChange={handlePlayerStateChange}
             />
 
@@ -368,11 +571,15 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
               onPromptChange={setPrompt}
             />
 
-            {!isCarrying && !delivered && (
-              <ItemBall position={mission.objective.itemPosition} playerGroupRef={playerGroupRef} />
-            )}
-            <BasketMesh position={mission.objective.containerPosition} />
-            {!starCollected && mission.optionalCollectibles.map((collectible, index) => (
+            {inMissionRoom && mission.objectives.map((objective, index) => (
+              carriedObjectiveIndex !== index && !deliveredIndices.has(index) && (
+                <ItemBall key={`item-${index}`} position={objective.itemPosition} playerGroupRef={playerGroupRef} />
+              )
+            ))}
+            {inMissionRoom && mission.objectives.map((objective, index) => (
+              <BasketMesh key={`basket-${index}`} position={objective.containerPosition} />
+            ))}
+            {inMissionRoom && !starCollected && mission.optionalCollectibles.map((collectible, index) => (
               <StarMesh key={index} basePosition={collectible.position} playerGroupRef={playerGroupRef} />
             ))}
 
@@ -386,16 +593,20 @@ const GameWorld3D: React.FC<GameWorld3DProps> = ({ avatarId, missionId, missionL
               </Html>
             )}
 
-            {rewardKey !== null && (
+            {inMissionRoom && rewardKey !== null && lastDeliveredIndex !== null && (
               <Html
                 key={rewardKey}
-                position={[mission.objective.containerPosition.x, mission.objective.containerPosition.y + 1, mission.objective.containerPosition.z]}
+                position={[
+                  mission.objectives[lastDeliveredIndex].containerPosition.x,
+                  mission.objectives[lastDeliveredIndex].containerPosition.y + 1,
+                  mission.objectives[lastDeliveredIndex].containerPosition.z,
+                ]}
                 center
                 distanceFactor={8}
               >
                 <div className="game-world-3d__reward" onAnimationEnd={() => setRewardKey(null)}>
                   <span className="game-world-3d__reward-stars">⭐⭐⭐</span>
-                  <span>¡Muy bien! +{item.points}</span>
+                  <span>¡Muy bien! +{items[lastDeliveredIndex].points}</span>
                 </div>
               </Html>
             )}
