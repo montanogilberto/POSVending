@@ -69,6 +69,20 @@ export async function fetchActiveLoanOffers(companyId: number): Promise<Marketpl
   }
 }
 
+// Consumes announced capital as loans are granted against it — every
+// accepted loan (P2P Solicitudes tab or LoanChat) must call this so the
+// lender's "Capital publicado" / "Capital prestado" split stays correct.
+export async function updateLoanOffer(offerId: number, companyId: number, fields: {
+  availableCapital?: number; isActive?: boolean; description?: string;
+}): Promise<void> {
+  const res = await fetch(`${BASE}/loanOffers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ loanOffers: [{ action: 2, offerId, companyId, ...fields }] }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 // Convenience counts used by the dashboard banners.
 export async function countPendingProposalsForLender(companyId: number, lenderClientId: number): Promise<number> {
   const list = await fetchLoanProposals(companyId);

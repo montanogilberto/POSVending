@@ -781,6 +781,34 @@ const P2PLendingPage: React.FC = () => {
           status: 'accepted', respondedAt: new Date().toISOString(),
         }).catch(() => {});
 
+        // The amount is already committed to this borrower the moment the
+        // loan is created (pending_funding), even though the SPEI hasn't
+        // gone out yet — MyLoansConstants.isClosedLoan() already counts
+        // pending_funding as live "Capital prestado" on purpose. Without
+        // this, the lender's announced capital never shrinks for
+        // non-custodial loans, so "Capital publicado" stays inflated
+        // (double-counting money that's already spoken for) — same bug as
+        // the custodial branch below fixes via its own offer bookkeeping.
+        try {
+          const MIN_OFFER_REMAINDER_MXN = 100;
+          let toConsume = requestedAmount;
+          for (const o of offers.filter(x => x.lenderId === lenderId && x.isActive)) {
+            if (toConsume <= 0) break;
+            const take = Math.min(o.availableCapital, toConsume);
+            const remaining = o.availableCapital - take;
+            toConsume -= take;
+            const stillUseful = remaining >= MIN_OFFER_REMAINDER_MXN;
+            console.log('[P2P] acceptProposal: offer bookkeeping (no-custodio)', JSON.stringify({ offerId: o.offerId, remaining, stillUseful }));
+            await updateLoanOffer(o.offerId, companyId, {
+              availableCapital: remaining,
+              isActive: stillUseful,
+              ...(!stillUseful ? { description: 'Capital consumido por préstamo (P2P, no-custodio)' } : {}),
+            });
+          }
+        } catch (e) {
+          console.log('[P2P] acceptProposal: offer bookkeeping (no-custodio) FAILED —', String(e));
+        }
+
         const borrowerClientNC = clientMap[borrowerId];
         await createPushNotification({
           companyId,
