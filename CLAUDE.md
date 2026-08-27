@@ -1,4 +1,4 @@
-# Code Policy — POS GMO / SmartLoans Frontend
+# Code Policy — Factory AI GMO / SmartLoans Frontend
 
 **Vigente desde 2026-08-07.** Every NEW feature and every refactor MUST follow these
 rules. Legacy code migrates opportunistically (via the pending cleanup tasks), but

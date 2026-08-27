@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.lavanderia.gmo',
-  appName: 'POS GMO',
+  appName: 'Factory AI GMO',
   webDir: 'dist',
   android: {
     allowMixedContent: true
