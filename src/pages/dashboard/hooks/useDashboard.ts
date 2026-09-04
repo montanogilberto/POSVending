@@ -4,6 +4,8 @@ import { useIncome } from '../../../contexts/IncomeContext';
 import { useUser } from '../../../contexts/UserContext';
 import { isCashRegisterOpen, closeCashRegister } from '../../../api/cashRegisterApi';
 import { fetchTicket } from '../../../api/ticketApi';
+import { fetchAllExpenses, Expense } from '../../../api/expensesApi';
+import { toHermosilloDate } from '../../../utils/format';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
 import { Transaction, CartItem } from '../types';
 
@@ -15,12 +17,6 @@ const PAYMENT_COLORS: Record<PaymentMethod, string> = {
   Efectivo: '#16A34A',
   Transferencia: '#22C55E',
   Tarjeta: '#86EFAC',
-};
-
-// 🔥 helper to normalize Hermosillo date (reused everywhere)
-const toHermosilloDate = (dateStr: string) => {
-  const utcDate = new Date(dateStr + (dateStr.includes('Z') ? '' : 'Z'));
-  return new Date(utcDate.getTime() - 7 * 60 * 60 * 1000);
 };
 
 export const useDashboard = () => {
@@ -40,12 +36,20 @@ export const useDashboard = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   //const [pieData, setPieData] = useState<any>(null);
 
   const refreshDashboardData = () => {
     console.log('[Dashboard] refreshDashboardData: loading incomes, companyId =', companyId);
     const controller = new AbortController();
     loadIncomes(controller.signal).catch(() => {});
+
+    fetchAllExpenses()
+      .then((expenses) => {
+        if (!controller.signal.aborted) setAllExpenses(expenses);
+      })
+      .catch((err) => console.warn('[Dashboard] fetchAllExpenses failed:', err));
+
     return () => controller.abort();
   };
 
@@ -160,6 +164,22 @@ export const useDashboard = () => {
       .reduce((sum, i) => {
         return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
       }, 0);
+  };
+
+  const calculateExpensesMonthlyTotal = () => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    return allExpenses
+      .filter((e) => e?.paymentDate)
+      .filter((e) => {
+        const d = toHermosilloDate(e.paymentDate);
+        return (
+          d.getMonth() === hermosilloNow.getMonth() &&
+          d.getFullYear() === hermosilloNow.getFullYear()
+        );
+      })
+      .reduce((sum, e) => sum + (Number(e.total) || 0), 0);
   };
 
   const currentMonthYear = new Date().toLocaleDateString('es-ES', {
@@ -291,6 +311,7 @@ export const useDashboard = () => {
     calculateTotal,
     calculateDailySales,
     calculateMonthlyTotal,
+    calculateExpensesMonthlyTotal,
     currentMonthYear,
 
     handleStartSeller,

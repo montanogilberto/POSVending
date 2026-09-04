@@ -272,6 +272,82 @@
    }
 
    /* ==========================================================================
+   EXPENSES (EGRESOS) SUMMARY CARD
+   ========================================================================== */
+.dashboard-expense-card {
+  margin: 0 !important;
+  border-radius: 24px !important;
+  overflow: hidden;
+  --background: #ffffff;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.02),
+    0 2px 8px rgba(0, 0, 0, 0.01) !important;
+}
+
+.expense-card-content {
+  display: flex !important;
+  align-items: center;
+  gap: 20px;
+  --padding-start: 24px !important;
+  --padding-end: 24px !important;
+  --padding-top: 24px !important;
+  --padding-bottom: 24px !important;
+}
+
+.expense-card-icon {
+  width: 64px;
+  height: 64px;
+  background: #FEE2E2;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #DC2626;
+  flex-shrink: 0;
+}
+
+.expense-card-icon ion-icon {
+  font-size: 30px;
+}
+
+.expense-card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.expense-card-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1A202C;
+}
+
+.expense-card-amount h2 {
+  font-family: 'Inter', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #DC2626;
+  margin: 4px 0;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.expense-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #718096;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.expense-card-meta ion-icon {
+  font-size: 15px;
+  color: #718096;
+}
+
+/* ==========================================================================
    RECENT ACTIVITY CONTAINER CARD
    ========================================================================== */
 .dashboard-activity-card {

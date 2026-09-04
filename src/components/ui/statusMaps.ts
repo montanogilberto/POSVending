@@ -45,3 +45,10 @@ export const ARCADE_OUTCOME: Record<string, StatusMeta> = {
   push:      { label: 'Empate',    color: 'warning' },
   lose:      { label: 'Perdida',   color: 'medium'  },
 };
+
+/** Método de pago (income.paymentMethod / expenses.paymentMethod). */
+export const PAYMENT_METHOD: Record<string, StatusMeta> = {
+  efectivo:      { label: 'Efectivo',      color: 'success'  },
+  tarjeta:       { label: 'Tarjeta',       color: 'primary'  },
+  transferencia: { label: 'Transferencia', color: 'tertiary' },
+};
