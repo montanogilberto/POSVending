@@ -24,6 +24,9 @@ import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
 import { disbursePayment, isNonCustodialFundingEnabled, ledgerBalance } from '../../api/bankingApi';
 import { analyzeProposal, ProposalAnalysis } from '../../api/loanAnalysisApi';
+import { createLoan, generateInstallmentSchedule } from '../../api/loanApi';
+import { createLoanContract } from '../../api/digitalContractsApi';
+import { fetchActiveLoanOffers, updateLoanOffer } from '../../api/loanMarketplaceApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
 import { fmtNum as fmt, mxChatDate as toDate, mxChatTime as toTime } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
@@ -434,6 +437,9 @@ const LoanChatPage: React.FC = () => {
       const disburseResult = myRole === 'lender'
         ? await triggerDisbursement(msg)
         : { ok: false, detail: 'Pendiente — el prestamista aún no ha desembolsado.' };
+      if (myRole === 'lender' && disburseResult.ok) {
+        await createLoanRecord(msg, amount);
+      }
       notifyDataChanged('chat_proposal_accepted');
       setAcceptedTicket({
         conversationId: conv.conversationId, amount, rate: msg.rate ?? 0, termMonths: msg.termMonths ?? 0,
@@ -472,6 +478,77 @@ const LoanChatPage: React.FC = () => {
     finally { setLoading(false); setShowCloseConfirm(false); }
   };
 
+  // Brings chat-based acceptance to parity with P2PLendingPage.acceptProposal():
+  // sp_loanChat's accept_proposal action only ever touches
+  // loanConversations/loanMessages, so without this the loans/loanContracts
+  // rows never existed and the lender's announced capital was never consumed
+  // — "Capital publicado"/"Capital prestado" stayed wrong forever for any
+  // loan granted through chat. Only reached post-disbursement (the
+  // non-custodial flow is blocked earlier in handleAccept and never gets here).
+  const createLoanRecord = async (msg: LoanMessage, amount: number) => {
+    if (!conv) return;
+    const rate = msg.rate ?? 0;
+    const termMonths = msg.termMonths ?? 0;
+    try {
+      const disbursementDate = new Date().toISOString();
+      const loan = await createLoan({
+        companyId: companyId!,
+        loanNumber: `CHAT-${Date.now()}`,
+        clientId: conv.borrowerId,
+        principalAmount: amount,
+        interestRate: rate,
+        termMonths,
+        paymentFrequency: 'monthly',
+        loanStatus: 'active',
+        notes: `Préstamo vía chat. Prestamista clientId=${conv.lenderId}`,
+        disbursementDate,
+      });
+      console.log('[ChatUI] accept: loan created', JSON.stringify({ loanId: loan.loanId }));
+
+      await generateInstallmentSchedule({
+        loanId: loan.loanId, clientId: conv.borrowerId, companyId: companyId!, lenderId: conv.lenderId,
+        principalAmount: amount, interestRate: rate, termMonths, disbursementDate,
+      });
+
+      // Contract row = the loan↔lender link (LenderDashboard scopes through
+      // it). Non-fatal: money already moved; a miss falls back to loans.clientId.
+      await createLoanContract({
+        companyId: companyId!, loanId: loan.loanId, borrowerClientId: conv.borrowerId, lenderClientId: conv.lenderId,
+        principalAmount: amount, interestRate: rate, termMonths,
+        conversationId: conv.conversationId,
+        notes: `Aceptado desde chat conversationId=${conv.conversationId}`,
+      }).catch((e) => console.log('[ChatUI] accept: contract create FAILED —', String(e)));
+
+      // The lent amount consumes the lender's announced capital — same
+      // bookkeeping as P2PLendingPage.acceptProposal(): decrement the active
+      // offer(s) and deactivate the leftover once it drops below a useful
+      // loan size.
+      try {
+        const MIN_OFFER_REMAINDER_MXN = 100;
+        let toConsume = amount;
+        const offers = await fetchActiveLoanOffers(companyId!);
+        for (const o of offers.filter(x => x.lenderId === conv.lenderId && x.isActive)) {
+          if (toConsume <= 0) break;
+          const take = Math.min(o.availableCapital, toConsume);
+          const remaining = o.availableCapital - take;
+          toConsume -= take;
+          const stillUseful = remaining >= MIN_OFFER_REMAINDER_MXN;
+          console.log('[ChatUI] accept: offer bookkeeping', JSON.stringify({ offerId: o.offerId, remaining, stillUseful }));
+          await updateLoanOffer(o.offerId, companyId!, {
+            availableCapital: remaining,
+            isActive: stillUseful,
+            ...(!stillUseful ? { description: 'Capital consumido por préstamo (chat)' } : {}),
+          });
+        }
+      } catch (e) {
+        console.log('[ChatUI] accept: offer bookkeeping FAILED —', String(e));
+      }
+    } catch (e) {
+      console.log('[ChatUI] accept: loan record creation FAILED —', String(e));
+      showToast('Desembolso realizado, pero no se pudo registrar el préstamo. Contacta soporte.', 'danger');
+    }
+  };
+
   // SPEI-only disbursement. Stripe is never a fallback for loan principal —
   // it's reserved for direct, one-shot platform charges (e.g. premium
   // subscription billing), per docs/p2p-direct-payments-architecture.md and
@@ -479,15 +556,6 @@ const LoanChatPage: React.FC = () => {
   // Stripe fallback used to sit here; removed rather than "fixed", since
   // funding a loan through Stripe was the actual policy violation, not a
   // missing safeguard on it.
-  //
-  // NOTE (known gap, not fixed here): this whole function still only moves
-  // money directly — it doesn't create a loans row, doesn't know about
-  // paymentIntents/fundingTransactions, and never branches into the
-  // non-custodial declare/confirm flow the way P2PLendingPage.acceptProposal()
-  // does. sp_loanChat's accept_proposal action only ever touches
-  // loanConversations/loanMessages, never loans/loanProposals — chat-based
-  // acceptance has never gone through the same loan-creation path as the
-  // Solicitudes tab. Bringing it up to parity is a real, separate task.
   const triggerDisbursement = async (msg: LoanMessage): Promise<{ ok: boolean; detail: string; transferId?: number }> => {
     if (!conv) return { ok: false, detail: 'Sin conversación activa.' };
     const amount = msg.amount ?? 0;

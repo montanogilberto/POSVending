@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { IonButton, IonIcon, IonSpinner } from "@ionic/react";
-import { lockOpen, lockClosed, addCircle, removeCircle, logIn, logOut } from "ionicons/icons";
+import { lockOpen, lockClosed, addCircle, removeCircle, logIn, logOut, sparkles } from "ionicons/icons";
 import { postCashRegister, isCashRegisterOpen as checkCashRegisterOpen } from "../../api/cashRegisterApi";
+import { reviewCashRegisterCloseout, CashRegisterReview } from "../../api/cashRegisterAgentApi";
+import "./CashRegisterCard.css";
 
 type Props = {
   companyId: number;
@@ -18,6 +20,8 @@ export default function CashRegisterCard({ companyId, userId, onToast, onCashReg
   const [moveType, setMoveType] = useState<"in" | "out">("in");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [agentReview, setAgentReview] = useState<CashRegisterReview | null>(null);
+  const [agentReviewing, setAgentReviewing] = useState(false);
 
   const loadOpen = async () => {
     try {
@@ -92,12 +96,25 @@ export default function CashRegisterCard({ companyId, userId, onToast, onCashReg
       }
       setAmount("");
       setDescription("");
+      setAgentReview(null);
       await loadOpen();
     } catch (e: any) {
       console.error('[CashRegister] Error closing box:', e);
       onToast(e.message || "No se pudo cerrar caja", "danger");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const reviewCloseout = async () => {
+    setAgentReviewing(true);
+    setAgentReview(null);
+    try {
+      const result = await reviewCashRegisterCloseout({ companyId });
+      setAgentReview(result);
+      if (!result) onToast("No se pudo revisar el cierre con el agente", "warning");
+    } finally {
+      setAgentReviewing(false);
     }
   };
 
@@ -198,12 +215,36 @@ export default function CashRegisterCard({ companyId, userId, onToast, onCashReg
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Descripción (opcional)"
               />
+              <IonButton
+                expand="block"
+                fill="outline"
+                onClick={reviewCloseout}
+                disabled={agentReviewing}
+              >
+                {agentReviewing ? <IonSpinner name="dots" /> : (
+                  <>
+                    <IonIcon icon={sparkles} slot="start" />
+                    Revisar cierre con agente
+                  </>
+                )}
+              </IonButton>
+              {agentReview && (
+                <div className={`cash-agent-review cash-agent-${agentReview.severity}`}>
+                  <div className="cash-agent-status">{agentReview.status === "balanced" ? "Cuadra" : agentReview.status === "discrepancy" ? "Discrepancia" : "No disponible"}</div>
+                  <p className="cash-agent-explanation">{agentReview.explanation}</p>
+                  {agentReview.suggestedActions.length > 0 && (
+                    <ul className="cash-agent-actions">
+                      {agentReview.suggestedActions.map((a, i) => <li key={i}>{a}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
               <div className="cash-actions">
                 <IonButton color="danger" onClick={closeCaja}>
                   <IonIcon icon={logOut} slot="start" />
                   Confirmar Cierre
                 </IonButton>
-                <IonButton fill="outline" onClick={() => { setShowClose(false); setAmount(""); setDescription(""); }}>
+                <IonButton fill="outline" onClick={() => { setShowClose(false); setAmount(""); setDescription(""); setAgentReview(null); }}>
                   Cancelar
                 </IonButton>
               </div>

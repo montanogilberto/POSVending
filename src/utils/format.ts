@@ -39,3 +39,9 @@ export const toHermosillo = (utc: string | undefined): string => {
   const d = new Date(utc.includes('Z') ? utc : utc + 'Z');
   return new Date(d.getTime() - 7 * 60 * 60 * 1000).toLocaleString();
 };
+
+/** Date desplazado a Hermosillo (UTC-7, sin DST) — para agrupar/comparar por día o mes. */
+export const toHermosilloDate = (utc: string): Date => {
+  const d = new Date(utc.includes('Z') ? utc : utc + 'Z');
+  return new Date(d.getTime() - 7 * 60 * 60 * 1000);
+};

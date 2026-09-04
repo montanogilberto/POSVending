@@ -206,7 +206,7 @@ const IncomesPage: React.FC = () => {
       <Header
         screenTitle="Incomes"
         showBackButton={true}
-        backButtonHref="/Laundry"
+        backButtonHref="/dashboard"
         presentAlertPopover={() => {}}
         presentMailPopover={() => {}}
       />

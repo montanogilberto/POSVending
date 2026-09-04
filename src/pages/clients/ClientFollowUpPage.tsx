@@ -4,13 +4,13 @@ import {
   IonPage, IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonButton, IonLoading, IonToast, IonIcon, IonAvatar, IonBadge,
   IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonInput,
-  IonSelect, IonSelectOption, IonTextarea, IonAlert,
+  IonSelect, IonSelectOption, IonTextarea, IonAlert, IonSpinner,
 } from '@ionic/react';
 import {
   arrowBack, addOutline, closeOutline, callOutline, homeOutline,
   cardOutline, documentTextOutline, alertCircleOutline, checkmarkCircleOutline,
   ellipseOutline, trashOutline, refreshOutline, personCircleOutline,
-  timeOutline, createOutline, walletOutline, barChartOutline,
+  timeOutline, createOutline, walletOutline, barChartOutline, sparklesOutline,
 } from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
 import { getAllClients, Client } from '../../api/clientsApi';
@@ -19,6 +19,7 @@ import {
   ClientFollowUp, FollowUpType, FollowUpStatus, ClientRisk,
   getAllClientFollowUps, createClientFollowUp, updateClientFollowUp, deleteClientFollowUp,
 } from '../../api/clientFollowUpApi';
+import { getFollowUpSuggestion, ClientFollowUpSuggestion } from '../../api/clientFollowUpAgentApi';
 import './ClientFollowUpPage.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,6 +75,9 @@ const ClientFollowUpPage: React.FC = () => {
   const [editing, setEditing]     = useState<Partial<ClientFollowUp> | null>(null);
   const [deleteId, setDeleteId]   = useState<number | null>(null);
 
+  const [agentSuggestion, setAgentSuggestion] = useState<ClientFollowUpSuggestion | null>(null);
+  const [agentLoading, setAgentLoading]       = useState(false);
+
   const fetchAll = async () => {
     if (!companyId) return;
     setLoading(true);
@@ -95,6 +99,19 @@ const ClientFollowUpPage: React.FC = () => {
   };
 
   useEffect(() => { fetchAll(); }, [companyId, clientId]);
+
+  const handleAgentSuggestion = async () => {
+    if (!companyId) return;
+    setAgentLoading(true);
+    setAgentSuggestion(null);
+    try {
+      const result = await getFollowUpSuggestion({ clientId, companyId });
+      setAgentSuggestion(result);
+      if (!result) setError('No se pudo obtener la sugerencia del agente.');
+    } finally {
+      setAgentLoading(false);
+    }
+  };
 
   // ── Current risk = latest record's riskStatus ─────────────────────────────
   const currentRisk: ClientRisk = followUps[0]?.riskStatus ?? 'on_track';
@@ -202,6 +219,34 @@ const ClientFollowUpPage: React.FC = () => {
             </IonBadge>
           </div>
         )}
+
+        {/* Agent-assisted follow-up suggestion */}
+        <IonCard className="cfu-agent-card">
+          <IonCardContent>
+            <IonButton
+              expand="block"
+              fill="outline"
+              onClick={handleAgentSuggestion}
+              disabled={agentLoading || !companyId}
+            >
+              {agentLoading ? <IonSpinner name="dots" /> : (
+                <>
+                  <IonIcon slot="start" icon={sparklesOutline} />
+                  Sugerencia del agente
+                </>
+              )}
+            </IonButton>
+            {agentSuggestion && (
+              <div className="cfu-agent-result">
+                <IonBadge className={`cfu-agent-risk-badge cfu-risk-${agentSuggestion.riskStatus}`}>
+                  {RISK_META[agentSuggestion.riskStatus].label}
+                </IonBadge>
+                <p className="cfu-agent-action">{agentSuggestion.suggestedAction}</p>
+                <p className="cfu-agent-reasoning">{agentSuggestion.reasoning}</p>
+              </div>
+            )}
+          </IonCardContent>
+        </IonCard>
 
         {/* Stats row */}
         <div className="cfu-stats-row">

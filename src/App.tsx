@@ -65,6 +65,8 @@ import {
   personCircleOutline,
   gameControllerOutline,
   diamondOutline,
+  trendingUpOutline,
+  trendingDownOutline,
 }
   from 'ionicons/icons';
   
@@ -581,7 +583,7 @@ const AppShell: React.FC = () => {
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'ingresos') && (
               <IonItem button routerLink="/ingresos" title="Ingresos">
-                <IonIcon icon={barChart} slot="start" />
+                <IonIcon icon={trendingUpOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Ingresos</IonLabel>}
               </IonItem>
               )}
@@ -590,7 +592,7 @@ const AppShell: React.FC = () => {
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'egresos') && (
               <IonItem button routerLink="/egresos" title="Egresos">
-                <IonIcon icon={barChart} slot="start" />
+                <IonIcon icon={trendingDownOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Egresos</IonLabel>}
               </IonItem>
               )}
@@ -828,6 +830,12 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={peopleOutline} />
                   <span>Invitar</span>
                 </button>
+                {canAccess(roleCode, 'loanChat') && (
+                  <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
+                    <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
+                    <span>Chat</span>
+                  </button>
+                )}
               </>
             ) : isSmartLoansRole ? (
               <>
@@ -851,12 +859,26 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={personCircleOutline} />
                   <span>Perfil</span>
                 </button>
+                {canAccess(roleCode, 'loanChat') && (
+                  <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
+                    <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
+                    <span>Chat</span>
+                  </button>
+                )}
               </>
             ) : (
-              <button type="button" className="cd-tab" onClick={() => history.push('/dashboard')}>
-                <IonIcon aria-hidden="true" icon={home} />
-                <span>Dashboard</span>
-              </button>
+              <>
+                <button type="button" className="cd-tab" onClick={() => history.push('/dashboard')}>
+                  <IonIcon aria-hidden="true" icon={home} />
+                  <span>Dashboard</span>
+                </button>
+                {canAccess(roleCode, 'loanChat') && (
+                  <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
+                    <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
+                    <span>Chat</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </IonTabs>

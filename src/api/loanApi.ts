@@ -107,6 +107,20 @@ export async function updateLoan(loanId: number, data: Partial<Omit<Loan, 'loanI
   return { ...data, loanId: loanId, updated_at: new Date().toISOString() } as Loan;
 }
 
+// Builds the monthly cuota schedule (automated-payments) for a freshly
+// disbursed loan. Non-fatal by design — the loan is already funded by the
+// time this runs; callers should log rather than treat this as fatal.
+export async function generateInstallmentSchedule(payload: {
+  loanId: number; clientId: number; companyId: number; lenderId: number;
+  principalAmount: number; interestRate: number; termMonths: number; disbursementDate: string;
+}): Promise<void> {
+  await fetch(`${BASE_URL}/automated-payments/generate-schedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
+
 export async function deleteLoan(loanId: number, companyId: number): Promise<void> {
   const url = `${BASE_URL}/loans`;
   const body = {

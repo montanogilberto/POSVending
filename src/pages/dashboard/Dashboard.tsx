@@ -21,6 +21,7 @@ import { usePopovers } from '../../hooks/usePopovers';
 import MetricsGrid from './components/MetricsGrid';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
+import ExpensesSummaryCard from './components/ExpensesSummaryCard';
 import { onDataChanged } from '../../utils/refreshBus';
 
 const Dashboard: React.FC = () => {
@@ -43,6 +44,7 @@ const Dashboard: React.FC = () => {
     calculateTotal,
     calculateDailySales,
     calculateMonthlyTotal,
+    calculateExpensesMonthlyTotal,
     currentMonthYear,
     currentUser,
     percentageChange,
@@ -111,6 +113,12 @@ const Dashboard: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* ✅ Egresos del Mes */}
+          <ExpensesSummaryCard
+            monthlyTotal={calculateExpensesMonthlyTotal()}
+            currentMonthYear={currentMonthYear}
+          />
 
           {/* ✅ Cart Summary */}
           {showCart && cart.length > 0 && (
