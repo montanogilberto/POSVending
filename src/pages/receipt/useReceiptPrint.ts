@@ -1,10 +1,6 @@
 import { useCallback } from 'react';
-import {
-  postOneTicketTracking,
-  saveTicketHtml,
-  sendTicketSms,
-  sendTicketWhatsapp
-} from '../../api/ticketApi';
+import { postOneTicketTracking, saveTicketHtml } from '../../api/ticketApi';
+import { dispatchNotification } from '../../api/notificationDispatchApi';
 import { ReceiptService } from '../../services/ReceiptService';
 
 export interface ReceiptActionStatus {
@@ -15,6 +11,7 @@ export interface ReceiptActionStatus {
 
 export interface ReceiptPrintSummary {
   azureHtml: ReceiptActionStatus;
+  push: ReceiptActionStatus;
   whatsapp: ReceiptActionStatus;
   sms: ReceiptActionStatus;
   print: ReceiptActionStatus;
@@ -52,6 +49,7 @@ export function useReceiptPrint({
   const handlePrint = useCallback(async () => {
     const summary: ReceiptPrintSummary = {
       azureHtml: { ok: false, message: 'No ejecutado' },
+      push: { ok: false, message: 'No ejecutado' },
       whatsapp: { ok: false, message: 'No ejecutado' },
       sms: { ok: false, message: 'No ejecutado' },
       print: { ok: false, message: 'No ejecutado' },
@@ -62,6 +60,7 @@ export function useReceiptPrint({
     if (!receiptData) {
       console.log('[ReceiptPrint] No receiptData, print aborted');
       summary.azureHtml = { ok: false, message: 'Sin datos de recibo', error: 'No receiptData' };
+      summary.push = { ok: false, message: 'No ejecutado por falta de recibo' };
       summary.whatsapp = { ok: false, message: 'No ejecutado por falta de recibo' };
       summary.sms = { ok: false, message: 'No ejecutado por falta de recibo' };
       summary.print = { ok: false, message: 'No ejecutado por falta de recibo' };
@@ -73,8 +72,7 @@ export function useReceiptPrint({
     console.log('[ReceiptPrint][TRACK] Goal checklist', {
         uploadHtmlToAzure: true,
         generateHtmlLink: true,
-        sendWhatsapp: true,
-        sendSms: true,
+        dispatchNotification: true,
         updateDatabaseTables: true,
         physicalPrint: true
       });
@@ -93,9 +91,8 @@ export function useReceiptPrint({
         ''
       ).trim();
       const normalizedPhoneDigits = rawClientPhone.replace(/\D/g, '');
-      const clientPhoneWithPlus = normalizedPhoneDigits ? `+${normalizedPhoneDigits}` : '';
-      const clientPhoneDigits = normalizedPhoneDigits;
-      const clientPhone = clientPhoneWithPlus;
+      const clientPhone = normalizedPhoneDigits ? `+${normalizedPhoneDigits}` : '';
+      const clientId = Number(ticketData?.client?.clientId ?? 0);
       summary.phone = clientPhone;
       const safeIncomeForFile = incomeId > 0 ? incomeId : Date.now();
       const fileName = `receipt_${safeIncomeForFile}.html`;
@@ -230,115 +227,68 @@ export function useReceiptPrint({
         if (receiptUrl && clientPhone) {
           const message = 'Aquí está su recibo:';
 
-          console.log('[ReceiptPrint] Sending WhatsApp...', {
-            endpointTicketId: String(incomeId),
-            endpointPhoneFallback: clientPhone,
-            endpointPhoneFallbackDigits: clientPhoneDigits,
+          console.log('[ReceiptPrint] Dispatching notification (push -> whatsapp -> sms)...', {
+            incomeId,
+            companyId,
+            clientId,
             phone: clientPhone,
             message,
             receiptUrl
           });
 
-          let whatsappResponse = await sendTicketWhatsapp(String(incomeId), {
-            phone: clientPhone,
-            message,
-            receiptUrl
-          });
-
-          if (!whatsappResponse) {
-            console.warn('[ReceiptPrint] WhatsApp by incomeId failed, retrying with phone path param');
-            whatsappResponse = await sendTicketWhatsapp(clientPhone, {
+          try {
+            const dispatchResult = await dispatchNotification({
+              companyId,
+              sourceType: 'ticket',
+              sourceId: incomeId,
+              recipientType: 'client',
+              recipientId: clientId,
+              eventName: 'ticket_ready',
               phone: clientPhone,
-              message,
+              pushTitle: 'Recibo listo',
+              pushMessage: message,
+              waSmsMessage: message,
+              messagePreview: message,
               receiptUrl
             });
-          }
+            console.log('[ReceiptPrint] Dispatch result', dispatchResult);
 
-          if (!whatsappResponse && clientPhoneDigits) {
-            console.warn('[ReceiptPrint] WhatsApp by +phone path param failed, retrying with digits-only path param');
-            whatsappResponse = await sendTicketWhatsapp(clientPhoneDigits, {
-              phone: clientPhone,
-              message,
-              receiptUrl
-            });
-          }
+            const { selectedChannel, status: dispatchStatus } = dispatchResult;
+            const sent = dispatchStatus === 'sent';
+            const channelLabel = selectedChannel === 'push' ? 'notificación push'
+              : selectedChannel === 'whatsapp' ? 'WhatsApp'
+              : 'SMS';
 
-          if (whatsappResponse) {
-            summary.whatsapp = { ok: true, message: 'WhatsApp enviado correctamente' };
-            onToast('WhatsApp enviado correctamente');
-            const whatsappTrackingPayload = {
-              ticket: [{
-                action: 'whatsapp' as const,
-                incomeId,
-                companyId,
-                fileName,
-                containerName,
-                receiptUrl,
-                phone: clientPhone,
-                channelResponse: whatsappResponse
-              }]
-            };
-            console.log('[ReceiptPrint][DB_TRACKING] Sending whatsapp payload', whatsappTrackingPayload);
-            const whatsappTrackingResponse = await postOneTicketTracking(whatsappTrackingPayload);
-            console.log('[ReceiptPrint][DB_TRACKING] WhatsApp tracking response', whatsappTrackingResponse);
-          } else {
-            summary.whatsapp = {
-              ok: false,
-              message: 'No se pudo enviar WhatsApp',
-              error: 'All endpoint variants failed'
-            };
-            onToast('No se pudo enviar WhatsApp');
-          }
+            summary.push = selectedChannel === 'push'
+              ? { ok: sent, message: sent ? 'Notificación push enviada correctamente' : 'No se pudo enviar push' }
+              : { ok: false, message: 'No fue necesario (otro canal usado)' };
+            summary.whatsapp = selectedChannel === 'whatsapp'
+              ? { ok: sent, message: sent ? 'WhatsApp enviado correctamente' : 'No se pudo enviar WhatsApp' }
+              : { ok: false, message: 'No fue necesario (otro canal usado)' };
+            summary.sms = selectedChannel === 'sms'
+              ? { ok: sent, message: sent ? 'SMS enviado correctamente' : 'No se pudo enviar SMS' }
+              : { ok: false, message: 'No fue necesario (otro canal usado)' };
 
-          console.log('[ReceiptPrint] Sending SMS...', {
-            endpointIncomeId: String(incomeId),
-            phone: clientPhone,
-            message,
-            receiptUrl
-          });
-
-          const smsResponse = await sendTicketSms(String(incomeId), {
-            phone: clientPhone,
-            message,
-            receiptUrl
-          });
-
-          if (smsResponse) {
-            summary.sms = { ok: true, message: 'SMS enviado correctamente' };
-            onToast('SMS enviado correctamente');
-            const smsTrackingPayload = {
-              ticket: [{
-                action: 'sms' as const,
-                incomeId,
-                companyId,
-                fileName,
-                containerName,
-                receiptUrl,
-                phone: clientPhone,
-                channelResponse: smsResponse
-              }]
-            };
-            console.log('[ReceiptPrint][DB_TRACKING] Sending sms payload', smsTrackingPayload);
-            const smsTrackingResponse = await postOneTicketTracking(smsTrackingPayload);
-            console.log('[ReceiptPrint][DB_TRACKING] SMS tracking response', smsTrackingResponse);
-          } else {
-            summary.sms = {
-              ok: false,
-              message: 'No se pudo enviar SMS',
-              error: 'sendTicketSms returned null'
-            };
-            onToast('No se pudo enviar SMS');
+            onToast(sent ? `Recibo enviado por ${channelLabel}` : 'No se pudo enviar el recibo por ningún canal');
+          } catch (dispatchError: any) {
+            console.error('[ReceiptPrint] dispatchNotification failed', dispatchError);
+            summary.push = { ok: false, message: 'No se pudo enviar', error: dispatchError?.message || String(dispatchError) };
+            summary.whatsapp = { ok: false, message: 'No se pudo enviar', error: dispatchError?.message || String(dispatchError) };
+            summary.sms = { ok: false, message: 'No se pudo enviar', error: dispatchError?.message || String(dispatchError) };
+            onToast('No se pudo enviar el recibo');
           }
         } else if (receiptUrl && !clientPhone) {
-          console.warn('[ReceiptPrint] No client phone available, skipping WhatsApp/SMS send');
+          console.warn('[ReceiptPrint] No client phone available, skipping notification dispatch');
+          summary.push = { ok: false, message: 'No enviado: cliente sin teléfono' };
           summary.whatsapp = { ok: false, message: 'No enviado: cliente sin teléfono' };
           summary.sms = { ok: false, message: 'No enviado: cliente sin teléfono' };
           onToast('Recibo guardado. Cliente sin teléfono para envío');
         } else {
-          console.warn('[ReceiptPrint] No receiptUrl available; skipping WhatsApp/SMS tracking.');
+          console.warn('[ReceiptPrint] No receiptUrl available; skipping notification dispatch.');
           if (!summary.azureHtml.message || summary.azureHtml.message === 'No ejecutado') {
             summary.azureHtml = { ok: false, message: 'No se obtuvo URL del recibo' };
           }
+          summary.push = { ok: false, message: 'No enviado: sin URL de recibo' };
           summary.whatsapp = { ok: false, message: 'No enviado: sin URL de recibo' };
           summary.sms = { ok: false, message: 'No enviado: sin URL de recibo' };
         }
@@ -353,6 +303,7 @@ export function useReceiptPrint({
           }
         });
         summary.azureHtml = { ok: false, message: 'incomeId inválido para guardar ticket' };
+        summary.push = { ok: false, message: 'No enviado por incomeId inválido' };
         summary.whatsapp = { ok: false, message: 'No enviado por incomeId inválido' };
         summary.sms = { ok: false, message: 'No enviado por incomeId inválido' };
       }
