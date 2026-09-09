@@ -67,6 +67,7 @@ import {
   diamondOutline,
   trendingUpOutline,
   trendingDownOutline,
+  paperPlaneOutline,
 }
   from 'ionicons/icons';
   
@@ -110,6 +111,7 @@ import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
+import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import P2PLendingPage from './pages/loans/P2PLendingPage';
 import MyLoansPage from './pages/loans/MyLoansPage';
@@ -532,6 +534,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'notificationDispatchLog') && (
+              <IonItem button routerLink="/notification-dispatch-log" title="Historial de Notificaciones">
+                <IonIcon icon={paperPlaneOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Historial de Notificaciones</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'categories') && (
               <IonItem button routerLink="/categories" title="Categorías">
                 <IonIcon icon={grid} slot="start" />
@@ -798,6 +809,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
+            <PrivateRoute exact path="/notification-dispatch-log" component={NotificationDispatchLogPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
           </IonRouterOutlet>
 

@@ -38,6 +38,21 @@ export const PROPOSAL_STATUS: Record<string, { label: string }> = {
   cancelled: { label: 'Cancelada' },
 };
 
+/** Cascada de notificaciones (notificationDispatches.status). */
+export const NOTIFICATION_DISPATCH_STATUS: Record<string, StatusMeta> = {
+  pending:   { label: 'Pendiente',  color: 'medium'  },
+  sent:      { label: 'Enviada',    color: 'success' },
+  confirmed: { label: 'Confirmada', color: 'primary' },
+  failed:    { label: 'Fallida',    color: 'danger'  },
+};
+
+/** Canal de envío (notificationDispatches.selectedChannel) — verde=gratis, ambar=medio, rojo=caro. */
+export const NOTIFICATION_CHANNEL: Record<string, StatusMeta> = {
+  push:     { label: 'Push',     color: 'success' },
+  whatsapp: { label: 'WhatsApp', color: 'warning' },
+  sms:      { label: 'SMS',      color: 'danger'  },
+};
+
 /** Resultado de una ronda del arcade (arcadeRounds.outcome). */
 export const ARCADE_OUTCOME: Record<string, StatusMeta> = {
   win:       { label: 'Ganada',    color: 'success' },

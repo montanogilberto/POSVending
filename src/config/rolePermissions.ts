@@ -59,6 +59,7 @@ export type UiFeature =
   | 'clientFaceRecognitions'
   | 'clientDashboards'
   | 'pushNotifications'
+  | 'notificationDispatchLog'
   | 'manufacturing'
   | 'rewards'
   | 'loanChat'
@@ -74,14 +75,14 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'users', 'ingresos', 'egresos',
     'iot', 'settings',
     'loans', 'clientDashboards', 'clientFaceRecognitions',
-    'manufacturing', 'pushNotifications',
+    'manufacturing', 'pushNotifications', 'notificationDispatchLog',
     'rewards', 'loanChat', 'p2pLending', 'game', 'arcade',
   ],
   manager: [
     'laundry', 'pos', 'scannerqr', 'sells',
     'clients', 'products', 'categories', 'suppliers',
     'ingresos', 'egresos',
-    'clientDashboards', 'manufacturing',
+    'clientDashboards', 'manufacturing', 'notificationDispatchLog',
     'rewards', 'game', 'arcade',
   ],
   employee: [
