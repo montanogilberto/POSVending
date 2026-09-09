@@ -1,0 +1,28 @@
+.ndl-page {
+  --background: var(--ion-background-color, #f4f5f8);
+}
+
+.ndl-filter-toolbar {
+  --background: transparent;
+  --min-height: 44px;
+}
+
+.ndl-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.ndl-item h2 {
+  font-weight: 600;
+}
+
+.ndl-fallback {
+  color: var(--ion-color-medium);
+  font-size: 0.85em;
+}
+
+.ndl-date {
+  color: var(--ion-color-medium);
+  font-size: 0.8em;
+}
