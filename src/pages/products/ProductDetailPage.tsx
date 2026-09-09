@@ -32,7 +32,7 @@ import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
-import { fetchCategories } from '../../data/categories';
+import { getOneProduct } from '../../api/productsApi';
 import '../../styles/dashboard.css';
 
 interface RouteParams {
@@ -80,15 +80,13 @@ const ProductDetailPage: React.FC = () => {
       console.log('Product from state:', stateProduct);
       setProduct(stateProduct);
     } else {
-      console.warn('Product not found in state, this should not happen');
+      console.warn('Product not found in navigation state, fetching by id:', productId);
       const fetchProduct = async () => {
         try {
-          const categories = await fetchCategories();
-          const category = categories.find(cat => cat.categoryId === parseInt(productId));
-          if (category) setProduct(undefined);
-          else setProduct(undefined);
+          const products = await getOneProduct({ products: [{ productId: parseInt(productId) }] });
+          setProduct(products[0]);
         } catch (error) {
-          console.error('Error fetching categories:', error);
+          console.error('Error fetching product:', error);
           setProduct(undefined);
         }
       };

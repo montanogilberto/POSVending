@@ -144,7 +144,7 @@ const ReceiptPage: React.FC = () => {
                       {!!printSummary.whatsapp.error && <IonText color="medium"><p>{printSummary.whatsapp.error}</p></IonText>}
                     </IonLabel>
                     <IonText color={statusColor(printSummary.whatsapp.ok)}>
-                      <strong>{printSummary.whatsapp.ok ? 'OK' : 'FALLÓ'}</strong>
+                      <strong>{printSummary.whatsapp.ok ? 'OK' : 'N/A'}</strong>
                     </IonText>
                   </IonItem>
 
@@ -155,7 +155,7 @@ const ReceiptPage: React.FC = () => {
                       {!!printSummary.sms.error && <IonText color="medium"><p>{printSummary.sms.error}</p></IonText>}
                     </IonLabel>
                     <IonText color={statusColor(printSummary.sms.ok)}>
-                      <strong>{printSummary.sms.ok ? 'OK' : 'FALLÓ'}</strong>
+                      <strong>{printSummary.sms.ok ? 'OK' : 'N/A'}</strong>
                     </IonText>
                   </IonItem>
 

@@ -351,12 +351,23 @@ const unifiedReceiptData = React.useMemo(() => {
 
                 <IonItem>
                   <IonLabel>
+                    <h2>Notificación push</h2>
+                    <p>{printSummary.push.message}</p>
+                    {!!printSummary.push.error && <IonText color="medium"><p>{printSummary.push.error}</p></IonText>}
+                  </IonLabel>
+                  <IonText color={statusColor(printSummary.push.ok)}>
+                    <strong>{printSummary.push.ok ? 'OK' : 'N/A'}</strong>
+                  </IonText>
+                </IonItem>
+
+                <IonItem>
+                  <IonLabel>
                     <h2>WhatsApp</h2>
                     <p>{printSummary.whatsapp.message}</p>
                     {!!printSummary.whatsapp.error && <IonText color="medium"><p>{printSummary.whatsapp.error}</p></IonText>}
                   </IonLabel>
                   <IonText color={statusColor(printSummary.whatsapp.ok)}>
-                    <strong>{printSummary.whatsapp.ok ? 'OK' : 'FALLÓ'}</strong>
+                    <strong>{printSummary.whatsapp.ok ? 'OK' : 'N/A'}</strong>
                   </IonText>
                 </IonItem>
 
@@ -367,7 +378,7 @@ const unifiedReceiptData = React.useMemo(() => {
                     {!!printSummary.sms.error && <IonText color="medium"><p>{printSummary.sms.error}</p></IonText>}
                   </IonLabel>
                   <IonText color={statusColor(printSummary.sms.ok)}>
-                    <strong>{printSummary.sms.ok ? 'OK' : 'FALLÓ'}</strong>
+                    <strong>{printSummary.sms.ok ? 'OK' : 'N/A'}</strong>
                   </IonText>
                 </IonItem>
 
