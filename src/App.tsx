@@ -92,6 +92,7 @@ import CategoriesPage from './pages/category/CategoriesPage';
 import UsersPage from './pages/admin/UsersPage';
 import IncomesPage from './pages/finance/IncomesPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
+import AccountingPage from './pages/finance/AccountingPage';
 import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/receipt/ReceiptPage';
@@ -610,6 +611,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'accounting') && (
+              <IonItem button routerLink="/accounting" title="Contabilidad">
+                <IonIcon icon={documentTextOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Contabilidad</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'loans') && (
               <IonItem button routerLink="/loans" title="Préstamos">
                 <IonIcon icon={cashOutline} slot="start" />
@@ -760,6 +770,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/users" component={UsersPage} />
             <PrivateRoute exact path="/ingresos" component={IncomesPage} />
             <PrivateRoute exact path="/egresos" component={ExpensesPage} />
+            <PrivateRoute exact path="/accounting" component={AccountingPage} />
             <PrivateRoute exact path="/water-tanks" component={WaterTanksPage} />
             <PrivateRoute exact path="/water-tanks-history/:tankId" component={WaterTanksHistoryPage} />
             <PrivateRoute exact path="/receipt" component={ReceiptPage} />

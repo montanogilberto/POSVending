@@ -8,6 +8,21 @@ export interface StatusMeta {
   color: string; // color Ionic (primary/success/danger/warning/medium)
 }
 
+/** Asientos contables (journalEntries.status). */
+export const JOURNAL_ENTRY_STATUS: Record<string, StatusMeta> = {
+  posted: { label: 'Contabilizado', color: 'success' },
+  void:   { label: 'Anulado',       color: 'medium'  },
+};
+
+/** Tipo de cuenta contable (chartOfAccounts.accountType). */
+export const ACCOUNT_TYPE: Record<string, StatusMeta> = {
+  asset:     { label: 'Activo',   color: 'primary' },
+  liability: { label: 'Pasivo',   color: 'warning' },
+  equity:    { label: 'Capital',  color: 'tertiary' },
+  income:    { label: 'Ingreso',  color: 'success' },
+  expense:   { label: 'Gasto',    color: 'danger'  },
+};
+
 /** Conversaciones de negociación (loanConversations.status). */
 export const CONVERSATION_STATUS: Record<string, StatusMeta> = {
   open:     { label: 'Abierta',   color: 'primary' },
