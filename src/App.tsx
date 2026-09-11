@@ -55,6 +55,7 @@ import {
   walletOutline,
   constructOutline,
   starOutline,
+  giftOutline,
   chatbubblesOutline,
   chevronBackOutline,
   chevronForwardOutline,
@@ -92,6 +93,7 @@ import CategoriesPage from './pages/category/CategoriesPage';
 import UsersPage from './pages/admin/UsersPage';
 import IncomesPage from './pages/finance/IncomesPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
+import AccountingPage from './pages/finance/AccountingPage';
 import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/receipt/ReceiptPage';
@@ -109,6 +111,7 @@ const ClientFaceRecognitionPage = React.lazy(() => import('./pages/clients/Clien
 import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
+import RewardsDashboardPage from './pages/clients/RewardsDashboardPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
@@ -119,6 +122,7 @@ import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import ManufacturingPage from './pages/manufacturing/ManufacturingPage';
 import RewardsPage from './pages/finance/RewardsPage';
+import PosRewardsPage from './pages/pos/PosRewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import LoanDetailPage from './pages/loans/LoanDetailPage';
@@ -610,6 +614,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'accounting') && (
+              <IonItem button routerLink="/accounting" title="Contabilidad">
+                <IonIcon icon={documentTextOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Contabilidad</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'loans') && (
               <IonItem button routerLink="/loans" title="Préstamos">
                 <IonIcon icon={cashOutline} slot="start" />
@@ -632,6 +645,12 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/rewards" title="Recompensas">
                 <IonIcon icon={starOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Recompensas</IonLabel>}
+              </IonItem>
+              )}
+              {canAccess(roleCode, 'posRewards') && (
+              <IonItem button routerLink="/pos-rewards" title="Puntos POS">
+                <IonIcon icon={giftOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Puntos POS</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -760,6 +779,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/users" component={UsersPage} />
             <PrivateRoute exact path="/ingresos" component={IncomesPage} />
             <PrivateRoute exact path="/egresos" component={ExpensesPage} />
+            <PrivateRoute exact path="/accounting" component={AccountingPage} />
             <PrivateRoute exact path="/water-tanks" component={WaterTanksPage} />
             <PrivateRoute exact path="/water-tanks-history/:tankId" component={WaterTanksHistoryPage} />
             <PrivateRoute exact path="/receipt" component={ReceiptPage} />
@@ -777,6 +797,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/client-dashboard/:clientId" component={ClientDashboardPage} />
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
+            <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
             {/* Mismo patrón que /client-dashboard/:clientId — el id va en la URL
                 para que la ruta sea compartible y sobreviva un refresh. La
@@ -790,6 +811,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
             <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
+            <PrivateRoute exact path="/pos-rewards" component={PosRewardsPage} />
             <PrivateRoute exact path="/game/mission-clean-room" component={MissionCleanRoomPage} />
             {/* Arcade de fichas virtuales. Los 8 juegos que faltan salen como
                 tiles bloqueados en /arcade, asi que no necesitan ruta todavia. */}

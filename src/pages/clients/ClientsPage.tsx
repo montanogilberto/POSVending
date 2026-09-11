@@ -64,6 +64,7 @@ import {
   copyOutline,
   closeOutline,
   close,
+  giftOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
@@ -1762,6 +1763,9 @@ const ClientsPage: React.FC = () => {
                         <IonIcon icon={walletOutline} slot="start" /> Portfolio
                       </IonButton>
                     )}
+                    <IonButton fill="outline" size="small" color="secondary" onClick={() => history.push(`/rewards-dashboard/${client.clientId}`)} className="action-button">
+                      <IonIcon icon={giftOutline} slot="start" /> Recompensas
+                    </IonButton>
                     <IonButton fill="outline" size="small" color="warning" onClick={() => history.push(`/client-followup/${client.clientId}`)} className="action-button">
                       <IonIcon icon={calendarOutline} slot="start" /> Seguimiento
                     </IonButton>

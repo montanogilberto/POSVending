@@ -626,6 +626,13 @@
   text-overflow: ellipsis;
 }
 
+.client-points-chip {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  --background: #d1fae5;
+  --color: #065f46;
+}
+
 .client-change-btn {
   --border-radius: 10px;
   --border-width: 1.5px;

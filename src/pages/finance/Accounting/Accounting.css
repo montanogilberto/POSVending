@@ -1,0 +1,52 @@
+.accounting-segment {
+  margin-bottom: 12px;
+}
+
+.accounting-container {
+  padding: 0 12px 24px;
+}
+
+.accounting-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 4px;
+}
+
+.accounting-toolbar h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.accounting-code {
+  font-family: monospace;
+  margin-right: 4px;
+}
+
+.accounting-inline-badge {
+  margin-left: 8px;
+}
+
+.accounting-lines-title {
+  margin: 16px 4px 4px;
+  font-size: 1rem;
+}
+
+.accounting-line-row {
+  margin-bottom: 8px;
+}
+
+.accounting-totals-row {
+  margin: 12px 4px;
+}
+
+.accounting-imbalance-hint {
+  color: var(--ion-color-danger);
+  font-size: 0.85rem;
+  margin: 4px 0 0;
+}
+
+.accounting-refresh-btn {
+  margin: 0 4px 8px;
+}

@@ -8,6 +8,21 @@ export interface StatusMeta {
   color: string; // color Ionic (primary/success/danger/warning/medium)
 }
 
+/** Asientos contables (journalEntries.status). */
+export const JOURNAL_ENTRY_STATUS: Record<string, StatusMeta> = {
+  posted: { label: 'Contabilizado', color: 'success' },
+  void:   { label: 'Anulado',       color: 'medium'  },
+};
+
+/** Tipo de cuenta contable (chartOfAccounts.accountType). */
+export const ACCOUNT_TYPE: Record<string, StatusMeta> = {
+  asset:     { label: 'Activo',   color: 'primary' },
+  liability: { label: 'Pasivo',   color: 'warning' },
+  equity:    { label: 'Capital',  color: 'tertiary' },
+  income:    { label: 'Ingreso',  color: 'success' },
+  expense:   { label: 'Gasto',    color: 'danger'  },
+};
+
 /** Conversaciones de negociación (loanConversations.status). */
 export const CONVERSATION_STATUS: Record<string, StatusMeta> = {
   open:     { label: 'Abierta',   color: 'primary' },
@@ -66,4 +81,18 @@ export const PAYMENT_METHOD: Record<string, StatusMeta> = {
   efectivo:      { label: 'Efectivo',      color: 'success'  },
   tarjeta:       { label: 'Tarjeta',       color: 'primary'  },
   transferencia: { label: 'Transferencia', color: 'tertiary' },
+};
+
+/** Tipo de movimiento del ledger de puntos POS (posRewardTransactions.txType, comparar en minúsculas). */
+export const POS_REWARD_TX_TYPE: Record<string, StatusMeta> = {
+  earn:       { label: 'Ganados',   color: 'success' },
+  redeem:     { label: 'Canjeados', color: 'primary' },
+  adjustment: { label: 'Ajuste',    color: 'warning' },
+  expire:     { label: 'Expirado',  color: 'medium'  },
+};
+
+/** Estado de una redención de puntos POS (posRewardRedemptions.status). */
+export const POS_REWARD_REDEMPTION_STATUS: Record<string, StatusMeta> = {
+  applied:   { label: 'Aplicada',  color: 'success' },
+  cancelled: { label: 'Cancelada', color: 'medium'  },
 };

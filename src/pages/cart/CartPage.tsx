@@ -26,6 +26,8 @@ import { fetchTicket } from '../../api/ticketApi';
 import { postIncome, applyPromoToIncome } from '../../api/incomeApi';
 import { useIncome } from '../../contexts/IncomeContext';
 import { Client } from '../../api/clientsApi';
+import { posRewardsApi } from '../../api/posRewardsApi';
+import { notifyDataChanged } from '../../utils/refreshBus';
 
 import '../../styles/dashboard.css';
 import './CartPage.css';
@@ -60,6 +62,9 @@ const CartPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
+  const [clientPointsBalance, setClientPointsBalance] = useState<number | null>(null);
+  const [pointsEarned, setPointsEarned] = useState<number | null>(null);
+  const [newPointsBalance, setNewPointsBalance] = useState<number | null>(null);
 
   // Promotion code state
   const [promoCode, setPromoCode] = useState('');
@@ -147,6 +152,18 @@ const CartPage: React.FC = () => {
     }
   }, [cashPaid, paymentMethod, total]);
 
+  useEffect(() => {
+    if (!selectedClient?.clientId) {
+      setClientPointsBalance(null);
+      return;
+    }
+    let cancelled = false;
+    posRewardsApi.getBalance(1, selectedClient.clientId)
+      .then(balance => { if (!cancelled) setClientPointsBalance(balance?.balance ?? 0); })
+      .catch(err => console.error('[CartPage] Failed to load points balance', err));
+    return () => { cancelled = true; };
+  }, [selectedClient?.clientId]);
+
   const showErrorToast = (message: string, color: 'success' | 'danger' | 'warning' = 'danger') => {
     setToastMessage(message);
     setToastColor(color);
@@ -166,6 +183,9 @@ const CartPage: React.FC = () => {
       setShowAlert(true);
       return;
     }
+
+    setPointsEarned(null);
+    setNewPointsBalance(null);
 
 
     if (paymentMethod === 'Efectivo') {
@@ -291,7 +311,18 @@ const CartPage: React.FC = () => {
           if (rec && rec.msg === 'Inserted Successfully' && rec.value != null) {
             const newId = String(rec.value);
             setLastIncomeId(newId);
-            await loadIncomes();
+            await loadIncomes(1);
+
+            // POS loyalty points: calculated server-side from the ticket's lines — never here.
+            try {
+              const earnResult = await posRewardsApi.earnFromTicket(parseInt(newId), 1);
+              setPointsEarned(earnResult.pointsEarned);
+              setNewPointsBalance(earnResult.newBalance);
+              notifyDataChanged('pos_reward_earned');
+            } catch (rewardError) {
+              console.error('[PosRewards] earnFromTicket failed:', rewardError);
+              // Ticket is already recorded — a points failure must not block or undo the sale.
+            }
 
             // Apply promo code to income via stored procedure (DB is source of truth)
             if (promoActive && promoCodeValue) {
@@ -481,6 +512,12 @@ const CartPage: React.FC = () => {
                             {selectedClient.cellphone}
                             {selectedClient.email && ` • ${selectedClient.email}`}
                           </div>
+                          {clientPointsBalance != null && (
+                            <IonChip color="success" className="client-points-chip">
+                              <IonIcon icon={pricetag} />
+                              <IonLabel>{clientPointsBalance} pts</IonLabel>
+                            </IonChip>
+                          )}
                         </>
                       ) : (
                         <>
@@ -630,6 +667,8 @@ const CartPage: React.FC = () => {
             setTicketData={setTicketData}
             promotionCode={promoActive ? promoCode.trim().toUpperCase() : undefined}
             discountAmount={promoActive ? totals.discount : undefined}
+            pointsEarned={pointsEarned}
+            newPointsBalance={newPointsBalance}
           />
         )}
 

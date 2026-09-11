@@ -23,7 +23,7 @@ interface ProductContextType {
   clearAllProducts: () => void;
   fetchProducts: () => Promise<void>;
   fetchProductById: (productId: number) => Promise<void>;
-  createProduct: (productData: CreateProductInput) => Promise<void>;
+  createProduct: (productData: CreateProductInput) => Promise<number | null>;
   updateProduct: (productId: number, productData: Partial<Product>) => Promise<void>;
   removeProduct: (productId: number) => Promise<void>;
 }
@@ -128,8 +128,10 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
           productOptions: (productData as any).productOptions ?? [],
         }]
       };
-      await createOrUpdateProduct(request);
+      const response = await createOrUpdateProduct(request);
       await fetchProducts(); // Refresh list
+      const newProductId = Number(response?.result?.[0]?.value);
+      return Number.isFinite(newProductId) && newProductId > 0 ? newProductId : null;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create product';
       setError(message);

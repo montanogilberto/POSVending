@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { fetchAllLaundry } from '../api/laundryApi';
+import { fetchMonthlyLaundry } from '../api/laundryApi';
 
 interface Income {
   incomeId: number;
@@ -15,7 +15,7 @@ interface Income {
 
 interface IncomeContextType {
   allIncome: Income[];
-  loadIncomes: (signal?: AbortSignal) => Promise<void>;
+  loadIncomes: (companyId: number, signal?: AbortSignal) => Promise<void>;
 }
 
 const IncomeContext = createContext<IncomeContextType | undefined>(undefined);
@@ -43,9 +43,9 @@ const serializeError = (error: unknown) => {
 export const IncomeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [allIncome, setAllIncome] = useState<Income[]>([]);
 
-  const loadIncomes = useCallback(async (signal?: AbortSignal) => {
+  const loadIncomes = useCallback(async (companyId: number, signal?: AbortSignal) => {
     try {
-      const incomes = await fetchAllLaundry(signal);
+      const incomes = await fetchMonthlyLaundry(companyId, signal);
 
       if (!signal?.aborted) {
         setAllIncome(incomes);
