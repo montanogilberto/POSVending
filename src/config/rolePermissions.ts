@@ -6,7 +6,13 @@ export type RoleCode =
   | 'borrower'
   | 'lender'
   | 'business'
-  | 'viewer';
+  | 'viewer'
+  // Groundwork only (per the frozen workflow architecture, §04): a POS
+  // customer's own identity, distinct from staff and from borrower/lender.
+  // No self-service login/account view exists yet — this just reserves the
+  // role in the type/permission system so it doesn't collide with anything
+  // built later.
+  | 'client';
 
 export const ROLE_LABELS: Record<RoleCode, string> = {
   admin:    'Administrador',
@@ -16,6 +22,7 @@ export const ROLE_LABELS: Record<RoleCode, string> = {
   lender:   'Prestamista',
   business: 'Negocio',
   viewer:   'Lector',
+  client:   'Cliente',
 };
 
 export const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
@@ -26,6 +33,7 @@ export const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
   lender:   'Ofrecer préstamos y recibir pagos.',
   business: 'POS, ventas y puntos de recompensa.',
   viewer:   'Solo lectura de reportes.',
+  client:   'Ver mi cuenta, compras y recompensas.',
 };
 
 export const ROLE_EMOJI: Record<RoleCode, string> = {
@@ -36,6 +44,7 @@ export const ROLE_EMOJI: Record<RoleCode, string> = {
   lender:   '💼',
   business: '🏪',
   viewer:   '👁️',
+  client:   '🛍️',
 };
 
 /** UI features that can be gated by role. */
@@ -55,6 +64,7 @@ export type UiFeature =
   | 'sells'
   | 'laundry'
   | 'pos'
+  | 'posRewards'
   | 'scannerqr'
   | 'loans'
   | 'clientFaceRecognitions'
@@ -70,7 +80,7 @@ export type UiFeature =
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
-    'laundry', 'pos', 'scannerqr', 'sells',
+    'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
     'clients', 'products', 'categories', 'suppliers',
     'alerts', 'emails',
     'users', 'ingresos', 'egresos', 'accounting',
@@ -80,14 +90,14 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'rewards', 'loanChat', 'p2pLending', 'game', 'arcade',
   ],
   manager: [
-    'laundry', 'pos', 'scannerqr', 'sells',
+    'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
     'clients', 'products', 'categories', 'suppliers',
     'ingresos', 'egresos', 'accounting',
     'clientDashboards', 'manufacturing', 'notificationDispatchLog',
     'rewards', 'game', 'arcade',
   ],
   employee: [
-    'laundry', 'pos', 'scannerqr', 'sells',
+    'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
     'rewards', 'game', 'arcade',
   ],
   borrower: [
@@ -105,7 +115,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'game', 'arcade',
   ],
   business: [
-    'pos', 'scannerqr', 'sells',
+    'pos', 'posRewards', 'scannerqr', 'sells',
     'clients', 'products', 'categories',
     'ingresos', 'egresos',
     'rewards', 'game', 'arcade',
@@ -113,11 +123,19 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   viewer: [
     'ingresos', 'egresos', 'clientDashboards', 'game', 'arcade',
   ],
+  // Groundwork only — see the RoleCode comment. Deliberately does not grant
+  // 'rewards'/'posRewards' (those routes are staff admin panels today, not
+  // a customer self-service view) or 'clientDashboards' (that's the
+  // borrower/lender loan dashboard, a different module). Shared/entertainment
+  // only until a real self-service view exists.
+  client: [
+    'game', 'arcade',
+  ],
 };
 
 export const normalizeRoleCode = (raw?: string | null): RoleCode => {
   const code = raw?.trim().toLowerCase();
-  const valid: RoleCode[] = ['admin', 'manager', 'employee', 'borrower', 'lender', 'business', 'viewer'];
+  const valid: RoleCode[] = ['admin', 'manager', 'employee', 'borrower', 'lender', 'business', 'viewer', 'client'];
   if (valid.includes(code as RoleCode)) return code as RoleCode;
   return 'employee';
 };

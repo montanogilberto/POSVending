@@ -42,7 +42,7 @@ export const useDashboard = () => {
   const refreshDashboardData = () => {
     console.log('[Dashboard] refreshDashboardData: loading incomes, companyId =', companyId);
     const controller = new AbortController();
-    loadIncomes(controller.signal).catch(() => {});
+    loadIncomes(companyId, controller.signal).catch(() => {});
 
     fetchAllExpenses()
       .then((expenses) => {
@@ -263,7 +263,7 @@ export const useDashboard = () => {
       setShowToast(true);
       setCart([]);
       setShowCart(false);
-      loadIncomes();
+      loadIncomes(companyId);
     } catch (err) {
       console.log('[Dashboard] handleConfirmSale ❌', err);
       setToastMessage('Error al confirmar la venta.');

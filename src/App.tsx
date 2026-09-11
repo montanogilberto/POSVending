@@ -55,6 +55,7 @@ import {
   walletOutline,
   constructOutline,
   starOutline,
+  giftOutline,
   chatbubblesOutline,
   chevronBackOutline,
   chevronForwardOutline,
@@ -110,6 +111,7 @@ const ClientFaceRecognitionPage = React.lazy(() => import('./pages/clients/Clien
 import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
+import RewardsDashboardPage from './pages/clients/RewardsDashboardPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
@@ -120,6 +122,7 @@ import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import ManufacturingPage from './pages/manufacturing/ManufacturingPage';
 import RewardsPage from './pages/finance/RewardsPage';
+import PosRewardsPage from './pages/pos/PosRewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import LoanDetailPage from './pages/loans/LoanDetailPage';
@@ -644,6 +647,12 @@ const AppShell: React.FC = () => {
                 {!menuCollapsed && <IonLabel>Recompensas</IonLabel>}
               </IonItem>
               )}
+              {canAccess(roleCode, 'posRewards') && (
+              <IonItem button routerLink="/pos-rewards" title="Puntos POS">
+                <IonIcon icon={giftOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Puntos POS</IonLabel>}
+              </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
@@ -788,6 +797,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/client-dashboard/:clientId" component={ClientDashboardPage} />
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
+            <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
             {/* Mismo patrón que /client-dashboard/:clientId — el id va en la URL
                 para que la ruta sea compartible y sobreviva un refresh. La
@@ -801,6 +811,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
             <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
+            <PrivateRoute exact path="/pos-rewards" component={PosRewardsPage} />
             <PrivateRoute exact path="/game/mission-clean-room" component={MissionCleanRoomPage} />
             {/* Arcade de fichas virtuales. Los 8 juegos que faltan salen como
                 tiles bloqueados en /arcade, asi que no necesitan ruta todavia. */}

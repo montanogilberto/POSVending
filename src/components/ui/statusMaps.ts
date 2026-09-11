@@ -82,3 +82,17 @@ export const PAYMENT_METHOD: Record<string, StatusMeta> = {
   tarjeta:       { label: 'Tarjeta',       color: 'primary'  },
   transferencia: { label: 'Transferencia', color: 'tertiary' },
 };
+
+/** Tipo de movimiento del ledger de puntos POS (posRewardTransactions.txType, comparar en minúsculas). */
+export const POS_REWARD_TX_TYPE: Record<string, StatusMeta> = {
+  earn:       { label: 'Ganados',   color: 'success' },
+  redeem:     { label: 'Canjeados', color: 'primary' },
+  adjustment: { label: 'Ajuste',    color: 'warning' },
+  expire:     { label: 'Expirado',  color: 'medium'  },
+};
+
+/** Estado de una redención de puntos POS (posRewardRedemptions.status). */
+export const POS_REWARD_REDEMPTION_STATUS: Record<string, StatusMeta> = {
+  applied:   { label: 'Aplicada',  color: 'success' },
+  cancelled: { label: 'Cancelada', color: 'medium'  },
+};

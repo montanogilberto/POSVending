@@ -20,6 +20,8 @@ import { printOutline, closeOutline } from 'ionicons/icons';
 import UnifiedReceipt from '../../components/pos/UnifiedReceipt';
 import { ReceiptService } from '../../services/ReceiptService';
 import { useReceiptPrint, ReceiptPrintSummary } from './useReceiptPrint';
+import { fmtInt } from '../../utils/format';
+import './ReceiptDisplay.css';
 
 interface ReceiptDisplayProps {
   ticketData: any;
@@ -30,6 +32,10 @@ interface ReceiptDisplayProps {
   setTicketData: (data: any) => void;
   promotionCode?: string;
   discountAmount?: number;
+  /** Puntos POS ganados con este ticket (posRewardsApi.earnFromTicket), si el cálculo tuvo éxito. */
+  pointsEarned?: number | null;
+  /** Nuevo saldo de puntos del cliente tras este ticket. */
+  newPointsBalance?: number | null;
 }
 
 /**
@@ -123,6 +129,8 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
   setTicketData,
   promotionCode,
   discountAmount,
+  pointsEarned,
+  newPointsBalance,
 }) => {
   const history = useHistory();
   const [closing, setClosing] = React.useState(false);
@@ -279,6 +287,13 @@ const unifiedReceiptData = React.useMemo(() => {
         data={unifiedReceiptData}
         options={{ width: '46mm', thermal: true }}
       />
+
+      {pointsEarned != null && (
+        <div className="receipt-points-badge">
+          +{fmtInt(pointsEarned)} puntos POS
+          {newPointsBalance != null && <span> · Saldo: {fmtInt(newPointsBalance)} pts</span>}
+        </div>
+      )}
 
       <div
         style={{
