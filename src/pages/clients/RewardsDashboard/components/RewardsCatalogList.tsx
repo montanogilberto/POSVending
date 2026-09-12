@@ -46,7 +46,7 @@ const RewardsCatalogList: React.FC<Props> = ({ vm }) => {
         message={target ? `¿Canjear “${target.name}” por ${fmtInt(target.requiredPoints)} puntos?` : undefined}
         buttons={[
           { text: 'Cancelar', role: 'cancel', handler: vm.cancelRedeem },
-          { text: 'Canjear', role: 'confirm', handler: vm.confirmRedeem },
+          { text: 'Canjear', role: 'confirm', handler: () => { void vm.confirmRedeem(); } },
         ]}
         onDidDismiss={vm.cancelRedeem}
       />
