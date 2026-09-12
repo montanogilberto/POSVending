@@ -28,6 +28,84 @@
   color: var(--ion-color-medium);
 }
 
-.rewards-dashboard-segment {
-  margin: 12px 8px;
+.rewards-hero-card {
+  margin: 12px 12px 8px;
+  text-align: center;
+  border-radius: 18px;
+}
+
+.rewards-hero-card .rewards-kpi-label {
+  margin-bottom: 6px;
+}
+
+.rewards-hero-value {
+  font-size: clamp(2.5rem, 12vw, 4rem);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.rewards-hero-unit {
+  margin-top: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ion-color-medium);
+}
+
+.rewards-hero-delta {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ion-color-success);
+}
+
+.rewards-totals-row {
+  padding-top: 0;
+}
+
+.rewards-section {
+  margin-top: 10px;
+}
+
+.rewards-section-title {
+  margin: 18px 16px 8px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.rewards-activity-icon,
+.rewards-catalog-icon {
+  font-size: 1.25rem;
+  color: var(--ion-color-medium);
+}
+
+.rewards-activity-status {
+  margin-top: 5px;
+}
+
+.rewards-activity-amount {
+  min-width: 62px;
+  text-align: right;
+  font-size: 0.95rem;
+}
+
+.rewards-activity-amount--positive {
+  color: var(--ion-color-success);
+}
+
+.rewards-activity-amount--negative {
+  color: var(--ion-color-danger);
+}
+
+.rewards-catalog-section {
+  padding-bottom: 24px;
+}
+
+.rewards-catalog-redeem {
+  min-width: 78px;
+}
+
+.rewards-catalog-redeem[disabled] {
+  opacity: 0.45;
 }
