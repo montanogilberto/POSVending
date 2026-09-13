@@ -79,6 +79,20 @@
   letter-spacing: -0.02em;
 }
 
+.expenses-summary-count-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: #718096;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.expenses-summary-count-row ion-icon {
+  font-size: 15px;
+}
+
 .expenses-trends-button {
   --border-radius: 12px !important;
   font-weight: 700;

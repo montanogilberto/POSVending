@@ -99,6 +99,7 @@ import SignaturePad from '../../components/kyc/SignaturePad';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
+import { PLAY_STORE_URL, APP_STORE_URL } from '../../utils/appLinks';
 
 const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   nombre: '',
@@ -372,10 +373,6 @@ const ClientsPage: React.FC = () => {
   }, [clients, searchTerm]);
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  // ── App store links (update with real URLs once published) ───────────────
-  const PLAY_STORE_URL  = 'https://play.google.com/store/apps/details?id=com.lavanderia.gmo';
-  const APP_STORE_URL   = 'https://apps.apple.com/app/pos-gmo/id000000000';
-
   const buildShareMessage = (client: Client): string => {
     const name  = `${client.first_name} ${client.last_name}`;
     const type  = client.clientType ?? 'borrower';

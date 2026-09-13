@@ -143,16 +143,22 @@ export const useExpenses = () => {
 
   const currentMonthYear = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
-  const monthlyTotal = useMemo(() => {
+  const currentMonthExpenses = useMemo(() => {
     const now = toHermosilloDate(new Date().toISOString());
     return allExpenses
       .filter((e) => e?.paymentDate)
       .filter((e) => {
         const d = toHermosilloDate(e.paymentDate);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      })
-      .reduce((sum, e) => sum + (Number(e.total) || 0), 0);
+      });
   }, [allExpenses]);
+
+  const monthlyTotal = useMemo(
+    () => currentMonthExpenses.reduce((sum, e) => sum + (Number(e.total) || 0), 0),
+    [currentMonthExpenses]
+  );
+
+  const monthlyCount = currentMonthExpenses.length;
 
   const trendsData: TrendsChartData | null = useMemo(() => {
     if (!allExpenses.length) return null;
@@ -238,6 +244,7 @@ export const useExpenses = () => {
 
     monthlyTotal,
     monthlyTotalFormatted: fmtMXN(monthlyTotal),
+    monthlyCount,
     currentMonthYear,
     mxDate,
 

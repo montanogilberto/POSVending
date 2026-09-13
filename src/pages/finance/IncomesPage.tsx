@@ -10,14 +10,13 @@ import {
   IonIcon,
   IonCard,
   IonCardContent,
-  IonCardHeader,
   IonCardSubtitle,
-  IonCardTitle,
   IonLoading,
   IonButton,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import Header from '../../components/layout/Header';
+import './IncomesPage.css';
 
 import IncomesChart from '../../components/finance/IncomesChart';
 import IncomesFilters from '../../components/finance/IncomesFilters';
@@ -52,7 +51,6 @@ const IncomesPage: React.FC = () => {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [chartData, setChartData] = useState<unknown>(null);
-  const [totalIncome, setTotalIncome] = useState<number>(0);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -99,10 +97,6 @@ const IncomesPage: React.FC = () => {
   }, [searchText, filterPaymentMethod, filterDateFrom, filterDateTo, allIncome]);
 
   useEffect(() => {
-    // Calculate total income from allIncome
-    const total = allIncome.reduce((sum, income) => sum + income.total, 0);
-    setTotalIncome(total);
-
     if (filteredIncome.length > 0) {
       const dailyTotals: { [key: string]: number } = {};
       filteredIncome.forEach((income) => {
@@ -178,28 +172,26 @@ const IncomesPage: React.FC = () => {
     }
   };
 
-  const calculateTotal = () => {
-    return totalIncome;
+  const isCurrentMonth = (paymentDate: string) => {
+    const now = new Date();
+    const d = new Date(paymentDate);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   };
 
   const calculateMonthlyTotal = () => {
-    const now = new Date();
     return allIncome
-      .filter((income) => {
-        const d = new Date(income.paymentDate);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      })
+      .filter((income) => isCurrentMonth(income.paymentDate))
       .reduce((sum, income) => sum + (Number(income.total) || 0), 0);
   };
 
-  // 🔹 NEW: define the values you are using in the KPI card
+  const calculateMonthlyCount = () => {
+    return allIncome.filter((income) => isCurrentMonth(income.paymentDate)).length;
+  };
+
   const currentMonthYear = new Date().toLocaleDateString('es-ES', {
     month: 'long',
     year: 'numeric',
   });
-
-  const currentUser = 'Todos los usuarios'; // cámbialo por el usuario real si lo tienes
-  const percentageChange = ''; // o algo como "+5% vs mes anterior"
 
   return (
     <IonPage>
@@ -219,51 +211,30 @@ const IncomesPage: React.FC = () => {
             </IonCol>
           </IonRow>
 
-          {/* Monthly income metric (like Laundry MetricsGrid monthly total) */}
-          <IonRow>
-            
-            {/* Monthly Total Card */}
-            <IonCol size="12" size-md="6">
-              <IonCard className="dashboard-small-kpi-card">
-                <IonCardContent className="kpi-card-content">
-                  <div className="kpi-icon">
-                    <IonIcon icon={calendar} size="large" />
-                  </div>
-                  <div className="kpi-info">
-                    <IonCardTitle className="kpi-label">Total Mensual</IonCardTitle>
-                    <div className="kpi-amount">{formatCurrencyWithSymbol(calculateMonthlyTotal())}</div>
-                    <div className="kpi-meta">
-                      <span>{currentMonthYear}</span>
+          {/* Monthly summary: total + operations, current month */}
+          <IonRow className="ion-justify-content-center">
+            <IonCol sizeMd="8" sizeLg="6" sizeXs="12">
+              <IonCard className="incomes-summary-card">
+                <IonCardContent>
+                  <div className="incomes-summary-title">{currentMonthYear}</div>
+                  <div className="incomes-summary-grid">
+                    <div className="incomes-summary-tile">
+                      <div className="incomes-summary-tile-icon">
+                        <IonIcon icon={calendar} />
+                      </div>
+                      <div>
+                        <div className="incomes-summary-tile-label">Total Mensual</div>
+                        <div className="incomes-summary-tile-value">{formatCurrencyWithSymbol(calculateMonthlyTotal())}</div>
+                      </div>
                     </div>
-                  </div>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          </IonRow>
-
-          {/* Total Income (legacy KPI) */}
-          <IonRow>
-            <IonCol size="12">
-              <IonCard className="dashboard-kpi-card">
-                <IonCardHeader>
-                  <IonCardTitle className="kpi-label">
-                    Total de Ingresos
-                  </IonCardTitle>
-                  <IonCardSubtitle className="kpi-meta">
-                    {currentMonthYear} • {currentUser}
-                  </IonCardSubtitle>
-                </IonCardHeader>
-
-                <IonCardContent className="kpi-card-content">
-                  <div className="kpi-icon">
-                    <IonIcon icon={waterOutline} size="large" />
-                  </div>
-                  <div className="kpi-info">
-                    <div className="kpi-amount">
-                      ${calculateTotal().toFixed(2)}
-                    </div>
-                    <div className="kpi-meta">
-                      <span className="kpi-change">{percentageChange}</span>
+                    <div className="incomes-summary-tile">
+                      <div className="incomes-summary-tile-icon">
+                        <IonIcon icon={waterOutline} />
+                      </div>
+                      <div>
+                        <div className="incomes-summary-tile-label">Operaciones</div>
+                        <div className="incomes-summary-tile-value">{calculateMonthlyCount()}</div>
+                      </div>
                     </div>
                   </div>
                 </IonCardContent>

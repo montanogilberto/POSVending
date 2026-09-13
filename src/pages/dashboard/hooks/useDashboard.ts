@@ -37,6 +37,7 @@ export const useDashboard = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const [loadingReceiptId, setLoadingReceiptId] = useState<number | null>(null);
   //const [pieData, setPieData] = useState<any>(null);
 
   const refreshDashboardData = () => {
@@ -75,8 +76,8 @@ export const useDashboard = () => {
     //console.log("🔵 useLaundryDashboard - Computing pie chart, allIncome length:", allIncome?.length);
 
   // ✅ PIE CHART (🔥 FIXED — single source of truth)
-  const pieData = useMemo(() => {
-    if (!allIncome?.length) return null;
+  const paymentBreakdown = useMemo(() => {
+    if (!allIncome?.length) return [];
 
     const now = new Date();
     const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
@@ -90,7 +91,7 @@ export const useDashboard = () => {
       );
     });
 
-    if (!monthly.length) return null;
+    if (!monthly.length) return [];
 
     const methodMap: Record<string, PaymentMethod> = {
       efectivo: 'Efectivo',
@@ -108,25 +109,16 @@ export const useDashboard = () => {
       { Efectivo: 0, Transferencia: 0, Tarjeta: 0 }
     );
 
-    const values = PAYMENT_METHODS.map((m) => totals[m] || 0);
-    if (values.every((v) => v === 0)) return null;
+    const total = PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
+    if (total === 0) return [];
 
-    return {
-      labels: PAYMENT_METHODS,
-      datasets: [
-        {
-          data: values,
-          backgroundColor: PAYMENT_METHODS.map((m) => PAYMENT_COLORS[m]),
-          borderWidth: 0,
-        },
-      ],
-    };
+    return PAYMENT_METHODS.map((method) => ({
+      method,
+      amount: totals[method],
+      percent: (totals[method] / total) * 100,
+      color: PAYMENT_COLORS[method],
+    }));
   }, [allIncome]);
-
-  // sync state (optional, keeps compatibility with your component)
-  //useEffect(() => {
-    //setPieData(pieChartData);
-  //}, [pieChartData]);
 
   // ✅ METRICS
   const calculateTotal = () =>
@@ -146,6 +138,28 @@ export const useDashboard = () => {
       .reduce((sum, i) => {
         return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
       }, 0);
+  };
+
+  const calculateDailySalesCount = () => {
+    const today = toHermosilloDate(new Date().toISOString())
+      .toISOString()
+      .split('T')[0];
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => toHermosilloDate(i.paymentDate).toISOString().split('T')[0] === today)
+      .length;
+  };
+
+  const calculateExpensesDailyTotal = () => {
+    const today = toHermosilloDate(new Date().toISOString())
+      .toISOString()
+      .split('T')[0];
+
+    return allExpenses
+      .filter((e) => e?.paymentDate)
+      .filter((e) => toHermosilloDate(e.paymentDate).toISOString().split('T')[0] === today)
+      .reduce((sum, e) => sum + (Number(e.total) || 0), 0);
   };
 
   const calculateMonthlyTotal = () => {
@@ -273,6 +287,7 @@ export const useDashboard = () => {
 
   const handleShowReceipt = async (incomeId: number) => {
     console.log('[Dashboard] handleShowReceipt: fetching ticket, incomeId =', incomeId);
+    setLoadingReceiptId(incomeId);
     try {
       const ticket = await fetchTicket(incomeId.toString());
       if (!ticket) throw new Error();
@@ -283,6 +298,8 @@ export const useDashboard = () => {
       console.log('[Dashboard] handleShowReceipt ❌', err);
       setToastMessage('Error al obtener el recibo.');
       setShowToast(true);
+    } finally {
+      setLoadingReceiptId(null);
     }
   };
 
@@ -306,10 +323,12 @@ export const useDashboard = () => {
     setShowLogoutAlert,
     receiptData,
     setReceiptData,
-    pieData,
+    paymentBreakdown,
 
     calculateTotal,
     calculateDailySales,
+    calculateDailySalesCount,
+    calculateExpensesDailyTotal,
     calculateMonthlyTotal,
     calculateExpensesMonthlyTotal,
     currentMonthYear,
@@ -317,6 +336,7 @@ export const useDashboard = () => {
     handleStartSeller,
     handleConfirmSale,
     handleShowReceipt,
+    loadingReceiptId,
 
     handleLogoutConfirm: async () => {
       try {

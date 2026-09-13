@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { postOneTicketTracking, saveTicketHtml } from '../../api/ticketApi';
 import { dispatchNotification } from '../../api/notificationDispatchApi';
 import { ReceiptService } from '../../services/ReceiptService';
+import { APP_DOWNLOAD_NUDGE } from '../../utils/appLinks';
 
 export interface ReceiptActionStatus {
   ok: boolean;
@@ -128,6 +129,11 @@ export function useReceiptPrint({
 
         const existingTicket = validateResponse?.tickets?.[0];
         const existingReceiptUrl = normalizeReceiptUrl(String(existingTicket?.receiptUrl || '').trim());
+        // sp_ticket_tracking sets printed=1 the first time action='print' runs for
+        // this incomeId (see finally block below). Reprints (staple copy, lost
+        // receipt, etc.) are legitimate, but the client should only be notified
+        // once -- re-dispatching push/whatsapp/sms on every reprint spams them.
+        const alreadyPrinted = Boolean(existingTicket?.printed);
 
         if (existingReceiptUrl) {
           receiptUrl = existingReceiptUrl;
@@ -224,8 +230,14 @@ export function useReceiptPrint({
           }
         }
 
-        if (receiptUrl && clientPhone) {
-          const message = 'Aquí está su recibo:';
+        if (alreadyPrinted) {
+          console.log('[ReceiptPrint] Ticket already printed before (printed=1) — reprint only, skipping notification dispatch.');
+          summary.push = { ok: false, message: 'No reenviado: el recibo ya fue notificado en una impresión anterior' };
+          summary.whatsapp = { ok: false, message: 'No reenviado: el recibo ya fue notificado en una impresión anterior' };
+          summary.sms = { ok: false, message: 'No reenviado: el recibo ya fue notificado en una impresión anterior' };
+          onToast('Reimpresión: el cliente ya fue notificado antes, no se reenvía.');
+        } else if (receiptUrl && clientPhone) {
+          const message = `Aquí está su recibo. ${APP_DOWNLOAD_NUDGE}`;
 
           console.log('[ReceiptPrint] Dispatching notification (push -> whatsapp -> sms)...', {
             incomeId,
