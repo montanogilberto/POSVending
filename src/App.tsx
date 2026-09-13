@@ -100,6 +100,7 @@ import ReceiptPage from './pages/receipt/ReceiptPage';
 import Login from './pages/authentication/Login';
 import ForgotPassword from './pages/authentication/ForgotPassword';
 import CreateAccount from './pages/authentication/CreateAccount';
+import ClientLogin from './pages/authentication/ClientLogin';
 import SupplierPage from './pages/admin/SupplierPage';
 import LoanPage from './pages/loans/LoanPage';
 import ProfilePage from './pages/profile/ProfilePage';
@@ -195,6 +196,7 @@ const AppShell: React.FC = () => {
   const { logout, username, companyName, branchName, avatarUrl, userId, clientId, roleCode, roleName, setAvatarUrl } =
     useUser();
   const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
+  const isClientRole = roleCode === 'client';
   const history = useHistory();
   const location = useLocation();
   // ClientDashboardPage's 5 sections are ?tab=... on one route, not separate
@@ -900,6 +902,21 @@ const AppShell: React.FC = () => {
                   </button>
                 )}
               </>
+            ) : isClientRole ? (
+              <>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/rewards-dashboard') ? ' cd-tab--active' : ''}`} onClick={() => history.push(`/rewards-dashboard/${clientId}`)}>
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Inicio</span>
+                </button>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/arcade') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/arcade')}>
+                  <IonIcon aria-hidden="true" icon={gameControllerOutline} />
+                  <span>Arcade</span>
+                </button>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/profile') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/profile')}>
+                  <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                  <span>Perfil</span>
+                </button>
+              </>
             ) : (
               <>
                 <button type="button" className="cd-tab" onClick={() => history.push('/dashboard')}>
@@ -1062,6 +1079,7 @@ const App: React.FC = () => {
                 <Route exact path="/login" component={Login} />
                 <Route exact path="/forgot-password" component={ForgotPassword} />
                 <Route exact path="/create-account" component={CreateAccount} />
+                <Route exact path="/client-login" component={ClientLogin} />
 
                 <Route exact path="/">
                   <Redirect to="/login" />

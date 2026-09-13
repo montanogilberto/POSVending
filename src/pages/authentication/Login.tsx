@@ -381,6 +381,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   <IonRouterLink href="/forgot-password">¿Olvidaste tu contraseña?</IonRouterLink>
                   <IonRouterLink href="/create-account">Crear cuenta</IonRouterLink>
                 </div>
+                <div className="login-links">
+                  <IonRouterLink href="/client-login">¿Eres cliente? Inicia sesión con tu teléfono</IonRouterLink>
+                </div>
               </div>
 
             </IonCol>

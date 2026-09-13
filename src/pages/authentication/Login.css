@@ -60,6 +60,13 @@
   text-align: center;
 }
 
+.login-card-subtitle {
+  font-size: 13px;
+  color: #6B7280;
+  margin: -16px 0 20px 0;
+  text-align: center;
+}
+
 /* ── Form ── */
 .login-form {
   display: flex;
