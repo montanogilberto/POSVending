@@ -57,6 +57,7 @@ import {
   starOutline,
   giftOutline,
   chatbubblesOutline,
+  chatbubbleEllipsesOutline,
   chevronBackOutline,
   chevronForwardOutline,
   homeOutline,
@@ -126,6 +127,7 @@ import PosRewardsPage from './pages/pos/PosRewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import LoanDetailPage from './pages/loans/LoanDetailPage';
+import PosSupportChatPage from './pages/support/PosSupportChatPage';
 import MissionCleanRoomPage from './pages/game/MissionCleanRoomPage';
 import ArcadePage from './pages/game/ArcadePage';
 import BlackjackPage from './pages/game/BlackjackPage';
@@ -190,6 +192,26 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
     />
   );
 };
+
+// POS operational routes where the global SmartLoans "Chat" tab is hidden --
+// tapping it here reads as an app glitch (e.g. right after registering a
+// client) since POS admins have no reason to expect a loan-chat shortcut in
+// the middle of Clientes/Productos/etc. Left visible on lending-related admin
+// routes (loans, p2p-lending, client-followup, borrower-onboarding...) where
+// quick chat access still makes sense.
+const POS_ONLY_ROUTE_PREFIXES = [
+  '/dashboard', '/category', '/products', '/product/', '/cart',
+  '/expense-categories', '/expense-products', '/expense-cart',
+  '/movements', '/led-status', '/clients', '/products-management',
+  '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
+  '/accounting', '/water-tanks', '/receipt', '/suppliers',
+  '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
+  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log',
+  '/notifications', '/setting', '/profile', '/pos-support',
+];
+
+const isPosOnlyRoute = (pathname: string): boolean =>
+  POS_ONLY_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
 const AppShell: React.FC = () => {
   const { logout, username, companyName, branchName, avatarUrl, userId, clientId, roleCode, roleName, setAvatarUrl } =
@@ -829,6 +851,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/arcade/boliche" component={BowlingPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
+            <PrivateRoute exact path="/pos-support" component={PosSupportChatPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
             <PrivateRoute exact path="/notification-dispatch-log" component={NotificationDispatchLogPage} />
@@ -906,10 +929,16 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={home} />
                   <span>Dashboard</span>
                 </button>
-                {canAccess(roleCode, 'loanChat') && (
+                {canAccess(roleCode, 'loanChat') && !isPosOnlyRoute(location.pathname) && (
                   <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
                     <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
                     <span>Chat</span>
+                  </button>
+                )}
+                {isPosOnlyRoute(location.pathname) && (
+                  <button type="button" className={`cd-tab${location.pathname.startsWith('/pos-support') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/pos-support')}>
+                    <IonIcon aria-hidden="true" icon={chatbubbleEllipsesOutline} />
+                    <span>Soporte</span>
                   </button>
                 )}
               </>

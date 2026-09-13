@@ -1,0 +1,67 @@
+.incomes-summary-card {
+  margin: 0 !important;
+  border-radius: 24px !important;
+  --background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02), 0 2px 8px rgba(0, 0, 0, 0.01) !important;
+}
+
+.incomes-summary-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #718096;
+  text-transform: capitalize;
+  margin-bottom: 16px;
+}
+
+.incomes-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.incomes-summary-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #F9FAFB;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.incomes-summary-tile-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 12px;
+  background: #EFF6FF;
+  color: #0056D2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.incomes-summary-tile-icon ion-icon {
+  font-size: 20px;
+}
+
+.incomes-summary-tile-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #718096;
+}
+
+.incomes-summary-tile-value {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #1A202C;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .incomes-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}

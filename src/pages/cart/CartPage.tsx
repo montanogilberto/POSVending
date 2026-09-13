@@ -15,7 +15,7 @@ import {
   IonChip,
   IonInput,
 } from '@ionic/react';
-import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, pricetag } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, pricetag, qrCodeOutline } from 'ionicons/icons';
 import { useCart } from '../../contexts/CartContext';
 import { useProduct } from '../../contexts/ProductContext';
 import { useState, useEffect, useMemo } from 'react';
@@ -34,6 +34,7 @@ import './CartPage.css';
 
 import CartItemCard from '../../components/pos/CartItemCard';
 import ClientSelector from '../../components/pos/ClientSelector';
+import ClientQrScannerModal from '../../components/pos/ClientQrScannerModal';
 import ReceiptDisplay from '../receipt/ReceiptDisplay';
 
 /**
@@ -62,6 +63,7 @@ const CartPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
   const [clientPointsBalance, setClientPointsBalance] = useState<number | null>(null);
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
   const [newPointsBalance, setNewPointsBalance] = useState<number | null>(null);
@@ -527,14 +529,24 @@ const CartPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <IonButton
-                    fill="outline"
-                    onClick={() => setShowClientSelector(true)}
-                    className="client-change-btn"
-                  >
-                    <IonIcon icon={person} slot="start" />
-                    Cambiar cliente
-                  </IonButton>
+                  <div className="client-actions-row">
+                    <IonButton
+                      fill="outline"
+                      onClick={() => setShowClientSelector(true)}
+                      className="client-change-btn"
+                    >
+                      <IonIcon icon={person} slot="start" />
+                      Cambiar cliente
+                    </IonButton>
+                    <IonButton
+                      fill="outline"
+                      onClick={() => setShowQrScanner(true)}
+                      className="client-scan-btn"
+                    >
+                      <IonIcon icon={qrCodeOutline} slot="start" />
+                      Escanear QR
+                    </IonButton>
+                  </div>
                 </div>
 
                 {/* Payment Method */}
@@ -680,6 +692,17 @@ const CartPage: React.FC = () => {
           onClose={() => setShowClientSelector(false)}
           onChange={setSelectedClient}
           selectedClient={selectedClient}
+        />
+
+        <ClientQrScannerModal
+          isOpen={showQrScanner}
+          onClose={() => setShowQrScanner(false)}
+          onClientFound={(client) => {
+            setSelectedClient(client);
+            setToastMessage(`Cliente identificado: ${client.first_name} ${client.last_name}`);
+            setToastColor('success');
+            setShowToast(true);
+          }}
         />
       </IonContent>
     </IonPage>

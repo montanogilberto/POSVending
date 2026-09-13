@@ -29,7 +29,17 @@
 
    .dashboard-tools-row {
      display: flex;
-     justify-content: flex-end;
+     align-items: center;
+     justify-content: space-between;
+     gap: 12px;
+   }
+
+   .dashboard-page-title {
+     font-family: 'Inter', sans-serif;
+     font-size: 1.8rem;
+     font-weight: 800;
+     color: #1A202C;
+     margin: 0;
    }
 
    .dashboard-refresh-button {
@@ -153,14 +163,29 @@
      font-size: 16px;
      color: #718096;
    }
-   
+
+   .kpi-operations-text {
+     color: #718096;
+     font-size: 0.95rem;
+     font-weight: 600;
+     margin-top: 2px;
+   }
+
    /* Responsive Right Container Placement rules */
    .kpi-right-responsive-col {
      width: 100%;
      display: flex;
      justify-content: flex-start; /* Left align trend block when stacked on mobile screens */
    }
-   
+
+   .kpi-right-stack {
+     display: flex;
+     flex-direction: column;
+     align-items: flex-start;
+     gap: 12px;
+     width: 100%;
+   }
+
    /* Premium High-Fidelity Green Trend Capsule */
    .kpi-trend-badge-box {
      display: flex;
@@ -205,6 +230,21 @@
      color: #5F6368;
      font-weight: 600;
    }
+
+   /* Negative variant — red/pink pill when today's sales are below yesterday's */
+   .kpi-trend-badge-box.negative {
+     background: #FEE2E2 !important;
+     border-color: #FECACA;
+   }
+
+   .kpi-trend-badge-box.negative .trend-badge-icon-circle {
+     background: #FECACA;
+     color: #B91C1C;
+   }
+
+   .kpi-trend-badge-box.negative .trend-percentage-value {
+     color: #B91C1C;
+   }
    
    /* Full-Width Core CTA Action Button */
    .start-sale-button-fullwidth {
@@ -245,7 +285,12 @@
        display: flex;
        justify-content: flex-end; /* Pin trend badge completely to the right corner */
      }
-   
+
+     .kpi-right-stack {
+       align-items: flex-end;
+       width: auto;
+     }
+
      .kpi-amount-text h1 {
        font-size: 3.8rem !important; /* Restore large, premium text sizes when width permits */
        letter-spacing: -0.03em;
@@ -272,84 +317,160 @@
    }
 
    /* ==========================================================================
-   EXPENSES (EGRESOS) SUMMARY CARD
-   ========================================================================== */
-.dashboard-expense-card {
-  margin: 0 !important;
-  border-radius: 24px !important;
-  overflow: hidden;
-  --background: #ffffff;
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.02),
-    0 2px 8px rgba(0, 0, 0, 0.01) !important;
-}
+      RESUMEN — daily KPI grid
+      ========================================================================== */
+   .dashboard-summary-card {
+     margin: 0 !important;
+     border-radius: 24px !important;
+     --background: #ffffff;
+     box-shadow:
+       0 10px 30px rgba(0, 0, 0, 0.02),
+       0 2px 8px rgba(0, 0, 0, 0.01) !important;
+   }
 
-.expense-card-content {
-  display: flex !important;
-  align-items: center;
-  gap: 20px;
-  --padding-start: 24px !important;
-  --padding-end: 24px !important;
-  --padding-top: 24px !important;
-  --padding-bottom: 24px !important;
-}
+   .summary-card-content {
+     --padding-start: 24px !important;
+     --padding-end: 24px !important;
+     --padding-top: 24px !important;
+     --padding-bottom: 24px !important;
+   }
 
-.expense-card-icon {
-  width: 64px;
-  height: 64px;
-  background: #FEE2E2;
-  border-radius: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #DC2626;
-  flex-shrink: 0;
-}
+   .summary-card-title {
+     font-size: 0.8rem;
+     font-weight: 700;
+     letter-spacing: 0.06em;
+     color: #6B7280;
+     margin-bottom: 16px;
+   }
 
-.expense-card-icon ion-icon {
-  font-size: 30px;
-}
+   .summary-grid {
+     display: grid;
+     grid-template-columns: 1fr 1fr;
+     gap: 12px;
+   }
 
-.expense-card-info {
-  display: flex;
-  flex-direction: column;
-}
+   .summary-tile {
+     display: flex;
+     align-items: center;
+     gap: 12px;
+     background: #F9FAFB;
+     border-radius: 16px;
+     padding: 14px;
+   }
 
-.expense-card-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1A202C;
-}
+   .summary-tile-icon {
+     width: 40px;
+     height: 40px;
+     min-width: 40px;
+     border-radius: 12px;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+   }
 
-.expense-card-amount h2 {
-  font-family: 'Inter', sans-serif;
-  font-size: 2rem;
-  font-weight: 800;
-  color: #DC2626;
-  margin: 4px 0;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
+   .summary-tile-icon ion-icon {
+     font-size: 18px;
+   }
 
-.expense-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #718096;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
+   .summary-tile-icon.green {
+     background: #DCFCE7;
+     color: #16A34A;
+   }
 
-.expense-card-meta ion-icon {
-  font-size: 15px;
-  color: #718096;
-}
+   .summary-tile-icon.pink {
+     background: #FEE2E2;
+     color: #DC2626;
+   }
 
-/* ==========================================================================
-   RECENT ACTIVITY CONTAINER CARD
-   ========================================================================== */
+   .summary-tile-label {
+     font-size: 0.8rem;
+     font-weight: 600;
+     color: #1A202C;
+   }
+
+   .summary-tile-value {
+     font-size: 1.05rem;
+     font-weight: 700;
+     color: #1A202C;
+     white-space: nowrap;
+   }
+
+   @media (max-width: 480px) {
+     .summary-tile-value {
+       font-size: 0.95rem;
+     }
+   }
+
+   /* ==========================================================================
+      COBROS — horizontal payment-method bars
+      ========================================================================== */
+   .cobros-list {
+     display: flex;
+     flex-direction: column;
+     gap: 16px;
+   }
+
+   .cobros-row {
+     display: flex;
+     align-items: center;
+     gap: 10px;
+   }
+
+   .cobros-row-icon {
+     font-size: 18px;
+     color: var(--cobros-color);
+     flex-shrink: 0;
+   }
+
+   .cobros-row-label {
+     font-size: 0.85rem;
+     font-weight: 600;
+     color: #374151;
+     width: 100px;
+     flex-shrink: 0;
+   }
+
+   .cobros-row-bar-track {
+     flex: 1;
+     height: 8px;
+     background: #F3F4F6;
+     border-radius: 99px;
+     overflow: hidden;
+   }
+
+   .cobros-row-bar-fill {
+     height: 100%;
+     width: var(--cobros-percent);
+     background: var(--cobros-color);
+     border-radius: 99px;
+     transition: width 0.3s ease;
+   }
+
+   .cobros-row-amount {
+     font-size: 0.85rem;
+     font-weight: 700;
+     color: #1A202C;
+     white-space: nowrap;
+   }
+
+   .cobros-row-percent {
+     font-size: 0.8rem;
+     font-weight: 600;
+     color: #9CA3AF;
+     width: 36px;
+     text-align: right;
+     flex-shrink: 0;
+   }
+
+   @media (max-width: 480px) {
+     .cobros-row-label {
+       width: 76px;
+     }
+   }
+
+   /* ==========================================================================
+      RECENT ACTIVITY CONTAINER CARD
+      ========================================================================== */
 .dashboard-activity-card {
   margin: 0 !important;
   border-radius: 24px !important;
@@ -398,16 +519,16 @@
   transition: all 0.2s ease-in-out;
 }
 
-/* Custom Circle Icon Background */
+/* Custom Circle Icon Background — matches /movements' list-row icon style */
 .activity-icon-badge {
   width: 48px;
   height: 48px;
-  background: #EBF4FF;
-  border-radius: 14px;
+  background: #E6F4EA;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #0056D2;
+  color: #16A34A;
   margin-right: 16px !important;
   flex-shrink: 0;
 }
@@ -416,17 +537,25 @@
   font-size: 22px;
 }
 
-.style-grid-fullwidth {
-  width: 100%;
+/* Date group header — matches /movements' .movements-day-group */
+.activity-day-group {
+  --background: #F3F4F6;
+  --border-radius: 12px;
+  margin: 12px 0 6px 0;
+}
+
+.activity-day-group h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.activity-day-group p {
+  font-size: 12px;
+  color: #6B7280;
 }
 
 /* Typography Matrix Configurations */
-.activity-text-stack {
-  display: flex;
-  flex-direction: column;
-  margin: 0 !important;
-}
-
 .activity-amount-label {
   font-family: 'Inter', sans-serif;
   font-size: 1.1rem;
@@ -440,33 +569,34 @@
   font-weight: 600;
   color: #718096;
   margin-top: 2px;
+  text-transform: capitalize;
 }
 
-.activity-timestamp {
-  font-family: 'Inter', sans-serif;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #A0AEC0;
-}
-
-.activity-item-chevron {
-  font-size: 18px;
-  color: #CBD5E0;
+.activity-view-ticket-icon {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: #EFF6FF;
+  color: #0056D2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-left: 12px;
 }
 
-/* Empty State Configurations */
-.no-activity-item {
-  --background: #F9FAFB !important;
-  --border-radius: 16px !important;
-  color: #718096;
-  font-weight: 600;
-  text-align: center;
+.activity-view-ticket-icon ion-icon {
+  font-size: 15px;
 }
 
-.no-activity-icon {
+/* Empty State — shared EmptyState component styling */
+.activity-empty {
   color: #A0AEC0;
-  font-size: 24px;
+}
+
+.activity-empty ion-icon {
+  font-size: 48px;
+  color: #C7D2FE;
 }
 
 /* ==========================================================================
@@ -502,21 +632,12 @@
 
 /* Mobile-Specific Adaptations for Data Stacking */
 @media (max-width: 576px) {
-  .activity-primary-data {
-    margin-bottom: 4px; /* Space out values vertically on narrow viewports */
-  }
-  
-  .activity-timestamp {
-    font-size: 0.8rem; /* Scale stamp slightly downwards */
-  }
-
   .activity-icon-badge {
     width: 42px;
     height: 42px;
-    border-radius: 12px;
     margin-right: 12px !important;
   }
-  
+
   .activity-icon-badge ion-icon {
     font-size: 18px;
   }

@@ -3,25 +3,22 @@ import {
   IonContent,
   IonToast,
   IonPage,
-  IonButton,
-  IonIcon,
   useIonViewWillEnter,
 } from '@ionic/react';
 import './Dashboard.css';
-import { refreshOutline } from 'ionicons/icons';
 
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import LogoutAlert from '../../components/alerts/LogoutAlert';
 import MailPopover from '../../components/popovers/MailPopover';
-import LaundryChart from '../../components/finance/LaundryChart';
 
 import { useDashboard } from './hooks/useDashboard';
 import { usePopovers } from '../../hooks/usePopovers';
 import MetricsGrid from './components/MetricsGrid';
+import SummaryGrid from './components/SummaryGrid';
+import PaymentBreakdown from './components/PaymentBreakdown';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
-import ExpensesSummaryCard from './components/ExpensesSummaryCard';
 import { onDataChanged } from '../../utils/refreshBus';
 
 const Dashboard: React.FC = () => {
@@ -38,18 +35,16 @@ const Dashboard: React.FC = () => {
     setShowCart,
     showLogoutAlert,
     setShowLogoutAlert,
-    pieData,
+    paymentBreakdown,
     handleStartSeller,
     handleConfirmSale,
-    calculateTotal,
     calculateDailySales,
-    calculateMonthlyTotal,
-    calculateExpensesMonthlyTotal,
-    currentMonthYear,
-    currentUser,
+    calculateDailySalesCount,
+    calculateExpensesDailyTotal,
     percentageChange,
     handleLogoutConfirm,
     handleShowReceipt,
+    loadingReceiptId,
     getTitleFromPath,
     refreshDashboardData,
   } = useDashboard();
@@ -79,46 +74,27 @@ const Dashboard: React.FC = () => {
     <IonPage>
       <Header {...pops.headerProps} screenTitle={getTitleFromPath()} />
 
-      <IonContent fullscreen={true} style={{ '--background': '#F9FAFB' }} className="dashboard-content">
+      <IonContent fullscreen={true} className="dashboard-content">
         <div className="dashboard-container">
-          <div className="dashboard-tools-row">
-            <button className="dashboard-refresh-button" onClick={handleManualRefresh}>
-              <IonIcon icon={refreshOutline} />
-              <span>Actualizar</span>
-            </button>
-          </div>
 
-          {/* ✅ Metrics Grid ALWAYS visible */}
+          {/* ✅ Hero: Ventas Hoy */}
           <MetricsGrid
             calculateDailySales={calculateDailySales}
-            calculateMonthlyTotal={calculateMonthlyTotal}
-            calculateTotal={calculateTotal}
-            currentMonthYear={currentMonthYear}
-            currentUser={currentUser}
+            calculateDailySalesCount={calculateDailySalesCount}
             percentageChange={percentageChange}
             handleStartSeller={handleStartSeller}
+            onRefresh={handleManualRefresh}
           />
 
-          {/* ✅ Chart Section (SAFE RENDERING) */}
-          <div style={{ marginTop: '20px' }}>
-            {allIncome?.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                Cargando datos...
-              </div>
-            ) : pieData ? (
-              <LaundryChart pieData={pieData} />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                No hay datos para el mes actual
-              </div>
-            )}
-          </div>
-
-          {/* ✅ Egresos del Mes */}
-          <ExpensesSummaryCard
-            monthlyTotal={calculateExpensesMonthlyTotal()}
-            currentMonthYear={currentMonthYear}
+          {/* ✅ Resumen: Ventas / Egresos / Neto / Operaciones (hoy) */}
+          <SummaryGrid
+            ventas={calculateDailySales()}
+            egresos={calculateExpensesDailyTotal()}
+            operaciones={calculateDailySalesCount()}
           />
+
+          {/* ✅ Cobros: desglose por método de pago (mes actual) */}
+          <PaymentBreakdown breakdown={paymentBreakdown} />
 
           {/* ✅ Cart Summary */}
           {showCart && cart.length > 0 && (
@@ -135,6 +111,7 @@ const Dashboard: React.FC = () => {
             <RecentActivity
               allIncome={allIncome}
               onShowReceipt={handleShowReceipt}
+              loadingReceiptId={loadingReceiptId}
             />
           )}
 

@@ -95,6 +95,7 @@ import ZoomableImage from '../../components/ui/ZoomableImage';
 import { pickAvatarPhoto } from '../../utils/pickAvatarPhoto';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
 import { onDataChanged } from '../../utils/refreshBus';
+import { PLAY_STORE_URL, APP_STORE_URL } from '../../utils/appLinks';
 import { usePopovers } from '../../hooks/usePopovers';
 
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
@@ -522,8 +523,6 @@ const ClientDashboardPage: React.FC = () => {
   // Invite-a-friend — unlike ClientsPage.tsx's staff version (which targets
   // one specific client's phone), this has no fixed recipient: the client
   // picks who to send it to from their own WhatsApp/SMS contacts.
-  const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.lavanderia.gmo';
-  const APP_STORE_URL  = 'https://apps.apple.com/app/pos-gmo/id000000000';
   const buildInviteMessage = (): string => {
     const store = `📱 Android: ${PLAY_STORE_URL}\n🍎 iOS: ${APP_STORE_URL}`;
     return `¡Hola! 👋\n\nTe invito a descargar la app *SmartLoans* para solicitar u ofrecer préstamos fácilmente.\n\n${store}`;
