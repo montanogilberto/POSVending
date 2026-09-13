@@ -1,58 +1,56 @@
 import React from 'react';
-import { IonList, IonItem, IonLabel, IonIcon, IonButton, IonSpinner, IonAlert } from '@ionic/react';
+import { IonAlert, IonButton, IonIcon, IonItem, IonLabel, IonList } from '@ionic/react';
 import { giftOutline } from 'ionicons/icons';
 import { fmtInt } from '../../../../utils/format';
 import { RewardsDashboardVM } from '../RewardsDashboardLogic';
 
-interface Props {
-  vm: RewardsDashboardVM;
-}
+interface Props { vm: RewardsDashboardVM; }
 
 const RewardsCatalogList: React.FC<Props> = ({ vm }) => {
-  const balance = vm.balance?.balance ?? 0;
+  const target = vm.redeemTarget;
 
   return (
-    <>
+    <section className="rewards-section rewards-catalog-section">
       <h2 className="rewards-section-title">Catálogo de Recompensas</h2>
       <IonList inset>
         {vm.catalog.map((item) => {
-          const isRedeemingThis = vm.redeeming && vm.redeemTarget?.catalogItemId === item.catalogItemId;
-          const affordable = !!item.catalogItemId && item.requiredPoints <= balance;
+          const canRedeem = Boolean(item.catalogItemId) && (vm.balance?.balance ?? 0) >= item.requiredPoints;
           return (
-            <IonItem key={item.catalogItemId}>
-              <IonIcon icon={giftOutline} slot="start" className="rewards-activity-icon" />
+            <IonItem key={item.catalogItemId ?? item.name} lines="full">
+              <IonIcon slot="start" icon={giftOutline} className="rewards-catalog-icon" aria-hidden="true" />
               <IonLabel>
                 <h3>{item.name}</h3>
-                <p className="rewards-catalog-row-points">{fmtInt(item.requiredPoints)} puntos</p>
+                <p>{fmtInt(item.requiredPoints)} puntos</p>
+                {item.description && <p>{item.description}</p>}
               </IonLabel>
               <IonButton
                 slot="end"
                 size="small"
-                fill="outline"
-                disabled={vm.redeeming || !affordable}
+                disabled={vm.redeeming || !item.catalogItemId || !canRedeem}
                 onClick={() => vm.requestRedeem(item)}
+                className="rewards-catalog-redeem"
               >
-                {isRedeemingThis ? <IonSpinner name="dots" /> : 'Canjear'}
+                Canjear
               </IonButton>
             </IonItem>
           );
         })}
         {vm.catalog.length === 0 && !vm.loading && (
-          <IonItem><IonLabel color="medium">Sin recompensas disponibles todavía.</IonLabel></IonItem>
+          <IonItem><IonLabel color="medium">No hay recompensas disponibles.</IonLabel></IonItem>
         )}
       </IonList>
 
       <IonAlert
-        isOpen={!!vm.redeemTarget}
-        onDidDismiss={vm.cancelRedeem}
+        isOpen={!!target}
         header="Confirmar canje"
-        message={`¿Canjear "${vm.redeemTarget?.name}" por ${fmtInt(vm.redeemTarget?.requiredPoints ?? 0)} puntos?`}
+        message={target ? `¿Canjear “${target.name}” por ${fmtInt(target.requiredPoints)} puntos?` : undefined}
         buttons={[
           { text: 'Cancelar', role: 'cancel', handler: vm.cancelRedeem },
-          { text: 'Canjear', handler: vm.confirmRedeem },
+          { text: 'Canjear', role: 'confirm', handler: () => { void vm.confirmRedeem(); } },
         ]}
+        onDidDismiss={vm.cancelRedeem}
       />
-    </>
+    </section>
   );
 };
 

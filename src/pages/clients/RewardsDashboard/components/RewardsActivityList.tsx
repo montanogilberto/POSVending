@@ -1,51 +1,51 @@
 import React from 'react';
-import { IonList, IonItem, IonLabel, IonIcon } from '@ionic/react';
+import { IonIcon, IonItem, IonLabel, IonList } from '@ionic/react';
 import { receiptOutline, giftOutline } from 'ionicons/icons';
 import StatusBadge from '../../../../components/ui/StatusBadge';
-import { POS_REWARD_TX_TYPE, POS_REWARD_REDEMPTION_STATUS } from '../../../../components/ui/statusMaps';
+import { POS_REWARD_REDEMPTION_STATUS, POS_REWARD_TX_TYPE } from '../../../../components/ui/statusMaps';
 import { fmtInt, mxChatDate, mxChatTime } from '../../../../utils/format';
 import { RewardsDashboardVM } from '../RewardsDashboardLogic';
 
-interface Props {
-  vm: RewardsDashboardVM;
-}
+interface Props { vm: RewardsDashboardVM; }
 
-const RewardsActivityList: React.FC<Props> = ({ vm }) => {
-  return (
-    <>
-      <h2 className="rewards-section-title">Actividad Reciente</h2>
-      <IonList inset>
-        {vm.activity.map((item) => (
-          <IonItem key={item.id}>
+const RewardsActivityList: React.FC<Props> = ({ vm }) => (
+  <section className="rewards-section">
+    <h2 className="rewards-section-title">Actividad Reciente</h2>
+    <IonList inset>
+      {vm.activity.map((item) => {
+        const positive = item.kind === 'ledger' && item.txType === 'EARN';
+        return (
+          <IonItem key={item.id} lines="full">
             <IonIcon
-              icon={item.kind === 'redemption' ? giftOutline : receiptOutline}
               slot="start"
+              icon={item.kind === 'ledger' ? receiptOutline : giftOutline}
               className="rewards-activity-icon"
+              aria-hidden="true"
             />
             <IonLabel>
               <h3>{item.description}</h3>
-              <p>
-                {mxChatDate(item.date)} · {mxChatTime(item.date)}{' '}
-                {item.kind === 'ledger'
-                  ? <StatusBadge status={item.txType} map={POS_REWARD_TX_TYPE} />
-                  : <StatusBadge status={item.status} map={POS_REWARD_REDEMPTION_STATUS} />}
-              </p>
+              <p>{mxChatDate(item.date)} · {mxChatTime(item.date)}</p>
+              <div className="rewards-activity-status">
+                <StatusBadge
+                  status={item.kind === 'ledger' ? item.txType : item.status}
+                  map={item.kind === 'ledger' ? POS_REWARD_TX_TYPE : POS_REWARD_REDEMPTION_STATUS}
+                />
+              </div>
             </IonLabel>
-            <IonLabel
+            <strong
               slot="end"
-              color={item.points >= 0 ? 'success' : 'danger'}
-              className="ion-text-end rewards-activity-amount"
+              className={`rewards-activity-amount ${positive ? 'rewards-activity-amount--positive' : 'rewards-activity-amount--negative'}`}
             >
-              {item.points >= 0 ? '+' : ''}{fmtInt(item.points)}
-            </IonLabel>
+              {positive ? '+' : '-'}{fmtInt(item.points)}
+            </strong>
           </IonItem>
-        ))}
-        {vm.activity.length === 0 && !vm.loading && (
-          <IonItem><IonLabel color="medium">Sin actividad todavía.</IonLabel></IonItem>
-        )}
-      </IonList>
-    </>
-  );
-};
+        );
+      })}
+      {vm.activity.length === 0 && !vm.loading && (
+        <IonItem><IonLabel color="medium">Sin actividad de puntos todavía.</IonLabel></IonItem>
+      )}
+    </IonList>
+  </section>
+);
 
 export default RewardsActivityList;

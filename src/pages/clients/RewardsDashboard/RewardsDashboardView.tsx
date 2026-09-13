@@ -1,5 +1,5 @@
 import React from 'react';
-import { IonPage, IonContent, IonToast, IonLoading } from '@ionic/react';
+import { IonContent, IonLoading, IonPage, IonToast } from '@ionic/react';
 import Header from '../../../components/layout/Header';
 import { usePopovers } from '../../../hooks/usePopovers';
 import { useRewardsDashboard } from './RewardsDashboardLogic';
