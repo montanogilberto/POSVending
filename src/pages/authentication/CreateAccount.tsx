@@ -120,6 +120,13 @@ const ROLE_BY_CLIENT_TYPE: Record<ClientType, RoleCode> = {
   lender:   'lender',
   both:     'borrower', // primary role; the lender view is a toggle inside the app
   lawyer:   'viewer',   // legal advisor — read-only, no dedicated role code
+  // 'pos' realistically never reaches this table — a POS retail customer is
+  // created through the independent POS profile role picker (see
+  // DEFAULT_ROLE_BY_PROFILE above), not this loans-profile derivation. Kept
+  // here only for exhaustiveness; matches DEFAULT_ROLE_BY_PROFILE.pos so a
+  // 'pos' client type never accidentally gets borrower/lender permissions
+  // if this table is ever consulted for one.
+  pos:      'employee',
 };
 
 const ROLE_COLOR: Record<string, string> = {

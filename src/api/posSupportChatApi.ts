@@ -24,8 +24,7 @@ async function sp(payload: Record<string, unknown>) {
   }
 }
 
-// 'clients' is the only topic with a live agent today — income/expenses/
-// accounting are planned, see LoanAgents_SmartLoans' agents/pos_clients_support.
+// Each topic has its own pos_{topic}_support_agent in LoanAgents_SmartLoans.
 export type PosSupportTopic = 'clients' | 'income' | 'expenses' | 'accounting';
 
 export interface PosSupportMessage {
@@ -50,13 +49,20 @@ export const posSupportChatApi = {
   startConversation: (p: { companyId: number; userId: number; topic: PosSupportTopic }) =>
     sp({ action: 'start_conversation', ...p }),
 
+  // userId is required as of the write-capable agents (2026-09-14): the
+  // backend's pending-action confirm/cancel check is scoped to the same
+  // (companyId, userId) that proposed the action.
   sendMessage: (p: {
-    companyId: number; conversationId: number; topic: PosSupportTopic;
+    companyId: number; userId: number; conversationId: number; topic: PosSupportTopic;
     body: string; clientId?: number;
   }) => sp({ action: 'send_message', senderRole: 'user', ...p }),
 
-  listMessages: (conversationId: number) =>
-    sp({ action: 'list_messages', conversationId }),
+  // companyId/userId are required as of the 2026-09-14 backend fix:
+  // sp_posSupportChat now verifies the caller actually owns this
+  // conversation before returning any messages (previously conversationId
+  // alone was enough to read any user's/company's messages).
+  listMessages: (conversationId: number, companyId: number, userId: number) =>
+    sp({ action: 'list_messages', conversationId, companyId, userId }),
 
   listConversations: (companyId: number, userId: number) =>
     sp({ action: 'list_conversations', companyId, userId }),

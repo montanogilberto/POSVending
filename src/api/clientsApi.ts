@@ -1,6 +1,8 @@
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
-export type ClientType = 'borrower' | 'lender' | 'both' | 'lawyer';
+// 'pos' = plain POS retail customer, no lending relationship — added
+// 2026-09-14 (CK_clients_clientType on the backend updated to match).
+export type ClientType = 'borrower' | 'lender' | 'both' | 'lawyer' | 'pos';
 
 export interface Client {
   clientId: number;

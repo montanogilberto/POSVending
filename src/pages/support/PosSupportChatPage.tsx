@@ -59,7 +59,8 @@ const PosSupportChatPage: React.FC = () => {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchMessages = useCallback(async (convId: number) => {
-    const res = await posSupportChatApi.listMessages(convId);
+    if (!companyId || !userId) return;
+    const res = await posSupportChatApi.listMessages(convId, companyId, userId);
     if (Array.isArray(res)) {
       setMessages(res);
       const lastAgent = [...res].reverse().find(m => m.senderRole === 'agent');
@@ -75,7 +76,7 @@ const PosSupportChatPage: React.FC = () => {
       }
       setTimeout(() => contentRef.current?.scrollToBottom(300), 100);
     }
-  }, []);
+  }, [companyId, userId]);
 
   useEffect(() => {
     if (!companyId || !userId) return;
@@ -90,24 +91,33 @@ const PosSupportChatPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [companyId, userId, TOPIC]);
 
+  // Immediate fetch only on a genuinely NEW conversation — not split out by
+  // agentTyping (see the interval effect below), which previously caused an
+  // extra immediate fetch on every agentTyping toggle (i.e. twice per sent
+  // message) on top of whatever the poll interval was already doing.
   useEffect(() => {
     if (!conv) return;
     fetchMessages(conv.conversationId);
+  }, [conv?.conversationId, fetchMessages]);
+
+  useEffect(() => {
+    if (!conv) return;
     // Same cadence as LoanChatPage: 8s idle, 2.5s while the agent is "typing"
-    // so its reply appears without waiting the full idle cycle.
+    // so its reply appears without waiting the full idle cycle. Only resets
+    // the timer at the new cadence — does not itself trigger an extra fetch.
     pollRef.current = setInterval(() => fetchMessages(conv.conversationId), agentTyping ? 2500 : 8000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [conv?.conversationId, agentTyping, fetchMessages]);
 
   const sendText = async () => {
-    if (!text.trim() || !conv || sending || !companyId) return;
+    if (!text.trim() || !conv || sending || !companyId || !userId) return;
     const body = text.trim();
     setText('');
     setSending(true);
     setAgentTyping(true);
     agentTypingSince.current = Date.now();
     await posSupportChatApi.sendMessage({
-      companyId, conversationId: conv.conversationId, topic: TOPIC, body,
+      companyId, userId, conversationId: conv.conversationId, topic: TOPIC, body,
     });
     setSending(false);
     fetchMessages(conv.conversationId);

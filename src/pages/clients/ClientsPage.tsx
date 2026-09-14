@@ -381,6 +381,9 @@ const ClientsPage: React.FC = () => {
     if (type === 'lender') {
       return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para gestionar tu cartera de préstamos, ver el estado de tus acreditados y más.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta de prestamista y accede a tu dashboard de portfolio.`;
     }
+    if (type === 'pos') {
+      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para ver tu historial de compras y tus puntos de recompensas.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard de recompensas.`;
+    }
     return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para consultar tu préstamo, ver tu estado de cuenta y realizar pagos fácilmente.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard.`;
   };
 
@@ -894,6 +897,7 @@ const ClientsPage: React.FC = () => {
             { id: 'lender',   label: '💼 Prestamista', desc: 'Financia préstamos', color: '#15803d' },
             { id: 'both',     label: '🔄 Ambos', desc: 'Acreditado y prestamista', color: '#7c3aed' },
             { id: 'lawyer',   label: '⚖️ Licenciado en derecho', desc: 'Asesoría legal', color: '#b45309' },
+            { id: 'pos',      label: '🛒 Cliente POS', desc: 'Compras en tienda, sin préstamo', color: '#ea580c' },
           ] as { id: ClientType; label: string; desc: string; color: string }[]).map(t => (
             <button
               key={t.id}
@@ -1891,13 +1895,14 @@ const ClientsPage: React.FC = () => {
                   <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>{shareClient.cellphone}</p>
                   <span style={{
                     fontSize: 11,
-                    background: shareClient.clientType === 'lender' ? '#dcfce7' : shareClient.clientType === 'lawyer' ? '#fef3c7' : '#eff6ff',
-                    color: shareClient.clientType === 'lender' ? '#15803d' : shareClient.clientType === 'lawyer' ? '#b45309' : '#2563eb',
+                    background: shareClient.clientType === 'lender' ? '#dcfce7' : shareClient.clientType === 'lawyer' ? '#fef3c7' : shareClient.clientType === 'pos' ? '#ffedd5' : '#eff6ff',
+                    color: shareClient.clientType === 'lender' ? '#15803d' : shareClient.clientType === 'lawyer' ? '#b45309' : shareClient.clientType === 'pos' ? '#c2410c' : '#2563eb',
                     padding: '2px 8px', borderRadius: 99, fontWeight: 700,
                   }}>
                     {shareClient.clientType === 'lender' ? '💼 Prestamista'
                       : shareClient.clientType === 'both' ? '🔄 Ambos'
                       : shareClient.clientType === 'lawyer' ? '⚖️ Licenciado en derecho'
+                      : shareClient.clientType === 'pos' ? '🛒 Cliente POS'
                       : '📋 Acreditado'}
                   </span>
                 </div>
