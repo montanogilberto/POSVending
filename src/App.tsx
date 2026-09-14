@@ -851,7 +851,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/arcade/boliche" component={BowlingPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
-            <PrivateRoute exact path="/pos-support" component={PosSupportChatPage} />
+            <PrivateRoute exact path="/pos-support/:topic?" component={PosSupportChatPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
             <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
             <PrivateRoute exact path="/notification-dispatch-log" component={NotificationDispatchLogPage} />

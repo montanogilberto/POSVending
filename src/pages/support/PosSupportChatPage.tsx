@@ -1,9 +1,10 @@
 /**
  * PosSupportChatPage — "Soporte POS" chat, distinct from the SmartLoans
  * loan-chat (see [[CLAUDE.md]] rule and App.tsx's POS_ONLY_ROUTE_PREFIXES).
- * Phase 1: 'clients' topic only (registration wizard help). Income/Expenses/
- * Accounting are planned — see posSupportChatApi.ts's PosSupportTopic.
- * Route: /pos-support
+ * Topic-parameterized: clients, income, expenses, accounting — each backed
+ * by its own pos_{topic}_support_agent in LoanAgents_SmartLoans, all
+ * advisory-only (explain real data, never write). Route: /pos-support/:topic?
+ * (missing/unrecognized topic falls back to 'clients' for old links).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -11,18 +12,39 @@ import {
   IonButtons, IonButton, IonIcon, IonInput, IonSpinner,
 } from '@ionic/react';
 import { arrowBack, refreshOutline, sendOutline, chatbubbleEllipsesOutline } from 'ionicons/icons';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useParams } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
-import { posSupportChatApi, PosSupportMessage, PosSupportConversation } from '../../api/posSupportChatApi';
+import { posSupportChatApi, PosSupportMessage, PosSupportConversation, PosSupportTopic } from '../../api/posSupportChatApi';
 import { mxChatTime as toTime } from '../../utils/format';
 import EmptyState from '../../components/ui/EmptyState';
 import './PosSupportChatPage.css';
 
-const TOPIC = 'clients' as const;
-const TOPIC_LABEL = 'Soporte POS · Clientes';
+const TOPIC_META: Record<PosSupportTopic, { label: string; placeholder: string }> = {
+  clients: {
+    label: 'Soporte POS · Clientes',
+    placeholder: 'Pregúntame sobre el registro de un nuevo cliente: pasos, verificación, contrato, etc.',
+  },
+  income: {
+    label: 'Soporte POS · Ingresos',
+    placeholder: 'Pregúntame cuánto ingreso llevamos registrado este mes.',
+  },
+  expenses: {
+    label: 'Soporte POS · Gastos',
+    placeholder: 'Pregúntame cuánto hemos gastado, o muéstrame los gastos recientes.',
+  },
+  accounting: {
+    label: 'Soporte POS · Contabilidad',
+    placeholder: 'Pregúntame por el resultado contable (balanza de comprobación).',
+  },
+};
 
 const PosSupportChatPage: React.FC = () => {
   const history = useHistory();
+  const { topic: topicParam } = useParams<{ topic?: string }>();
+  const TOPIC: PosSupportTopic = (topicParam && topicParam in TOPIC_META)
+    ? (topicParam as PosSupportTopic)
+    : 'clients';
+  const { label: TOPIC_LABEL, placeholder: TOPIC_PLACEHOLDER } = TOPIC_META[TOPIC];
   const { companyId, userId } = useUser();
 
   const [conv, setConv] = useState<PosSupportConversation | null>(null);
@@ -57,6 +79,8 @@ const PosSupportChatPage: React.FC = () => {
 
   useEffect(() => {
     if (!companyId || !userId) return;
+    setConv(null);
+    setMessages([]);
     setLoading(true);
     posSupportChatApi.startConversation({ companyId, userId, topic: TOPIC })
       .then((res) => {
@@ -64,7 +88,7 @@ const PosSupportChatPage: React.FC = () => {
         setConv(res);
       })
       .finally(() => setLoading(false));
-  }, [companyId, userId]);
+  }, [companyId, userId, TOPIC]);
 
   useEffect(() => {
     if (!conv) return;
@@ -112,7 +136,7 @@ const PosSupportChatPage: React.FC = () => {
           <EmptyState
             className="psc-empty"
             icon={chatbubbleEllipsesOutline}
-            text="Pregúntame sobre el registro de un nuevo cliente: pasos, verificación, contrato, etc."
+            text={TOPIC_PLACEHOLDER}
           />
         )}
 

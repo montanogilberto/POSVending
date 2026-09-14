@@ -15,7 +15,7 @@ const AccountingView: React.FC = () => {
 
   return (
     <IonPage>
-      <Header screenTitle="Contabilidad" showBackButton={true} backButtonHref="/dashboard" {...pops.headerProps} />
+      <Header screenTitle="Contabilidad" showBackButton={true} backButtonHref="/dashboard" posSupportTopic="accounting" {...pops.headerProps} />
       <IonContent fullscreen className="accounting-content">
         <IonSegment
           value={vm.activeTab}

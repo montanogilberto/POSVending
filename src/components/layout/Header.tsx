@@ -8,6 +8,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useUser } from '../../contexts/UserContext';
 import { fetchMyNotifications } from '../../api/myNotificationsApi';
 import { getChatConfig } from '../../api/loanChatApi';
+import { PosSupportTopic } from '../../api/posSupportChatApi';
 import { APP_ENV, IS_DEV_BUILD } from '../../utils/appEnv';
 import './Header.css';
 
@@ -18,6 +19,11 @@ interface HeaderProps {
   showBackButton?: boolean;
   backButtonText?: string;
   backButtonHref?: string;
+  // Opt-in per page: shows the same "ask the assistant" sparkles button the
+  // SmartLoans role gets, pointed at /pos-support/{topic} instead of
+  // /loan-chat. Only rendered for POS roles (mirrors the SmartLoans button's
+  // own role gating) — pass this from Incomes/Expenses/Accounting pages only.
+  posSupportTopic?: PosSupportTopic;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -26,7 +32,8 @@ const Header: React.FC<HeaderProps> = ({
   screenTitle = 'POS GMO',
   showBackButton = false,
   backButtonText = 'Atrás',
-  backButtonHref = '/'
+  backButtonHref = '/',
+  posSupportTopic,
 }) => {
   const history = useHistory();
   const { cart } = useCart();
@@ -126,6 +133,16 @@ const Header: React.FC<HeaderProps> = ({
               style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
             >
               <IonIcon icon={chatbubblesOutline} style={{ fontSize: '28px' }} />
+            </IonButton>
+          )}
+          {!isSmartLoansRole && posSupportTopic && (
+            <IonButton
+              onClick={() => { console.log(`[Header] agent icon → /pos-support/${posSupportTopic}`); history.push(`/pos-support/${posSupportTopic}`); }}
+              title="Asistente POS"
+              className="header-action-button"
+              style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
+            >
+              <IonIcon icon={sparklesOutline} style={{ fontSize: '28px' }} />
             </IonButton>
           )}
           <IonButton onClick={handleNotificationsClick} title="Notifications" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>

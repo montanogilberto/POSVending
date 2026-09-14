@@ -19,7 +19,7 @@ const ExpensesView: React.FC = () => {
 
   return (
     <IonPage>
-      <Header screenTitle="Egresos" showBackButton={true} backButtonHref="/dashboard" {...pops.headerProps} />
+      <Header screenTitle="Egresos" showBackButton={true} backButtonHref="/dashboard" posSupportTopic="expenses" {...pops.headerProps} />
       <IonContent fullscreen className="expenses-content">
         <div className="expenses-container">
           <ExpensesSummaryCard vm={vm} />

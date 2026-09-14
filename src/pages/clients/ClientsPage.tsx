@@ -1690,6 +1690,7 @@ const ClientsPage: React.FC = () => {
       <Header
         {...pops.headerProps}
         screenTitle="Clientes"
+        posSupportTopic="clients"
         showBackButton={true}
         backButtonText="Menú"
         backButtonHref="/dashboard"
