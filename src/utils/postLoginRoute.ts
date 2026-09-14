@@ -10,6 +10,9 @@ export function getPostLoginRoute(roleCode: string | undefined, clientId: number
   if (roleCode === 'borrower') {
     return clientId ? `/client-dashboard/${clientId}` : '/dashboard';
   }
+  if (roleCode === 'client') {
+    return clientId ? `/rewards-dashboard/${clientId}` : '/client-login';
+  }
   if (roleCode === 'business' || roleCode === 'employee') {
     return '/dashboard';
   }

@@ -76,7 +76,8 @@ export type UiFeature =
   | 'loanChat'
   | 'p2pLending'
   | 'game'
-  | 'arcade';
+  | 'arcade'
+  | 'rewardsHome';
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
@@ -123,13 +124,12 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   viewer: [
     'ingresos', 'egresos', 'clientDashboards', 'game', 'arcade',
   ],
-  // Groundwork only — see the RoleCode comment. Deliberately does not grant
-  // 'rewards'/'posRewards' (those routes are staff admin panels today, not
-  // a customer self-service view) or 'clientDashboards' (that's the
-  // borrower/lender loan dashboard, a different module). Shared/entertainment
-  // only until a real self-service view exists.
+  // Self-service client role. Deliberately does not grant 'rewards'/'posRewards'
+  // (those routes are staff admin panels, not this customer self-service view)
+  // or 'clientDashboards' (that's the borrower/lender loan dashboard, a
+  // different module) — 'rewardsHome' is the client's own equivalent.
   client: [
-    'game', 'arcade',
+    'game', 'arcade', 'rewardsHome',
   ],
 };
 

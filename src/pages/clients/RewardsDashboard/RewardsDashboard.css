@@ -109,3 +109,7 @@
 .rewards-catalog-redeem[disabled] {
   opacity: 0.45;
 }
+
+.rewards-dashboard-borrower-cta {
+  padding: 4px 16px 24px;
+}

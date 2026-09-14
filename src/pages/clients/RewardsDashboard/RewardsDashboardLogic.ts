@@ -18,7 +18,7 @@ import { RewardsActivityItem } from './RewardsDashboardTypes';
 export const useRewardsDashboard = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const clientId = Number(clientIdParam);
-  const { companyId, userId } = useUser();
+  const { companyId, userId, roleCode } = useUser();
   const { showToast, toastProps } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -137,6 +137,7 @@ export const useRewardsDashboard = () => {
   return {
     clientId,
     clientName,
+    roleCode,
     loading,
     balance,
     ledger,
