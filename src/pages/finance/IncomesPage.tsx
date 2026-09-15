@@ -201,6 +201,7 @@ const IncomesPage: React.FC = () => {
         backButtonHref="/dashboard"
         presentAlertPopover={() => {}}
         presentMailPopover={() => {}}
+        posSupportTopic="income"
       />
       <IonContent fullscreen>
         <IonGrid className="ion-padding">
