@@ -66,4 +66,11 @@ export const posSupportChatApi = {
 
   listConversations: (companyId: number, userId: number) =>
     sp({ action: 'list_conversations', companyId, userId }),
+
+  // "Clear history": closes the current thread so the next startConversation
+  // for this (companyId, userId, topic) creates a genuinely new one instead
+  // of reusing it. Scoped the same way as listMessages — only the owner can
+  // close their own conversation.
+  closeConversation: (conversationId: number, companyId: number, userId: number) =>
+    sp({ action: 'close_conversation', conversationId, companyId, userId }),
 };
