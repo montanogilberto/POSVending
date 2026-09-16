@@ -54,12 +54,14 @@ export const useDashboard = () => {
     return () => controller.abort();
   };
 
-  useEffect(() => {
-    console.log('[Dashboard] initial-load effect: mounting, companyId =', companyId, 'userId =', userId);
-    return refreshDashboardData();
-  // loadIncomes is stable (useCallback with no deps) — omitting it avoids double-fetch
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // No mount-only fetch here on purpose: Dashboard.tsx's useIonViewWillEnter
+  // already calls refreshDashboardData() on both the first entry AND every
+  // revisit (Ionic keeps this page mounted, so a mount effect only ever
+  // covers the first entry — see CLAUDE.md rule #6). A mount effect here
+  // used to run IN ADDITION to that, firing two overlapping fetches (each
+  // with its own AbortController, so both ran to completion) on every
+  // single Dashboard view — confirmed in a production logcat capture,
+  // not just a dev double-invoke.
 
   // ✅ Refresh on inactivity
   useInactivityTimer(300000, () => {
