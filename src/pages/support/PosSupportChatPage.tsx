@@ -15,15 +15,17 @@
  * /pos-support to /pos-support/:topic (React Router keeps this component
  * mounted across that navigation since both match ":topic?").
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonFooter,
-  IonButtons, IonButton, IonIcon, IonInput, IonSpinner, IonList, IonItem, IonLabel, IonToast,
+  IonButtons, IonButton, IonIcon, IonTextarea, IonSpinner, IonList, IonItem, IonLabel, IonToast,
+  IonFab, IonFabButton,
 } from '@ionic/react';
 import {
   arrowBack, refreshOutline, sendOutline, chatbubbleEllipsesOutline,
   trashOutline, peopleOutline, cashOutline, receiptOutline, calculatorOutline, chevronForward,
-  micOutline, volumeHighOutline, volumeMuteOutline,
+  micOutline, volumeHighOutline, volumeMuteOutline, volumeMediumOutline, chevronDownOutline,
+  checkmarkOutline,
 } from 'ionicons/icons';
 import { useHistory, useParams } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
@@ -31,7 +33,7 @@ import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
 import { useUser } from '../../contexts/UserContext';
 import { posSupportChatApi, PosSupportMessage, PosSupportConversation, PosSupportTopic } from '../../api/posSupportChatApi';
-import { mxChatTime as toTime } from '../../utils/format';
+import { mxChatTime as toTime, mxChatDate, toHermosilloDate } from '../../utils/format';
 import EmptyState from '../../components/ui/EmptyState';
 import './PosSupportChatPage.css';
 
@@ -64,12 +66,59 @@ const TOPIC_META: Record<PosSupportTopic, { label: string; placeholder: string; 
 
 const TOPIC_ORDER: PosSupportTopic[] = ['clients', 'income', 'expenses', 'accounting'];
 
+const dateKey = (iso?: string | null): string => (iso ? toHermosilloDate(iso).toISOString().split('T')[0] : '');
+
+const formatElapsed = (sec: number): string => {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0');
+  const s = Math.floor(sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+};
+
+type RenderItem =
+  | { kind: 'divider'; key: string; label: string }
+  | { kind: 'msg'; key: string; msg: PosSupportMessage; groupStart: boolean };
+
+/** Splits the flat message list into date dividers + grouped-by-sender
+ * rows — the two things a professional chat UI needs that a plain map()
+ * over messages doesn't give you. A "group" breaks on sender change OR a
+ * date divider, so a lone message right after midnight never silently
+ * merges into the previous day's group. */
+const buildRenderItems = (msgs: PosSupportMessage[]): RenderItem[] => {
+  const todayKey = dateKey(new Date().toISOString());
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = dateKey(yesterday.toISOString());
+
+  const dividerLabel = (iso: string): string => {
+    const k = dateKey(iso);
+    if (k === todayKey) return 'Hoy';
+    if (k === yesterdayKey) return 'Ayer';
+    return mxChatDate(iso);
+  };
+
+  const items: RenderItem[] = [];
+  let prevDateKey = '';
+  let prevSender = '';
+  msgs.forEach((msg, i) => {
+    const iso = msg.created_At ?? '';
+    const dKey = dateKey(iso);
+    if (dKey && dKey !== prevDateKey) {
+      items.push({ kind: 'divider', key: `d-${dKey}-${i}`, label: dividerLabel(iso) });
+      prevSender = ''; // force a fresh group right after a date divider
+      prevDateKey = dKey;
+    }
+    items.push({ kind: 'msg', key: String(msg.messageId), msg, groupStart: msg.senderRole !== prevSender });
+    prevSender = msg.senderRole;
+  });
+  return items;
+};
+
 const PosSupportChatPage: React.FC = () => {
   const history = useHistory();
   const { topic: topicParam } = useParams<{ topic?: string }>();
   const isPicker = !topicParam;
   const TOPIC: PosSupportTopic = (!isPicker && topicParam! in TOPIC_META) ? (topicParam as PosSupportTopic) : 'clients';
-  const { label: TOPIC_LABEL, placeholder: TOPIC_PLACEHOLDER } = TOPIC_META[TOPIC];
+  const { label: TOPIC_LABEL, placeholder: TOPIC_PLACEHOLDER, icon: TOPIC_ICON } = TOPIC_META[TOPIC];
   const { companyId, userId } = useUser();
 
   const [conv, setConv] = useState<PosSupportConversation | null>(null);
@@ -81,12 +130,26 @@ const PosSupportChatPage: React.FC = () => {
   const [agentTyping, setAgentTyping] = useState(false);
   const agentTypingSince = useRef(0);
   const [listening, setListening] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const [voiceOn, setVoiceOn] = useState(false);
   const [voiceToast, setVoiceToast] = useState('');
+  const [speakingId, setSpeakingId] = useState<number | null>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const lastSpokenIdRef = useRef<number | null>(null);
+  // Set right before a recording ends with intent to send (checkmark tap OR
+  // the OS deciding you've stopped talking) — read back by the effect below
+  // once `listening` actually flips to false. A ref, not a plain variable
+  // closed over by the native listener, because that listener is
+  // registered once per recording (see toggleListen) and would otherwise
+  // run with the `text`/`listening` values from THAT moment, not the
+  // latest ones — refs and state setters stay stable across renders,
+  // ordinary closures don't.
+  const pendingSendRef = useRef(false);
 
   const contentRef = useRef<HTMLIonContentElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const renderItems = useMemo(() => buildRenderItems(messages), [messages]);
 
   const fetchMessages = useCallback(async (convId: number) => {
     if (!companyId || !userId) return;
@@ -169,18 +232,32 @@ const PosSupportChatPage: React.FC = () => {
     }
   };
 
-  // ── Voz — same pattern as LoanChatPage.tsx (@capacitor-community/speech-
-  // recognition for dictation, @capacitor-community/text-to-speech for
-  // reading agent replies aloud). Native-only, same as there: the web
-  // build shows a toast instead of silently doing nothing.
+  // ── Voz — same underlying plugins as LoanChatPage.tsx
+  // (@capacitor-community/speech-recognition for dictation,
+  // @capacitor-community/text-to-speech for reading agent replies aloud),
+  // but delivered as a proper voice message: tap mic -> the composer
+  // becomes a live audio line (waveform + timer), tap the checkmark (or
+  // just stop talking) -> it's sent straight to the chat as your next
+  // message, never left sitting in the text box for editing. Native-only,
+  // same as there: the web build shows a toast instead of silently doing
+  // nothing.
+  const finishListening = async () => {
+    pendingSendRef.current = true;
+    try { await SpeechRecognition.stop(); } catch { /* ya detenido */ }
+    setListening(false);
+  };
+
+  const cancelListening = async () => {
+    pendingSendRef.current = false;
+    try { await SpeechRecognition.stop(); } catch { /* ya detenido */ }
+    setListening(false);
+    setText('');
+  };
+
   const toggleListen = async () => {
     if (isPicker) return;
     if (!Capacitor.isNativePlatform()) { setVoiceToast('El dictado por voz está disponible en la app móvil.'); return; }
-    if (listening) {
-      try { await SpeechRecognition.stop(); } catch { /* ya detenido */ }
-      setListening(false);
-      return;
-    }
+    if (listening) { await finishListening(); return; }
     try {
       const perm = await SpeechRecognition.requestPermissions();
       if ((perm as any).speechRecognition !== 'granted') {
@@ -193,10 +270,25 @@ const PosSupportChatPage: React.FC = () => {
         const t = data?.matches?.[0];
         if (t) setText(t);
       });
+      // The OS decided you stopped talking (silence timeout) — treat that
+      // exactly like tapping the checkmark: send what was heard. Mutating
+      // a ref + calling the (stable) state setter is safe from this
+      // long-lived listener even though it can fire long after this
+      // closure was created — see pendingSendRef's own comment.
       SpeechRecognition.addListener('listeningState' as any, (s: any) => {
-        if (s?.status === 'stopped') setListening(false);
+        if (s?.status === 'stopped') {
+          pendingSendRef.current = true;
+          setListening(false);
+        }
       });
       setListening(true);
+      // Voice-first in -> voice-first out: dictating a question implies you'd
+      // rather hear the answer than read it. Only flips it ON, never off —
+      // the speaker button in the header still lets you silence it mid-chat.
+      if (!voiceOn) {
+        setVoiceOn(true);
+        setVoiceToast('🔊 Respuestas en voz alta activadas');
+      }
       await SpeechRecognition.start({ language: 'es-MX', partialResults: true, popup: false });
     } catch (e) {
       console.log('[PosSupportChat] voice: dictado ❌', String(e));
@@ -204,11 +296,47 @@ const PosSupportChatPage: React.FC = () => {
     }
   };
 
-  const speak = async (body: string) => {
+  // Fires exactly once per recording that ended with intent to send
+  // (finishListening or a native auto-stop) — never for a cancel. Reads
+  // `text`/sendText from THIS render, i.e. whatever was last transcribed,
+  // which is why this is a `[listening]`-only effect and not folded into
+  // finishListening itself (that function's own closure can be stale by
+  // the time an OS-driven stop calls it indirectly).
+  useEffect(() => {
+    if (listening || !pendingSendRef.current) return;
+    pendingSendRef.current = false;
+    sendText();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listening]);
+
+  // Live mm:ss while recording — purely cosmetic feedback, resets whenever
+  // listening turns off (cancelled, confirmed, or auto-stopped natively).
+  useEffect(() => {
+    if (!listening) { setElapsedSec(0); return; }
+    const start = Date.now();
+    const id = setInterval(() => setElapsedSec(Math.floor((Date.now() - start) / 1000)), 500);
+    return () => clearInterval(id);
+  }, [listening]);
+
+  // Unified speak(): fire-and-forget for the auto-read effect (no id), or
+  // tap-to-play/tap-to-stop for one specific bubble (id = that message's).
+  // Always stops whatever was playing first, so tapping a second bubble
+  // interrupts the first rather than overlapping two replies.
+  const speak = async (body: string, id?: number) => {
+    if (id !== undefined && speakingId === id) {
+      await TextToSpeech.stop().catch(() => {});
+      setSpeakingId(null);
+      return;
+    }
     try {
       await TextToSpeech.stop().catch(() => {});
+      if (id !== undefined) setSpeakingId(id);
       await TextToSpeech.speak({ text: body, lang: 'es-MX', rate: 1.0 });
-    } catch (e) { console.log('[PosSupportChat] voice: TTS ❌', String(e)); }
+    } catch (e) {
+      console.log('[PosSupportChat] voice: TTS ❌', String(e));
+    } finally {
+      if (id !== undefined) setSpeakingId(null);
+    }
   };
 
   // Reads aloud each NEW agent reply (never the loaded history — the first
@@ -240,6 +368,13 @@ const PosSupportChatPage: React.FC = () => {
       SpeechRecognition.removeAllListeners().catch(() => {});
     }
   }, []);
+
+  const handleScroll = async () => {
+    const el = await contentRef.current?.getScrollElement();
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollBtn(distanceFromBottom > 200);
+  };
 
   if (isPicker) {
     return (
@@ -284,7 +419,14 @@ const PosSupportChatPage: React.FC = () => {
               <IonIcon icon={arrowBack} slot="icon-only" />
             </IonButton>
           </IonButtons>
-          <IonTitle>{TOPIC_LABEL}</IonTitle>
+          <IonTitle>
+            <div className="psc-header-title">
+              <span className="psc-header-name">{TOPIC_LABEL.replace('Soporte POS · ', '')}</span>
+              <span className="psc-header-status">
+                {agentTyping ? 'escribiendo…' : 'Asistente IA · Soporte POS'}
+              </span>
+            </div>
+          </IonTitle>
           <IonButtons slot="end">
             <IonButton onClick={() => {
               const next = !voiceOn;
@@ -304,7 +446,13 @@ const PosSupportChatPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
 
-      <IonContent ref={contentRef} className="psc-content">
+      <IonContent ref={contentRef} className="psc-content" scrollEvents onIonScroll={handleScroll}>
+        {loading && messages.length === 0 && (
+          <div className="psc-loading">
+            <IonSpinner name="crescent" />
+          </div>
+        )}
+
         {messages.length === 0 && !loading && (
           <EmptyState
             className="psc-empty"
@@ -314,45 +462,124 @@ const PosSupportChatPage: React.FC = () => {
         )}
 
         <div className="psc-messages">
-          {messages.map((msg) => (
-            <div key={msg.messageId} className={`psc-bubble-wrap ${msg.senderRole === 'user' ? 'psc-own' : 'psc-other'}`}>
-              <div className={`psc-bubble ${msg.senderRole === 'user' ? 'psc-bubble-own' : 'psc-bubble-other'}`}>
-                {msg.body}
+          {renderItems.map((item) => {
+            if (item.kind === 'divider') {
+              return (
+                <div key={item.key} className="psc-date-divider">
+                  <span>{item.label}</span>
+                </div>
+              );
+            }
+
+            const { msg, groupStart } = item;
+            if (msg.senderRole === 'user') {
+              return (
+                <div key={item.key} className={`psc-bubble-wrap psc-own ${!groupStart ? 'psc-grouped' : ''}`}>
+                  <div className="psc-bubble psc-bubble-own">{msg.body}</div>
+                  <span className="psc-time">{toTime(msg.created_At)}</span>
+                </div>
+              );
+            }
+
+            return (
+              <div key={item.key} className={`psc-row-other ${!groupStart ? 'psc-grouped' : ''}`}>
+                <div className="psc-avatar-slot">
+                  {groupStart && (
+                    <div className="psc-avatar">
+                      <IonIcon icon={TOPIC_ICON} />
+                    </div>
+                  )}
+                </div>
+                <div className="psc-bubble-wrap psc-other">
+                  <div className="psc-bubble psc-bubble-other">{msg.body}</div>
+                  <div className="psc-msg-meta">
+                    <span className="psc-time">{toTime(msg.created_At)}</span>
+                    {msg.body && (
+                      <IonButton
+                        fill="clear" size="small" className="psc-speak-btn"
+                        onClick={() => speak(msg.body!, msg.messageId)}
+                        title={speakingId === msg.messageId ? 'Detener lectura' : 'Escuchar respuesta'}
+                      >
+                        <IonIcon
+                          icon={speakingId === msg.messageId ? volumeHighOutline : volumeMediumOutline}
+                          slot="icon-only"
+                          className={speakingId === msg.messageId ? 'psc-speak-live' : ''}
+                        />
+                      </IonButton>
+                    )}
+                  </div>
+                </div>
               </div>
-              <span className="psc-time">{toTime(msg.created_At)}</span>
-            </div>
-          ))}
+            );
+          })}
           {agentTyping && (
-            <div className="psc-typing" aria-label="El asistente está escribiendo">
-              <span className="psc-typing-dot" />
-              <span className="psc-typing-dot" />
-              <span className="psc-typing-dot" />
+            <div className="psc-row-other">
+              <div className="psc-avatar-slot">
+                <div className="psc-avatar"><IonIcon icon={TOPIC_ICON} /></div>
+              </div>
+              <div className="psc-typing" aria-label="El asistente está escribiendo">
+                <span className="psc-typing-dot" />
+                <span className="psc-typing-dot" />
+                <span className="psc-typing-dot" />
+              </div>
             </div>
           )}
         </div>
+
+        {showScrollBtn && (
+          <IonFab vertical="bottom" horizontal="end" className="psc-scroll-fab">
+            <IonFabButton size="small" onClick={() => contentRef.current?.scrollToBottom(300)}>
+              <IonIcon icon={chevronDownOutline} />
+            </IonFabButton>
+          </IonFab>
+        )}
       </IonContent>
 
       <IonFooter className="psc-footer">
-        <div className="psc-toolbar">
-          <IonButton fill="clear" size="small" onClick={toggleListen} disabled={!conv}
-            className={listening ? 'psc-mic-live' : ''}>
-            <IonIcon icon={micOutline} slot="icon-only" color={listening ? 'danger' : 'medium'} />
-          </IonButton>
-          <IonInput
-            className="psc-input"
-            placeholder={listening ? '🎙️ Escuchando…' : 'Escribe tu pregunta...'}
-            value={text}
-            enterkeyhint="send"
-            disabled={!conv}
-            onIonInput={e => setText(e.detail.value ?? '')}
-            onKeyDown={e => e.key === 'Enter' && sendText()}
-          />
-          <IonButton fill="clear" size="small" onClick={sendText} disabled={!text.trim() || sending || !conv}>
-            {sending
-              ? <IonSpinner name="dots" />
-              : <IonIcon icon={sendOutline} slot="icon-only" color="primary" />}
-          </IonButton>
-        </div>
+        {listening ? (
+          <div className="psc-rec-bar">
+            <IonButton fill="clear" shape="round" size="small" className="psc-rec-cancel-btn" onClick={cancelListening}>
+              <IonIcon icon={trashOutline} slot="icon-only" color="medium" />
+            </IonButton>
+            <span className="psc-rec-dot" />
+            <div className="psc-waveform" aria-hidden="true">
+              <span /><span /><span /><span /><span /><span /><span />
+            </div>
+            <span className="psc-rec-timer">{formatElapsed(elapsedSec)}</span>
+            <IonButton fill="solid" shape="round" size="small" color="primary"
+              className="psc-rec-confirm-btn" onClick={finishListening}>
+              <IonIcon icon={checkmarkOutline} slot="icon-only" />
+            </IonButton>
+          </div>
+        ) : (
+          <div className="psc-toolbar">
+            <IonButton fill="clear" shape="round" size="small" onClick={toggleListen} disabled={!conv}
+              className="psc-mic-btn">
+              <IonIcon icon={micOutline} slot="icon-only" color="medium" />
+            </IonButton>
+            <IonTextarea
+              className="psc-input"
+              placeholder="Escribe tu pregunta..."
+              value={text}
+              rows={1}
+              autoGrow
+              enterkeyhint="send"
+              disabled={!conv}
+              onIonInput={e => setText(e.detail.value ?? '')}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }
+              }}
+            />
+            <IonButton
+              fill={text.trim() ? 'solid' : 'clear'} shape="round" size="small" color="primary"
+              className="psc-send-btn" onClick={sendText} disabled={!text.trim() || sending || !conv}
+            >
+              {sending
+                ? <IonSpinner name="dots" />
+                : <IonIcon icon={sendOutline} slot="icon-only" />}
+            </IonButton>
+          </div>
+        )}
       </IonFooter>
 
       <IonToast
