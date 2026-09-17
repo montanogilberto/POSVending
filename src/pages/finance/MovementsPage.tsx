@@ -151,6 +151,7 @@ const MovementsPage: React.FC = () => {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
+      timeZone: 'UTC',
     });
     // Capitalize only the first letter -- text-transform:capitalize would
     // also capitalize "de" (Spanish preposition), which reads wrong.
@@ -322,7 +323,7 @@ const MovementsPage: React.FC = () => {
                       </IonItem>
                       <IonList lines="none">
                         {incomes.map((income, i) => {
-                          const time = toHermosilloDate(income.paymentDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                          const time = toHermosilloDate(income.paymentDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
                           return (
                             <IonItem key={i}>
                               <div className="movements-row-icon" slot="start">

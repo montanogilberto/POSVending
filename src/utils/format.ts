@@ -37,7 +37,7 @@ export const mxChatTime = (s: string) =>
 export const toHermosillo = (utc: string | undefined): string => {
   if (!utc) return '';
   const d = new Date(utc.includes('Z') ? utc : utc + 'Z');
-  return new Date(d.getTime() - 7 * 60 * 60 * 1000).toLocaleString();
+  return new Date(d.getTime() - 7 * 60 * 60 * 1000).toLocaleString('es-MX', { timeZone: 'UTC' });
 };
 
 /** Date desplazado a Hermosillo (UTC-7, sin DST) — para agrupar/comparar por día o mes. */

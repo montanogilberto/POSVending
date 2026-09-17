@@ -34,6 +34,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ allIncome, onShowReceip
       weekday: 'long',
       day: 'numeric',
       month: 'long',
+      timeZone: 'UTC',
     });
     const date = rawDate.charAt(0).toUpperCase() + rawDate.slice(1);
     if (!groups[date]) {
@@ -68,7 +69,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ allIncome, onShowReceip
                 </IonItem>
                 <IonList lines="none" className="activity-ion-list">
                   {incomes.map((income, i) => {
-                    const time = toHermosilloDate(income.paymentDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                    const time = toHermosilloDate(income.paymentDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
                     const isLoading = loadingReceiptId === income.incomeId;
                     return (
                       <IonItem

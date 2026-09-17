@@ -45,8 +45,11 @@
    .dashboard-refresh-button {
      display: inline-flex;
      align-items: center;
+     justify-content: flex-start;
      gap: 6px;
-     padding: 8px 16px;
+     height: 52px;
+     padding: 0 18px;
+     box-sizing: border-box;
      background: #ffffff;
      border: 1.5px solid #e2e8f0;
      border-radius: 99px;
@@ -180,8 +183,10 @@
 
    .kpi-right-stack {
      display: flex;
-     flex-direction: column;
-     align-items: flex-start;
+     flex-direction: row;
+     flex-wrap: wrap;
+     align-items: center;
+     justify-content: space-between;
      gap: 12px;
      width: 100%;
    }
@@ -192,10 +197,12 @@
      align-items: center;
      gap: 12px;
      background: #E6F4EA !important;
-     padding: 10px 16px;
+     height: 52px;
+     padding: 0 16px;
      border-radius: 18px;
      border: 1px solid #DCFCE7;
      display: inline-flex !important;
+     box-sizing: border-box;
    }
    
    .trend-badge-icon-circle {
