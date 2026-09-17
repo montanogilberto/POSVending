@@ -18,6 +18,7 @@ import {
 import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, pricetag, qrCodeOutline } from 'ionicons/icons';
 import { useCart } from '../../contexts/CartContext';
 import { useProduct } from '../../contexts/ProductContext';
+import { useUser } from '../../contexts/UserContext';
 import { useState, useEffect, useMemo } from 'react';
 import { useHistory } from 'react-router-dom';
 import { submitOrder } from '../../api/cartApi';
@@ -47,6 +48,7 @@ const payQty2x1 = (qty: number): number => Math.max(0, qty - Math.floor(qty / 2)
 const CartPage: React.FC = () => {
   const { cart: cartItems, removeFromCart, clearCart } = useCart();
   const { clearAllProducts } = useProduct();
+  const { companyId, userId } = useUser();
   const { loadIncomes } = useIncome();
   const history = useHistory();
 
@@ -160,7 +162,7 @@ const CartPage: React.FC = () => {
       return;
     }
     let cancelled = false;
-    posRewardsApi.getBalance(1, selectedClient.clientId)
+    posRewardsApi.getBalance(companyId, selectedClient.clientId)
       .then(balance => { if (!cancelled) setClientPointsBalance(balance?.balance ?? 0); })
       .catch(err => console.error('[CartPage] Failed to load points balance', err));
     return () => { cancelled = true; };
@@ -217,7 +219,7 @@ const CartPage: React.FC = () => {
           paymentMethod: paymentMethod,
           orderNumber: Math.floor(Math.random() * 10000),
           tableNumber: 5,
-          userId: 1,
+          userId,
           total: item.price, // item.price already includes quantity
           clientId: selectedClient?.clientId ?? 1,
           comments: '',
@@ -282,9 +284,9 @@ const CartPage: React.FC = () => {
                 cashPaid: paymentMethod === 'Efectivo' ? cashNumber : 0,
                 cashReturn: paymentMethod === 'Efectivo' ? changeAmount : 0,
                 paymentDate: new Date().toISOString(),
-                userId: 1,
+                userId,
                 clientId: selectedClient?.clientId ?? 1,
-                companyId: 1,
+                companyId,
                 promotionCode: promoCodeValue,
                 products: cartItems.map((item) => ({
                   productId: parseInt(item.productId),
@@ -317,7 +319,7 @@ const CartPage: React.FC = () => {
 
             // POS loyalty points: calculated server-side from the ticket's lines — never here.
             try {
-              const earnResult = await posRewardsApi.earnFromTicket(parseInt(newId), 1);
+              const earnResult = await posRewardsApi.earnFromTicket(parseInt(newId), companyId);
               setPointsEarned(earnResult.pointsEarned);
               setNewPointsBalance(earnResult.newBalance);
               notifyDataChanged('pos_reward_earned');
@@ -333,9 +335,9 @@ const CartPage: React.FC = () => {
                   promo: [{
                     action: 1,
                     incomeId: parseInt(newId),
-                    companyId: 1,
+                    companyId,
                     code: promoCodeValue,
-                    userId: 1
+                    userId
                   }]
                 };
                 console.log('Applying promo:', JSON.stringify(promoPayload, null, 2));
