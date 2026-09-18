@@ -441,7 +441,7 @@ const CartPage: React.FC = () => {
                 {/* Detail Footer */}
                 <div className="detail-footer">
                   <IonButton
-                    fill="clear"
+                    fill="outline"
                     onClick={handleAddMoreProducts}
                     className="detail-add-more-btn"
                   >
@@ -495,19 +495,19 @@ const CartPage: React.FC = () => {
                       Cambiar cliente
                     </IonButton>
                     <IonButton
-                      fill="clear"
+                      fill="outline"
                       onClick={() => setShowQrScanner(true)}
                       className="client-scan-btn"
                     >
                       <IonIcon icon={qrCodeOutline} slot="start" />
-                      QR
+                      Escanear QR
                     </IonButton>
                   </div>
                 </div>
 
                 {/* Payment Method */}
-                <div className="payment-section">
-                  <div className="payment-label">Método de pago</div>
+                <div className="cart-payment-section">
+                  <div className="cart-payment-label">Método de pago</div>
                   <div className="payment-method-selector">
                     <IonButton
                       fill="outline"
