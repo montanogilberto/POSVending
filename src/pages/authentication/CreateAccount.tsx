@@ -15,6 +15,7 @@ import { getAllCompanies, getBranchesByCompany, Company, CompanyBranch } from '.
 import { RoleCode, ROLE_GROUPS, ROLE_LABELS } from '../../config/rolePermissions';
 import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, checkUsername, sendAccountCreated, ContactCheckResult } from '../../api/usersApi';
 import { createOrUpdateClient, getAllClients, ClientType } from '../../api/clientsApi';
+import { grantClientCapability, ClientCapability } from '../../api/clientCapabilitiesApi';
 import { useUser } from '../../contexts/UserContext';
 import { useObservability } from '../../contexts/ObservabilityContext';
 import { getPostLoginRoute } from '../../utils/postLoginRoute';
@@ -47,12 +48,18 @@ const APP_PROFILES: AppProfile[] = [
     bgColor: '#EFF6FF',
   },
   {
-    id: 'loans',
-    label: 'SmartLoans',
-    intent: 'Pedir o dar préstamos',
-    description: 'Créditos, chat, validación facial y pagos Stripe.',
-    icon: '💰',
-    modules: ['clients', 'clientFaceRecognition', 'pushNotifications', 'loanChat', 'accounting_ledger'],
+    // Was the 'loans' profile (SmartLoans-only). Broadened into the general
+    // GMO customer entry point: selecting a product here is an interest,
+    // not an authorization — see INTEREST_OPTIONS. SmartLoans specifically
+    // still asks its own borrower/lender/lawyer question afterward (see
+    // renderClientTypePicker), it's just no longer the only thing this
+    // card can lead to.
+    id: 'customer',
+    label: 'Cliente GMO',
+    intent: 'Comprar, ganar recompensas, jugar o pedir un préstamo',
+    description: 'Elige qué quieres usar — puedes agregar más después.',
+    icon: '🙋',
+    modules: [],
     color: '#7c3aed',
     bgColor: '#F5F3FF',
   },
@@ -107,7 +114,34 @@ const CLIENT_TYPES: { id: ClientType; icon: string; label: string; desc: string;
   { id: 'lawyer',   icon: '⚖️', label: 'Jurídico',              desc: 'Asesoría legal',      color: '#b45309' },
 ];
 
-const DEFAULT_ROLE_BY_PROFILE: Record<string, RoleCode> = { pos: 'employee', loans: 'borrower', custom: 'employee' };
+// Note the two different 'pos' namespaces here: the KEY 'pos' is a wizard
+// *profile* id (the staff/business-owner signup card, "Punto de Venta"),
+// unrelated to the VALUE 'pos' below (the roleCode a plain POS customer
+// gets — renamed from 'client', see rolePermissions.ts's RoleCode comment).
+// Same literal string, two different concepts — selectedProfile vs roleCode.
+const DEFAULT_ROLE_BY_PROFILE: Record<string, RoleCode> = { pos: 'employee', customer: 'pos', custom: 'employee' };
+
+// The 'customer' profile's "what do you want to use?" step — multi-select,
+// not exclusive. Checking a box records interest, it does not by itself
+// grant anything except for pos/rewards/arcade, which ARE the capability
+// (there's no separate eligibility question for those — see
+// clientCapabilitiesApi.grantClientCapability). SmartLoans is deliberately
+// different: checking it only reveals the existing borrower/lender/lawyer
+// question (renderClientTypePicker) rather than granting a capability
+// directly, since that's a real authorization decision, not a preference.
+interface InterestOption {
+  id: 'pos' | 'rewards' | 'arcade' | 'loans';
+  label: string;
+  desc: string;
+  icon: string;
+  capability?: ClientCapability;
+}
+const INTEREST_OPTIONS: InterestOption[] = [
+  { id: 'pos',     label: 'POS',        desc: 'Comprar en negocios POS GMO',     icon: '🛍️', capability: 'POS' },
+  { id: 'rewards', label: 'Rewards',    desc: 'Ganar y canjear puntos',          icon: '🎁', capability: 'REWARDS' },
+  { id: 'arcade',  label: 'Arcade',     desc: 'Jugar y usar tus fichas',         icon: '🕹️', capability: 'ARCADE' },
+  { id: 'loans',   label: 'SmartLoans', desc: 'Pedir o dar un préstamo',         icon: '💰' },
+];
 
 // For SmartLoans the access role is fully determined by the loan client type
 // chosen in step "Perfil" — asking "Rol de acceso" again in step "Acceso" just
@@ -200,6 +234,10 @@ const CreateAccount: React.FC = () => {
   // Step 1 — profile
   const [selectedProfile, setSelectedProfile] = useState<string>('');
   const [enabledModules, setEnabledModules]     = useState<string[]>([]);
+  // 'customer' profile only — which of POS/Rewards/Arcade/SmartLoans they
+  // want (multi-select). Empty until they check something.
+  const [selectedInterests, setSelectedInterests] = useState<InterestOption['id'][]>([]);
+  const wantsLoans = selectedInterests.includes('loans');
 
   // Step 2 — verification (moved before Acceso)
   const [verifyChannel, setVerifyChannel] = useState<'email' | 'sms' | 'whatsapp'>('email');
@@ -220,7 +258,7 @@ const CreateAccount: React.FC = () => {
 
   // Persisted user ID from step 0 save — used for steps 1-3 updates
   const [createdUserId, setCreatedUserId] = useState<number | null>(null);
-  // Client stub created at step "Perfil" when profile === 'loans'; patched with
+  // Client stub created at step "Perfil" for an email-only 'customer' signup; patched with
   // companyId at step "Acceso" once it's known (clients.companyId is nullable).
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
   const [stepSaved, setStepSaved] = useState<boolean[]>([false, false, false, false]);
@@ -238,7 +276,7 @@ const CreateAccount: React.FC = () => {
   // account would then keep whatever role/company it had before, silently
   // ignoring the role just chosen in the wizard).
   useEffect(() => {
-    if (selectedProfile !== 'loans' || companies.length === 0) return;
+    if (selectedProfile !== 'customer' || !wantsLoans || companies.length === 0) return;
     const smartLoans = companies.find(c => c.name.trim().toLowerCase() === 'smartloans');
     if (!smartLoans || selectedCompany?.companyId === smartLoans.companyId) return;
     console.log('[autoSelectSmartLoans] companyId=', smartLoans.companyId);
@@ -250,15 +288,33 @@ const CreateAccount: React.FC = () => {
         if (list.length > 0) setSelectedBranch(list[0]);
       })
       .catch(() => setBranches([]));
-  }, [selectedProfile, companies, selectedCompany]);
+  }, [selectedProfile, wantsLoans, companies, selectedCompany]);
 
   // SmartLoans: keep the access role locked to the chosen client type so step
   // "Acceso" confirms the role instead of asking the borrower/lender question a
-  // second time. This is what handleStep3Submit persists as roleCode.
+  // second time. This is what handleStep3Submit persists as roleCode. Only
+  // applies once SmartLoans is among the checked interests — otherwise the
+  // 'customer' profile's role stays 'pos' (its DEFAULT_ROLE_BY_PROFILE).
   useEffect(() => {
-    if (selectedProfile !== 'loans') return;
+    if (selectedProfile !== 'customer' || !wantsLoans) return;
     setUserRole(ROLE_BY_CLIENT_TYPE[clientType]);
-  }, [selectedProfile, clientType]);
+  }, [selectedProfile, wantsLoans, clientType]);
+
+  // A 'customer' who did NOT check SmartLoans should never end up labeled
+  // 'borrower' (the step-0 clientType picker's default, asked before their
+  // interests are even known) — that's a real, empirically-checked-live
+  // value (CK_clients_clientType allows 'pos' as of the 2026-09-14
+  // migration), not a guess. Only touches a brand-new client row: for
+  // someone already pre-registered via a POS sale, handleStep3Submit skips
+  // the patch that would carry this (no company is chosen for a plain
+  // customer), so their existing clientType is left alone. Skips entirely
+  // once SmartLoans is checked — that path owns clientType via the
+  // CLIENT_TYPES picker above, this must not fight it.
+  useEffect(() => {
+    if (selectedProfile !== 'customer' || wantsLoans) return;
+    console.log('[clientType] customer profile without SmartLoans interest — defaulting clientType to pos');
+    setClientType('pos');
+  }, [selectedProfile, wantsLoans]);
 
   // Quiz sub-step: entering "Perfil" with an objetivo already chosen (resume,
   // or stepping back and forward) jumps past the intent question to its detail;
@@ -658,12 +714,18 @@ const CreateAccount: React.FC = () => {
   // Step 1 → save profile + modules → advance to verification.
   // Client creation normally happens at step "Cuenta" (handleStep0Next),
   // alongside the user itself, for any signup with a phone. An email-only
-  // signup that picks SmartLoans here still needs a dbo.clients row
+  // signup that picks the 'customer' profile still needs a dbo.clients row
   // (clients.cellphone is NOT NULL + UNIQUE) — collected and created below.
-  const needsClientPhone = selectedProfile === 'loans' && !createdClientId && !contactPhone;
+  // Any customer interest needs a client row, not just SmartLoans, since
+  // POS/Rewards/Arcade are all clientId-scoped capabilities too.
+  const needsClientPhone = selectedProfile === 'customer' && selectedInterests.length > 0 && !createdClientId && !contactPhone;
 
   const handleStep1Next = async () => {
     if (!selectedProfile) { setMessage('Selecciona un perfil de aplicación.'); return; }
+    if (selectedProfile === 'customer' && selectedInterests.length === 0) {
+      setMessage('Elige al menos una opción de lo que te gustaría usar.');
+      return;
+    }
     if (needsClientPhone) {
       if (!isPhoneValid(loansPhone)) {
         setMessage('Ingresa un teléfono válido para continuar con SmartLoans.');
@@ -715,6 +777,63 @@ const CreateAccount: React.FC = () => {
         }
       }
 
+      // Persist the clientType='pos' default set above — the earlier
+      // useEffect only updates in-memory state; handleStep3Submit's client
+      // patch is gated on selectedCompany, which a plain customer (no
+      // SmartLoans interest) never has, so without this the DB row is
+      // silently left at whatever step "Cuenta" defaulted it to
+      // ('borrower'). Caught by actually querying the live row after a
+      // real signup, not assumed from the effect firing.
+      const clientIdForTypePatch = createdClientId ?? existingRecord?.clientId;
+      if (selectedProfile === 'customer' && !wantsLoans && clientIdForTypePatch) {
+        const [firstName, ...rest] = username.trim().split(/\s+/);
+        try {
+          await createOrUpdateClient({
+            clients: [{
+              clientId: clientIdForTypePatch,
+              first_name: existingRecord?.firstName || firstName || username.trim(),
+              last_name: existingRecord?.lastName || rest.join(' ') || '-',
+              cellphone: existingRecord?.cellphone || effectivePhone,
+              email: existingRecord?.email || contactEmail,
+              clientType: 'pos',
+              action: '2',
+            }],
+          });
+          console.log('[handleStep1Next] persisted clientType=pos for clientId=', clientIdForTypePatch);
+        } catch (typeErr) {
+          console.warn('[handleStep1Next] clientType=pos patch failed for clientId=', clientIdForTypePatch, typeErr);
+        }
+      }
+
+      // POS/Rewards/Arcade interests ARE the capability — grant immediately,
+      // no separate eligibility step (unlike SmartLoans). Only possible when
+      // a companyId is already known for this client, which today only
+      // happens for someone pre-registered through an actual POS sale
+      // (existingRecord.companyId, set on their clients row by that
+      // company's staff). A brand-new direct-download signup with no POS
+      // history has no companyId to scope the capability to yet — skipped
+      // here, not defaulted to a guessed company. clientCapabilities is
+      // company-scoped by design (see sql/sp_clientCapabilities.sql); making
+      // "interest before any company relationship" representable is a
+      // separate, not-yet-made schema decision, not something to paper over.
+      const grantCompanyId = existingRecord?.companyId;
+      const clientIdForGrants = createdClientId ?? existingRecord?.clientId;
+      if (selectedProfile === 'customer' && clientIdForGrants && grantCompanyId) {
+        const toGrant = INTEREST_OPTIONS.filter(o => selectedInterests.includes(o.id) && o.capability);
+        for (const opt of toGrant) {
+          try {
+            await grantClientCapability(grantCompanyId, clientIdForGrants, opt.capability!);
+          } catch (capErr) {
+            // Best-effort — a capability grant failure must not block signup;
+            // it can be retried/backfilled later, same philosophy as the
+            // comprobante-email pattern elsewhere in this codebase.
+            console.warn('[handleStep1Next] grantClientCapability failed for', opt.capability, capErr);
+          }
+        }
+      } else if (selectedProfile === 'customer') {
+        console.log('[handleStep1Next] skipping capability grants — no companyId known yet for clientId=', clientIdForGrants);
+      }
+
       markSaved(1);
       setStep(2);
     } catch (err) {
@@ -727,7 +846,12 @@ const CreateAccount: React.FC = () => {
 
   // Step 3 → save role/company/branch → done
   const handleStep3Submit = async () => {
-    if (!selectedCompany) { setMessage('Selecciona una empresa.'); return; }
+    // A pure POS/Rewards/Arcade customer (no SmartLoans interest) has no
+    // company/branch picker to fill out — see the third branch in
+    // renderStep3 — so there's nothing to require here for that case.
+    const isPlainCustomer = selectedProfile === 'customer' && !wantsLoans;
+    console.log('[handleStep3Submit] isPlainCustomer=%s interests=%o userRole=%s', isPlainCustomer, selectedInterests, userRole);
+    if (!isPlainCustomer && !selectedCompany) { setMessage('Selecciona una empresa.'); return; }
     setLoading(true);
     console.log('[handleStep3Submit] userId=%d role=%s companyId=%d branchId=%d',
       createdUserId, userRole, selectedCompany?.companyId, selectedBranch?.branchId);
@@ -1157,21 +1281,67 @@ const CreateAccount: React.FC = () => {
           <span style={{ fontSize: 30 }}>{selectedProfileObj?.icon ?? '🔧'}</span>
         </div>
         <h2 className="ca-step-title">
-          {selectedProfile === 'loans' ? 'En SmartLoans, ¿qué harás?'
+          {selectedProfile === 'customer' ? '¿Qué te gustaría usar?'
             : selectedProfile === 'custom' ? '¿Qué necesitas hacer?'
             : 'Esto es lo que incluye'}
         </h2>
         <p className="ca-step-desc">
-          {selectedProfile === 'loans' ? 'Tu rol se define solo — no lo preguntamos otra vez.'
+          {selectedProfile === 'customer' ? 'Marca lo que te interese — puedes agregar más después.'
             : selectedProfile === 'custom' ? 'Marca todo lo que apliques.'
             : 'Listo para continuar.'}
         </p>
       </div>
 
+      {/* GMO customer: what they want to use — multi-select, not exclusive.
+          Checking a box is an expression of interest; for POS/Rewards/Arcade
+          that interest IS the capability (granted in handleStep1Next). For
+          SmartLoans it only reveals the borrower/lender/lawyer question
+          below — that's the actual authorization decision, kept separate on
+          purpose so picking SmartLoans never silently makes someone a
+          borrower. */}
+      {selectedProfile === 'customer' && (
+        <div className="ca-modules-custom">
+          <div className="ca-module-list">
+            {INTEREST_OPTIONS.map(opt => {
+              const checked = selectedInterests.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`ca-module-btn${checked ? ' checked' : ''}`}
+                  onClick={() => setSelectedInterests(prev => {
+                    const next = prev.includes(opt.id) ? prev.filter(i => i !== opt.id) : [...prev, opt.id];
+                    console.log('[interests] toggled=%s next=%o', opt.id, next);
+                    return next;
+                  })}
+                >
+                  <div className={`ca-checkbox-box${checked ? ' checked' : ''}`}>
+                    {checked && <IonIcon icon={checkmark} />}
+                  </div>
+                  <span style={{ fontSize: 18, marginRight: 8 }}>{opt.icon}</span>
+                  <span className="ca-module-label">{opt.label} — {opt.desc}</span>
+                </button>
+              );
+            })}
+            {/* Informational only — Factory AI is Factory AI GMO's own separate
+                commercial-platform product (a different tenancy model
+                entirely, see posgmo-factory/decision_registry ADR-003), not a
+                capability this account model grants. Shown as an offering,
+                not a checkbox, per the "don't pretend they already have
+                access" principle. */}
+            <div className="ca-module-btn" style={{ opacity: 0.55, cursor: 'default' }}>
+              <div className="ca-checkbox-box" />
+              <span style={{ fontSize: 18, marginRight: 8 }}>🏭</span>
+              <span className="ca-module-label">Factory AI — próximamente</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SmartLoans: client type (and, for an email-only signup, the phone a
           dbo.clients row needs). clientType drives the derived roleCode. */}
-      {selectedProfile === 'loans' && needsClientPhone && renderClientTypePicker()}
-      {selectedProfile === 'loans' && needsClientPhone && (
+      {selectedProfile === 'customer' && wantsLoans && renderClientTypePicker()}
+      {selectedProfile === 'customer' && needsClientPhone && (
         <div className="ca-form-fields" style={{ marginTop: 16, marginBottom: 4 }}>
           <IonInput
             fill="outline" label="Teléfono (requerido para SmartLoans)" labelPlacement="floating"
@@ -1236,8 +1406,9 @@ const CreateAccount: React.FC = () => {
         </div>
       )}
 
-      {/* Included-modules summary — for objetivos with a fixed bundle. */}
-      {selectedProfile && selectedProfile !== 'custom' && (
+      {/* Included-modules summary — for objetivos with a fixed bundle
+          ('customer' has no module bundle, it has interests instead). */}
+      {selectedProfile && selectedProfile !== 'custom' && selectedProfile !== 'customer' && (
         <div className="ca-modules-summary">
           <p className="ca-modules-title">Módulos incluidos:</p>
           <div className="ca-modules-tags">
@@ -1270,10 +1441,13 @@ const CreateAccount: React.FC = () => {
 
         {/* Role — SmartLoans derives it from the client type picked in step
             "Perfil" (see ROLE_BY_CLIENT_TYPE), so here we only CONFIRM it
-            instead of asking the borrower/lender question again. POS/custom
-            still choose their role freely, where role ≠ client type. */}
+            instead of asking the borrower/lender question again. A plain
+            GMO customer (no SmartLoans interest) has no role question at
+            all — 'pos' isn't a choice, it's what the interests they
+            already picked mean. POS/custom staff still choose their role
+            freely, where role ≠ client type. */}
         <p className="ca-section-label">Rol de acceso:</p>
-        {selectedProfile === 'loans' ? (
+        {selectedProfile === 'customer' && wantsLoans ? (
           <div className="ca-summary-box" style={{ marginBottom: 20 }}>
             <div className="ca-summary-row">
               <span>Rol</span>
@@ -1282,6 +1456,15 @@ const CreateAccount: React.FC = () => {
             <div className="ca-summary-row">
               <span>Según tu tipo de cliente</span>
               <strong>{CLIENT_TYPES.find(t => t.id === clientType)?.label ?? '—'}</strong>
+            </div>
+          </div>
+        ) : selectedProfile === 'customer' ? (
+          <div className="ca-summary-box" style={{ marginBottom: 20 }}>
+            <div className="ca-summary-row">
+              <span>Lo que usarás</span>
+              <strong>
+                {INTEREST_OPTIONS.filter(o => selectedInterests.includes(o.id)).map(o => o.label).join(', ') || '—'}
+              </strong>
             </div>
           </div>
         ) : (
@@ -1312,14 +1495,17 @@ const CreateAccount: React.FC = () => {
           </div>
         )}
 
-        {/* Company / branch — the SmartLoans profile is scoped to SmartLoans only,
-            auto-selected above, so there's nothing to pick here. */}
-        {selectedProfile === 'loans' ? (
+        {/* Company / branch — SmartLoans interest is scoped to the SmartLoans
+            company only, auto-selected above, so there's nothing to pick.
+            A plain customer (POS/Rewards/Arcade, no SmartLoans) isn't tied
+            to any one company at signup either — see handleStep1Next's
+            grant-skip note — so there's nothing to pick for them here. */}
+        {selectedProfile === 'customer' && wantsLoans ? (
           <div className="ca-summary-box" style={{ marginBottom: 20 }}>
             <div className="ca-summary-row"><span>Empresa</span><strong>{selectedCompany?.name ?? 'SmartLoans'}</strong></div>
             <div className="ca-summary-row"><span>Sucursal</span><strong>{selectedBranch?.name ?? '—'}</strong></div>
           </div>
-        ) : (
+        ) : selectedProfile === 'customer' ? null : (
           <>
             <p className="ca-section-label">
               {branchScreen ? (
@@ -1367,13 +1553,20 @@ const CreateAccount: React.FC = () => {
           </>
         )}
 
-        {/* Summary */}
+        {/* Summary — the 'customer' profile already showed its own "Lo que
+            usarás"/role/company summaries above (module count and
+            ROLE_GROUPS.custom labels don't apply to it: it has no module
+            bundle, and roleCode 'pos' isn't in ROLE_GROUPS.custom). */}
         <div className="ca-summary-box">
           <div className="ca-summary-row"><span>Perfil</span><strong>{APP_PROFILES.find(p => p.id === selectedProfile)?.label}</strong></div>
-          <div className="ca-summary-row"><span>Módulos activos</span><strong>{enabledModules.length}</strong></div>
-          <div className="ca-summary-row"><span>Rol</span><strong>{ROLE_GROUPS.custom.find(r => r.id === userRole)?.label}</strong></div>
-          <div className="ca-summary-row"><span>Empresa</span><strong>{selectedCompany?.name ?? '—'}</strong></div>
-          {selectedBranch && <div className="ca-summary-row"><span>Sucursal</span><strong>{selectedBranch.name}</strong></div>}
+          {selectedProfile !== 'customer' && (
+            <>
+              <div className="ca-summary-row"><span>Módulos activos</span><strong>{enabledModules.length}</strong></div>
+              <div className="ca-summary-row"><span>Rol</span><strong>{ROLE_GROUPS.custom.find(r => r.id === userRole)?.label}</strong></div>
+              <div className="ca-summary-row"><span>Empresa</span><strong>{selectedCompany?.name ?? '—'}</strong></div>
+              {selectedBranch && <div className="ca-summary-row"><span>Sucursal</span><strong>{selectedBranch.name}</strong></div>}
+            </>
+          )}
         </div>
 
         {/* Submit */}

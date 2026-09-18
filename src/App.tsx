@@ -99,6 +99,7 @@ import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/receipt/ReceiptPage';
 import Login from './pages/authentication/Login';
+import ClientLogin from './pages/authentication/ClientLogin';
 import ForgotPassword from './pages/authentication/ForgotPassword';
 import CreateAccount from './pages/authentication/CreateAccount';
 import SupplierPage from './pages/admin/SupplierPage';
@@ -675,6 +676,12 @@ const AppShell: React.FC = () => {
                 {!menuCollapsed && <IonLabel>Puntos POS</IonLabel>}
               </IonItem>
               )}
+              {canAccess(roleCode, 'myRewards') && clientId && (
+              <IonItem button routerLink={`/rewards-dashboard/${clientId}`} title="Mis Recompensas">
+                <IonIcon icon={giftOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mis Recompensas</IonLabel>}
+              </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
@@ -1089,6 +1096,7 @@ const App: React.FC = () => {
             <BiometricLockGate>
               <IonRouterOutlet id="root-outlet">
                 <Route exact path="/login" component={Login} />
+                <Route exact path="/client-login" component={ClientLogin} />
                 <Route exact path="/forgot-password" component={ForgotPassword} />
                 <Route exact path="/create-account" component={CreateAccount} />
 

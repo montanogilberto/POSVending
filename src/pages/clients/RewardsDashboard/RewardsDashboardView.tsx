@@ -14,7 +14,12 @@ const RewardsDashboardView: React.FC = () => {
 
   return (
     <IonPage>
-      <Header screenTitle={`Recompensas · ${vm.clientName}`} showBackButton={true} backButtonHref="/clients" {...pops.headerProps} />
+      <Header
+        screenTitle={`Recompensas · ${vm.clientName}`}
+        showBackButton={!vm.isSelfServiceClient}
+        backButtonHref="/clients"
+        {...pops.headerProps}
+      />
       <IonContent fullscreen className="rewards-dashboard-content">
         <RewardsHeroCard vm={vm} />
         <RewardsTotalsRow vm={vm} />

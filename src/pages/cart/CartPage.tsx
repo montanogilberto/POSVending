@@ -15,7 +15,7 @@ import {
   IonChip,
   IonInput,
 } from '@ionic/react';
-import { addCircle, card, wallet, business, receipt, cart, person, checkmarkCircle, pricetag, qrCodeOutline } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart, person, pricetag, qrCodeOutline } from 'ionicons/icons';
 import { useCart } from '../../contexts/CartContext';
 import { useProduct } from '../../contexts/ProductContext';
 import { useUser } from '../../contexts/UserContext';
@@ -376,9 +376,6 @@ const CartPage: React.FC = () => {
     }
   };
 
-  // Get original total for display
-  const originalTotal = cartItems.reduce((acc, item) => acc + item.price, 0);
-
   return (
     <IonPage>
       <IonHeader>
@@ -434,7 +431,6 @@ const CartPage: React.FC = () => {
                       quantity={item.quantity}
                       unitPrice={item.price / item.quantity}
                       totalPrice={item.price}
-                      selectedChoices={item.selectedChoices}
                       selectedOptionLabels={item.selectedOptionLabels}
                       pieces={item.pieces}
                       onRemove={removeFromCart}
@@ -445,7 +441,7 @@ const CartPage: React.FC = () => {
                 {/* Detail Footer */}
                 <div className="detail-footer">
                   <IonButton
-                    fill="outline"
+                    fill="clear"
                     onClick={handleAddMoreProducts}
                     className="detail-add-more-btn"
                   >
@@ -453,53 +449,11 @@ const CartPage: React.FC = () => {
                     Agregar más
                   </IonButton>
                   <div className="detail-total">
-                    <span className="detail-total-label">Total:</span>
+                    <span className="detail-total-label">Total</span>
                     <span className="detail-total-amount">
                       {formatPrice(total)}
                     </span>
                   </div>
-                </div>
-
-                {/* Promotion Code Section */}
-                <div className="promo-section">
-                  <div className="promo-label">CÓDIGO DE PROMOCIÓN</div>
-                  <div className="promo-input-wrapper">
-                    <IonInput
-                      value={promoCode}
-                      placeholder="Ej: 2X1"
-                      onIonInput={(e) => setPromoCode(e.detail.value ?? '')}
-                      className={`promo-input ${promoActive ? 'promo-active' : ''} ${promoError ? 'promo-error' : ''}`}
-                      fill="outline"
-                      mode="md"
-                    />
-                    {promoActive && (
-                      <div className="promo-badge">
-                        <IonIcon icon={checkmarkCircle} />
-                        <span>2x1 aplicado</span>
-                      </div>
-                    )}
-                  </div>
-                  {promoError && (
-                    <div className="promo-error-message">
-                      {promoError}
-                    </div>
-                  )}
-                  {promoActive && totals.discount > 0 && (
-                    <div className="promo-discount-display">
-                      <div className="discount-row">
-                        <span className="discount-label">Subtotal:</span>
-                        <span className="discount-original">{formatPrice(originalTotal)}</span>
-                      </div>
-                      <div className="discount-row discount-savings">
-                        <span className="discount-label">Descuento 2x1:</span>
-                        <span className="discount-amount">-{formatPrice(totals.discount)}</span>
-                      </div>
-                      <div className="discount-row discount-final">
-                        <span className="discount-label">Total a pagar:</span>
-                        <span className="discount-final-amount">{formatPrice(total)}</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Client Selector */}
@@ -541,41 +495,44 @@ const CartPage: React.FC = () => {
                       Cambiar cliente
                     </IonButton>
                     <IonButton
-                      fill="outline"
+                      fill="clear"
                       onClick={() => setShowQrScanner(true)}
                       className="client-scan-btn"
                     >
                       <IonIcon icon={qrCodeOutline} slot="start" />
-                      Escanear QR
+                      QR
                     </IonButton>
                   </div>
                 </div>
 
                 {/* Payment Method */}
                 <div className="payment-section">
-                  <label className="payment-label">Método de pago</label>
+                  <div className="payment-label">Método de pago</div>
                   <div className="payment-method-selector">
-                    <button
+                    <IonButton
+                      fill="outline"
                       className={`payment-method-btn ${paymentMethod === 'Efectivo' ? 'selected' : ''}`}
                       onClick={() => handlePaymentMethodSelect('Efectivo')}
                     >
-                      <IonIcon icon={wallet} className="icon" />
+                      <IonIcon icon={wallet} slot="start" className="icon" />
                       Efectivo
-                    </button>
-                    <button
+                    </IonButton>
+                    <IonButton
+                      fill="outline"
                       className={`payment-method-btn ${paymentMethod === 'Tarjeta' ? 'selected' : ''}`}
                       onClick={() => handlePaymentMethodSelect('Tarjeta')}
                     >
-                      <IonIcon icon={card} className="icon" />
+                      <IonIcon icon={card} slot="start" className="icon" />
                       Tarjeta
-                    </button>
-                    <button
+                    </IonButton>
+                    <IonButton
+                      fill="outline"
                       className={`payment-method-btn ${paymentMethod === 'Transferir' ? 'selected' : ''}`}
                       onClick={() => handlePaymentMethodSelect('Transferir')}
                     >
-                      <IonIcon icon={business} className="icon" />
+                      <IonIcon icon={business} slot="start" className="icon" />
                       Transferir
-                    </button>
+                    </IonButton>
                   </div>
                 </div>
 
@@ -584,10 +541,12 @@ const CartPage: React.FC = () => {
                   <div className="cash-input-section">
                     <div className="cash-input-wrapper">
                       <span className="currency-symbol">$</span>
-                      <input
+                      <IonInput
                         type="number"
+                        inputmode="decimal"
+                        fill="outline"
                         value={cashPaid}
-                        onChange={(e) => setCashPaid(e.target.value)}
+                        onIonInput={(e) => setCashPaid(e.detail.value ?? '')}
                         placeholder="0.00"
                         min={0}
                         step="0.01"

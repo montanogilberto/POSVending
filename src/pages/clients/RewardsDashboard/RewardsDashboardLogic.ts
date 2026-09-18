@@ -13,12 +13,25 @@ import {
   PosRewardCatalogItem,
 } from '../../../api/posRewardsApi';
 import { toHermosilloDate } from '../../../utils/format';
+import { isStaffRole } from '../../../config/rolePermissions';
 import { RewardsActivityItem } from './RewardsDashboardTypes';
 
 export const useRewardsDashboard = () => {
+  // /rewards-dashboard/:clientId is used two ways: staff pulling up any
+  // client's record (roleCode admin/manager/employee/etc — param wins,
+  // same as every other :clientId dashboard), and a client viewing their
+  // own account after /client-login (roleCode 'pos' — renamed from
+  // 'client', see rolePermissions.ts's RoleCode comment). Uses isStaffRole
+  // rather than a single roleCode==='pos' check (same fix as
+  // MyLoansLogic.ts) so ANY self-service session — not just 'pos' — is
+  // pinned to its own clientId, never trusted with a foreign id from the
+  // URL, regardless of which clientCapabilities it happens to hold.
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
-  const clientId = Number(clientIdParam);
-  const { companyId, userId } = useUser();
+  const { companyId, userId, clientId: contextClientId, roleCode } = useUser();
+  const isSelfServiceRole = !isStaffRole(roleCode);
+  const paramId = clientIdParam ? Number(clientIdParam) : null;
+  const foreignId = paramId !== null && paramId !== contextClientId && isSelfServiceRole;
+  const clientId = foreignId ? contextClientId : (paramId ?? contextClientId);
   const { showToast, toastProps } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -137,6 +150,11 @@ export const useRewardsDashboard = () => {
   return {
     clientId,
     clientName,
+    // Header back button defaults to /clients (a staff-only page) — wrong
+    // for a client viewing their own dashboard after /client-login, since
+    // they have no access to it. The view falls back to the menu button
+    // instead when this is true.
+    isSelfServiceClient: isSelfServiceRole,
     loading,
     balance,
     ledger,
