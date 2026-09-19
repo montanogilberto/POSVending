@@ -99,7 +99,7 @@ import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/receipt/ReceiptPage';
 import Login from './pages/authentication/Login';
-import ClientLogin from './pages/authentication/ClientLogin';
+import ClientLoginPage from './pages/authentication/ClientLoginPage';
 import ForgotPassword from './pages/authentication/ForgotPassword';
 import CreateAccount from './pages/authentication/CreateAccount';
 import SupplierPage from './pages/admin/SupplierPage';
@@ -114,6 +114,7 @@ import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
 import RewardsDashboardPage from './pages/clients/RewardsDashboardPage';
+import MyQrPage from './pages/clients/MyQrPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
@@ -208,7 +209,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/accounting', '/water-tanks', '/receipt', '/suppliers',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
   '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log',
-  '/notifications', '/setting', '/profile', '/pos-support',
+  '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
 ];
 
 const isPosOnlyRoute = (pathname: string): boolean =>
@@ -827,6 +828,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
+            <PrivateRoute exact path="/my-qr" component={MyQrPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
             {/* Mismo patrón que /client-dashboard/:clientId — el id va en la URL
                 para que la ruta sea compartible y sobreviva un refresh. La
@@ -932,10 +934,24 @@ const AppShell: React.FC = () => {
               </>
             ) : (
               <>
-                <button type="button" className="cd-tab" onClick={() => history.push('/dashboard')}>
+                <button
+                  type="button"
+                  className={`cd-tab${location.pathname === '/dashboard' || location.pathname.startsWith('/rewards-dashboard') ? ' cd-tab--active' : ''}`}
+                  onClick={() => history.push(roleCode === 'pos' ? `/rewards-dashboard/${clientId}` : '/dashboard')}
+                >
                   <IonIcon aria-hidden="true" icon={home} />
                   <span>Dashboard</span>
                 </button>
+                {roleCode === 'pos' && (
+                  <button
+                    type="button"
+                    className={`cd-tab${location.pathname === '/my-qr' ? ' cd-tab--active' : ''}`}
+                    onClick={() => history.push('/my-qr')}
+                  >
+                    <IonIcon aria-hidden="true" icon={qrCode} />
+                    <span>Mi QR</span>
+                  </button>
+                )}
                 {canAccess(roleCode, 'loanChat') && !isPosOnlyRoute(location.pathname) && (
                   <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
                     <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
@@ -943,7 +959,11 @@ const AppShell: React.FC = () => {
                   </button>
                 )}
                 {isPosOnlyRoute(location.pathname) && (
-                  <button type="button" className={`cd-tab${location.pathname.startsWith('/pos-support') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/pos-support')}>
+                  <button
+                    type="button"
+                    className={`cd-tab${location.pathname.startsWith('/pos-support') ? ' cd-tab--active' : ''}`}
+                    onClick={() => history.push(roleCode === 'pos' ? '/pos-support/rewards' : '/pos-support')}
+                  >
                     <IonIcon aria-hidden="true" icon={chatbubbleEllipsesOutline} />
                     <span>Soporte</span>
                   </button>
@@ -1096,7 +1116,7 @@ const App: React.FC = () => {
             <BiometricLockGate>
               <IonRouterOutlet id="root-outlet">
                 <Route exact path="/login" component={Login} />
-                <Route exact path="/client-login" component={ClientLogin} />
+                <Route exact path="/client-login" component={ClientLoginPage} />
                 <Route exact path="/forgot-password" component={ForgotPassword} />
                 <Route exact path="/create-account" component={CreateAccount} />
 

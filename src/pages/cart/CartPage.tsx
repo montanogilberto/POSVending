@@ -15,7 +15,7 @@ import {
   IonChip,
   IonInput,
 } from '@ionic/react';
-import { addCircle, card, wallet, business, receipt, cart, person, pricetag, qrCodeOutline } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart, person, pricetag, qrCodeOutline, giftOutline } from 'ionicons/icons';
 import { useCart } from '../../contexts/CartContext';
 import { useProduct } from '../../contexts/ProductContext';
 import { useUser } from '../../contexts/UserContext';
@@ -27,7 +27,7 @@ import { fetchTicket } from '../../api/ticketApi';
 import { postIncome, applyPromoToIncome } from '../../api/incomeApi';
 import { useIncome } from '../../contexts/IncomeContext';
 import { Client } from '../../api/clientsApi';
-import { posRewardsApi } from '../../api/posRewardsApi';
+import { posRewardsApi, PosRewardBalance } from '../../api/posRewardsApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
 
 import '../../styles/dashboard.css';
@@ -66,31 +66,28 @@ const CartPage: React.FC = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
   const [showQrScanner, setShowQrScanner] = useState(false);
-  const [clientPointsBalance, setClientPointsBalance] = useState<number | null>(null);
+  const [clientBalance, setClientBalance] = useState<PosRewardBalance | null>(null);
+  const [clientBalanceLoading, setClientBalanceLoading] = useState(false);
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
   const [newPointsBalance, setNewPointsBalance] = useState<number | null>(null);
 
-  // Promotion code state
-  const [promoCode, setPromoCode] = useState('');
-  const [promoError, setPromoError] = useState('');
+  // Welcome coupon: every client gets one 2x1 on their first purchase.
+  // "First purchase" = zero lifetime POS-reward points earned so far — no
+  // new backend table needed, it reuses the ledger that's already updated
+  // after every completed sale (see earnFromTicket below).
+  const WELCOME_COUPON_CODE = '2X1';
   const [promoApplied, setPromoApplied] = useState(false);
+  const [welcomeCouponApplied, setWelcomeCouponApplied] = useState(false);
 
-  // Validate promo code (currently supports "2X1" for 2x1 on all services)
-  const isPromoValid = useMemo(() => {
-    const code = promoCode.trim().toUpperCase();
-    if (!code) return false;
-    // Supported promo codes
-    const supportedCodes = ['2X1'];
-    return supportedCodes.includes(code);
-  }, [promoCode]);
+  const welcomeCouponEligible =
+    !!selectedClient && !clientBalanceLoading && (clientBalance === null || clientBalance.lifetimeEarned === 0);
 
-  // Promotion is active if code is valid
-  const promoActive = promoCode.trim().length > 0 && isPromoValid;
-
-  // Clear promo error when code changes
+  // A coupon checked for one customer must never carry over to the next.
   useEffect(() => {
-    setPromoError('');
-  }, [promoCode]);
+    setWelcomeCouponApplied(false);
+  }, [selectedClient?.clientId]);
+
+  const promoActive = welcomeCouponApplied && welcomeCouponEligible;
 
   // Compute totals with promotion preview
   const totals = useMemo(() => {
@@ -158,13 +155,16 @@ const CartPage: React.FC = () => {
 
   useEffect(() => {
     if (!selectedClient?.clientId) {
-      setClientPointsBalance(null);
+      setClientBalance(null);
+      setClientBalanceLoading(false);
       return;
     }
     let cancelled = false;
+    setClientBalanceLoading(true);
     posRewardsApi.getBalance(companyId, selectedClient.clientId)
-      .then(balance => { if (!cancelled) setClientPointsBalance(balance?.balance ?? 0); })
-      .catch(err => console.error('[CartPage] Failed to load points balance', err));
+      .then(balance => { if (!cancelled) setClientBalance(balance); })
+      .catch(err => console.error('[CartPage] Failed to load points balance', err))
+      .finally(() => { if (!cancelled) setClientBalanceLoading(false); });
     return () => { cancelled = true; };
   }, [selectedClient?.clientId]);
 
@@ -273,7 +273,7 @@ const CartPage: React.FC = () => {
             };
           });
 
-          const promoCodeValue = promoActive ? promoCode.trim().toUpperCase() : null;
+          const promoCodeValue = promoActive ? WELCOME_COUPON_CODE : null;
 
           const payload = {
             income: [
@@ -323,6 +323,13 @@ const CartPage: React.FC = () => {
               setPointsEarned(earnResult.pointsEarned);
               setNewPointsBalance(earnResult.newBalance);
               notifyDataChanged('pos_reward_earned');
+              // Refresh so a client who just placed their first order stops
+              // looking "welcome-coupon eligible" if they buy again same session.
+              if (selectedClient?.clientId) {
+                posRewardsApi.getBalance(companyId, selectedClient.clientId)
+                  .then(setClientBalance)
+                  .catch(err => console.error('[CartPage] Failed to refresh points balance', err));
+              }
             } catch (rewardError) {
               console.error('[PosRewards] earnFromTicket failed:', rewardError);
               // Ticket is already recorded — a points failure must not block or undo the sale.
@@ -354,6 +361,7 @@ const CartPage: React.FC = () => {
 
         clearCart();
         clearAllProducts();
+        setWelcomeCouponApplied(false);
         setShowSuccessToast(true);
       } else {
         showErrorToast('Ocurrió un error al procesar el pedido.');
@@ -449,6 +457,11 @@ const CartPage: React.FC = () => {
                     Agregar más
                   </IonButton>
                   <div className="detail-total">
+                    {promoActive && totals.discount > 0 && (
+                      <span className="detail-discount-label">
+                        2x1 bienvenida: -{formatPrice(totals.discount)}
+                      </span>
+                    )}
                     <span className="detail-total-label">Total</span>
                     <span className="detail-total-amount">
                       {formatPrice(total)}
@@ -470,10 +483,10 @@ const CartPage: React.FC = () => {
                             {selectedClient.cellphone}
                             {selectedClient.email && ` • ${selectedClient.email}`}
                           </div>
-                          {clientPointsBalance != null && (
+                          {clientBalance != null && (
                             <IonChip color="success" className="client-points-chip">
                               <IonIcon icon={pricetag} />
-                              <IonLabel>{clientPointsBalance} pts</IonLabel>
+                              <IonLabel>{clientBalance.balance} pts</IonLabel>
                             </IonChip>
                           )}
                         </>
@@ -485,6 +498,23 @@ const CartPage: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {welcomeCouponEligible && (
+                    <div className="welcome-coupon-row">
+                      <IonChip
+                        className={`welcome-coupon-chip ${welcomeCouponApplied ? 'applied' : ''}`}
+                        onClick={() => setWelcomeCouponApplied((applied) => !applied)}
+                      >
+                        <IonIcon icon={giftOutline} />
+                        <IonLabel>
+                          {welcomeCouponApplied
+                            ? 'Cupón de bienvenida 2x1 aplicado'
+                            : 'Cliente nuevo: cupón 2x1 disponible — toca para aplicar'}
+                        </IonLabel>
+                      </IonChip>
+                    </div>
+                  )}
+
                   <div className="client-actions-row">
                     <IonButton
                       fill="outline"
@@ -638,7 +668,7 @@ const CartPage: React.FC = () => {
             changeAmount={changeAmount}
             clearCart={clearCart}
             setTicketData={setTicketData}
-            promotionCode={promoActive ? promoCode.trim().toUpperCase() : undefined}
+            promotionCode={promoActive ? WELCOME_COUPON_CODE : undefined}
             discountAmount={promoActive ? totals.discount : undefined}
             pointsEarned={pointsEarned}
             newPointsBalance={newPointsBalance}

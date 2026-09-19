@@ -139,6 +139,12 @@
   letter-spacing: -0.02em;
 }
 
+.detail-discount-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #059669;
+}
+
 /* ===== Payment Actions ===== */
 .payment-actions {
   margin-top: 16px;
@@ -627,6 +633,25 @@
 .client-points-chip {
   margin-top: 6px;
   font-size: 0.78rem;
+  --background: #d1fae5;
+  --color: #065f46;
+}
+
+.welcome-coupon-row {
+  margin-top: 10px;
+}
+
+.welcome-coupon-chip {
+  width: 100%;
+  height: auto;
+  padding: 8px 12px;
+  white-space: normal;
+  --background: #fef3c7;
+  --color: #92400e;
+  cursor: pointer;
+}
+
+.welcome-coupon-chip.applied {
   --background: #d1fae5;
   --color: #065f46;
 }

@@ -18,6 +18,7 @@ const RewardsDashboardView: React.FC = () => {
         screenTitle={`Recompensas · ${vm.clientName}`}
         showBackButton={!vm.isSelfServiceClient}
         backButtonHref="/clients"
+        posSupportTopic="rewards"
         {...pops.headerProps}
       />
       <IonContent fullscreen className="rewards-dashboard-content">
