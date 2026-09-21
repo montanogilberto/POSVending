@@ -114,6 +114,7 @@ import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
 import RewardsDashboardPage from './pages/clients/RewardsDashboardPage';
+import MyQrPage from './pages/clients/MyQrPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
@@ -208,7 +209,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/accounting', '/water-tanks', '/receipt', '/suppliers',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
   '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log',
-  '/notifications', '/setting', '/profile', '/pos-support',
+  '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
 ];
 
 const isPosOnlyRoute = (pathname: string): boolean =>
@@ -218,7 +219,7 @@ const AppShell: React.FC = () => {
   const { logout, username, companyName, branchName, avatarUrl, userId, clientId, roleCode, roleName, setAvatarUrl } =
     useUser();
   const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
-  const isClientRole = roleCode === 'client';
+  const isClientRole = roleCode === 'pos';
   const history = useHistory();
   const location = useLocation();
   // ClientDashboardPage's 5 sections are ?tab=... on one route, not separate
@@ -677,6 +678,12 @@ const AppShell: React.FC = () => {
                 {!menuCollapsed && <IonLabel>Puntos POS</IonLabel>}
               </IonItem>
               )}
+              {canAccess(roleCode, 'myRewards') && clientId && (
+              <IonItem button routerLink={`/rewards-dashboard/${clientId}`} title="Mis Recompensas">
+                <IonIcon icon={giftOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mis Recompensas</IonLabel>}
+              </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
@@ -822,6 +829,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
+            <PrivateRoute exact path="/my-qr" component={MyQrPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
             {/* Mismo patrón que /client-dashboard/:clientId — el id va en la URL
                 para que la ruta sea compartible y sobreviva un refresh. La
@@ -931,6 +939,14 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={homeOutline} />
                   <span>Inicio</span>
                 </button>
+                <button
+                  type="button"
+                  className={`cd-tab${location.pathname === '/my-qr' ? ' cd-tab--active' : ''}`}
+                  onClick={() => history.push('/my-qr')}
+                >
+                  <IonIcon aria-hidden="true" icon={qrCode} />
+                  <span>Mi QR</span>
+                </button>
                 <button type="button" className={`cd-tab${location.pathname.startsWith('/arcade') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/arcade')}>
                   <IonIcon aria-hidden="true" icon={gameControllerOutline} />
                   <span>Arcade</span>
@@ -942,7 +958,11 @@ const AppShell: React.FC = () => {
               </>
             ) : (
               <>
-                <button type="button" className="cd-tab" onClick={() => history.push('/dashboard')}>
+                <button
+                  type="button"
+                  className={`cd-tab${location.pathname === '/dashboard' ? ' cd-tab--active' : ''}`}
+                  onClick={() => history.push('/dashboard')}
+                >
                   <IonIcon aria-hidden="true" icon={home} />
                   <span>Dashboard</span>
                 </button>
@@ -953,7 +973,11 @@ const AppShell: React.FC = () => {
                   </button>
                 )}
                 {isPosOnlyRoute(location.pathname) && (
-                  <button type="button" className={`cd-tab${location.pathname.startsWith('/pos-support') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/pos-support')}>
+                  <button
+                    type="button"
+                    className={`cd-tab${location.pathname.startsWith('/pos-support') ? ' cd-tab--active' : ''}`}
+                    onClick={() => history.push('/pos-support')}
+                  >
                     <IonIcon aria-hidden="true" icon={chatbubbleEllipsesOutline} />
                     <span>Soporte</span>
                   </button>

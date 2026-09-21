@@ -10,14 +10,6 @@ interface CartItemCardProps {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  selectedChoices?: {
-    [key: number]: {
-      id: number;
-      name: string;
-      price: number;
-      quantity: number;
-    }[];
-  };
   selectedOptionLabels?: { [key: string]: string | string[] };
   pieces?: Piezas;
   onRemove: (id: string) => void;
@@ -29,7 +21,6 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
   quantity,
   unitPrice,
   totalPrice,
-  selectedChoices,
   selectedOptionLabels,
   pieces,
   onRemove,
@@ -40,28 +31,6 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       style: 'currency',
       currency: 'MXN',
     }).format(price);
-  };
-
-  // Build option chips from selectedChoices
-  const buildOptionChips = (): React.ReactNode[] => {
-    const chips: React.ReactNode[] = [];
-
-    if (selectedChoices) {
-      Object.entries(selectedChoices).forEach(([optionId, choices]) => {
-        choices.forEach((choice) => {
-          chips.push(
-            <span key={`${optionId}-${choice.id}`} className="option-chip">
-              <span className="option-name">{choice.name}</span>
-              {choice.quantity > 1 && (
-                <span className="option-quantity">x{choice.quantity}</span>
-              )}
-            </span>
-          );
-        });
-      });
-    }
-
-    return chips;
   };
 
   // Format option labels (for "Servicio Completo" and other products)
@@ -128,12 +97,7 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
         </IonButton>
       </div>
 
-      {/* Second row: Option chips */}
-      <div className="card-options-row">
-        {buildOptionChips()}
-      </div>
-
-      {/* Third row: Option labels (for "Servicio Completo" and other products) */}
+      {/* Option labels (e.g. "Ciclo: Basico", or "Servicio Completo" and other products) */}
       {formatOptionLabels() && (
         <div className="card-option-labels-row">
           {formatOptionLabels()}
@@ -147,10 +111,12 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
         </div>
       )}
 
-      {/* Unit price (secondary metadata) */}
-      <div className="card-unit-price">
-        {formatPrice(unitPrice)} c/u
-      </div>
+      {/* Unit price (secondary metadata) -- only informative when qty > 1 */}
+      {quantity > 1 && (
+        <div className="card-unit-price">
+          {formatPrice(unitPrice)} c/u
+        </div>
+      )}
     </div>
   );
 };

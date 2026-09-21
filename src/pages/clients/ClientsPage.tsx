@@ -65,6 +65,7 @@ import {
   closeOutline,
   close,
   giftOutline,
+  banOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
@@ -73,7 +74,7 @@ import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
 import { useUser } from '../../contexts/UserContext';
-import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr } from '../../api/clientsApi';
+import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr, deleteClient, setClientActive } from '../../api/clientsApi';
 import QRCode from 'qrcode';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
 import {
@@ -164,6 +165,8 @@ const ClientsPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<Client | null>(null);
+  const [deletingClientId, setDeletingClientId] = useState<number | null>(null);
+  const [togglingActiveId, setTogglingActiveId] = useState<number | null>(null);
   const pops = usePopovers();
 
   // ── Wizard state ───────────────────────────────────────────────────────────
@@ -326,6 +329,16 @@ const ClientsPage: React.FC = () => {
     return new Date(ds).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const clientTypeLabel = (t?: ClientType) => {
+    switch (t) {
+      case 'lender': return 'Prestamista';
+      case 'both': return 'Ambos';
+      case 'lawyer': return 'Licenciado en derecho';
+      case 'pos': return 'Cliente POS';
+      default: return 'Acreditado';
+    }
+  };
+
   // ── Load clients ───────────────────────────────────────────────────────────
   useEffect(() => { loadClients(); }, []);
 
@@ -405,14 +418,58 @@ const ClientsPage: React.FC = () => {
     setTimeout(() => setShareCopied(false), 2000);
   };
 
-  const handleDelete = (client: Client) => { setSelectedForDelete(client); setShowDeleteAlert(true); };
+  const handleDelete = (client: Client) => {
+    console.log('[ClientsPage] handleDelete: requested for clientId =', client.clientId, client.first_name, client.last_name);
+    setSelectedForDelete(client);
+    setShowDeleteAlert(true);
+  };
   const confirmDelete = async () => {
-    if (selectedForDelete) {
-      setClients(clients.filter(c => c.clientId !== selectedForDelete.clientId));
-      toast('Cliente eliminado exitosamente');
-    }
+    console.log('[ClientsPage] confirmDelete: confirmed for clientId =', selectedForDelete?.clientId);
+    if (!selectedForDelete) { setShowDeleteAlert(false); return; }
+    const clientId = selectedForDelete.clientId;
+    setDeletingClientId(clientId);
     setShowDeleteAlert(false);
-    setSelectedForDelete(null);
+    try {
+      const res = await deleteClient(clientId);
+      const result = typeof res === 'string' ? undefined : res.result?.[0];
+      if (result?.error === '1') {
+        console.log('[ClientsPage] confirmDelete: backend returned an error, clientId =', clientId, result.msg);
+        toast(result.msg || 'Error al eliminar el cliente');
+      } else {
+        setClients(prev => prev.filter(c => c.clientId !== clientId));
+        toast('Cliente eliminado exitosamente');
+        console.log('[ClientsPage] confirmDelete: SUCCESS, removed clientId =', clientId);
+      }
+    } catch (err) {
+      console.log('[ClientsPage] confirmDelete: FAILED', err);
+      toast('Error al eliminar el cliente');
+    } finally {
+      setDeletingClientId(null);
+      setSelectedForDelete(null);
+    }
+  };
+
+  const handleToggleActive = async (client: Client) => {
+    const nextActive = client.isActive === false;
+    console.log('[ClientsPage] handleToggleActive: clientId =', client.clientId, nextActive ? 'reactivating' : 'deactivating');
+    setTogglingActiveId(client.clientId);
+    try {
+      const res = await setClientActive(client.clientId, nextActive);
+      const result = typeof res === 'string' ? undefined : res.result?.[0];
+      if (result?.error === '1') {
+        console.log('[ClientsPage] handleToggleActive: backend returned an error, clientId =', client.clientId, result.msg);
+        toast(result.msg || 'Error al actualizar el cliente');
+      } else {
+        setClients(prev => prev.map(c => c.clientId === client.clientId ? { ...c, isActive: nextActive } : c));
+        toast(nextActive ? 'Cliente reactivado' : 'Cliente desactivado');
+        console.log('[ClientsPage] handleToggleActive: SUCCESS, clientId =', client.clientId, 'isActive =', nextActive);
+      }
+    } catch (err) {
+      console.log('[ClientsPage] handleToggleActive: FAILED', err);
+      toast('Error al actualizar el cliente');
+    } finally {
+      setTogglingActiveId(null);
+    }
   };
 
   // ── Edit modal ─────────────────────────────────────────────────────────────
@@ -1712,7 +1769,7 @@ const ClientsPage: React.FC = () => {
 
         <div className="clients-list">
           {filteredClients.map((client) => (
-            <IonCard key={client.clientId} className="client-card">
+            <IonCard key={client.clientId} className={`client-card${client.isActive === false ? ' client-card-inactive' : ''}`}>
               <IonCardContent className="client-card-content">
                 <div className="client-card-row">
                   <div className="client-left" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -1745,6 +1802,15 @@ const ClientsPage: React.FC = () => {
                         <span className="meta-label">Creado</span>
                         <span className="meta-value">{formatDate(client.created_At)}</span>
                       </span>
+                      <span className="client-meta-badge">
+                        <span className="meta-label">Tipo</span>
+                        <span className="meta-value">{clientTypeLabel(client.clientType)}</span>
+                      </span>
+                      {client.isActive === false && (
+                        <span className="client-meta-badge client-meta-badge-inactive">
+                          <span className="meta-value">Inactivo</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="client-actions">
@@ -1777,8 +1843,17 @@ const ClientsPage: React.FC = () => {
                     <IonButton fill="outline" size="small" color="primary" onClick={() => handleEdit(client)} className="action-button edit-button">
                       <IonIcon icon={pencil} slot="start" /> Editar
                     </IonButton>
-                    <IonButton fill="outline" size="small" color="danger" onClick={() => handleDelete(client)} className="action-button delete-button">
-                      <IonIcon icon={trash} slot="start" /> Eliminar
+                    <IonButton fill="outline" size="small" color={client.isActive === false ? 'success' : 'medium'} disabled={togglingActiveId === client.clientId} onClick={() => handleToggleActive(client)} className="action-button">
+                      {togglingActiveId === client.clientId
+                        ? <IonSpinner name="dots" />
+                        : client.isActive === false
+                          ? <><IonIcon icon={checkmarkCircle} slot="start" /> Activar</>
+                          : <><IonIcon icon={banOutline} slot="start" /> Desactivar</>}
+                    </IonButton>
+                    <IonButton fill="outline" size="small" color="danger" disabled={deletingClientId === client.clientId} onClick={() => handleDelete(client)} className="action-button delete-button">
+                      {deletingClientId === client.clientId
+                        ? <IonSpinner name="dots" />
+                        : <><IonIcon icon={trash} slot="start" /> Eliminar</>}
                     </IonButton>
                   </div>
                 </div>

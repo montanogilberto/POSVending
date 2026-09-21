@@ -137,6 +137,44 @@
 
 .login-eye-btn:hover { color: #6B7280; }
 
+/* ── Client login: password eye toggle (IonButton, shadow DOM) ── */
+.client-login-eye-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  margin: 0;
+  height: 32px;
+  min-height: 32px;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --box-shadow: none;
+  --background: transparent;
+  --background-hover: transparent;
+  --background-activated: transparent;
+  --color: #9CA3AF;
+}
+
+.client-login-eye-btn:hover { --color: #6B7280; }
+
+/* ── Client login: biometric activation icon ── */
+.client-login-biometric-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  margin: 24px auto;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.client-login-biometric-icon ion-icon {
+  font-size: 40px;
+  color: #2563EB;
+}
+
 /* ── Biometric toggle ── */
 .login-biometric-toggle {
   display: flex;

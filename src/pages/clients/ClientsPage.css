@@ -148,6 +148,21 @@
   font-weight: 400;
 }
 
+.client-meta-badge-inactive {
+  background: #FEE2E2;
+}
+
+.client-meta-badge-inactive .meta-value {
+  color: #B91C1C;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+
+.client-card-inactive {
+  opacity: 0.72;
+}
+
 /* Action Buttons */
 .client-actions {
   display: flex;

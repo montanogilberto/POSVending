@@ -78,7 +78,6 @@
 /* Cart items list */
 .cart-items-list {
   margin-bottom: 16px;
-  flex: 1;
   overflow-y: visible;
   display: flex;
   flex-direction: column;
@@ -89,7 +88,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 0;
+  gap: 12px;
+  padding: 14px 16px;
   margin-bottom: 16px;
   border-top: 1px solid #e5e7eb;
   border-bottom: 1px solid #e5e7eb;
@@ -99,45 +99,50 @@
 }
 
 .detail-add-more-btn {
-  --border-radius: 12px;
+  --border-radius: 10px;
   --border-width: 1.5px;
-  --border-color: #d1d5db;
+  --border-color: #93c5fd;
   --background: #ffffff;
-  --background-hover: #f9fafb;
-  --color: #4b5563;
+  --background-hover: #eff6ff;
+  --color: #2563eb;
   font-weight: 600;
-  font-size: 0.95rem;
-  padding: 12px 16px;
+  font-size: 0.9rem;
   text-transform: none;
-  min-height: 48px;
-}
-
-.detail-add-more-btn:hover {
-  --background: #f9fafb;
-  --border-color: #9ca3af;
+  min-height: 44px;
+  margin: 0;
 }
 
 .detail-add-more-btn .add-icon {
-  font-size: 1.2rem;
-  color: #6b7280;
+  font-size: 1.15rem;
+  color: #2563eb;
 }
 
 .detail-total {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
 }
 
 .detail-total-label {
-  font-size: 0.9rem;
-  color: #6b7280;
+  font-size: 0.75rem;
+  color: #9ca3af;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .detail-total-amount {
   font-size: 1.5rem;
   font-weight: 800;
   color: #111827;
+  letter-spacing: -0.02em;
+}
+
+.detail-discount-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #059669;
 }
 
 /* ===== Payment Actions ===== */
@@ -209,16 +214,17 @@
 }
 
 /* Payment method selector - de-emphasized */
-.payment-section {
+.cart-payment-section {
   margin-bottom: 12px;
 }
 
-.payment-label {
-  display: block;
-  font-size: 0.85rem;
+.cart-payment-label {
+  font-size: 0.8rem;
   font-weight: 600;
   color: #374151;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .payment-method-selector {
@@ -228,31 +234,26 @@
 
 .payment-method-btn {
   flex: 1;
-  padding: 12px 10px;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #4b5563;
-  font-size: 0.9rem;
+  --border-radius: 10px;
+  --border-width: 1.5px;
+  --border-color: #e5e7eb;
+  --background: #ffffff;
+  --background-hover: #f8fafc;
+  --color: #4b5563;
+  font-size: 0.85rem;
   font-weight: 500;
-  cursor: pointer;
+  text-transform: none;
+  min-height: 48px;
+  margin: 0;
   transition: all 0.15s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.payment-method-btn:hover {
-  border-color: #3b82f6;
-  background: #f8fafc;
 }
 
 .payment-method-btn.selected {
-  border-color: #3b82f6;
-  background: #ffffff;
-  color: #2563eb;
-  box-shadow: 0 0 0 1px #3b82f6;
+  --border-color: #3b82f6;
+  --background: #eff6ff;
+  --background-hover: #eff6ff;
+  --color: #2563eb;
+  --box-shadow: 0 0 0 1px #3b82f6;
 }
 
 .payment-method-btn .icon {
@@ -280,23 +281,23 @@
 
 .cash-input {
   width: 100%;
-  padding: 14px 14px 14px 32px;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 10px;
+  --border-radius: 10px;
+  --border-width: 1.5px;
+  --border-color: #e5e7eb;
+  --padding-start: 32px;
+  --padding-end: 14px;
+  --padding-top: 14px;
+  --padding-bottom: 14px;
+  --placeholder-color: #9ca3af;
   font-size: 1rem;
   font-weight: 500;
   color: #111827;
-  transition: border-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
-.cash-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.cash-input::placeholder {
-  color: #9ca3af;
+.cash-input.has-focus {
+  --border-color: #3b82f6;
+  --box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* Change display */
@@ -400,7 +401,8 @@
   }
 
   .payment-method-btn {
-    padding: 14px 12px;
+    --padding-top: 14px;
+    --padding-bottom: 14px;
   }
 
   .cart-button-primary {
@@ -460,7 +462,6 @@
 
   .detail-add-more-btn {
     font-size: 1rem;
-    padding: 14px 20px;
     min-height: 52px;
   }
 
@@ -489,7 +490,6 @@
 
   .detail-add-more-btn {
     font-size: 0.85rem;
-    padding: 10px 12px;
     min-height: 44px;
     flex-shrink: 0;
   }
@@ -539,12 +539,16 @@
   }
 
   .payment-method-btn {
-    padding: 16px 12px;
+    --padding-top: 16px;
+    --padding-bottom: 16px;
     min-height: 52px;
   }
 
   .cash-input {
-    padding: 16px 14px 16px 36px;
+    --padding-start: 36px;
+    --padding-end: 14px;
+    --padding-top: 16px;
+    --padding-bottom: 16px;
     font-size: 1.1rem;
   }
 
@@ -633,6 +637,25 @@
   --color: #065f46;
 }
 
+.welcome-coupon-row {
+  margin-top: 10px;
+}
+
+.welcome-coupon-chip {
+  width: 100%;
+  height: auto;
+  padding: 8px 12px;
+  white-space: normal;
+  --background: #fef3c7;
+  --color: #92400e;
+  cursor: pointer;
+}
+
+.welcome-coupon-chip.applied {
+  --background: #d1fae5;
+  --color: #065f46;
+}
+
 .client-actions-row {
   display: flex;
   gap: 8px;
@@ -644,8 +667,7 @@
   --border-radius: 10px;
   --border-width: 1.5px;
   font-weight: 600;
-  font-size: 0.95rem;
-  padding: 12px 16px;
+  font-size: 0.9rem;
   margin-top: 0;
   flex: 1;
   text-transform: none;
@@ -951,229 +973,22 @@
     line-height: 1.4;
   }
 
-  .client-change-btn {
-    font-size: 0.9rem;
-    padding: 14px 16px;
+  .client-actions-row {
+    flex-direction: column;
     margin-top: 12px;
+  }
+
+  .client-change-btn,
+  .client-scan-btn {
+    font-size: 0.9rem;
     min-height: 48px;
     width: 100%;
-    border-radius: 10px;
+    margin-top: 0;
   }
 
   /* Hide the old inline button on mobile */
   .client-choose-btn {
     display: none;
-  }
-}
-
-/* ===== Promotion Code Section ===== */
-.promo-section {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
-}
-
-.promo-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.promo-input-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.promo-input {
-  flex: 1;
-  --border-radius: 10px;
-  --border-color: #d1d5db;
-  --border-width: 1.5px;
-  --padding-start: 14px;
-  --padding-end: 14px;
-  --padding-top: 12px;
-  --padding-bottom: 12px;
-  font-size: 1rem;
-  color: #111827;
-  transition: all 0.15s ease;
-}
-
-.promo-input:focus-within {
-  --border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.promo-input.promo-active {
-  --border-color: #059669;
-  --color: #059669;
-}
-
-.promo-input.promo-error {
-  --border-color: #ef4444;
-}
-
-.promo-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  background: #dcfce7;
-  border-radius: 20px;
-  color: #059669;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.promo-badge ion-icon {
-  font-size: 1rem;
-}
-
-.promo-error-message {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 8px 12px;
-  background: #fef2f2;
-  border-radius: 8px;
-  color: #b91c1c;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.promo-error-message ion-icon {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.promo-discount-display {
-  margin-top: 12px;
-  padding: 12px;
-  background: #f8fafc;
-  border-radius: 10px;
-  border: 1px dashed #d1d5db;
-}
-
-.discount-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-  font-size: 0.95rem;
-}
-
-.discount-row:last-child {
-  margin-bottom: 0;
-}
-
-.discount-label {
-  color: #6b7280;
-}
-
-.discount-original {
-  color: #6b7280;
-  text-decoration: line-through;
-  font-weight: 500;
-}
-
-.discount-savings .discount-amount {
-  color: #059669;
-  font-weight: 700;
-}
-
-.discount-final {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.discount-final .discount-label {
-  font-weight: 600;
-  color: #111827;
-}
-
-.discount-final-amount {
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: #059669;
-}
-
-/* Responsive for promo section */
-@media (min-width: 768px) {
-  .promo-section {
-    padding: 16px 20px;
-    margin-bottom: 16px;
-  }
-
-  .promo-label {
-    font-size: 0.85rem;
-  }
-
-  .promo-input {
-    font-size: 1.05rem;
-    padding: 14px 16px;
-  }
-
-  .promo-badge {
-    padding: 8px 14px;
-    font-size: 0.85rem;
-  }
-
-  .discount-row {
-    font-size: 1rem;
-  }
-
-  .discount-final-amount {
-    font-size: 1.3rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .promo-section {
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    border-radius: 10px;
-  }
-
-  .promo-label {
-    font-size: 0.75rem;
-    margin-bottom: 8px;
-    letter-spacing: 0.04em;
-  }
-
-  .promo-input-wrapper {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .promo-input {
-    font-size: 0.95rem;
-    padding: 12px 14px;
-  }
-
-  .promo-badge {
-    justify-content: center;
-    padding: 8px 12px;
-    font-size: 0.8rem;
-  }
-
-  .promo-discount-display {
-    padding: 10px;
-  }
-
-  .discount-row {
-    font-size: 0.9rem;
-  }
-
-  .discount-final-amount {
-    font-size: 1.1rem;
   }
 }
 
