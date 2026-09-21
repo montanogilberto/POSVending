@@ -15,6 +15,7 @@ export interface Client {
   qrBlobUrl?: string;
   created_At?: string;
   updated_at?: string;
+  isActive?: boolean;
 }
 
 export interface CreateClientRequest {
@@ -27,6 +28,20 @@ export interface CreateClientRequest {
     email: string;
     clientType?: ClientType;
     action: string; // "1" for create, "2" for update
+  }>;
+}
+
+export interface DeleteClientRequest {
+  clients: Array<{
+    clientId: number;
+    action: '3';
+  }>;
+}
+
+export interface SetClientActiveRequest {
+  clients: Array<{
+    clientId: number;
+    action: '4' | '5'; // "4" to deactivate, "5" to reactivate
   }>;
 }
 
@@ -81,6 +96,58 @@ export const createOrUpdateClient = async (data: CreateClientRequest): Promise<C
   const responseData = await response.json();
   console.log('[CLIENTS_API] Response data:', JSON.stringify(responseData, null, 2));
   
+  return responseData;
+};
+
+export const deleteClient = async (clientId: number): Promise<CreateClientResponse> => {
+  const data: DeleteClientRequest = { clients: [{ clientId, action: '3' }] };
+  console.log('[CLIENTS_API] Sending POST request to:', `${API_BASE_URL}/clients`, '(delete) payload:', JSON.stringify(data));
+
+  const response = await fetch(`${API_BASE_URL}/clients`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  console.log('[CLIENTS_API] Response status:', response.status, response.statusText);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[CLIENTS_API] Error response:', errorText);
+    throw new Error(`Failed to delete client: ${response.status} ${response.statusText}`);
+  }
+
+  const responseData = await response.json();
+  console.log('[CLIENTS_API] Response data:', JSON.stringify(responseData, null, 2));
+
+  return responseData;
+};
+
+export const setClientActive = async (clientId: number, isActive: boolean): Promise<CreateClientResponse> => {
+  const data: SetClientActiveRequest = { clients: [{ clientId, action: isActive ? '5' : '4' }] };
+  console.log('[CLIENTS_API] Sending POST request to:', `${API_BASE_URL}/clients`, `(${isActive ? 'reactivate' : 'deactivate'}) payload:`, JSON.stringify(data));
+
+  const response = await fetch(`${API_BASE_URL}/clients`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  console.log('[CLIENTS_API] Response status:', response.status, response.statusText);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[CLIENTS_API] Error response:', errorText);
+    throw new Error(`Failed to ${isActive ? 'reactivate' : 'deactivate'} client: ${response.status} ${response.statusText}`);
+  }
+
+  const responseData = await response.json();
+  console.log('[CLIENTS_API] Response data:', JSON.stringify(responseData, null, 2));
+
   return responseData;
 };
 
