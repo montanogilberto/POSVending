@@ -1832,7 +1832,9 @@ const ClientsPage: React.FC = () => {
                       </IonButton>
                     )}
                     <IonButton fill="outline" size="small" color="secondary" onClick={() => history.push(`/rewards-dashboard/${client.clientId}`)} className="action-button">
-                      <IonIcon icon={giftOutline} slot="start" /> Recompensas
+                      {client.clientType === 'pos'
+                        ? <><IonIcon icon={barChartOutline} slot="start" /> Dashboard</>
+                        : <><IonIcon icon={giftOutline} slot="start" /> Recompensas</>}
                     </IonButton>
                     <IonButton fill="outline" size="small" color="warning" onClick={() => history.push(`/client-followup/${client.clientId}`)} className="action-button">
                       <IonIcon icon={calendarOutline} slot="start" /> Seguimiento
