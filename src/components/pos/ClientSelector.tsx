@@ -26,6 +26,8 @@ import {
 } from '@ionic/react';
 import { person, close, checkmarkCircle, business, add, save, informationCircle } from 'ionicons/icons';
 import { Client, getAllClients, createOrUpdateClient } from '../../api/clientsApi';
+import { posRewardsApi } from '../../api/posRewardsApi';
+import { useUser } from '../../contexts/UserContext';
 
 interface ClientSelectorProps {
   isOpen: boolean;
@@ -40,6 +42,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   onChange,
   selectedClient,
 }) => {
+  const { companyId, userId } = useUser();
   const [searchText, setSearchText] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
@@ -343,6 +346,13 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         setToastMessage('Cliente creado exitosamente');
         setToastColor('success');
         setShowToast(true);
+
+        // Sign-up bonus: registering unlocks any one of the 3x1 free-product
+        // rewards immediately. Best-effort — a PosRewards hiccup shouldn't
+        // block client creation.
+        posRewardsApi
+          .adjustPoints(companyId, persistedClient.clientId, 3, 'Bono de bienvenida: cliente registrado', userId)
+          .catch((err) => console.log('[ClientSelector] welcome bonus failed', err));
       }
 
       setShowCreateForm(false);

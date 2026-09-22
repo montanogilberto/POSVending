@@ -75,6 +75,7 @@ import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
 import { useUser } from '../../contexts/UserContext';
 import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr, deleteClient, setClientActive } from '../../api/clientsApi';
+import { posRewardsApi } from '../../api/posRewardsApi';
 import QRCode from 'qrcode';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
 import {
@@ -152,7 +153,7 @@ const emptyErrors = {
 };
 
 const ClientsPage: React.FC = () => {
-  const { companyId } = useUser();
+  const { companyId, userId } = useUser();
   const history = useHistory();
 
   // ── List state ─────────────────────────────────────────────────────────────
@@ -646,6 +647,12 @@ const ClientsPage: React.FC = () => {
         };
         await createOrUpdateClient(req);
         setCreatedClientId(clientId);
+        // Sign-up bonus: registering unlocks any one of the 3x1 free-product
+        // rewards immediately. Best-effort — a PosRewards hiccup shouldn't
+        // block client creation.
+        posRewardsApi
+          .adjustPoints(companyId, clientId, 3, 'Bono de bienvenida: cliente registrado', userId)
+          .catch((err) => console.log('[ClientsPage] welcome bonus failed', err));
         await loadClients();
       }
       setWizardStep(1);
