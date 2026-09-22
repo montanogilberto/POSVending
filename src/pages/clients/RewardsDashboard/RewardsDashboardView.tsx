@@ -1,41 +1,53 @@
-import React from 'react';
-import { IonButton, IonContent, IonLoading, IonPage, IonToast } from '@ionic/react';
-import { useHistory } from 'react-router-dom';
+import React, { useRef } from 'react';
+import { IonContent, IonLoading, IonPage, IonToast } from '@ionic/react';
 import Header from '../../../components/layout/Header';
 import { usePopovers } from '../../../hooks/usePopovers';
 import { useRewardsDashboard } from './RewardsDashboardLogic';
 import RewardsHeroCard from './components/RewardsHeroCard';
-import RewardsTotalsRow from './components/RewardsTotalsRow';
-import RewardsActivityList from './components/RewardsActivityList';
+import RewardsQuickActions from './components/RewardsQuickActions';
+import RewardsPromoBanner from './components/RewardsPromoBanner';
+import RewardsPointsTabs from './components/RewardsPointsTabs';
+import RewardsQuickLinks from './components/RewardsQuickLinks';
 import RewardsCatalogList from './components/RewardsCatalogList';
 
 const RewardsDashboardView: React.FC = () => {
   const vm = useRewardsDashboard();
   const pops = usePopovers();
-  const history = useHistory();
-  const isClientRole = vm.roleCode === 'client';
+
+  const pointsRef = useRef<HTMLDivElement>(null);
+  const catalogRef = useRef<HTMLDivElement>(null);
+
+  const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) =>
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
     <IonPage>
       <Header
-        screenTitle={`Recompensas · ${vm.clientName}`}
-        showBackButton={!isClientRole}
+        screenTitle="Inicio"
+        showBackButton={!vm.isSelfServiceClient}
         backButtonHref="/clients"
+        posSupportTopic="rewards"
         {...pops.headerProps}
       />
       <IonContent fullscreen className="rewards-dashboard-content">
-        <RewardsHeroCard vm={vm} />
-        <RewardsTotalsRow vm={vm} />
-        <RewardsActivityList vm={vm} />
-        <RewardsCatalogList vm={vm} />
+        <RewardsHeroCard vm={vm} onViewDetails={() => scrollTo(pointsRef)} />
 
-        {isClientRole && (
-          <div className="rewards-dashboard-borrower-cta">
-            <IonButton expand="block" fill="outline" onClick={() => history.push('/borrower-onboarding')}>
-              Conviértete en Prestatario
-            </IonButton>
-          </div>
-        )}
+        <RewardsQuickActions
+          onViewPoints={() => scrollTo(pointsRef)}
+          onViewCatalog={() => scrollTo(catalogRef)}
+        />
+
+        <RewardsPromoBanner onViewCatalog={() => scrollTo(catalogRef)} />
+
+        <div ref={pointsRef}>
+          <RewardsPointsTabs vm={vm} onViewCatalog={() => scrollTo(catalogRef)} />
+        </div>
+
+        <RewardsQuickLinks vm={vm} />
+
+        <div ref={catalogRef}>
+          <RewardsCatalogList vm={vm} />
+        </div>
 
         <IonToast {...vm.toastProps} />
         <IonLoading isOpen={vm.loading} message="Cargando..." />

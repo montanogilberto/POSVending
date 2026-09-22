@@ -8,6 +8,7 @@ import ChartOfAccountsTab from './components/ChartOfAccountsTab';
 import JournalEntriesTab from './components/JournalEntriesTab';
 import LedgerTab from './components/LedgerTab';
 import TrialBalanceTab from './components/TrialBalanceTab';
+import CommissionTerminalsTab from './components/CommissionTerminalsTab';
 
 const AccountingView: React.FC = () => {
   const vm = useAccounting();
@@ -26,6 +27,7 @@ const AccountingView: React.FC = () => {
           <IonSegmentButton value="journal"><IonLabel>Diario</IonLabel></IonSegmentButton>
           <IonSegmentButton value="ledger"><IonLabel>Mayor</IonLabel></IonSegmentButton>
           <IonSegmentButton value="trialBalance"><IonLabel>Balanza</IonLabel></IonSegmentButton>
+          <IonSegmentButton value="terminals"><IonLabel>Terminales</IonLabel></IonSegmentButton>
         </IonSegment>
 
         <div className="accounting-container">
@@ -33,6 +35,7 @@ const AccountingView: React.FC = () => {
           {vm.activeTab === 'journal' && <JournalEntriesTab vm={vm} />}
           {vm.activeTab === 'ledger' && <LedgerTab vm={vm} />}
           {vm.activeTab === 'trialBalance' && <TrialBalanceTab vm={vm} />}
+          {vm.activeTab === 'terminals' && <CommissionTerminalsTab vm={vm} />}
         </div>
 
         <IonToast {...vm.toastProps} />

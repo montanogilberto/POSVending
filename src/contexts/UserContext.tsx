@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { RoleCode, normalizeRoleCode } from '../config/rolePermissions';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { RoleCode, normalizeRoleCode, loadRoleCatalog } from '../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../utils/formatters';
 import { ClientType } from '../api/clientsApi';
+import { listClientCapabilities } from '../api/clientCapabilitiesApi';
 
 // ── Storage key ────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'pos_gmo_auth';
@@ -18,6 +19,13 @@ export interface AuthData {
   branchName: string;
   clientId: number;
   clientType?: ClientType;
+  /** The 1:N clientTypes concept (POS/SMARTLOANS_LENDER/SMARTLOANS_BORROWER/
+   * SMARTLOANS_JURIDICAL/REWARDS/ARCADE) — a client can hold several at
+   * once. Independent of clientType (above, a legacy single-value label)
+   * and of roleCode (below, staff operational permissions). Fetched
+   * automatically whenever companyId+clientId are known — see the effect
+   * in UserProvider — not set directly by login(). */
+  clientCapabilities: string[];
   roleCode: RoleCode;
   roleName: string;
 }
@@ -45,6 +53,7 @@ const DEFAULT_AUTH: AuthData = {
   branchId: 0,
   branchName: '',
   clientId: 0,
+  clientCapabilities: [],
   roleCode: 'employee',
   roleName: 'Empleado',
 };
@@ -83,6 +92,36 @@ const UserContext = createContext<UserContextProps | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [auth, setAuth] = useState<AuthData>(loadStoredAuth);
+
+  // Fetch the DB-backed role catalog once per app session, before most
+  // screens read ROLE_LABELS/ROLE_UI/ROLE_GROUPS. Failure just keeps the
+  // hardcoded defaults in config/rolePermissions.ts (see loadRoleCatalog).
+  useEffect(() => {
+    loadRoleCatalog();
+  }, []);
+
+  // clientCapabilities isn't part of what login()/setUserData get handed
+  // directly (none of /login, /client-login's verify response, or
+  // CreateAccount's flow return it) — fetched here instead, once per
+  // companyId+clientId pair, so every entry point picks it up uniformly
+  // rather than needing each login path to remember to fetch it itself.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.companyId || !auth.clientId) return;
+    let cancelled = false;
+    listClientCapabilities(auth.companyId, auth.clientId)
+      .then(rows => {
+        if (cancelled) return;
+        const active = rows.filter(r => r.isActive).map(r => r.capability);
+        console.log('[UserContext] fetched clientCapabilities for clientId=%d: %o', auth.clientId, active);
+        setAuth(prev => {
+          const next = { ...prev, clientCapabilities: active };
+          persistAuth(next);
+          return next;
+        });
+      })
+      .catch(err => console.warn('[UserContext] listClientCapabilities failed:', err));
+    return () => { cancelled = true; };
+  }, [auth.isAuthenticated, auth.companyId, auth.clientId]);
 
   const saveAuth = (data: AuthData) => {
     setAuth(data);

@@ -13,12 +13,25 @@ import {
   PosRewardCatalogItem,
 } from '../../../api/posRewardsApi';
 import { toHermosilloDate } from '../../../utils/format';
+import { isStaffRole } from '../../../config/rolePermissions';
 import { RewardsActivityItem } from './RewardsDashboardTypes';
 
 export const useRewardsDashboard = () => {
+  // /rewards-dashboard/:clientId is used two ways: staff pulling up any
+  // client's record (roleCode admin/manager/employee/etc — param wins,
+  // same as every other :clientId dashboard), and a client viewing their
+  // own account after /client-login (roleCode 'pos' — renamed from
+  // 'client', see rolePermissions.ts's RoleCode comment). Uses isStaffRole
+  // rather than a single roleCode==='pos' check (same fix as
+  // MyLoansLogic.ts) so ANY self-service session — not just 'pos' — is
+  // pinned to its own clientId, never trusted with a foreign id from the
+  // URL, regardless of which clientCapabilities it happens to hold.
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
-  const clientId = Number(clientIdParam);
-  const { companyId, userId, roleCode } = useUser();
+  const { companyId, userId, clientId: contextClientId, roleCode } = useUser();
+  const isSelfServiceRole = !isStaffRole(roleCode);
+  const paramId = clientIdParam ? Number(clientIdParam) : null;
+  const foreignId = paramId !== null && paramId !== contextClientId && isSelfServiceRole;
+  const clientId = foreignId ? contextClientId : (paramId ?? contextClientId);
   const { showToast, toastProps } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -64,6 +77,25 @@ export const useRewardsDashboard = () => {
   }, [load]);
 
   const clientName = client ? `${client.first_name} ${client.last_name}`.trim() : `Cliente #${clientId}`;
+  const firstName = client?.first_name?.trim() || clientName;
+
+  // Nearest not-yet-affordable reward, cheapest first — the mockup's "68%
+  // para tu próxima recompensa" bar. No such field exists server-side
+  // (posRewardBalances has no notion of "next" reward), so this is derived
+  // client-side from the same catalog list already loaded.
+  const nextReward = useMemo(() => {
+    const currentBalance = balance?.balance ?? 0;
+    const affordable = catalog
+      .filter((item) => item.requiredPoints > currentBalance)
+      .sort((a, b) => a.requiredPoints - b.requiredPoints);
+    return affordable[0] ?? null;
+  }, [catalog, balance]);
+
+  const progressToNextReward = useMemo(() => {
+    if (!nextReward || nextReward.requiredPoints <= 0) return null;
+    const currentBalance = balance?.balance ?? 0;
+    return Math.max(0, Math.min(100, Math.round((currentBalance / nextReward.requiredPoints) * 100)));
+  }, [nextReward, balance]);
 
   const catalogNameById = useMemo(
     () => new Map(catalog.filter((item) => item.catalogItemId).map((item) => [item.catalogItemId as number, item.name])),
@@ -137,7 +169,14 @@ export const useRewardsDashboard = () => {
   return {
     clientId,
     clientName,
-    roleCode,
+    firstName,
+    nextReward,
+    progressToNextReward,
+    // Header back button defaults to /clients (a staff-only page) — wrong
+    // for a client viewing their own dashboard after /client-login, since
+    // they have no access to it. The view falls back to the menu button
+    // instead when this is true.
+    isSelfServiceClient: isSelfServiceRole,
     loading,
     balance,
     ledger,

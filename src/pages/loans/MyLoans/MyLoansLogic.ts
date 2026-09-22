@@ -10,6 +10,7 @@ import { getAllLoans, Loan } from '../../../api/loanApi';
 import { getAllClients, Client } from '../../../api/clientsApi';
 import { listContractsForClient } from '../../../api/digitalContractsApi';
 import { onDataChanged } from '../../../utils/refreshBus';
+import { isStaffRole, hasCapability } from '../../../config/rolePermissions';
 import { LoanFilter, isClosedLoan } from './MyLoansConstants';
 
 export function useMyLoans() {
@@ -18,17 +19,23 @@ export function useMyLoans() {
   // client-dashboard / lender-dashboard / p2p-lending), así el link se puede
   // compartir y sobrevive un refresh.
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
-  const { clientId: contextClientId, companyId, roleCode } = useUser();
-  const isLender   = roleCode === 'lender';
-  const isBorrower = roleCode === 'borrower';
+  const { clientId: contextClientId, companyId, roleCode, clientCapabilities } = useUser();
+  // roleCode alone used to gate this (roleCode==='lender'/'borrower' from the
+  // password signup flow). A client can now ALSO reach SmartLoans purely via
+  // a granted clientCapabilities row (e.g. logged in through /client-login
+  // as roleCode='pos' with SMARTLOANS_BORROWER granted afterward) — that
+  // session must see the same borrower view a roleCode='borrower' session
+  // would, not be treated as neither and shown every loan in the company
+  // (see the 'mine' fallback below — that was the actual data leak this
+  // was blind to before clientCapabilities existed).
+  const isLender   = roleCode === 'lender'   || hasCapability(clientCapabilities, 'SMARTLOANS_LENDER');
+  const isBorrower = roleCode === 'borrower' || hasCapability(clientCapabilities, 'SMARTLOANS_BORROWER');
   // El param sólo sirve para que el link sea compartible/refrescable: es la
-  // MISMA persona de la sesión. Un prestamista o prestatario que teclee el id
-  // de otro cliente se queda en el suyo — si no, el rol viene de la sesión y
-  // el id de la URL, y la pantalla mezcla dos identidades (cartera vacía con
-  // copy de otro rol, o peor, la cartera ajena). Back-office sí puede mirar
-  // la de otro cliente.
+  // MISMA persona de la sesión. Cualquier sesión que no sea de staff (no solo
+  // lender/borrower) se queda en la suya — back-office sí puede mirar la de
+  // otro cliente.
   const paramId = clientIdParam ? Number(clientIdParam) : null;
-  const foreignId = paramId !== null && paramId !== contextClientId && (isLender || isBorrower);
+  const foreignId = paramId !== null && paramId !== contextClientId && !isStaffRole(roleCode);
   const clientId = foreignId ? contextClientId : (paramId ?? contextClientId);
   if (foreignId) {
     console.log('[MyLoans] param clientId', paramId, 'no es el de la sesión', contextClientId, '→ usando el de sesión');

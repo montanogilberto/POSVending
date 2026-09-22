@@ -25,7 +25,7 @@ import {
   arrowBack, refreshOutline, sendOutline, chatbubbleEllipsesOutline,
   trashOutline, peopleOutline, cashOutline, receiptOutline, calculatorOutline, chevronForward,
   micOutline, volumeHighOutline, volumeMuteOutline, volumeMediumOutline, chevronDownOutline,
-  checkmarkOutline,
+  checkmarkOutline, giftOutline,
 } from 'ionicons/icons';
 import { useHistory, useParams } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
@@ -62,8 +62,18 @@ const TOPIC_META: Record<PosSupportTopic, { label: string; placeholder: string; 
     icon: calculatorOutline,
     pickerDesc: 'Balanza de comprobación, resultado contable',
   },
+  rewards: {
+    label: 'Soporte · Mis Recompensas',
+    placeholder: 'Pregúntame por tu saldo de puntos o tu historial de movimientos.',
+    icon: giftOutline,
+    pickerDesc: 'Tu saldo y movimientos de puntos',
+  },
 };
 
+// Staff topics only (matches the generic /pos-support picker's audience).
+// "rewards" is client-facing and reached directly via /pos-support/rewards
+// (Header's sparkle button on RewardsDashboardView) — it never appears in
+// this staff picker, same reason it's not in POS_ONLY_ROUTE_PREFIXES logic.
 const TOPIC_ORDER: PosSupportTopic[] = ['clients', 'income', 'expenses', 'accounting'];
 
 const dateKey = (iso?: string | null): string => (iso ? toHermosilloDate(iso).toISOString().split('T')[0] : '');
@@ -119,7 +129,7 @@ const PosSupportChatPage: React.FC = () => {
   const isPicker = !topicParam;
   const TOPIC: PosSupportTopic = (!isPicker && topicParam! in TOPIC_META) ? (topicParam as PosSupportTopic) : 'clients';
   const { label: TOPIC_LABEL, placeholder: TOPIC_PLACEHOLDER, icon: TOPIC_ICON } = TOPIC_META[TOPIC];
-  const { companyId, userId } = useUser();
+  const { companyId, userId, clientId } = useUser();
 
   const [conv, setConv] = useState<PosSupportConversation | null>(null);
   const [messages, setMessages] = useState<PosSupportMessage[]>([]);
@@ -216,6 +226,7 @@ const PosSupportChatPage: React.FC = () => {
     agentTypingSince.current = Date.now();
     await posSupportChatApi.sendMessage({
       companyId, userId, conversationId: conv.conversationId, topic: TOPIC, body,
+      ...(TOPIC === 'rewards' ? { clientId } : {}),
     });
     setSending(false);
     fetchMessages(conv.conversationId);

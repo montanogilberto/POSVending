@@ -12,6 +12,10 @@ import {
   getAllJournalEntries, getOneJournalEntry, postJournalEntry, voidJournalEntry,
   getJournalEntriesLedger, getTrialBalance,
 } from '../../../api/journalEntriesApi';
+import {
+  CommissionTerminal, CreateCommissionTerminalRequest, UpdateCommissionTerminalRequest,
+  getAllCommissionTerminals, createCommissionTerminal, updateCommissionTerminal, deactivateCommissionTerminal,
+} from '../../../api/commissionTerminalsApi';
 import { AccountingTab } from './AccountingTypes';
 
 export const useAccounting = () => {
@@ -35,6 +39,10 @@ export const useAccounting = () => {
 
   const [trialBalance, setTrialBalance] = useState<TrialBalance | null>(null);
   const [trialBalanceLoaded, setTrialBalanceLoaded] = useState(false);
+
+  const [terminals, setTerminals] = useState<CommissionTerminal[]>([]);
+  const [showTerminalForm, setShowTerminalForm] = useState(false);
+  const [editingTerminal, setEditingTerminal] = useState<CommissionTerminal | null>(null);
 
   const loadAccounts = useCallback(async () => {
     if (!companyId) return;
@@ -91,12 +99,22 @@ export const useAccounting = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
+  const loadTerminals = useCallback(async () => {
+    try {
+      setTerminals(await getAllCommissionTerminals());
+    } catch (error) {
+      console.error('[useAccounting] loadTerminals failed:', error);
+      showToast('No se pudo cargar el catálogo de terminales', 'danger');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([loadAccounts(), loadEntries()]);
+    await Promise.all([loadAccounts(), loadEntries(), loadTerminals()]);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadAccounts, loadEntries]);
+  }, [loadAccounts, loadEntries, loadTerminals]);
 
   useIonViewWillEnter(() => {
     loadAll();
@@ -104,7 +122,7 @@ export const useAccounting = () => {
 
   useEffect(() => {
     return onDataChanged((reason) => {
-      if (reason.includes('accounting') || reason.includes('journal')) loadAll();
+      if (reason.includes('accounting') || reason.includes('journal') || reason.includes('commissionTerminal')) loadAll();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -177,6 +195,41 @@ export const useAccounting = () => {
     }
   };
 
+  const handleCreateTerminal = async (data: CreateCommissionTerminalRequest) => {
+    try {
+      await createCommissionTerminal(data);
+      showToast('Terminal creada correctamente');
+      setShowTerminalForm(false);
+      await loadTerminals();
+      notifyDataChanged('commissionTerminal:created');
+    } catch (error: any) {
+      showToast(error?.message || 'No se pudo crear la terminal', 'danger');
+    }
+  };
+
+  const handleUpdateTerminal = async (data: UpdateCommissionTerminalRequest) => {
+    try {
+      await updateCommissionTerminal(data);
+      showToast('Terminal actualizada');
+      setEditingTerminal(null);
+      await loadTerminals();
+      notifyDataChanged('commissionTerminal:updated');
+    } catch (error: any) {
+      showToast(error?.message || 'No se pudo actualizar la terminal', 'danger');
+    }
+  };
+
+  const handleDeactivateTerminal = async (commissionTerminalId: number) => {
+    try {
+      await deactivateCommissionTerminal(commissionTerminalId);
+      showToast('Terminal desactivada');
+      await loadTerminals();
+      notifyDataChanged('commissionTerminal:deactivated');
+    } catch (error: any) {
+      showToast(error?.message || 'No se pudo desactivar la terminal', 'danger');
+    }
+  };
+
   const handleViewEntry = async (entryId: number) => {
     try {
       const detail = await getOneJournalEntry(entryId);
@@ -219,6 +272,15 @@ export const useAccounting = () => {
 
     trialBalance,
     refreshTrialBalance: loadTrialBalance,
+
+    terminals,
+    showTerminalForm,
+    setShowTerminalForm,
+    editingTerminal,
+    setEditingTerminal,
+    handleCreateTerminal,
+    handleUpdateTerminal,
+    handleDeactivateTerminal,
 
     toastProps,
     refresh: loadAll,
