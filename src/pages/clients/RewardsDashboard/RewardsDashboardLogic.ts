@@ -77,6 +77,25 @@ export const useRewardsDashboard = () => {
   }, [load]);
 
   const clientName = client ? `${client.first_name} ${client.last_name}`.trim() : `Cliente #${clientId}`;
+  const firstName = client?.first_name?.trim() || clientName;
+
+  // Nearest not-yet-affordable reward, cheapest first — the mockup's "68%
+  // para tu próxima recompensa" bar. No such field exists server-side
+  // (posRewardBalances has no notion of "next" reward), so this is derived
+  // client-side from the same catalog list already loaded.
+  const nextReward = useMemo(() => {
+    const currentBalance = balance?.balance ?? 0;
+    const affordable = catalog
+      .filter((item) => item.requiredPoints > currentBalance)
+      .sort((a, b) => a.requiredPoints - b.requiredPoints);
+    return affordable[0] ?? null;
+  }, [catalog, balance]);
+
+  const progressToNextReward = useMemo(() => {
+    if (!nextReward || nextReward.requiredPoints <= 0) return null;
+    const currentBalance = balance?.balance ?? 0;
+    return Math.max(0, Math.min(100, Math.round((currentBalance / nextReward.requiredPoints) * 100)));
+  }, [nextReward, balance]);
 
   const catalogNameById = useMemo(
     () => new Map(catalog.filter((item) => item.catalogItemId).map((item) => [item.catalogItemId as number, item.name])),
@@ -150,6 +169,9 @@ export const useRewardsDashboard = () => {
   return {
     clientId,
     clientName,
+    firstName,
+    nextReward,
+    progressToNextReward,
     // Header back button defaults to /clients (a staff-only page) — wrong
     // for a client viewing their own dashboard after /client-login, since
     // they have no access to it. The view falls back to the menu button

@@ -5,7 +5,10 @@ import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonToggle,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { eye, eyeOff, fingerPrintOutline } from 'ionicons/icons';
+import {
+  eye, eyeOff, fingerPrintOutline, cartOutline, personOutline, lockClosedOutline,
+  logInOutline, callOutline, personAddOutline, headsetOutline, chevronForward,
+} from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
@@ -305,7 +308,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
               {/* Logo / Brand */}
               <div className="login-brand">
-                <div className="login-logo">POS</div>
+                <div className="login-logo">
+                  <IonIcon icon={cartOutline} aria-hidden="true" />
+                </div>
                 <h1 className="login-title">POS GMO</h1>
                 <p className="login-subtitle">Sistema de punto de venta</p>
               </div>
@@ -316,15 +321,18 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 duration={3500}
                 onDidDismiss={() => setMessage(null)}
                 color="danger"
-                position="top"
+                position="bottom"
               />
 
               <div className="login-card">
                 <h2 className="login-card-title">Iniciar sesión</h2>
+                <p className="login-card-subtitle">Ingresa a tu cuenta para continuar</p>
 
                 <form onSubmit={handleLogin} className="login-form">
                   <div className="login-field">
-                    <IonLabel className="login-label">Usuario</IonLabel>
+                    <IonLabel className="login-label login-label--icon">
+                      <IonIcon icon={personOutline} aria-hidden="true" /> Usuario
+                    </IonLabel>
                     <IonInput
                       type="text"
                       placeholder="Ingresa tu usuario"
@@ -335,7 +343,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   </div>
 
                   <div className="login-field">
-                    <IonLabel className="login-label">Contraseña</IonLabel>
+                    <IonLabel className="login-label login-label--icon">
+                      <IonIcon icon={lockClosedOutline} aria-hidden="true" /> Contraseña
+                    </IonLabel>
                     <div className="login-password-wrapper">
                       <IonInput
                         type={showPassword ? 'text' : 'password'}
@@ -344,14 +354,14 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         className="login-input"
                         autocomplete="current-password"
                       />
-                      <button
-                        type="button"
-                        className="login-eye-btn"
+                      <IonButton
+                        fill="clear"
+                        className="client-login-eye-btn"
                         onClick={() => setShowPassword(v => !v)}
                         tabIndex={-1}
                       >
-                        <IonIcon icon={showPassword ? eye : eyeOff} />
-                      </button>
+                        <IonIcon slot="icon-only" icon={showPassword ? eye : eyeOff} />
+                      </IonButton>
                     </div>
                   </div>
 
@@ -373,18 +383,41 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     disabled={loading}
                     className="login-submit-btn"
                   >
+                    <IonIcon icon={logInOutline} slot="start" aria-hidden="true" />
                     {loading ? 'Verificando...' : 'Iniciar sesión'}
                   </IonButton>
                 </form>
 
-                <div className="login-links">
-                  <IonRouterLink href="/forgot-password">¿Olvidaste tu contraseña?</IonRouterLink>
-                  <IonRouterLink href="/create-account">Crear cuenta</IonRouterLink>
-                  <IonRouterLink href="/client-login">Soy cliente, quiero ver mis recompensas</IonRouterLink>
+                <div className="login-help-divider">
+                  <span>¿Necesitas ayuda?</span>
                 </div>
-                <div className="login-links">
-                  <IonRouterLink href="/client-login">¿Eres cliente? Inicia sesión con tu teléfono</IonRouterLink>
+
+                <div className="login-help-tiles">
+                  <IonRouterLink routerLink="/forgot-password" className="login-help-tile">
+                    <div className="login-help-tile-inner">
+                      <IonIcon icon={callOutline} aria-hidden="true" />
+                      <span>¿Olvidaste tu contraseña?</span>
+                    </div>
+                  </IonRouterLink>
+                  <IonRouterLink routerLink="/create-account" className="login-help-tile">
+                    <div className="login-help-tile-inner">
+                      <IonIcon icon={personAddOutline} aria-hidden="true" />
+                      <span>Crear cuenta</span>
+                    </div>
+                  </IonRouterLink>
+                  <IonRouterLink routerLink="/client-login" className="login-help-tile">
+                    <div className="login-help-tile-inner">
+                      <IonIcon icon={headsetOutline} aria-hidden="true" />
+                      <span>Soy cliente, quiero ver mis recompensas</span>
+                    </div>
+                  </IonRouterLink>
                 </div>
+
+                <IonRouterLink routerLink="/client-login" className="login-client-banner">
+                  <IonIcon icon={callOutline} aria-hidden="true" />
+                  <span>¿Eres cliente? Inicia sesión con tu teléfono</span>
+                  <IonIcon icon={chevronForward} aria-hidden="true" className="login-client-banner-chevron" />
+                </IonRouterLink>
               </div>
 
             </IonCol>

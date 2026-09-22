@@ -1709,7 +1709,7 @@ const CreateAccount: React.FC = () => {
           duration={3000}
           onDidDismiss={() => setMessage(null)}
           color={message?.includes('exitosamente') ? 'success' : 'danger'}
-          position="top"
+          position="bottom"
         />
 
         <div className="ca-page-wrap">
