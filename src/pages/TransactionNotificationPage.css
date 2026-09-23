@@ -1,0 +1,178 @@
+.transaction-notification-page ion-content {
+  --background: #f4f5f8;
+}
+
+.transaction-notification-page .filters-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0;
+  background: #ffffff;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.transaction-notification-page ion-searchbar {
+  --background: #ffffff;
+  padding-bottom: 0;
+  padding-top: 0;
+}
+
+.transaction-notification-page ion-select {
+  --border-radius: 8px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  margin: 0 10px;
+  background: #ffffff;
+}
+
+.transaction-notification-page .notification-list {
+  background: transparent;
+  padding: 0;
+}
+
+.transaction-notification-page .notification-item {
+  --background: #ffffff;
+  --padding-start: 15px;
+  --padding-end: 15px;
+  --inner-padding-end: 0;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  align-items: center;
+}
+
+.transaction-notification-page .notification-item ion-label {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.transaction-notification-page .notification-item ion-label h2 {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.transaction-notification-page .notification-item ion-label p {
+  font-size: 0.9em;
+  color: #666;
+  margin: 2px 0;
+}
+
+.transaction-notification-page .movement-icon {
+  font-size: 1.8em;
+  min-width: 32px;
+  text-align: center;
+  margin-inline-end: 10px;
+  color: var(--ion-color-primary); /* Default color, can be overridden by specific types */
+}
+
+.transaction-notification-page .movement-icon-top-up { color: var(--ion-color-success); }
+.transaction-notification-page .movement-icon-loan-disbursement { color: var(--ion-color-tertiary); }
+.transaction-notification-page .movement-icon-repayment { color: var(--ion-color-warning); }
+.transaction-notification-page .movement-icon-withdrawal { color: var(--ion-color-danger); }
+
+/* Status badges */
+.transaction-notification-page .status-badge {
+  padding: 5px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.8em;
+  text-transform: capitalize;
+}
+
+.transaction-notification-page .status-pending {
+  --background: var(--ion-color-medium-tint);
+  --color: var(--ion-color-medium-shade);
+}
+
+.transaction-notification-page .status-sent {
+  --background: var(--ion-color-primary-tint);
+  --color: var(--ion-color-primary-shade);
+}
+
+.transaction-notification-page .status-confirmed {
+  --background: var(--ion-color-success-tint);
+  --color: var(--ion-color-success-shade);
+}
+
+.transaction-notification-page .status-failed {
+  --background: var(--ion-color-danger-tint);
+  --color: var(--ion-color-danger-shade);
+}
+
+/* Detail Modal Styling */
+.notification-detail-card {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin: 15px;
+  padding: 10px;
+}
+
+.notification-detail-card .detail-header-item {
+  --background: transparent;
+  padding: 10px 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.notification-detail-card .detail-header-item ion-label h1 {
+  font-size: 1.4em;
+  font-weight: 700;
+  color: #111;
+  margin: 0;
+}
+
+.notification-detail-card .detail-fields-list {
+  background: transparent;
+}
+
+.notification-detail-card .detail-fields-list ion-item {
+  --background: transparent;
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --min-height: 40px;
+}
+
+.notification-detail-card .detail-fields-list ion-item ion-label {
+  font-weight: 500;
+  color: #555;
+  min-width: 120px;
+}
+
+.notification-detail-card .detail-fields-list ion-item p {
+  color: #333;
+  margin: 0;
+  text-align: right;
+  flex-grow: 1;
+}
+
+.notification-detail-card .detail-fields-list ion-item[color="danger"] {
+  --background: var(--ion-color-danger-tint);
+  border-radius: 4px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  --padding-start: 10px;
+  --inner-padding-end: 10px;
+  --min-height: auto;
+}
+
+.notification-detail-card .detail-fields-list ion-item[color="danger"] ion-label,
+.notification-detail-card .detail-fields-list ion-item[color="danger"] p {
+  color: var(--ion-color-danger-shade);
+}
+
+/* Form Modal Styling */
+.form-fields-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.form-fields-container ion-input {
+  --border-radius: 12px;
+}
