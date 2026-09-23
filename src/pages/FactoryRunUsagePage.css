@@ -1,0 +1,46 @@
+.factoryrunusage-page {
+  --ion-background-color: #f4f5f8;
+}
+
+.factoryrunusage-list {
+  background: var(--ion-background-color);
+  padding: 0;
+}
+
+.factoryrunusage-list ion-item {
+  --background: #ffffff;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.factoryrunusage-list ion-item h2 {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #333;
+}
+
+.factoryrunusage-list ion-item p {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 4px;
+}
+
+.factoryrunusage-form .wizard-field-group {
+  margin-bottom: 14px; /* Consistent spacing for input fields */
+}
+
+.factoryrunusage-form ion-input {
+  --border-radius: 12px;
+}
+
+/* Ensure infinite scroll spinner is centered */
+ion-infinite-scroll-content {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+}
+
+.danger-button {
+  color: var(--ion-color-danger, #eb445a);
+}

@@ -81,7 +81,8 @@ export type UiFeature =
   | 'p2pLending'
   | 'game'
   | 'arcade'
-  | 'myRewards';
+  | 'myRewards'
+  | 'factoryRunUsages';
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
@@ -93,6 +94,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'loans', 'clientDashboards', 'clientFaceRecognitions',
     'manufacturing', 'pushNotifications', 'notificationDispatchLog',
     'rewards', 'loanChat', 'p2pLending', 'game', 'arcade',
+    'factoryRunUsages',
   ],
   manager: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',

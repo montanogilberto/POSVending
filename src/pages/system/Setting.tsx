@@ -106,6 +106,7 @@ const MODULES: ModuleDef[] = [
     name: 'IOT',
     features: [
       { code: 'iot', label: 'LED Status / Water Tanks', icon: bulbOutline },
+      { code: 'factoryRunUsages', label: 'Uso de Ejecución de Fábrica', icon: barChartOutline },
     ],
   },
 ];
