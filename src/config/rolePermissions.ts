@@ -81,7 +81,8 @@ export type UiFeature =
   | 'p2pLending'
   | 'game'
   | 'arcade'
-  | 'myRewards';
+  | 'myRewards'
+  | 'factoryRunUsages';
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
