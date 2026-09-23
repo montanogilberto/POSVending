@@ -94,6 +94,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'loans', 'clientDashboards', 'clientFaceRecognitions',
     'manufacturing', 'pushNotifications', 'notificationDispatchLog',
     'rewards', 'loanChat', 'p2pLending', 'game', 'arcade',
+    'transactionNotifications',
   ],
   manager: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
@@ -101,6 +102,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'ingresos', 'egresos', 'accounting',
     'clientDashboards', 'manufacturing', 'notificationDispatchLog',
     'rewards', 'game', 'arcade',
+    'transactionNotifications',
   ],
   employee: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
