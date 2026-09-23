@@ -100,6 +100,7 @@ const MODULES: ModuleDef[] = [
       { code: 'settings', label: 'Configuración', icon: settingsOutline },
       { code: 'loans', label: 'Préstamos', icon: cashOutline },
       { code: 'clientFaceRecognitions', label: 'Reconocimiento Facial', icon: shieldCheckmarkOutline },
+      { code: 'transactionNotifications', label: 'Movimientos', icon: cashOutline },
     ],
   },
   {
