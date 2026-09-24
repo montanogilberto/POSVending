@@ -129,8 +129,18 @@ export function adaptTicketToUnifiedReceipt(ticket: Ticket): UnifiedReceiptData 
     totals: {
       subtotal: ticket.totals.subtotal,
       iva: 0,
-      total: ticket.totals.subtotal
+      // Was hardcoded to subtotal, silently hiding any discount on this
+      // render path (ReceiptPage.tsx reprints) — total is the actual
+      // persisted, possibly-discounted amount from dbo.income.
+      total: ticket.totals.total,
+      discount: ticket.totals.discount || 0,
+      originalTotal: ticket.totals.discount ? ticket.totals.subtotal : undefined
     },
+    promotion: ticket.totals.promotionCode ? {
+      code: ticket.totals.promotionCode,
+      discount: ticket.totals.discount || 0,
+      type: 'B2G1'
+    } : undefined,
     payment: {
       method: normalizePaymentMethod(ticket.paymentMethod),
       amountReceived: ticket.totals.amountReceived,

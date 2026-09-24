@@ -60,6 +60,9 @@ function generateCompactProducts(data: UnifiedReceiptData): string {
 }
 
 function generateCompactTotals(data: UnifiedReceiptData): string {
+  const discount = Number(data.totals.discount ?? 0);
+  const originalTotal = Number(data.totals.originalTotal ?? data.totals.subtotal + data.totals.iva);
+
   return `
     <div class="totals-row">
       <span class="total-label">Subtotal:</span>
@@ -69,6 +72,15 @@ function generateCompactTotals(data: UnifiedReceiptData): string {
       <span class="total-label">IVA:</span>
       <span class="total-value">$${data.totals.iva.toFixed(2)}</span>
     </div>
+    ${discount > 0 ? `
+    <div class="totals-row">
+      <span class="total-label">Descuento${data.promotion?.code ? ` (${data.promotion.code})` : ''}:</span>
+      <span class="total-value">-$${discount.toFixed(2)}</span>
+    </div>
+    <div class="totals-row">
+      <span class="total-label">Total original:</span>
+      <span class="total-value">$${originalTotal.toFixed(2)}</span>
+    </div>` : ''}
     <div class="divider"></div>
     <div class="totals-row grand-total">
       <span class="total-label">TOTAL:</span>

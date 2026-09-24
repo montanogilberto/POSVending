@@ -154,6 +154,10 @@ export const useRewardsDashboard = () => {
         showToast('Puntos insuficientes para este canje', 'danger');
         return;
       }
+      if ('error' in result && result.error === 'insufficient_product_units') {
+        showToast('Esta recompensa solo aplica comprando ese mismo producto 3 veces', 'danger');
+        return;
+      }
       showToast('Recompensa canjeada correctamente');
       notifyDataChanged('pos_reward_redeemed');
       await load();
