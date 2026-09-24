@@ -138,6 +138,16 @@ export interface InsufficientPointsError {
   balance: number;
 }
 
+/** free_product rewards must be earned from that specific product's own purchase
+ * history, not the client's mixed/fungible point balance — see
+ * sp_posRewardRedemptions_redeem's same-product eligibility check. */
+export interface InsufficientProductUnitsError {
+  error: 'insufficient_product_units';
+  required: number;
+  purchased: number;
+  available: number;
+}
+
 export interface PosRewardDashboardSummary {
   pointsIssued: number;
   pointsRedeemed: number;
@@ -219,7 +229,7 @@ export const posRewardsApi = {
   redeem: (
     companyId: number, clientId: number, catalogItemId: number, redeemedByUserId: number, incomeId?: number
   ) =>
-    post<RedeemResult | InsufficientPointsError>('/posRewardRedemptions/redeem', {
+    post<RedeemResult | InsufficientPointsError | InsufficientProductUnitsError>('/posRewardRedemptions/redeem', {
       posRewardRedemptions: [{ companyId, clientId, catalogItemId, redeemedByUserId, incomeId }],
     }),
 };

@@ -19,6 +19,7 @@ import SummaryGrid from './components/SummaryGrid';
 import PaymentBreakdown from './components/PaymentBreakdown';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
+import ReservationsWidget from './components/ReservationsWidget';
 import { onDataChanged } from '../../utils/refreshBus';
 
 const Dashboard: React.FC = () => {
@@ -105,6 +106,9 @@ const Dashboard: React.FC = () => {
               setShowCart={setShowCart}
             />
           )}
+
+          {/* ✅ Reservaciones del día */}
+          <ReservationsWidget />
 
           {/* ✅ Recent Activity */}
           {allIncome?.length > 0 && (

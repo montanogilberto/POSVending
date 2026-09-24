@@ -24,7 +24,7 @@ import { useHistory } from 'react-router-dom';
 import { submitOrder } from '../../api/cartApi';
 import useInactivityTimer from '../../hooks/useInactivityTimer';
 import { fetchTicket } from '../../api/ticketApi';
-import { postIncome, applyPromoToIncome } from '../../api/incomeApi';
+import { postIncome } from '../../api/incomeApi';
 import { useIncome } from '../../contexts/IncomeContext';
 import { Client } from '../../api/clientsApi';
 import { posRewardsApi, PosRewardBalance } from '../../api/posRewardsApi';
@@ -335,26 +335,13 @@ const CartPage: React.FC = () => {
               // Ticket is already recorded — a points failure must not block or undo the sale.
             }
 
-            // Apply promo code to income via stored procedure (DB is source of truth)
+            // sp_income already applies the B2G1 promo (dbo.promotions lookup
+            // by companyId+code) synchronously during the same insert above —
+            // no separate round-trip needed. (There used to be one here, to a
+            // POST /income/apply-promo route that was never implemented
+            // server-side; it always 404'd and was silently swallowed.)
             if (promoActive && promoCodeValue) {
-              try {
-                const promoPayload = {
-                  promo: [{
-                    action: 1,
-                    incomeId: parseInt(newId),
-                    companyId,
-                    code: promoCodeValue,
-                    userId
-                  }]
-                };
-                console.log('Applying promo:', JSON.stringify(promoPayload, null, 2));
-                const promoResult = await applyPromoToIncome(promoPayload);
-                console.log('Promo applied result:', promoResult);
-                setPromoApplied(true);
-              } catch (promoError) {
-                console.error('Error applying promo:', promoError);
-                // Continue even if promo fails - income was still created
-              }
+              setPromoApplied(true);
             }
           }
         } catch (incomeError) {}
@@ -458,8 +445,18 @@ const CartPage: React.FC = () => {
                   </IonButton>
                   <div className="detail-total">
                     {promoActive && totals.discount > 0 && (
-                      <span className="detail-discount-label">
-                        2x1 bienvenida: -{formatPrice(totals.discount)}
+                      <>
+                        <span className="detail-subtotal-label">
+                          Subtotal: {formatPrice(totals.subtotal)}
+                        </span>
+                        <span className="detail-discount-label">
+                          2x1 bienvenida: -{formatPrice(totals.discount)}
+                        </span>
+                      </>
+                    )}
+                    {promoActive && totals.discount === 0 && (
+                      <span className="detail-discount-label detail-discount-label--pending">
+                        Cupón 2x1 activo: agrega otra unidad del mismo producto para el descuento
                       </span>
                     )}
                     <span className="detail-total-label">Total</span>
@@ -503,7 +500,21 @@ const CartPage: React.FC = () => {
                     <div className="welcome-coupon-row">
                       <IonChip
                         className={`welcome-coupon-chip ${welcomeCouponApplied ? 'applied' : ''}`}
-                        onClick={() => setWelcomeCouponApplied((applied) => !applied)}
+                        onClick={() => {
+                          const next = !welcomeCouponApplied;
+                          setWelcomeCouponApplied(next);
+                          // 2x1 only discounts a line once it has 2+ units of the SAME
+                          // product+options — a cart of single, distinct items produces
+                          // a $0 discount even though the chip now reads "aplicado".
+                          // Without this, that looks like a bug instead of the coupon
+                          // correctly having nothing to apply to yet.
+                          if (next && !cartItems.some((item) => Number(item.quantity) >= 2)) {
+                            showErrorToast(
+                              'El cupón 2x1 aplica cuando llevas 2 unidades del mismo producto — agrega otra para ver el descuento.',
+                              'warning'
+                            );
+                          }
+                        }}
                       >
                         <IonIcon icon={giftOutline} />
                         <IonLabel>

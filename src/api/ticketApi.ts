@@ -42,6 +42,8 @@ export interface Ticket {
     subtotal: number;
     iva: number;
     total: number;
+    discount?: number;
+    promotionCode?: string | null;
     amountReceived: number;
     change: number;
   };
