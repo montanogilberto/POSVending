@@ -52,6 +52,8 @@ interface UserContextProps extends AuthData {
    * role's default). Null for staff sessions. Shadows AuthData.activeProduct. */
   activeProduct: ProductContext | null;
   setActiveProduct: (product: ProductContext) => void;
+  /** Re-read clientCapabilities after a grant/revoke (e.g. self-enrollment). */
+  refreshCapabilities: () => Promise<string[]>;
 }
 
 // ── Defaults ───────────────────────────────────────────────────────────────
@@ -145,6 +147,20 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => { cancelled = true; };
   }, [auth.isAuthenticated, auth.companyId, auth.clientId]);
 
+  const refreshCapabilities = async (): Promise<string[]> => {
+    if (!auth.companyId || !auth.clientId) return [];
+    const key = `${auth.companyId}:${auth.clientId}`;
+    const rows = await listClientCapabilities(auth.companyId, auth.clientId);
+    const active = rows.filter(r => r.isActive).map(r => r.capability);
+    console.log('[UserContext] refreshCapabilities for clientId=%d: %o', auth.clientId, active);
+    setAuth(prev => {
+      const next = { ...prev, clientCapabilities: active, clientCapabilitiesKey: key };
+      persistAuth(next);
+      return next;
+    });
+    return active;
+  };
+
   const saveAuth = (data: AuthData) => {
     setAuth(data);
     persistAuth(data);
@@ -220,6 +236,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         availableProducts: products,
         activeProduct: effectiveProduct,
         setActiveProduct,
+        refreshCapabilities,
       }}
     >
       {children}

@@ -9,12 +9,14 @@ import { RoleCode, isStaffRole, hasCapability } from '../config/rolePermissions'
  * Staff roles never get a product context: their shell is the company POS
  * and is decided by roleCode alone.
  */
-export type ProductContext = 'pos' | 'borrower' | 'lender';
+export type ProductContext = 'pos' | 'borrower' | 'lender' | 'juridical' | 'factory';
 
 export const PRODUCT_LABELS: Record<ProductContext, string> = {
   pos:      'POS GMO',
   borrower: 'SmartLoans · Acreditado',
   lender:   'SmartLoans · Prestamista',
+  juridical: 'SmartLoans · Jurídico',
+  factory:  'Factory AI Software',
 };
 
 /** Products this self-service session can switch between (empty for staff). */
@@ -27,6 +29,8 @@ export const availableProducts = (
   if (roleCode === 'pos' || ['POS', 'REWARDS', 'ARCADE'].some(c => hasCapability(capabilities, c))) list.push('pos');
   if (roleCode === 'borrower' || hasCapability(capabilities, 'SMARTLOANS_BORROWER')) list.push('borrower');
   if (roleCode === 'lender' || hasCapability(capabilities, 'SMARTLOANS_LENDER')) list.push('lender');
+  if (hasCapability(capabilities, 'SMARTLOANS_JURIDICAL')) list.push('juridical');
+  if (hasCapability(capabilities, 'FACTORY_AI')) list.push('factory');
   return list;
 };
 
@@ -46,8 +50,19 @@ export const productLandingRoute = (product: ProductContext, clientId: number): 
   if (!clientId) return '/dashboard';
   if (product === 'lender') return `/lender-dashboard/${clientId}`;
   if (product === 'borrower') return `/client-dashboard/${clientId}`;
+  if (product === 'juridical') return `/juridical-dashboard/${clientId}`;
+  if (product === 'factory') return `/factory-dashboard/${clientId}`;
   return `/rewards-dashboard/${clientId}`;
 };
+
+/** Whether the session is acting as a lender / borrower right now: the active
+ * product for self-service sessions (a 'pos' login can hold SmartLoans
+ * capabilities), else the legacy roleCode. */
+export const actsAsLender = (roleCode: RoleCode | string | undefined, activeProduct: ProductContext | null): boolean =>
+  activeProduct ? activeProduct === 'lender' : roleCode === 'lender';
+
+export const actsAsBorrower = (roleCode: RoleCode | string | undefined, activeProduct: ProductContext | null): boolean =>
+  activeProduct ? activeProduct === 'borrower' : roleCode === 'borrower';
 
 /** Products a client does not hold yet — shown as "Descubrir" (cross-sell).
  * Promotion is not membership: tapping one never grants the capability. */
@@ -60,9 +75,9 @@ export const discoverProducts = (
   if (isStaffRole(roleCode)) return [];
   const held = availableProducts(roleCode, capabilities);
   const list: DiscoverProduct[] = [];
-  if (!held.includes('borrower') && !held.includes('lender') && !hasCapability(capabilities, 'SMARTLOANS_JURIDICAL')) {
+  if (!held.includes('borrower') && !held.includes('lender') && !held.includes('juridical')) {
     list.push('smartloans');
   }
-  if (!hasCapability(capabilities, 'FACTORY_AI')) list.push('factory');
+  if (!held.includes('factory')) list.push('factory');
   return list;
 };

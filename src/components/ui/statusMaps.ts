@@ -96,3 +96,11 @@ export const POS_REWARD_REDEMPTION_STATUS: Record<string, StatusMeta> = {
   applied:   { label: 'Aplicada',  color: 'success' },
   cancelled: { label: 'Cancelada', color: 'medium'  },
 };
+
+/** dbo.clientFollowUps.status — staff follow-ups, Factory AI requests,
+ * juridical assignments. */
+export const FOLLOW_UP_STATUS: Record<string, StatusMeta> = {
+  pending:   { label: 'Pendiente',  color: 'warning' },
+  completed: { label: 'Completado', color: 'success' },
+  cancelled: { label: 'Cancelado',  color: 'medium' },
+};
