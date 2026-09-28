@@ -196,7 +196,10 @@ export const normalizeRoleCode = (raw?: string | null): RoleCode => {
   const code = raw?.trim().toLowerCase();
   const valid: RoleCode[] = ['admin', 'manager', 'employee', 'borrower', 'lender', 'business', 'viewer', 'pos'];
   if (valid.includes(code as RoleCode)) return code as RoleCode;
-  return 'employee';
+  // Fail closed: an unknown/missing role gets the most restricted
+  // self-service role, never POS staff powers ('employee' before 2026-09-28).
+  if (code) console.warn('[rolePermissions] unknown roleCode', raw, '→ pos');
+  return 'pos';
 };
 
 export const canAccess = (roleCode: RoleCode | string | undefined, feature: UiFeature): boolean => {

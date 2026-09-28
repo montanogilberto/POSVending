@@ -162,7 +162,7 @@ import { IncomeProvider } from './contexts/IncomeContext';
 import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
-import { canAccess } from './config/rolePermissions';
+import { canAccess, UiFeature } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
 import BiometricLockScreen from './components/BiometricLockScreen';
@@ -177,20 +177,30 @@ interface PrivateRouteProps {
   component: React.ComponentType<any>;
   path: string;
   exact?: boolean;
+  /** Staff-only screen: also requires canAccess(roleCode, feature). The side
+   * menu already hides these items, but without this a lower role could still
+   * open them by typing the URL. Denied → the role's own landing page. */
+  feature?: UiFeature;
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({
   component: Component,
+  feature,
   ...rest
 }) => {
-  const { isAuthenticated } = useUser();
+  const { isAuthenticated, roleCode, clientId } = useUser();
 
   return (
     <Route
       {...rest}
-      render={(props) =>
-        isAuthenticated ? <Component {...props} /> : <Redirect to="/login" />
-      }
+      render={(props) => {
+        if (!isAuthenticated) return <Redirect to="/login" />;
+        if (feature && !canAccess(roleCode, feature)) {
+          console.warn('[PrivateRoute] role', roleCode, 'lacks feature', feature, '→ redirecting from', props.location.pathname);
+          return <Redirect to={getPostLoginRoute(roleCode, clientId)} />;
+        }
+        return <Component {...props} />;
+      }}
     />
   );
 };
@@ -785,7 +795,7 @@ const AppShell: React.FC = () => {
         <IonTabs>
           <IonRouterOutlet>
             
-            <PrivateRoute exact path="/setting" component={Setting} />
+            <PrivateRoute exact path="/setting" feature="settings" component={Setting} />
             
             <PrivateRoute exact path="/dashboard" component={Dashboard} />
             
@@ -800,26 +810,26 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/expense-cart" component={CartPage} />
 
             <PrivateRoute exact path="/movements" component={MovementsPage} />
-            <PrivateRoute exact path="/led-status" component={LedStatusPage} />
-            <PrivateRoute exact path="/clients" component={ClientsPage} />
-            <PrivateRoute exact path="/clients-map" component={ClientsMapPage} />
-            <PrivateRoute exact path="/products-management" component={ProductsManagementPage} />
-            <PrivateRoute exact path="/categories" component={CategoriesPage} />
-            <PrivateRoute exact path="/alerts" component={AlertsPage} />
-            <PrivateRoute exact path="/emails" component={EmailsPage} />
-            <PrivateRoute exact path="/users" component={UsersPage} />
-            <PrivateRoute exact path="/ingresos" component={IncomesPage} />
-            <PrivateRoute exact path="/egresos" component={ExpensesPage} />
-            <PrivateRoute exact path="/accounting" component={AccountingPage} />
-            <PrivateRoute exact path="/water-tanks" component={WaterTanksPage} />
-            <PrivateRoute exact path="/water-tanks-history/:tankId" component={WaterTanksHistoryPage} />
+            <PrivateRoute exact path="/led-status" feature="iot" component={LedStatusPage} />
+            <PrivateRoute exact path="/clients" feature="clients" component={ClientsPage} />
+            <PrivateRoute exact path="/clients-map" feature="clients" component={ClientsMapPage} />
+            <PrivateRoute exact path="/products-management" feature="products" component={ProductsManagementPage} />
+            <PrivateRoute exact path="/categories" feature="categories" component={CategoriesPage} />
+            <PrivateRoute exact path="/alerts" feature="alerts" component={AlertsPage} />
+            <PrivateRoute exact path="/emails" feature="emails" component={EmailsPage} />
+            <PrivateRoute exact path="/users" feature="users" component={UsersPage} />
+            <PrivateRoute exact path="/ingresos" feature="ingresos" component={IncomesPage} />
+            <PrivateRoute exact path="/egresos" feature="egresos" component={ExpensesPage} />
+            <PrivateRoute exact path="/accounting" feature="accounting" component={AccountingPage} />
+            <PrivateRoute exact path="/water-tanks" feature="iot" component={WaterTanksPage} />
+            <PrivateRoute exact path="/water-tanks-history/:tankId" feature="iot" component={WaterTanksHistoryPage} />
             <PrivateRoute exact path="/receipt" component={ReceiptPage} />
             <PrivateRoute exact path="/receipt/:incomeId" component={ReceiptPage} />
 
             <Route exact path="/">
               <Redirect to="/login" />
             </Route>
-            <PrivateRoute exact path="/suppliers" component={SupplierPage} />
+            <PrivateRoute exact path="/suppliers" feature="suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/loans" component={LoanPage} />
             <PrivateRoute exact path="/profile" component={ProfilePage} />
             <React.Suspense fallback={null}>
@@ -841,9 +851,9 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/my-loans" component={MyLoansPage} />
             <PrivateRoute exact path="/borrower-onboarding" component={BorrowerOnboardingPage} />
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
-            <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
+            <PrivateRoute exact path="/manufacturing" feature="manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
-            <PrivateRoute exact path="/pos-rewards" component={PosRewardsPage} />
+            <PrivateRoute exact path="/pos-rewards" feature="posRewards" component={PosRewardsPage} />
             <PrivateRoute exact path="/game/mission-clean-room" component={MissionCleanRoomPage} />
             {/* Arcade de fichas virtuales. Los 8 juegos que faltan salen como
                 tiles bloqueados en /arcade, asi que no necesitan ruta todavia. */}
@@ -863,8 +873,8 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/pos-support/:topic?" component={PosSupportChatPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
-            <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
-            <PrivateRoute exact path="/notification-dispatch-log" component={NotificationDispatchLogPage} />
+            <PrivateRoute exact path="/pushNotifications" feature="pushNotifications" component={PushNotificationPage} />
+            <PrivateRoute exact path="/notification-dispatch-log" feature="notificationDispatchLog" component={NotificationDispatchLogPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
           </IonRouterOutlet>
 

@@ -153,7 +153,10 @@ const ROLE_BY_CLIENT_TYPE: Record<ClientType, RoleCode> = {
   borrower: 'borrower',
   lender:   'lender',
   both:     'borrower', // primary role; the lender view is a toggle inside the app
-  lawyer:   'viewer',   // legal advisor — read-only, no dedicated role code
+  // Legal advisor. Was 'viewer' — but viewer is a STAFF role (company
+  // Ingresos/Egresos + any clientId by URL). 'pos' is the interim non-staff
+  // role until a dedicated juridical role exists in dbo.roles.
+  lawyer:   'pos',
   // 'pos' realistically never reaches this table — a POS retail customer is
   // created through the independent POS profile role picker (see
   // DEFAULT_ROLE_BY_PROFILE above), not this loans-profile derivation. Kept
