@@ -862,6 +862,59 @@
   line-height: 1.3;
 }
 
+/* Products (clientCapabilities) multi-select */
+.wizard-products-section {
+  margin-top: 20px;
+}
+
+.wizard-products-group {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 10px 14px 4px;
+  margin-bottom: 10px;
+  background: #ffffff;
+}
+
+.wizard-products-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin: 0 0 4px;
+}
+
+.wizard-product-checkbox {
+  display: flex;
+  width: 100%;
+  padding: 8px 0;
+  --size: 20px;
+}
+
+.wizard-product-checkbox::part(label) {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-inline-start: 10px;
+}
+
+.wizard-product-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.wizard-product-desc {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.wizard-products-error {
+  font-size: 12px;
+  color: #dc2626;
+  margin: 4px 0 0;
+}
+
 /* Summary box */
 .wizard-summary-box {
   background: #f9fafb;

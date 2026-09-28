@@ -348,10 +348,13 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         // Product membership lives in clientCapabilities (company-scoped),
         // not clientType. Best-effort — the client row already exists, so a
         // failed grant is logged for the backfill rather than failing the sale.
-        try {
-          await grantClientCapability(companyId, persistedClient.clientId, 'POS');
-        } catch (capErr) {
-          console.warn('[ClientSelector] grantClientCapability POS failed for clientId=', persistedClient.clientId, capErr);
+        // REWARDS too: every checkout client gets the welcome points below.
+        for (const capability of ['POS', 'REWARDS'] as const) {
+          try {
+            await grantClientCapability(companyId, persistedClient.clientId, capability);
+          } catch (capErr) {
+            console.warn('[ClientSelector] grantClientCapability', capability, 'failed for clientId=', persistedClient.clientId, capErr);
+          }
         }
 
         onChange(persistedClient);
