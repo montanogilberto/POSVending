@@ -3,7 +3,7 @@ import { API_BASE_URL } from './usersApi';
 /**
  * clientCapabilities — the multi-valued "clientTypes" concept: which GMO
  * applications a client participates in (POS, Rewards, Arcade, SmartLoans
- * Lender/Borrower/Juridical). Backend: routes_/clientCapabilities.py.
+ * Lender/Borrower/Juridical, Factory AI). Backend: routes_/clientCapabilities.py.
  * Separate from and does not read/write dbo.clients.clientType.
  */
 
@@ -13,7 +13,10 @@ export type ClientCapability =
   | 'SMARTLOANS_BORROWER'
   | 'SMARTLOANS_JURIDICAL'
   | 'REWARDS'
-  | 'ARCADE';
+  | 'ARCADE'
+  // One coarse membership value; what a client can do inside Factory AI is a
+  // separate permission model. Needs 2026-09-28_clientCapabilities_add_factory_ai.sql.
+  | 'FACTORY_AI';
 
 export interface ClientCapabilityRow {
   clientCapabilityId: number;
@@ -53,6 +56,15 @@ export const grantClientCapability = async (
   capability: ClientCapability,
 ): Promise<void> => {
   await post({ clientCapabilities: [{ action: 1, companyId, clientId, capability }] });
+};
+
+/** action 2 — revoke (soft: isActive = 0; the row is never deleted). */
+export const revokeClientCapability = async (
+  companyId: number,
+  clientId: number,
+  capability: ClientCapability,
+): Promise<void> => {
+  await post({ clientCapabilities: [{ action: 2, companyId, clientId, capability }] });
 };
 
 /** action 0 — read (list capabilities for a client). */
