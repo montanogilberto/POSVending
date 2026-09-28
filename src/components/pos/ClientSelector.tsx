@@ -27,6 +27,7 @@ import {
 import { person, close, checkmarkCircle, business, add, save, informationCircle } from 'ionicons/icons';
 import { Client, getAllClients, createOrUpdateClient } from '../../api/clientsApi';
 import { posRewardsApi } from '../../api/posRewardsApi';
+import { grantClientCapability } from '../../api/clientCapabilitiesApi';
 import { useUser } from '../../contexts/UserContext';
 
 interface ClientSelectorProps {
@@ -303,6 +304,9 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           last_name: newClient.last_name!,
           cellphone: formattedCellphone,
           email: newClient.email || '',
+          // Created from the POS checkout — always a retail customer. Omitting
+          // it let the backend default to 'borrower'.
+          clientType: 'pos' as const,
           action: '1'
         }]
       };
@@ -339,6 +343,15 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
         const persistedClient = findByPhone(updatedClients);
         if (!persistedClient) {
           throw new Error('No se pudo verificar el cliente creado en la base de datos.');
+        }
+
+        // Product membership lives in clientCapabilities (company-scoped),
+        // not clientType. Best-effort — the client row already exists, so a
+        // failed grant is logged for the backfill rather than failing the sale.
+        try {
+          await grantClientCapability(companyId, persistedClient.clientId, 'POS');
+        } catch (capErr) {
+          console.warn('[ClientSelector] grantClientCapability POS failed for clientId=', persistedClient.clientId, capErr);
         }
 
         onChange(persistedClient);

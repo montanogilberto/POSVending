@@ -179,7 +179,7 @@ const ClientsPage: React.FC = () => {
   const [wizardError, setWizardError] = useState('');
 
   // Step 0 — client info
-  const [newClient, setNewClient] = useState<Partial<Client>>({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'borrower' });
+  const [newClient, setNewClient] = useState<Partial<Client>>({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'pos' });
   const [createErrors, setCreateErrors] = useState(emptyErrors);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
@@ -491,7 +491,7 @@ const ClientsPage: React.FC = () => {
     setWizardStep(0);
     setCaptureSubStep('doc-intro');
     setWizardError('');
-    setNewClient({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'borrower' });
+    setNewClient({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'pos' });
     setCreateErrors(emptyErrors);
     setCreatedClientId(null);
     setDocumentType('');
