@@ -20,6 +20,7 @@ import { loanChatApi, getChatConfig, LoanConversation } from '../../api/loanChat
 import { p2pLendingRoute } from '../../utils/routes';
 import { getAllClients, Client } from '../../api/clientsApi';
 import { onDataChanged } from '../../utils/refreshBus';
+import { actsAsBorrower } from '../../utils/productContext';
 import { usePopovers } from '../../hooks/usePopovers';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { CONVERSATION_STATUS } from '../../components/ui/statusMaps';
@@ -28,7 +29,7 @@ import './LoanChatListPage.css';
 
 const LoanChatListPage: React.FC = () => {
   const history = useHistory();
-  const { clientId, companyId, roleCode } = useUser();
+  const { clientId, companyId, roleCode, activeProduct } = useUser();
   const [convs, setConvs] = useState<LoanConversation[]>([]);
   const [clientMap, setClientMap] = useState<Record<number, Client>>({});
   const [loading, setLoading] = useState(false);
@@ -89,7 +90,7 @@ const LoanChatListPage: React.FC = () => {
             action={
               <IonButton size="small" onClick={() => history.push(p2pLendingRoute(clientId))}>
                 <IonIcon icon={storefrontOutline} slot="start" />
-                {roleCode === 'borrower' ? 'Busca una oferta y chatea' : 'Ir al marketplace'}
+                {actsAsBorrower(roleCode, activeProduct) ? 'Busca una oferta y chatea' : 'Ir al marketplace'}
               </IonButton>
             } />
         )}

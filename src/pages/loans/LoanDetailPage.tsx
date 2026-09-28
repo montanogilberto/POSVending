@@ -36,6 +36,7 @@ import { createPushNotification } from '../../api/pushNotificationsApi';
 import { pickEvidencePhoto } from '../../utils/pickAvatarPhoto';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
+import { actsAsBorrower } from '../../utils/productContext';
 import { fmtMXN as fmt, mxDate as toDate } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -46,7 +47,7 @@ const LoanDetailPage: React.FC = () => {
   const { loanId: loanIdParam } = useParams<{ loanId: string }>();
   const loanId = Number(loanIdParam);
   const history = useHistory();
-  const { companyId, clientId, userId, roleCode } = useUser();
+  const { companyId, clientId, userId, roleCode, activeProduct } = useUser();
 
   const [loan, setLoan] = useState<Loan | null>(null);
   const [cuotas, setCuotas] = useState<Installment[]>([]);
@@ -106,7 +107,7 @@ const LoanDetailPage: React.FC = () => {
       }
       setLenderId(lid);
 
-      if (roleCode === 'borrower') {
+      if (actsAsBorrower(roleCode, activeProduct)) {
         const bal = await ledgerBalance(companyId, Number(clientId));
         setWalletBalance(bal.availableBalance);
       }
@@ -136,7 +137,7 @@ const LoanDetailPage: React.FC = () => {
       console.log('[LoanDetail] load ❌', String(e));
     }
     setLoading(false);
-  }, [companyId, clientId, loanId, roleCode]);
+  }, [companyId, clientId, loanId, roleCode, activeProduct]);
 
   useIonViewWillEnter(() => { load(); }, [load]);
 

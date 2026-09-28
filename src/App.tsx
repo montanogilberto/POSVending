@@ -72,6 +72,8 @@ import {
   paperPlaneOutline,
   checkmarkCircle,
   compassOutline,
+  briefcaseOutline,
+  sparklesOutline,
 }
   from 'ionicons/icons';
   
@@ -88,6 +90,9 @@ import CartPage from './pages/cart/CartPage';
 import MovementsPage from './pages/finance/MovementsPage';
 import LedStatusPage from './pages/iot/LedStatusPage';
 import ClientsPage from './pages/clients/ClientsPage';
+import EnrollmentPage from './pages/enrollment/EnrollmentPage';
+import JuridicalDashboardPage from './pages/juridical/JuridicalDashboardPage';
+import FactoryDashboardPage from './pages/factory/FactoryDashboardPage';
 import ClientsMapPage from './pages/clients/ClientsMapPage';
 import ProductsManagementPage from './pages/products/ProductsManagementPage';
 import AlertsPage from './pages/messaging/AlertsPage';
@@ -242,6 +247,14 @@ const AppShell: React.FC = () => {
     ? activeProduct === 'borrower' || activeProduct === 'lender'
     : roleCode === 'borrower' || roleCode === 'lender';
   const isClientRole = activeProduct ? activeProduct === 'pos' : roleCode === 'pos';
+  // Juridical / Factory AI products: their own dashboard + a small tab bar.
+  const isOwnDashboardProduct = activeProduct === 'juridical' || activeProduct === 'factory';
+  const shellTitle = activeProduct === 'factory' ? 'Factory AI'
+    : isSmartLoansRole || activeProduct === 'juridical' ? 'SmartLoans' : 'POS GMO';
+  const PRODUCT_ICONS = {
+    pos: storefrontOutline, borrower: walletOutline, lender: walletOutline,
+    juridical: briefcaseOutline, factory: sparklesOutline,
+  } as const;
   const discover = discoverProducts(roleCode, clientCapabilities);
   const [discoverOpen, setDiscoverOpen] = useState<DiscoverProduct | null>(null);
   const switchProduct = (product: typeof availableProducts[number]) => {
@@ -251,6 +264,20 @@ const AppShell: React.FC = () => {
   };
   const history = useHistory();
   const location = useLocation();
+  // A product dashboard opened directly (deep link, push, back button) makes
+  // that product the active one, so the shell never shows another product's
+  // tabs/header over it. Only products the session actually holds.
+  useEffect(() => {
+    const byRoute: [string, typeof availableProducts[number]][] = [
+      ['/rewards-dashboard', 'pos'], ['/client-dashboard', 'borrower'], ['/lender-dashboard', 'lender'],
+      ['/juridical-dashboard', 'juridical'], ['/factory-dashboard', 'factory'],
+    ];
+    const match = byRoute.find(([prefix]) => location.pathname.startsWith(prefix));
+    if (match && match[1] !== activeProduct && availableProducts.includes(match[1])) {
+      console.log('[AppShell] route', location.pathname, '→ active product', match[1]);
+      setActiveProduct(match[1]);
+    }
+  }, [location.pathname, activeProduct, availableProducts, setActiveProduct]);
   // ClientDashboardPage's 5 sections are ?tab=... on one route, not separate
   // routes — IonTabs matches tabs by path only (ignores query string), so a
   // plain href would treat all 5 buttons as "already on this tab" and never
@@ -502,7 +529,7 @@ const AppShell: React.FC = () => {
       <IonMenu menuId="main-menu" contentId="main" side="start" className={menuCollapsed ? 'menu-rail' : ''}>
         <IonHeader className="menu-header">
           <IonToolbar>
-            {!menuCollapsed && <IonTitle>{isSmartLoansRole ? 'SmartLoans' : 'POS GMO'}</IonTitle>}
+            {!menuCollapsed && <IonTitle>{shellTitle}</IonTitle>}
             <IonButtons slot="end">
               <IonButton fill="clear" size="small" onClick={() => setMenuCollapsed(c => !c)} className="menu-collapse-btn">
                 <IonIcon icon={menuCollapsed ? chevronForwardOutline : chevronBackOutline} />
@@ -546,7 +573,7 @@ const AppShell: React.FC = () => {
                       title={PRODUCT_LABELS[product]}
                       className={product === activeProduct ? 'menu-product-active' : undefined}
                     >
-                      <IonIcon icon={product === 'pos' ? storefrontOutline : walletOutline} slot="start" />
+                      <IonIcon icon={PRODUCT_ICONS[product]} slot="start" />
                       {!menuCollapsed && <IonLabel>{PRODUCT_LABELS[product]}</IonLabel>}
                       {product === activeProduct && <IonIcon icon={checkmarkCircle} slot="end" color="primary" />}
                     </IonItem>
@@ -906,6 +933,9 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
             <PrivateRoute exact path="/my-qr" component={MyQrPage} />
+            <PrivateRoute exact path="/enroll/:product" component={EnrollmentPage} />
+            <PrivateRoute exact path="/juridical-dashboard/:clientId" component={JuridicalDashboardPage} />
+            <PrivateRoute exact path="/factory-dashboard/:clientId" component={FactoryDashboardPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
             {/* Mismo patrón que /client-dashboard/:clientId — el id va en la URL
                 para que la ruta sea compartible y sobreviva un refresh. La
@@ -1008,6 +1038,21 @@ const AppShell: React.FC = () => {
                     <span>Chat</span>
                   </button>
                 )}
+              </>
+            ) : isOwnDashboardProduct && activeProduct ? (
+              <>
+                <button
+                  type="button"
+                  className={`cd-tab${location.pathname === productLandingRoute(activeProduct, clientId) ? ' cd-tab--active' : ''}`}
+                  onClick={() => history.push(productLandingRoute(activeProduct, clientId))}
+                >
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Inicio</span>
+                </button>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/profile') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/profile')}>
+                  <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                  <span>Perfil</span>
+                </button>
               </>
             ) : isClientRole ? (
               <>

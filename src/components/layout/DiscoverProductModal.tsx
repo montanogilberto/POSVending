@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useHistory } from 'react-router-dom';
 import {
   IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonModal, IonSpinner, IonTitle, IonToast, IonToolbar,
 } from '@ionic/react';
@@ -15,7 +16,7 @@ const COPY: Record<DiscoverProduct, { title: string; icon: string; lines: string
     lines: [
       'Pide un préstamo o invierte prestando a otros clientes.',
       'Tu cuenta, tus compras y tus recompensas se quedan igual.',
-      'Para activarlo necesitas identificación, verificación facial y firma de contrato.',
+      'Actívalo ahora; antes de tu primer préstamo verificamos tu identificación y firmas pagaré y contrato.',
     ],
     followUpTitle: 'Interesado en SmartLoans',
   },
@@ -24,7 +25,7 @@ const COPY: Record<DiscoverProduct, { title: string; icon: string; lines: string
     icon: sparklesOutline,
     lines: [
       'Software a la medida para tu negocio, construido con IA.',
-      'Un asesor te contacta para entender lo que necesitas.',
+      'Actívalo y envía tu primera solicitud; un asesor la revisa contigo.',
     ],
     followUpTitle: 'Interesado en Factory AI Software',
   },
@@ -40,13 +41,21 @@ interface Props {
 
 /**
  * "Descubrir" — cross-sell for a product the client does not hold yet.
- * Promotion is not membership: this never grants a capability. It records a
- * pending follow-up so staff contact the client and run the real enrollment.
+ * Promotion is not membership: this modal never grants a capability.
+ * "Activar" opens the self-service enrollment (/enroll/:product), which does;
+ * "Hablar con un asesor" only records a pending follow-up for staff.
  */
 const DiscoverProductModal: React.FC<Props> = ({ product, companyId, clientId, userId, onClose }) => {
+  const history = useHistory();
   const [sending, setSending] = useState(false);
   const { showToast, toastProps } = useToast();
   const copy = product ? COPY[product] : null;
+
+  const handleActivate = () => {
+    if (!product) return;
+    onClose();
+    history.push(`/enroll/${product}`);
+  };
 
   const handleInterested = async () => {
     if (!product || !copy || sending) return;
@@ -94,8 +103,11 @@ const DiscoverProductModal: React.FC<Props> = ({ product, companyId, clientId, u
               <ul className="discover-lines">
                 {copy.lines.map(line => <li key={line}>{line}</li>)}
               </ul>
-              <IonButton expand="block" onClick={handleInterested} disabled={sending} className="discover-cta">
-                {sending ? <IonSpinner name="dots" /> : 'Me interesa'}
+              <IonButton expand="block" onClick={handleActivate} disabled={sending} className="discover-cta">
+                Activar
+              </IonButton>
+              <IonButton expand="block" fill="clear" onClick={handleInterested} disabled={sending} className="discover-cta">
+                {sending ? <IonSpinner name="dots" /> : 'Hablar con un asesor'}
               </IonButton>
             </div>
           )}

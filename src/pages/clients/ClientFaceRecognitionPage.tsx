@@ -35,6 +35,7 @@ import SignaturePad from '../../components/kyc/SignaturePad';
 import SavedCardSetup from '../../components/payments/SavedCardSetup';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
+import { actsAsLender } from '../../utils/productContext';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../contexts/UserContext';
 import { saveProfileImage } from '../../api/usersApi';
@@ -79,7 +80,7 @@ type CaptureSubStep =
   | 'processing';     // "Cargando..."
 
 const ClientFaceRecognitionPage: React.FC = () => {
-  const { companyId, clientId: contextClientId, roleCode, setAvatarUrl } = useUser();
+  const { companyId, clientId: contextClientId, roleCode, setAvatarUrl, activeProduct } = useUser();
 
   const [step, setStep] = useState(0);
   const [captureSubStep, setCaptureSubStep] = useState<CaptureSubStep>('doc-intro');
@@ -109,7 +110,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // dashboard, not the borrower one. Only used when the caller didn't pass an
   // explicit returnTo (the lender/borrower dashboards do pass it).
   const returnTo = location.state?.returnTo
-    || (roleCode === 'lender'
+    || (actsAsLender(roleCode, activeProduct)
           ? `/lender-dashboard/${deepLinkClientId ?? contextClientId}`
           : `/client-dashboard/${deepLinkClientId}?tab=home`);
 
