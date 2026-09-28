@@ -70,6 +70,8 @@ import {
   trendingUpOutline,
   trendingDownOutline,
   paperPlaneOutline,
+  checkmarkCircle,
+  compassOutline,
 }
   from 'ionicons/icons';
   
@@ -170,6 +172,9 @@ import ZoomableImage from './components/ui/ZoomableImage';
 import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
 import { getPostLoginRoute } from './utils/postLoginRoute';
 import { myLoansRoute, p2pLendingRoute, withClientId } from './utils/routes';
+import { PRODUCT_LABELS, productLandingRoute, discoverProducts, DiscoverProduct } from './utils/productContext';
+import DiscoverProductModal from './components/layout/DiscoverProductModal';
+import './components/layout/DiscoverProductModal.css';
 
 setupIonicReact();
 
@@ -226,10 +231,24 @@ const isPosOnlyRoute = (pathname: string): boolean =>
   POS_ONLY_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName, avatarUrl, userId, clientId, roleCode, roleName, setAvatarUrl } =
-    useUser();
-  const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
-  const isClientRole = roleCode === 'pos';
+  const {
+    logout, username, companyName, branchName, avatarUrl, userId, clientId, companyId, roleCode, roleName, setAvatarUrl,
+    activeProduct, availableProducts, setActiveProduct, clientCapabilities,
+  } = useUser();
+  // Self-service sessions follow the ACTIVE PRODUCT (from clientCapabilities),
+  // so one login can be a POS customer and a SmartLoans borrower. Staff have
+  // no product context and keep the role-based shell.
+  const isSmartLoansRole = activeProduct
+    ? activeProduct === 'borrower' || activeProduct === 'lender'
+    : roleCode === 'borrower' || roleCode === 'lender';
+  const isClientRole = activeProduct ? activeProduct === 'pos' : roleCode === 'pos';
+  const discover = discoverProducts(roleCode, clientCapabilities);
+  const [discoverOpen, setDiscoverOpen] = useState<DiscoverProduct | null>(null);
+  const switchProduct = (product: typeof availableProducts[number]) => {
+    console.log('[AppShell] switching product context →', product);
+    setActiveProduct(product);
+    history.push(productLandingRoute(product, clientId));
+  };
   const history = useHistory();
   const location = useLocation();
   // ClientDashboardPage's 5 sections are ?tab=... on one route, not separate
@@ -243,7 +262,7 @@ const AppShell: React.FC = () => {
   // borrower ?tab= tabs above are sections of the borrower dashboard and would
   // send a lender to the wrong page. Pagos scrolls to a section on the lender
   // dashboard; Invertir/Invitar are real routes.
-  const isLender = roleCode === 'lender';
+  const isLender = activeProduct ? activeProduct === 'lender' : roleCode === 'lender';
   const lenderSection = new URLSearchParams(location.search).get('section');
   const activeLenderTab =
     location.pathname.startsWith('/p2p-lending') ? 'invertir'
@@ -516,6 +535,26 @@ const AppShell: React.FC = () => {
           </div>
 
           <IonList>
+            {availableProducts.length > 1 && (
+              <>
+                {!menuCollapsed && <IonItemDivider>Mis productos</IonItemDivider>}
+                {availableProducts.map(product => (
+                  <IonMenuToggle autoHide={false} key={product}>
+                    <IonItem
+                      button
+                      onClick={() => switchProduct(product)}
+                      title={PRODUCT_LABELS[product]}
+                      className={product === activeProduct ? 'menu-product-active' : undefined}
+                    >
+                      <IonIcon icon={product === 'pos' ? storefrontOutline : walletOutline} slot="start" />
+                      {!menuCollapsed && <IonLabel>{PRODUCT_LABELS[product]}</IonLabel>}
+                      {product === activeProduct && <IonIcon icon={checkmarkCircle} slot="end" color="primary" />}
+                    </IonItem>
+                  </IonMenuToggle>
+                ))}
+              </>
+            )}
+
             {!menuCollapsed && <IonItemDivider>Cuenta</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
@@ -780,6 +819,25 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            {discover.length > 0 && clientId > 0 && (
+              <>
+                {!menuCollapsed && <IonItemDivider>Descubrir</IonItemDivider>}
+                {discover.map(product => (
+                  <IonMenuToggle autoHide={false} key={product}>
+                    <IonItem
+                      button
+                      onClick={() => setDiscoverOpen(product)}
+                      title={product === 'smartloans' ? 'Descubre SmartLoans' : 'Descubre Factory AI'}
+                      className="menu-discover-item"
+                    >
+                      <IonIcon icon={compassOutline} slot="start" />
+                      {!menuCollapsed && <IonLabel>{product === 'smartloans' ? 'SmartLoans' : 'Factory AI Software'}</IonLabel>}
+                    </IonItem>
+                  </IonMenuToggle>
+                ))}
+              </>
+            )}
+
             <IonMenuToggle autoHide={false}>
               <IonItem button onClick={handleLogout} title="Cerrar sesión">
                 <IonIcon icon={logOutOutline} slot="start" color="danger" />
@@ -789,6 +847,14 @@ const AppShell: React.FC = () => {
           </IonList>
         </IonContent>
       </IonMenu>
+
+      <DiscoverProductModal
+        product={discoverOpen}
+        companyId={companyId}
+        clientId={clientId}
+        userId={userId}
+        onClose={() => setDiscoverOpen(null)}
+      />
 
       {/* Main content */}
       <IonPage id="main">
@@ -830,7 +896,7 @@ const AppShell: React.FC = () => {
               <Redirect to="/login" />
             </Route>
             <PrivateRoute exact path="/suppliers" feature="suppliers" component={SupplierPage} />
-            <PrivateRoute exact path="/loans" component={LoanPage} />
+            <PrivateRoute exact path="/loans" feature="loans" component={LoanPage} />
             <PrivateRoute exact path="/profile" component={ProfilePage} />
             <React.Suspense fallback={null}>
               <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
@@ -907,7 +973,7 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={peopleOutline} />
                   <span>Invitar</span>
                 </button>
-                {canAccess(roleCode, 'loanChat') && (
+                {(canAccess(roleCode, 'loanChat') || isSmartLoansRole) && (
                   <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
                     <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
                     <span>Chat</span>
@@ -936,7 +1002,7 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={personCircleOutline} />
                   <span>Perfil</span>
                 </button>
-                {canAccess(roleCode, 'loanChat') && (
+                {(canAccess(roleCode, 'loanChat') || isSmartLoansRole) && (
                   <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
                     <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
                     <span>Chat</span>

@@ -32,6 +32,7 @@ import {
 import { useHistory, useLocation, useParams } from 'react-router-dom';
 import { myLoansRoute, P2PTab } from '../../utils/routes';
 import { useUser } from '../../contexts/UserContext';
+import { hasCapability } from '../../config/rolePermissions';
 import { getAllClients, Client, ClientType } from '../../api/clientsApi';
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
@@ -253,15 +254,25 @@ const P2PLendingPage: React.FC = () => {
   // variante sin id sigue viva, así que el param solo gana cuando existe y el
   // contexto de sesión es el fallback.
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
-  const { clientId: contextClientId, companyId, userId, roleCode } = useUser();
+  const { clientId: contextClientId, companyId, userId, roleCode, clientCapabilities } = useUser();
   const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
   console.log('[P2P] render. clientId =', clientId, '(param:', clientIdParam ?? '—', '/ context:', contextClientId, ') companyId =', companyId);
 
   // Determine the role of the logged-in client
   const [myClient, setMyClient] = useState<Client | null>(null);
-  const clientType: ClientType = (myClient?.clientType as ClientType) ?? 'borrower';
-  const isLender   = clientType === 'lender' || clientType === 'both';
-  const isBorrower = clientType === 'borrower' || clientType === 'both';
+  // Membership comes from clientCapabilities (session = the logged-in client,
+  // so only when viewing yourself). Legacy clientType stays as a fallback until
+  // the validated backfill runs — including its old "no type → borrower"
+  // default, so nobody loses the borrower view mid-migration.
+  const viewingSelf = clientId === contextClientId;
+  const legacyType = myClient?.clientType as ClientType | undefined;
+  const isLender =
+    (viewingSelf && (roleCode === 'lender' || hasCapability(clientCapabilities, 'SMARTLOANS_LENDER')))
+    || legacyType === 'lender' || legacyType === 'both';
+  const isBorrower =
+    (viewingSelf && (roleCode === 'borrower' || hasCapability(clientCapabilities, 'SMARTLOANS_BORROWER')))
+    || legacyType === 'borrower' || legacyType === 'both'
+    || (!legacyType && !isLender);
 
   const goTopUp    = () => {
     console.log('[P2P] goTopUp → /payment?mode=top_up', JSON.stringify({ clientId, companyId, walletBalance }));

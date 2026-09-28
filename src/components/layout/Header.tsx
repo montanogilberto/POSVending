@@ -38,9 +38,13 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const history = useHistory();
   const { cart } = useCart();
-  const { roleCode, userId } = useUser();
+  const { roleCode, userId, activeProduct } = useUser();
   // No shopping cart concept in the SmartLoans (borrower/lender) experience.
-  const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
+  // Follows the active product for self-service sessions (a POS customer who
+  // is also a borrower gets SmartLoans icons while in SmartLoans).
+  const isSmartLoansRole = activeProduct
+    ? activeProduct === 'borrower' || activeProduct === 'lender'
+    : roleCode === 'borrower' || roleCode === 'lender';
   const [unreadCount, setUnreadCount] = useState(0);
   const listenerRef = useRef<any>(null);
   // LLM support agent (cuenta · contratos · legal GUÍA) — id from backend
