@@ -40,52 +40,22 @@ const normalizeError = (error: unknown) => {
   return { raw: String(error) };
 };
 
-// ✅ FIXED: Proper options object instead of raw signal
-export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> => {
-  try {
-    const response = await fetch(
-      'https://smartloansbackend.azurewebsites.net/all_income',
-      signal ? { signal } : {}
-    );
+// One company's income for one month (Hermosillo time). No period = the
+// current month (Dashboard, /movements); { year, month } = that month
+// (/ingresos) — needs sql/migrations/2026-09-29_income_monthly_any_month.sql,
+// before which the SP ignores the period and returns the current month.
+// (GET /all_income is NOT filtered by company — its wrapper was removed
+// 2026-09-29; don't reintroduce it.)
+export interface IncomePeriod {
+  year: number;
+  /** 1-12 */
+  month: number;
+}
 
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => '');
-      console.error('all_income non-OK response', {
-        status: response.status,
-        statusText: response.statusText,
-        body: responseText,
-      });
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    console.log('Fetched all_income:', data);
-
-    const incomeArray = Array.isArray(data.income) ? data.income : [];
-
-    return incomeArray.sort(
-      (a: Income, b: Income) =>
-        new Date(b.paymentDate).getTime() -
-        new Date(a.paymentDate).getTime()
-    );
-
-  } catch (error: unknown) {
-    if ((error as any)?.name === 'AbortError') {
-      console.log('Fetch aborted');
-      return [];
-    }
-
-    console.error('Error loading incomes (api detailed):', normalizeError(error));
-    return [];
-  }
-};
-
-// Current-month income for one company (Dashboard) — avoids transferring the
-// full all-time history that fetchAllLaundry/all_income returns.
 export const fetchMonthlyLaundry = async (
   companyId: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  period?: IncomePeriod
 ): Promise<Income[]> => {
   try {
     const response = await fetch(
@@ -93,7 +63,7 @@ export const fetchMonthlyLaundry = async (
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ income: [{ companyId }] }),
+        body: JSON.stringify({ income: [{ companyId, ...(period ?? {}) }] }),
         ...(signal ? { signal } : {}),
       }
     );

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonPage,
   IonContent,
@@ -17,6 +17,7 @@ import {
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonButton,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import Header from '../../components/layout/Header';
@@ -26,11 +27,14 @@ import IncomesChart from '../../components/finance/IncomesChart';
 import IncomesFilters from '../../components/finance/IncomesFilters';
 import IncomeMovementList from '../../components/finance/IncomeMovementList';
 import EmptyState from '../../components/ui/EmptyState';
-import { fetchAllLaundry } from '../../api/laundryApi';
+import { fetchMonthlyLaundry, IncomePeriod } from '../../api/laundryApi';
+import { useUser } from '../../contexts/UserContext';
+import { toHermosilloDate } from '../../utils/format';
+import { onDataChanged } from '../../utils/refreshBus';
 import { fetchTicket } from '../../api/ticketApi';
 import { ReceiptService } from '../../services/ReceiptService';
 
-import { calendar, waterOutline, receiptOutline } from 'ionicons/icons';
+import { calendar, waterOutline, receiptOutline, chevronBackOutline, chevronForwardOutline } from 'ionicons/icons';
 import { postIncomeAction } from '../../api/incomeApi';
 import { formatCurrencyWithSymbol } from '../../utils/formatters';
 
@@ -49,6 +53,22 @@ interface Income {
 // Rows rendered per infinite-scroll step.
 const PAGE_SIZE = 30;
 
+/** Hermosillo (UTC-7) year/month of a UTC timestamp — same boundary as sp_income_monthly. */
+const hermosilloPeriod = (utc: string): IncomePeriod => {
+  const d = toHermosilloDate(utc);
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+};
+const currentPeriod = (): IncomePeriod => hermosilloPeriod(new Date().toISOString());
+const samePeriod = (a: IncomePeriod, b: IncomePeriod) => a.year === b.year && a.month === b.month;
+const shiftPeriod = ({ year, month }: IncomePeriod, delta: number): IncomePeriod => {
+  const idx = year * 12 + (month - 1) + delta;
+  return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
+};
+const periodLabel = ({ year, month }: IncomePeriod) => {
+  const raw = new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('es-MX', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+};
+
 const IncomesPage: React.FC = () => {
   const history = useHistory();
   const [allIncome, setAllIncome] = useState<Income[]>([]);
@@ -65,24 +85,44 @@ const IncomesPage: React.FC = () => {
   // incomeId whose ticket fetch / delete is in flight — that row shows a spinner.
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const loadIncomes = async () => {
-      setLoading(true);
-      try {
-        const incomes = await fetchAllLaundry();
-        setAllIncome(incomes);
-        setFilteredIncome(incomes);
-        setDisplayedIncome(incomes.slice(0, PAGE_SIZE));
-      } catch (error) {
-        console.error('Error fetching incomes:', error);
-        setToastMessage('Error al cargar ingresos');
-        setShowToast(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadIncomes();
-  }, []);
+  const { companyId } = useUser();
+  // One company, one month (Hermosillo) — /all_income is NOT filtered by
+  // company, so /ingresos used to show and total every company's sales.
+  const [period, setPeriod] = useState<IncomePeriod>(currentPeriod);
+  const isCurrentPeriod = samePeriod(period, currentPeriod());
+
+  const loadIncomes = useCallback(async () => {
+    if (!companyId) return;
+    setLoading(true);
+    try {
+      const rows = await fetchMonthlyLaundry(companyId, undefined, period);
+      // Guard: before 2026-09-29_income_monthly_any_month.sql is deployed the
+      // SP ignores the period and returns the current month — never show
+      // those rows under another month's heading.
+      const incomes = rows.filter(r => samePeriod(hermosilloPeriod(r.paymentDate), period));
+      console.log('[Incomes] companyId=%d period=%o rows=%d (in period %d)', companyId, period, rows.length, incomes.length);
+      setAllIncome(incomes);
+      setFilteredIncome(incomes);
+      setDisplayedIncome(incomes.slice(0, PAGE_SIZE));
+    } catch (error) {
+      console.error('Error fetching incomes:', error);
+      setToastMessage('Error al cargar ingresos');
+      setShowToast(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [companyId, period]);
+
+  // Loads on mount and whenever the company or month changes...
+  useEffect(() => { loadIncomes(); }, [loadIncomes]);
+  // ...and again when returning to this (still-mounted) Ionic page — but not
+  // on the first entry, which the effect above already covered.
+  const enteredOnce = useRef(false);
+  useIonViewWillEnter(() => {
+    if (enteredOnce.current) loadIncomes();
+    enteredOnce.current = true;
+  });
+  useEffect(() => onDataChanged(() => { loadIncomes(); }), [loadIncomes]);
 
   useEffect(() => {
     const filtered = allIncome.filter((income) => {
@@ -110,7 +150,7 @@ const IncomesPage: React.FC = () => {
     if (filteredIncome.length > 0) {
       const dailyTotals: { [key: string]: number } = {};
       filteredIncome.forEach((income) => {
-        const date = new Date(income.paymentDate).toISOString().split('T')[0];
+        const date = toHermosilloDate(income.paymentDate).toISOString().split('T')[0];
         dailyTotals[date] = (dailyTotals[date] || 0) + income.total;
       });
 
@@ -197,9 +237,7 @@ const IncomesPage: React.FC = () => {
       setShowToast(true);
 
       // Reload from backend to reflect deletion/update
-      const incomes = await fetchAllLaundry();
-      setAllIncome(incomes);
-      setFilteredIncome(incomes);
+      await loadIncomes();
     } catch (error: unknown) {
       console.error('Error performing income action:', error);
       const msg = error instanceof Error ? error.message : undefined;
@@ -210,26 +248,10 @@ const IncomesPage: React.FC = () => {
     }
   };
 
-  const isCurrentMonth = (paymentDate: string) => {
-    const now = new Date();
-    const d = new Date(paymentDate);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  };
-
-  const calculateMonthlyTotal = () => {
-    return allIncome
-      .filter((income) => isCurrentMonth(income.paymentDate))
-      .reduce((sum, income) => sum + (Number(income.total) || 0), 0);
-  };
-
-  const calculateMonthlyCount = () => {
-    return allIncome.filter((income) => isCurrentMonth(income.paymentDate)).length;
-  };
-
-  const currentMonthYear = new Date().toLocaleDateString('es-ES', {
-    month: 'long',
-    year: 'numeric',
-  });
+  // The loaded rows ARE the selected month, so the summary is a plain sum —
+  // the same number /movements shows for the current month.
+  const monthlyTotal = allIncome.reduce((sum, income) => sum + (Number(income.total) || 0), 0);
+  const monthlyCount = allIncome.length;
 
   return (
     <IonPage>
@@ -255,7 +277,15 @@ const IncomesPage: React.FC = () => {
             <IonCol sizeMd="8" sizeLg="6" sizeXs="12">
               <IonCard className="incomes-summary-card">
                 <IonCardContent>
-                  <div className="incomes-summary-title">{currentMonthYear}</div>
+                  <div className="incomes-period">
+                    <IonButton fill="clear" size="small" aria-label="Mes anterior" disabled={loading} onClick={() => setPeriod(p => shiftPeriod(p, -1))}>
+                      <IonIcon icon={chevronBackOutline} slot="icon-only" />
+                    </IonButton>
+                    <div className="incomes-summary-title">{periodLabel(period)}</div>
+                    <IonButton fill="clear" size="small" aria-label="Mes siguiente" disabled={loading || isCurrentPeriod} onClick={() => setPeriod(p => shiftPeriod(p, 1))}>
+                      <IonIcon icon={chevronForwardOutline} slot="icon-only" />
+                    </IonButton>
+                  </div>
                   <div className="incomes-summary-grid">
                     <div className="incomes-summary-tile">
                       <div className="incomes-summary-tile-icon">
@@ -263,7 +293,7 @@ const IncomesPage: React.FC = () => {
                       </div>
                       <div>
                         <div className="incomes-summary-tile-label">Total Mensual</div>
-                        <div className="incomes-summary-tile-value">{formatCurrencyWithSymbol(calculateMonthlyTotal())}</div>
+                        <div className="incomes-summary-tile-value">{formatCurrencyWithSymbol(monthlyTotal)}</div>
                       </div>
                     </div>
                     <div className="incomes-summary-tile">
@@ -272,7 +302,7 @@ const IncomesPage: React.FC = () => {
                       </div>
                       <div>
                         <div className="incomes-summary-tile-label">Operaciones</div>
-                        <div className="incomes-summary-tile-value">{calculateMonthlyCount()}</div>
+                        <div className="incomes-summary-tile-value">{monthlyCount}</div>
                       </div>
                     </div>
                   </div>
@@ -351,7 +381,12 @@ const IncomesPage: React.FC = () => {
                   {loading ? (
                     <div className="incomes-list-loading"><IonSpinner name="dots" /></div>
                   ) : filteredIncome.length === 0 ? (
-                    <EmptyState icon={receiptOutline} text="No se encontraron ingresos con los filtros aplicados." />
+                    <EmptyState
+                      icon={receiptOutline}
+                      text={allIncome.length === 0
+                        ? `No hay ingresos en ${periodLabel(period).toLowerCase()}.`
+                        : 'No se encontraron ingresos con los filtros aplicados.'}
+                    />
                   ) : (
                     <>
                       <IncomeMovementList

@@ -83,3 +83,17 @@
   justify-content: center;
   padding: 24px 0;
 }
+
+/* Month picker in the summary card: ‹ Septiembre de 2026 › */
+.incomes-period {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.incomes-period .incomes-summary-title {
+  flex: 1;
+  text-align: center;
+  margin: 0;
+}
