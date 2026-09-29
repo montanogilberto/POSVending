@@ -12,18 +12,22 @@ import {
   IonCardHeader,
   IonCardTitle,
   IonCardContent,
-  IonList,
   IonItem,
   IonLabel,
   IonDatetime,
   IonIcon,
   IonChip,
+  IonToast,
 } from '@ionic/react';
+import { useHistory } from 'react-router-dom';
 import { waterOutline, calendarOutline, chevronForwardOutline, closeOutline, receiptOutline, cashOutline, appsOutline, cardOutline, swapHorizontalOutline, helpCircleOutline } from 'ionicons/icons';
 import { toHermosilloDate, fmtMXN } from '../../utils/format';
 import { fetchMonthlyLaundry } from '../../api/laundryApi';
 import { useUser } from '../../contexts/UserContext';
 import EmptyState from '../../components/ui/EmptyState';
+import IncomeMovementList from '../../components/finance/IncomeMovementList';
+import { fetchTicket } from '../../api/ticketApi';
+import { useToast } from '../../hooks/useToast';
 import './MovementsPage.css';
 
 interface Income {
@@ -59,6 +63,31 @@ const TYPE_FILTERS: { key: IncomeType | 'all'; label: string; icon: string }[] =
 
 const MovementsPage: React.FC = () => {
   const { companyId } = useUser();
+  const history = useHistory();
+  const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
+  // incomeId whose ticket is being fetched — that row shows a spinner.
+  const [openingTicketId, setOpeningTicketId] = useState<number | null>(null);
+
+  // Same flow as IncomesPage: /receipt renders the ticket passed in the
+  // navigation state (it does not fetch by incomeId on its own).
+  const handleOpenTicket = async (incomeId: number) => {
+    if (openingTicketId !== null) return;
+    setOpeningTicketId(incomeId);
+    try {
+      console.log('[Movements] fetching ticket for incomeId =', incomeId);
+      const ticket = await fetchTicket(String(incomeId));
+      if (!ticket) {
+        showToast('No se encontró el ticket de este movimiento');
+        return;
+      }
+      history.push({ pathname: '/receipt', state: { ticketData: ticket } });
+    } catch (error) {
+      console.error('[Movements] fetchTicket error:', error);
+      showToast('Error al cargar el ticket');
+    } finally {
+      setOpeningTicketId(null);
+    }
+  };
   const [allIncome, setAllIncome] = useState<Income[]>([]);
   const [filteredIncome, setFilteredIncome] = useState<Income[]>([]);
   const [rangeStart, setRangeStart] = useState<string>('');
@@ -145,23 +174,6 @@ const MovementsPage: React.FC = () => {
     return undefined;
   };
 
-  // Group incomes by date
-  const groupedIncomes = filteredIncome.reduce((groups, income) => {
-    const rawDate = toHermosilloDate(income.paymentDate).toLocaleDateString('es-MX', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      timeZone: 'UTC',
-    });
-    // Capitalize only the first letter -- text-transform:capitalize would
-    // also capitalize "de" (Spanish preposition), which reads wrong.
-    const date = rawDate.charAt(0).toUpperCase() + rawDate.slice(1);
-    if (!groups[date]) {
-      groups[date] = [];
-    }
-    groups[date].push(income);
-    return groups;
-  }, {} as Record<string, Income[]>);
 
   // The calendar is locked to one month (min/max below), so start and end
   // always share month/year -- no need to repeat "de septiembre" twice.
@@ -196,6 +208,7 @@ const MovementsPage: React.FC = () => {
           </IonButtons>
         </IonToolbar>
       </IonHeader>
+      <IonToast {...toastProps} />
       <IonContent className="movements-content">
         <div className="movements-container">
 
@@ -312,34 +325,11 @@ const MovementsPage: React.FC = () => {
                   text="No hay movimientos con estos filtros."
                 />
               ) : (
-                <div>
-                  {Object.entries(groupedIncomes).map(([date, incomes]) => (
-                    <div key={date}>
-                      <IonItem lines="none" className="movements-day-group">
-                        <IonLabel>
-                          <h2>{date}</h2>
-                          <p>{incomes.length} movimiento{incomes.length !== 1 ? 's' : ''}</p>
-                        </IonLabel>
-                      </IonItem>
-                      <IonList lines="none">
-                        {incomes.map((income, i) => {
-                          const time = toHermosilloDate(income.paymentDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
-                          return (
-                            <IonItem key={i}>
-                              <div className="movements-row-icon" slot="start">
-                                <IonIcon icon={receiptOutline} />
-                              </div>
-                              <IonLabel>
-                                <div className="movements-row-amount">Ingreso — {fmtMXN(income.total)}</div>
-                                <div className="movements-row-meta">{time} — {income.paymentMethod}</div>
-                              </IonLabel>
-                            </IonItem>
-                          );
-                        })}
-                      </IonList>
-                    </div>
-                  ))}
-                </div>
+                <IncomeMovementList
+                  incomes={filteredIncome}
+                  onOpenTicket={handleOpenTicket}
+                  busyId={openingTicketId}
+                />
               )}
             </IonCardContent>
           </IonCard>

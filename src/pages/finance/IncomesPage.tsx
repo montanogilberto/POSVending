@@ -11,7 +11,11 @@ import {
   IonCard,
   IonCardContent,
   IonCardSubtitle,
-  IonLoading,
+  IonCardHeader,
+  IonCardTitle,
+  IonSpinner,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonButton,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
@@ -20,12 +24,13 @@ import './IncomesPage.css';
 
 import IncomesChart from '../../components/finance/IncomesChart';
 import IncomesFilters from '../../components/finance/IncomesFilters';
-import IncomesList from '../../components/finance/IncomesList';
+import IncomeMovementList from '../../components/finance/IncomeMovementList';
+import EmptyState from '../../components/ui/EmptyState';
 import { fetchAllLaundry } from '../../api/laundryApi';
 import { fetchTicket } from '../../api/ticketApi';
 import { ReceiptService } from '../../services/ReceiptService';
 
-import { calendar, waterOutline } from 'ionicons/icons';
+import { calendar, waterOutline, receiptOutline } from 'ionicons/icons';
 import { postIncomeAction } from '../../api/incomeApi';
 import { formatCurrencyWithSymbol } from '../../utils/formatters';
 
@@ -41,6 +46,9 @@ interface Income {
   companyId: number;
 }
 
+// Rows rendered per infinite-scroll step.
+const PAGE_SIZE = 30;
+
 const IncomesPage: React.FC = () => {
   const history = useHistory();
   const [allIncome, setAllIncome] = useState<Income[]>([]);
@@ -54,6 +62,8 @@ const IncomesPage: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  // incomeId whose ticket fetch / delete is in flight — that row shows a spinner.
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   useEffect(() => {
     const loadIncomes = async () => {
@@ -62,7 +72,7 @@ const IncomesPage: React.FC = () => {
         const incomes = await fetchAllLaundry();
         setAllIncome(incomes);
         setFilteredIncome(incomes);
-        setDisplayedIncome(incomes.slice(0, 3));
+        setDisplayedIncome(incomes.slice(0, PAGE_SIZE));
       } catch (error) {
         console.error('Error fetching incomes:', error);
         setToastMessage('Error al cargar ingresos');
@@ -93,7 +103,7 @@ const IncomesPage: React.FC = () => {
     });
 
     setFilteredIncome(filtered);
-    setDisplayedIncome(filtered.slice(0, 3));
+    setDisplayedIncome(filtered.slice(0, PAGE_SIZE));
   }, [searchText, filterPaymentMethod, filterDateFrom, filterDateTo, allIncome]);
 
   useEffect(() => {
@@ -133,7 +143,7 @@ const IncomesPage: React.FC = () => {
     setTimeout(() => {
       const nextItems = filteredIncome.slice(
         displayedIncome.length,
-        displayedIncome.length + 3
+        displayedIncome.length + PAGE_SIZE
       );
       setDisplayedIncome([...displayedIncome, ...nextItems]);
       (event.target as unknown as { complete: () => void }).complete();
@@ -141,7 +151,8 @@ const IncomesPage: React.FC = () => {
   };
 
   const handleShowReceipt = async (incomeId: number) => {
-    setLoading(true);
+    if (busyId !== null) return;
+    setBusyId(incomeId);
     try {
       console.log('Fetching ticket for incomeId:', incomeId);
       const ticket = await fetchTicket(incomeId.toString());
@@ -168,7 +179,34 @@ const IncomesPage: React.FC = () => {
       setToastMessage('Error al cargar el recibo: ' + message);
       setShowToast(true);
     } finally {
-      setLoading(false);
+      setBusyId(null);
+    }
+  };
+
+  const handleDeleteIncome = async (incomeId: number) => {
+    setBusyId(incomeId);
+    try {
+      const res = await postIncomeAction({
+        income: [{ incomeId, action: 2 }], // action 2 = delete (per backend)
+      });
+
+      // Backend example:
+      // { result: [{ value: "4320", msg: "Deleted Successfully", error: "0" }] }
+      const msg = res?.result?.[0]?.msg ?? 'Acción realizada exitosamente';
+      setToastMessage(msg);
+      setShowToast(true);
+
+      // Reload from backend to reflect deletion/update
+      const incomes = await fetchAllLaundry();
+      setAllIncome(incomes);
+      setFilteredIncome(incomes);
+    } catch (error: unknown) {
+      console.error('Error performing income action:', error);
+      const msg = error instanceof Error ? error.message : undefined;
+      setToastMessage(msg ? `Error: ${msg}` : 'Error al procesar la acción');
+      setShowToast(true);
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -305,38 +343,32 @@ const IncomesPage: React.FC = () => {
           {/* Incomes List */}
           <IonRow className="ion-justify-content-center">
             <IonCol sizeMd="8" sizeLg="6" sizeXs="12">
-              <IncomesList
-                filteredIncome={filteredIncome}
-                displayedIncome={displayedIncome}
-                loadMoreIncomes={loadMoreIncomes}
-                handleShowReceipt={handleShowReceipt}
-                onIncomeAction={async (incomeId, action) => {
-                  setLoading(true);
-                  try {
-                    const res = await postIncomeAction({
-                      income: [{ incomeId, action }],
-                    });
-
-                    // Backend example:
-                    // { result: [{ value: "4320", msg: "Deleted Successfully", error: "0" }] }
-                    const msg = res?.result?.[0]?.msg ?? 'Acción realizada exitosamente';
-                    setToastMessage(msg);
-                    setShowToast(true);
-
-                    // Reload from backend to reflect deletion/update
-                    const incomes = await fetchAllLaundry();
-                    setAllIncome(incomes);
-                    setFilteredIncome(incomes);
-                  } catch (error: unknown) {
-                    console.error('Error performing income action:', error);
-                  const msg = error instanceof Error ? error.message : undefined;
-                    setToastMessage(msg ? `Error: ${msg}` : 'Error al procesar la acción');
-                    setShowToast(true);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-              />
+              <IonCard className="incomes-list-card">
+                <IonCardHeader>
+                  <IonCardTitle>Ingresos ({filteredIncome.length})</IonCardTitle>
+                </IonCardHeader>
+                <IonCardContent>
+                  {loading ? (
+                    <div className="incomes-list-loading"><IonSpinner name="dots" /></div>
+                  ) : filteredIncome.length === 0 ? (
+                    <EmptyState icon={receiptOutline} text="No se encontraron ingresos con los filtros aplicados." />
+                  ) : (
+                    <>
+                      <IncomeMovementList
+                        incomes={displayedIncome}
+                        busyId={busyId}
+                        onOpenTicket={handleShowReceipt}
+                        onDelete={handleDeleteIncome}
+                      />
+                      {displayedIncome.length < filteredIncome.length && (
+                        <IonInfiniteScroll onIonInfinite={loadMoreIncomes}>
+                          <IonInfiniteScrollContent loadingText="Cargando más ingresos..." />
+                        </IonInfiniteScroll>
+                      )}
+                    </>
+                  )}
+                </IonCardContent>
+              </IonCard>
 
             </IonCol>
           </IonRow>
@@ -349,10 +381,6 @@ const IncomesPage: React.FC = () => {
           duration={2000}
         />
 
-        <IonLoading
-          isOpen={loading}
-          message="Cargando..."
-        />
       </IonContent>
     </IonPage>
   );

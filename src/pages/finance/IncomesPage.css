@@ -65,3 +65,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Income list card — same design as /movements' list card ─────────── */
+.incomes-list-card {
+  border-radius: 24px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+.incomes-list-card ion-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.incomes-list-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
