@@ -42,7 +42,7 @@ export const useExpenses = () => {
       const [expenses, supplierList, employeeList] = await Promise.all([
         fetchAllExpenses(),
         companyId ? getAllSuppliers(companyId) : Promise.resolve([]),
-        getAllEmployees().catch((error) => {
+        (companyId ? getAllEmployees(companyId) : Promise.resolve([])).catch((error) => {
           console.error('[useExpenses] getAllEmployees failed:', error);
           return [];
         }),

@@ -28,6 +28,7 @@ import { createLoan, generateInstallmentSchedule } from '../../api/loanApi';
 import { createLoanContract } from '../../api/digitalContractsApi';
 import { fetchActiveLoanOffers, updateLoanOffer } from '../../api/loanMarketplaceApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
+import { actsAsLender } from '../../utils/productContext';
 import { fmtNum as fmt, mxChatDate as toDate, mxChatTime as toTime } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
 import './LoanChatPage.css';
@@ -75,7 +76,7 @@ const LoanChatPage: React.FC = () => {
   const history = useHistory();
   const { conversationId: convIdParam } = useParams<{ conversationId: string }>();
   const location = useLocation();
-  const { companyId, clientId, userId, roleCode } = useUser();
+  const { companyId, clientId, userId, roleCode, activeProduct } = useUser();
 
   const isNew = convIdParam === 'new';
   const params = new URLSearchParams(location.search);
@@ -86,7 +87,7 @@ const LoanChatPage: React.FC = () => {
   const initAmount     = Number(params.get('amount') ?? 0);
   const initTitle      = params.get('title') ?? 'Solicitud de préstamo';
 
-  const myRole = (roleCode === 'lender') ? 'lender' : 'borrower';
+  const myRole = actsAsLender(roleCode, activeProduct) ? 'lender' : 'borrower';
   const mySenderId = clientId ?? 0;
 
   // Agent clientId comes from backend config (LOANCHAT_AGENT_CLIENT_ID) — the

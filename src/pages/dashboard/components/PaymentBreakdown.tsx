@@ -8,6 +8,7 @@ type PaymentMethod = 'Efectivo' | 'Transferencia' | 'Tarjeta';
 interface BreakdownEntry {
   method: PaymentMethod;
   amount: number;
+  commission: number; // card-terminal commission on `amount` (0 for cash/transfer)
   percent: number;
   color: string;
 }
@@ -54,6 +55,12 @@ const PaymentBreakdown: React.FC<PaymentBreakdownProps> = ({ breakdown }) => {
               <span className="cobros-row-percent">
                 {entry.amount > 0 ? `${Math.round(entry.percent)}%` : '—'}
               </span>
+              {entry.commission > 0 && (
+                <div className="cobros-row-commission">
+                  <span>Comisión terminal −{fmtMXN(entry.commission)}</span>
+                  <span className="cobros-row-net">Neto {fmtMXN(entry.amount - entry.commission)}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>

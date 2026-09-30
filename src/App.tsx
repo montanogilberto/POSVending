@@ -47,6 +47,7 @@ import {
   person,
   water,
   storefrontOutline,
+  idCardOutline,
   cashOutline,
   peopleOutline,
   shieldCheckmarkOutline,
@@ -70,6 +71,10 @@ import {
   trendingUpOutline,
   trendingDownOutline,
   paperPlaneOutline,
+  checkmarkCircle,
+  compassOutline,
+  briefcaseOutline,
+  sparklesOutline,
 }
   from 'ionicons/icons';
   
@@ -86,6 +91,9 @@ import CartPage from './pages/cart/CartPage';
 import MovementsPage from './pages/finance/MovementsPage';
 import LedStatusPage from './pages/iot/LedStatusPage';
 import ClientsPage from './pages/clients/ClientsPage';
+import EnrollmentPage from './pages/enrollment/EnrollmentPage';
+import JuridicalDashboardPage from './pages/juridical/JuridicalDashboardPage';
+import FactoryDashboardPage from './pages/factory/FactoryDashboardPage';
 import ClientsMapPage from './pages/clients/ClientsMapPage';
 import ProductsManagementPage from './pages/products/ProductsManagementPage';
 import AlertsPage from './pages/messaging/AlertsPage';
@@ -103,6 +111,7 @@ import ForgotPassword from './pages/authentication/ForgotPassword';
 import CreateAccount from './pages/authentication/CreateAccount';
 import ClientLogin from './pages/authentication/ClientLogin';
 import SupplierPage from './pages/admin/SupplierPage';
+import EmployeesPage from './pages/admin/EmployeesPage';
 import LoanPage from './pages/loans/LoanPage';
 import ProfilePage from './pages/profile/ProfilePage';
 // Lazy-loaded: pulls in the gated @azure/ai-vision-face-ui SDK, which isn't
@@ -162,7 +171,7 @@ import { IncomeProvider } from './contexts/IncomeContext';
 import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
-import { canAccess } from './config/rolePermissions';
+import { canAccess, UiFeature } from './config/rolePermissions';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
 import BiometricLockScreen from './components/BiometricLockScreen';
@@ -170,6 +179,9 @@ import ZoomableImage from './components/ui/ZoomableImage';
 import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
 import { getPostLoginRoute } from './utils/postLoginRoute';
 import { myLoansRoute, p2pLendingRoute, withClientId } from './utils/routes';
+import { PRODUCT_LABELS, productLandingRoute, discoverProducts, DiscoverProduct } from './utils/productContext';
+import DiscoverProductModal from './components/layout/DiscoverProductModal';
+import './components/layout/DiscoverProductModal.css';
 
 setupIonicReact();
 
@@ -177,20 +189,30 @@ interface PrivateRouteProps {
   component: React.ComponentType<any>;
   path: string;
   exact?: boolean;
+  /** Staff-only screen: also requires canAccess(roleCode, feature). The side
+   * menu already hides these items, but without this a lower role could still
+   * open them by typing the URL. Denied → the role's own landing page. */
+  feature?: UiFeature;
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({
   component: Component,
+  feature,
   ...rest
 }) => {
-  const { isAuthenticated } = useUser();
+  const { isAuthenticated, roleCode, clientId } = useUser();
 
   return (
     <Route
       {...rest}
-      render={(props) =>
-        isAuthenticated ? <Component {...props} /> : <Redirect to="/login" />
-      }
+      render={(props) => {
+        if (!isAuthenticated) return <Redirect to="/login" />;
+        if (feature && !canAccess(roleCode, feature)) {
+          console.warn('[PrivateRoute] role', roleCode, 'lacks feature', feature, '→ redirecting from', props.location.pathname);
+          return <Redirect to={getPostLoginRoute(roleCode, clientId)} />;
+        }
+        return <Component {...props} />;
+      }}
     />
   );
 };
@@ -206,7 +228,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/expense-categories', '/expense-products', '/expense-cart',
   '/movements', '/led-status', '/clients', '/products-management',
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
-  '/accounting', '/water-tanks', '/receipt', '/suppliers',
+  '/accounting', '/water-tanks', '/receipt', '/suppliers', '/employees',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
   '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
@@ -216,12 +238,48 @@ const isPosOnlyRoute = (pathname: string): boolean =>
   POS_ONLY_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName, avatarUrl, userId, clientId, roleCode, roleName, setAvatarUrl } =
-    useUser();
-  const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
-  const isClientRole = roleCode === 'pos';
+  const {
+    logout, username, companyName, branchName, avatarUrl, userId, clientId, companyId, roleCode, roleName, setAvatarUrl,
+    activeProduct, availableProducts, setActiveProduct, clientCapabilities,
+  } = useUser();
+  // Self-service sessions follow the ACTIVE PRODUCT (from clientCapabilities),
+  // so one login can be a POS customer and a SmartLoans borrower. Staff have
+  // no product context and keep the role-based shell.
+  const isSmartLoansRole = activeProduct
+    ? activeProduct === 'borrower' || activeProduct === 'lender'
+    : roleCode === 'borrower' || roleCode === 'lender';
+  const isClientRole = activeProduct ? activeProduct === 'pos' : roleCode === 'pos';
+  // Juridical / Factory AI products: their own dashboard + a small tab bar.
+  const isOwnDashboardProduct = activeProduct === 'juridical' || activeProduct === 'factory';
+  const shellTitle = activeProduct === 'factory' ? 'Factory AI'
+    : isSmartLoansRole || activeProduct === 'juridical' ? 'SmartLoans' : 'POS GMO';
+  const PRODUCT_ICONS = {
+    pos: storefrontOutline, borrower: walletOutline, lender: walletOutline,
+    juridical: briefcaseOutline, factory: sparklesOutline,
+  } as const;
+  const discover = discoverProducts(roleCode, clientCapabilities);
+  const [discoverOpen, setDiscoverOpen] = useState<DiscoverProduct | null>(null);
+  const switchProduct = (product: typeof availableProducts[number]) => {
+    console.log('[AppShell] switching product context →', product);
+    setActiveProduct(product);
+    history.push(productLandingRoute(product, clientId));
+  };
   const history = useHistory();
   const location = useLocation();
+  // A product dashboard opened directly (deep link, push, back button) makes
+  // that product the active one, so the shell never shows another product's
+  // tabs/header over it. Only products the session actually holds.
+  useEffect(() => {
+    const byRoute: [string, typeof availableProducts[number]][] = [
+      ['/rewards-dashboard', 'pos'], ['/client-dashboard', 'borrower'], ['/lender-dashboard', 'lender'],
+      ['/juridical-dashboard', 'juridical'], ['/factory-dashboard', 'factory'],
+    ];
+    const match = byRoute.find(([prefix]) => location.pathname.startsWith(prefix));
+    if (match && match[1] !== activeProduct && availableProducts.includes(match[1])) {
+      console.log('[AppShell] route', location.pathname, '→ active product', match[1]);
+      setActiveProduct(match[1]);
+    }
+  }, [location.pathname, activeProduct, availableProducts, setActiveProduct]);
   // ClientDashboardPage's 5 sections are ?tab=... on one route, not separate
   // routes — IonTabs matches tabs by path only (ignores query string), so a
   // plain href would treat all 5 buttons as "already on this tab" and never
@@ -233,7 +291,7 @@ const AppShell: React.FC = () => {
   // borrower ?tab= tabs above are sections of the borrower dashboard and would
   // send a lender to the wrong page. Pagos scrolls to a section on the lender
   // dashboard; Invertir/Invitar are real routes.
-  const isLender = roleCode === 'lender';
+  const isLender = activeProduct ? activeProduct === 'lender' : roleCode === 'lender';
   const lenderSection = new URLSearchParams(location.search).get('section');
   const activeLenderTab =
     location.pathname.startsWith('/p2p-lending') ? 'invertir'
@@ -473,7 +531,7 @@ const AppShell: React.FC = () => {
       <IonMenu menuId="main-menu" contentId="main" side="start" className={menuCollapsed ? 'menu-rail' : ''}>
         <IonHeader className="menu-header">
           <IonToolbar>
-            {!menuCollapsed && <IonTitle>{isSmartLoansRole ? 'SmartLoans' : 'POS GMO'}</IonTitle>}
+            {!menuCollapsed && <IonTitle>{shellTitle}</IonTitle>}
             <IonButtons slot="end">
               <IonButton fill="clear" size="small" onClick={() => setMenuCollapsed(c => !c)} className="menu-collapse-btn">
                 <IonIcon icon={menuCollapsed ? chevronForwardOutline : chevronBackOutline} />
@@ -506,6 +564,26 @@ const AppShell: React.FC = () => {
           </div>
 
           <IonList>
+            {availableProducts.length > 1 && (
+              <>
+                {!menuCollapsed && <IonItemDivider>Mis productos</IonItemDivider>}
+                {availableProducts.map(product => (
+                  <IonMenuToggle autoHide={false} key={product}>
+                    <IonItem
+                      button
+                      onClick={() => switchProduct(product)}
+                      title={PRODUCT_LABELS[product]}
+                      className={product === activeProduct ? 'menu-product-active' : undefined}
+                    >
+                      <IonIcon icon={PRODUCT_ICONS[product]} slot="start" />
+                      {!menuCollapsed && <IonLabel>{PRODUCT_LABELS[product]}</IonLabel>}
+                      {product === activeProduct && <IonIcon icon={checkmarkCircle} slot="end" color="primary" />}
+                    </IonItem>
+                  </IonMenuToggle>
+                ))}
+              </>
+            )}
+
             {!menuCollapsed && <IonItemDivider>Cuenta</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
@@ -585,6 +663,15 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/suppliers" title="Proveedores">
                 <IonIcon icon={storefrontOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Proveedores</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'employees') && (
+              <IonItem button routerLink="/employees" title="Empleados">
+                <IonIcon icon={idCardOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Empleados</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -770,6 +857,25 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            {discover.length > 0 && clientId > 0 && (
+              <>
+                {!menuCollapsed && <IonItemDivider>Descubrir</IonItemDivider>}
+                {discover.map(product => (
+                  <IonMenuToggle autoHide={false} key={product}>
+                    <IonItem
+                      button
+                      onClick={() => setDiscoverOpen(product)}
+                      title={product === 'smartloans' ? 'Descubre SmartLoans' : 'Descubre Factory AI'}
+                      className="menu-discover-item"
+                    >
+                      <IonIcon icon={compassOutline} slot="start" />
+                      {!menuCollapsed && <IonLabel>{product === 'smartloans' ? 'SmartLoans' : 'Factory AI Software'}</IonLabel>}
+                    </IonItem>
+                  </IonMenuToggle>
+                ))}
+              </>
+            )}
+
             <IonMenuToggle autoHide={false}>
               <IonItem button onClick={handleLogout} title="Cerrar sesión">
                 <IonIcon icon={logOutOutline} slot="start" color="danger" />
@@ -780,12 +886,20 @@ const AppShell: React.FC = () => {
         </IonContent>
       </IonMenu>
 
+      <DiscoverProductModal
+        product={discoverOpen}
+        companyId={companyId}
+        clientId={clientId}
+        userId={userId}
+        onClose={() => setDiscoverOpen(null)}
+      />
+
       {/* Main content */}
       <IonPage id="main">
         <IonTabs>
           <IonRouterOutlet>
             
-            <PrivateRoute exact path="/setting" component={Setting} />
+            <PrivateRoute exact path="/setting" feature="settings" component={Setting} />
             
             <PrivateRoute exact path="/dashboard" component={Dashboard} />
             
@@ -800,27 +914,28 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/expense-cart" component={CartPage} />
 
             <PrivateRoute exact path="/movements" component={MovementsPage} />
-            <PrivateRoute exact path="/led-status" component={LedStatusPage} />
-            <PrivateRoute exact path="/clients" component={ClientsPage} />
-            <PrivateRoute exact path="/clients-map" component={ClientsMapPage} />
-            <PrivateRoute exact path="/products-management" component={ProductsManagementPage} />
-            <PrivateRoute exact path="/categories" component={CategoriesPage} />
-            <PrivateRoute exact path="/alerts" component={AlertsPage} />
-            <PrivateRoute exact path="/emails" component={EmailsPage} />
-            <PrivateRoute exact path="/users" component={UsersPage} />
-            <PrivateRoute exact path="/ingresos" component={IncomesPage} />
-            <PrivateRoute exact path="/egresos" component={ExpensesPage} />
-            <PrivateRoute exact path="/accounting" component={AccountingPage} />
-            <PrivateRoute exact path="/water-tanks" component={WaterTanksPage} />
-            <PrivateRoute exact path="/water-tanks-history/:tankId" component={WaterTanksHistoryPage} />
+            <PrivateRoute exact path="/led-status" feature="iot" component={LedStatusPage} />
+            <PrivateRoute exact path="/clients" feature="clients" component={ClientsPage} />
+            <PrivateRoute exact path="/clients-map" feature="clients" component={ClientsMapPage} />
+            <PrivateRoute exact path="/products-management" feature="products" component={ProductsManagementPage} />
+            <PrivateRoute exact path="/categories" feature="categories" component={CategoriesPage} />
+            <PrivateRoute exact path="/alerts" feature="alerts" component={AlertsPage} />
+            <PrivateRoute exact path="/emails" feature="emails" component={EmailsPage} />
+            <PrivateRoute exact path="/users" feature="users" component={UsersPage} />
+            <PrivateRoute exact path="/ingresos" feature="ingresos" component={IncomesPage} />
+            <PrivateRoute exact path="/egresos" feature="egresos" component={ExpensesPage} />
+            <PrivateRoute exact path="/accounting" feature="accounting" component={AccountingPage} />
+            <PrivateRoute exact path="/water-tanks" feature="iot" component={WaterTanksPage} />
+            <PrivateRoute exact path="/water-tanks-history/:tankId" feature="iot" component={WaterTanksHistoryPage} />
             <PrivateRoute exact path="/receipt" component={ReceiptPage} />
             <PrivateRoute exact path="/receipt/:incomeId" component={ReceiptPage} />
 
             <Route exact path="/">
               <Redirect to="/login" />
             </Route>
-            <PrivateRoute exact path="/suppliers" component={SupplierPage} />
-            <PrivateRoute exact path="/loans" component={LoanPage} />
+            <PrivateRoute exact path="/suppliers" feature="suppliers" component={SupplierPage} />
+            <PrivateRoute exact path="/employees" feature="employees" component={EmployeesPage} />
+            <PrivateRoute exact path="/loans" feature="loans" component={LoanPage} />
             <PrivateRoute exact path="/profile" component={ProfilePage} />
             <React.Suspense fallback={null}>
               <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
@@ -830,6 +945,9 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
             <PrivateRoute exact path="/my-qr" component={MyQrPage} />
+            <PrivateRoute exact path="/enroll/:product" component={EnrollmentPage} />
+            <PrivateRoute exact path="/juridical-dashboard/:clientId" component={JuridicalDashboardPage} />
+            <PrivateRoute exact path="/factory-dashboard/:clientId" component={FactoryDashboardPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
             {/* Mismo patrón que /client-dashboard/:clientId — el id va en la URL
                 para que la ruta sea compartible y sobreviva un refresh. La
@@ -841,9 +959,9 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/my-loans" component={MyLoansPage} />
             <PrivateRoute exact path="/borrower-onboarding" component={BorrowerOnboardingPage} />
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
-            <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
+            <PrivateRoute exact path="/manufacturing" feature="manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
-            <PrivateRoute exact path="/pos-rewards" component={PosRewardsPage} />
+            <PrivateRoute exact path="/pos-rewards" feature="posRewards" component={PosRewardsPage} />
             <PrivateRoute exact path="/game/mission-clean-room" component={MissionCleanRoomPage} />
             {/* Arcade de fichas virtuales. Los 8 juegos que faltan salen como
                 tiles bloqueados en /arcade, asi que no necesitan ruta todavia. */}
@@ -863,8 +981,8 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
             <PrivateRoute exact path="/pos-support/:topic?" component={PosSupportChatPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
-            <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
-            <PrivateRoute exact path="/notification-dispatch-log" component={NotificationDispatchLogPage} />
+            <PrivateRoute exact path="/pushNotifications" feature="pushNotifications" component={PushNotificationPage} />
+            <PrivateRoute exact path="/notification-dispatch-log" feature="notificationDispatchLog" component={NotificationDispatchLogPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
           </IonRouterOutlet>
 
@@ -897,7 +1015,7 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={peopleOutline} />
                   <span>Invitar</span>
                 </button>
-                {canAccess(roleCode, 'loanChat') && (
+                {(canAccess(roleCode, 'loanChat') || isSmartLoansRole) && (
                   <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
                     <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
                     <span>Chat</span>
@@ -926,12 +1044,27 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={personCircleOutline} />
                   <span>Perfil</span>
                 </button>
-                {canAccess(roleCode, 'loanChat') && (
+                {(canAccess(roleCode, 'loanChat') || isSmartLoansRole) && (
                   <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
                     <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
                     <span>Chat</span>
                   </button>
                 )}
+              </>
+            ) : isOwnDashboardProduct && activeProduct ? (
+              <>
+                <button
+                  type="button"
+                  className={`cd-tab${location.pathname === productLandingRoute(activeProduct, clientId) ? ' cd-tab--active' : ''}`}
+                  onClick={() => history.push(productLandingRoute(activeProduct, clientId))}
+                >
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Inicio</span>
+                </button>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/profile') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/profile')}>
+                  <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                  <span>Perfil</span>
+                </button>
               </>
             ) : isClientRole ? (
               <>

@@ -120,16 +120,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
     if (isOpen && companyId) {
       loadProducts();
       loadSuppliers();
-    }
-  }, [isOpen, companyId]);
-
-  useEffect(() => {
-    // Employees aren't company-scoped on the backend today (no companyId on
-    // dbo.employees) — loaded once per open, independent of companyId.
-    if (isOpen) {
       loadEmployees();
     }
-  }, [isOpen]);
+  }, [isOpen, companyId]);
 
   useEffect(() => {
     // Calculate total whenever products change
@@ -158,7 +151,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
 
   const loadEmployees = async () => {
     try {
-      const employeeList = await getAllEmployees();
+      const employeeList = await getAllEmployees(companyId);
       setEmployees(employeeList);
     } catch (error) {
       console.error('Error loading employees:', error);
@@ -482,8 +475,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
               </IonCardHeader>
               <IonCardContent>
                 {expenseType === 'payroll' ? (
-                <IonItem className="expense-form-item" lines="none">
                   <IonSelect
+                    className="expense-form-item"
                     fill="outline"
                     label="Empleado"
                     labelPlacement="floating"
@@ -498,10 +491,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                       </IonSelectOption>
                     ))}
                   </IonSelect>
-                </IonItem>
                 ) : (
-                <IonItem className="expense-form-item" lines="none">
                   <IonSelect
+                    className="expense-form-item"
                     fill="outline"
                     label="Proveedor"
                     labelPlacement="floating"
@@ -516,38 +508,35 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                       </IonSelectOption>
                     ))}
                   </IonSelect>
-                </IonItem>
                 )}
 
-                <IonItem className="expense-form-item" lines="none">
-                  <IonSelect
-                    fill="outline"
-                    label="Método de Pago"
-                    labelPlacement="floating"
-                    placeholder="Seleccionar método"
-                    value={paymentMethod}
-                    onIonChange={(e) => setPaymentMethod(e.detail.value)}
-                  >
-                    <IonSelectOption value="Efectivo">Efectivo</IonSelectOption>
-                    <IonSelectOption value="Tarjeta">Tarjeta</IonSelectOption>
-                    <IonSelectOption value="Transferencia">Transferencia</IonSelectOption>
-                  </IonSelect>
-                </IonItem>
+                <IonSelect
+                  className="expense-form-item"
+                  fill="outline"
+                  label="Método de Pago"
+                  labelPlacement="floating"
+                  placeholder="Seleccionar método"
+                  value={paymentMethod}
+                  onIonChange={(e) => setPaymentMethod(e.detail.value)}
+                >
+                  <IonSelectOption value="Efectivo">Efectivo</IonSelectOption>
+                  <IonSelectOption value="Tarjeta">Tarjeta</IonSelectOption>
+                  <IonSelectOption value="Transferencia">Transferencia</IonSelectOption>
+                </IonSelect>
 
-                <IonItem className="expense-form-item" lines="none">
-                  <IonInput
-                    fill="outline"
-                    label="Fecha de Pago"
-                    labelPlacement="floating"
-                    type="date"
-                    value={paymentDate}
-                    onIonInput={(e) => setPaymentDate(e.detail.value!)}
-                  />
-                </IonItem>
+                <IonInput
+                  className="expense-form-item"
+                  fill="outline"
+                  label="Fecha de Pago"
+                  labelPlacement="floating"
+                  type="date"
+                  value={paymentDate}
+                  onIonInput={(e) => setPaymentDate(e.detail.value!)}
+                />
 
                 {expenseType !== 'inventory' && (
-                <IonItem className="expense-form-item" lines="none">
                   <IonInput
+                    className="expense-form-item"
                     fill="outline"
                     label="Total"
                     labelPlacement="floating"
@@ -556,12 +545,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                     placeholder="0.00"
                     onIonInput={(e) => setTotal(parseFloat(e.detail.value || '0') || 0)}
                   />
-                </IonItem>
                 )}
 
                 {expenseType !== 'inventory' && (
-                <IonItem className="expense-form-item" lines="none">
                   <IonTextarea
+                    className="expense-form-item"
                     fill="outline"
                     label="Notas"
                     labelPlacement="floating"
@@ -570,7 +558,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                     onIonInput={(e) => setNotes(e.detail.value ?? '')}
                     autoGrow
                   />
-                </IonItem>
                 )}
               </IonCardContent>
             </IonCard>

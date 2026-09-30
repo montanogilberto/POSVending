@@ -63,6 +63,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
 import { useUser } from '../../contexts/UserContext';
+import { hasCapability } from '../../config/rolePermissions';
 import BenefitPicker from '../../components/rewards/BenefitPicker';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans } from '../../api/loanApi';
@@ -197,7 +198,7 @@ const ClientDashboardPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
   const location = useLocation();
-  const { companyId, clientId: contextClientId, username, avatarUrl, setAvatarUrl, roleCode, clientType } = useUser();
+  const { companyId, clientId: contextClientId, username, avatarUrl, setAvatarUrl, roleCode, clientType, clientCapabilities } = useUser();
   // Foto de cuenta (users.imageUrl) — distinta de la selfie biométrica KYC
   // (clientFaceRecognitions.clientSelfieBlobUrl), así que sí se puede
   // reemplazar con cualquier foto. setAvatarUrl solo actualiza esta sesión;
@@ -217,7 +218,8 @@ const ClientDashboardPage: React.FC = () => {
   // A lender/payout client's payment step IS a Stripe payout account (needs an
   // external bank). A borrower's is the repayment CARD — they are never asked
   // for a payout account, so the checklist must not gate them on one.
-  const isPayoutClient = clientType === 'lender' || clientType === 'both' || roleCode === 'lender';
+  const isPayoutClient = hasCapability(clientCapabilities, 'SMARTLOANS_LENDER')
+    || clientType === 'lender' || clientType === 'both' || roleCode === 'lender';
   const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
 
   console.log('[ClientDashboard] render. clientId =', clientId, 'companyId =', companyId, 'tab query =', location.search);

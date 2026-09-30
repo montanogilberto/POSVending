@@ -57,6 +57,7 @@ export type UiFeature =
   | 'products'
   | 'categories'
   | 'suppliers'
+  | 'employees'
   | 'alerts'
   | 'emails'
   | 'users'
@@ -86,7 +87,7 @@ export type UiFeature =
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
-    'clients', 'products', 'categories', 'suppliers',
+    'clients', 'products', 'categories', 'suppliers', 'employees',
     'alerts', 'emails',
     'users', 'ingresos', 'egresos', 'accounting',
     'iot', 'settings',
@@ -96,13 +97,14 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   ],
   manager: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
-    'clients', 'products', 'categories', 'suppliers',
+    'clients', 'products', 'categories', 'suppliers', 'employees',
     'ingresos', 'egresos', 'accounting',
     'clientDashboards', 'manufacturing', 'notificationDispatchLog',
     'rewards', 'game', 'arcade',
   ],
   employee: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
+    'employees',
     'rewards', 'game', 'arcade',
   ],
   borrower: [
@@ -196,7 +198,10 @@ export const normalizeRoleCode = (raw?: string | null): RoleCode => {
   const code = raw?.trim().toLowerCase();
   const valid: RoleCode[] = ['admin', 'manager', 'employee', 'borrower', 'lender', 'business', 'viewer', 'pos'];
   if (valid.includes(code as RoleCode)) return code as RoleCode;
-  return 'employee';
+  // Fail closed: an unknown/missing role gets the most restricted
+  // self-service role, never POS staff powers ('employee' before 2026-09-28).
+  if (code) console.warn('[rolePermissions] unknown roleCode', raw, '→ pos');
+  return 'pos';
 };
 
 export const canAccess = (roleCode: RoleCode | string | undefined, feature: UiFeature): boolean => {

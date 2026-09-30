@@ -41,6 +41,7 @@ const Dashboard: React.FC = () => {
     handleConfirmSale,
     calculateDailySales,
     calculateDailySalesCount,
+    calculateDailyCommissions,
     calculateExpensesDailyTotal,
     percentageChange,
     handleLogoutConfirm,
@@ -87,9 +88,10 @@ const Dashboard: React.FC = () => {
             onRefresh={handleManualRefresh}
           />
 
-          {/* ✅ Resumen: Ventas / Egresos / Neto / Operaciones (hoy) */}
+          {/* ✅ Resumen: Ventas / Egresos / Neto (después de comisión terminal) / Operaciones (hoy) */}
           <SummaryGrid
             ventas={calculateDailySales()}
+            comisiones={calculateDailyCommissions()}
             egresos={calculateExpensesDailyTotal()}
             operaciones={calculateDailySalesCount()}
           />

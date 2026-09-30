@@ -35,6 +35,7 @@ import { Loan, getAllLoans, createLoan, updateLoan, deleteLoan } from '../../api
 import { Client } from '../../api/clientsApi';
 import ClientSelector from '../../components/pos/ClientSelector';
 import { useUser } from '../../contexts/UserContext';
+import { isStaffRole } from '../../config/rolePermissions';
 import { toHermosillo } from '../../utils/format';
 import { usePopovers } from '../../hooks/usePopovers';
 
@@ -60,8 +61,9 @@ const LoanPage: React.FC = () => {
   // P2P loans are contracts born from negotiation (oferta → propuesta →
   // aprobación) and backed by real money movement. Borrowers and lenders see
   // them READ-ONLY here — no editar/eliminar/registrar. Back-office roles
-  // keep the CRUD.
-  const canManageLoans = roleCode !== 'borrower' && roleCode !== 'lender';
+  // keep the CRUD. Staff only (was "not borrower/lender", which also gave
+  // the 'pos' customer role CRUD); viewer stays read-only.
+  const canManageLoans = isStaffRole(roleCode) && roleCode !== 'viewer';
 
   const filteredLoans = useMemo(() => {
     // Scope by role: a borrower only sees their own loans; a lender only the

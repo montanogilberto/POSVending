@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { RoleCode, normalizeRoleCode, loadRoleCatalog } from '../config/rolePermissions';
 import { DEFAULT_AVATAR_URL } from '../utils/formatters';
 import { ClientType } from '../api/clientsApi';
 import { listClientCapabilities } from '../api/clientCapabilitiesApi';
+import { ProductContext, availableProducts, defaultProduct } from '../utils/productContext';
 
 // ── Storage key ────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'pos_gmo_auth';
@@ -26,8 +27,13 @@ export interface AuthData {
    * automatically whenever companyId+clientId are known — see the effect
    * in UserProvider — not set directly by login(). */
   clientCapabilities: string[];
+  /** `${companyId}:${clientId}` the capabilities above were loaded for — a
+   * mismatch means they belong to another company/client and are dropped. */
+  clientCapabilitiesKey?: string;
   roleCode: RoleCode;
   roleName: string;
+  /** Product the user last switched to (self-service sessions only). */
+  activeProduct?: ProductContext | null;
 }
 
 interface UserContextProps extends AuthData {
@@ -40,6 +46,14 @@ interface UserContextProps extends AuthData {
   login: (data: Partial<AuthData>) => void;
   /** Clear session */
   logout: () => void;
+  /** Products this session can switch between — empty for staff. */
+  availableProducts: ProductContext[];
+  /** Effective product context (stored choice if still held, else the
+   * role's default). Null for staff sessions. Shadows AuthData.activeProduct. */
+  activeProduct: ProductContext | null;
+  setActiveProduct: (product: ProductContext) => void;
+  /** Re-read clientCapabilities after a grant/revoke (e.g. self-enrollment). */
+  refreshCapabilities: () => Promise<string[]>;
 }
 
 // ── Defaults ───────────────────────────────────────────────────────────────
@@ -107,6 +121,16 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // rather than needing each login path to remember to fetch it itself.
   useEffect(() => {
     if (!auth.isAuthenticated || !auth.companyId || !auth.clientId) return;
+    const key = `${auth.companyId}:${auth.clientId}`;
+    // Never keep another company's/client's capabilities while (or if) the
+    // fetch below fails — capability checks must use the current companyId.
+    if (auth.clientCapabilitiesKey !== key && auth.clientCapabilities.length > 0) {
+      setAuth(prev => {
+        const next = { ...prev, clientCapabilities: [], clientCapabilitiesKey: key };
+        persistAuth(next);
+        return next;
+      });
+    }
     let cancelled = false;
     listClientCapabilities(auth.companyId, auth.clientId)
       .then(rows => {
@@ -114,7 +138,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const active = rows.filter(r => r.isActive).map(r => r.capability);
         console.log('[UserContext] fetched clientCapabilities for clientId=%d: %o', auth.clientId, active);
         setAuth(prev => {
-          const next = { ...prev, clientCapabilities: active };
+          const next = { ...prev, clientCapabilities: active, clientCapabilitiesKey: key };
           persistAuth(next);
           return next;
         });
@@ -122,6 +146,20 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .catch(err => console.warn('[UserContext] listClientCapabilities failed:', err));
     return () => { cancelled = true; };
   }, [auth.isAuthenticated, auth.companyId, auth.clientId]);
+
+  const refreshCapabilities = async (): Promise<string[]> => {
+    if (!auth.companyId || !auth.clientId) return [];
+    const key = `${auth.companyId}:${auth.clientId}`;
+    const rows = await listClientCapabilities(auth.companyId, auth.clientId);
+    const active = rows.filter(r => r.isActive).map(r => r.capability);
+    console.log('[UserContext] refreshCapabilities for clientId=%d: %o', auth.clientId, active);
+    setAuth(prev => {
+      const next = { ...prev, clientCapabilities: active, clientCapabilitiesKey: key };
+      persistAuth(next);
+      return next;
+    });
+    return active;
+  };
 
   const saveAuth = (data: AuthData) => {
     setAuth(data);
@@ -152,6 +190,23 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAuth(DEFAULT_AUTH);
   };
 
+  const products = useMemo(
+    () => (auth.isAuthenticated ? availableProducts(auth.roleCode, auth.clientCapabilities) : []),
+    [auth.isAuthenticated, auth.roleCode, auth.clientCapabilities],
+  );
+  const effectiveProduct: ProductContext | null =
+    auth.activeProduct && products.includes(auth.activeProduct)
+      ? auth.activeProduct
+      : defaultProduct(auth.roleCode, products);
+
+  const setActiveProduct = (activeProduct: ProductContext) => {
+    setAuth((prev) => {
+      const next = { ...prev, activeProduct };
+      persistAuth(next);
+      return next;
+    });
+  };
+
   // Legacy setters (functional updates avoid stale auth in async flows)
   const setUsername = (username: string) => {
     setAuth((prev) => {
@@ -178,6 +233,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUserData,
         login,
         logout,
+        availableProducts: products,
+        activeProduct: effectiveProduct,
+        setActiveProduct,
+        refreshCapabilities,
       }}
     >
       {children}

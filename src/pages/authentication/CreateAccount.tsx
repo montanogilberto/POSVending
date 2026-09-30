@@ -130,7 +130,7 @@ const DEFAULT_ROLE_BY_PROFILE: Record<string, RoleCode> = { pos: 'employee', cus
 // question (renderClientTypePicker) rather than granting a capability
 // directly, since that's a real authorization decision, not a preference.
 interface InterestOption {
-  id: 'pos' | 'rewards' | 'arcade' | 'loans';
+  id: 'pos' | 'rewards' | 'arcade' | 'loans' | 'factory';
   label: string;
   desc: string;
   icon: string;
@@ -141,7 +141,18 @@ const INTEREST_OPTIONS: InterestOption[] = [
   { id: 'rewards', label: 'Rewards',    desc: 'Ganar y canjear puntos',          icon: '🎁', capability: 'REWARDS' },
   { id: 'arcade',  label: 'Arcade',     desc: 'Jugar y usar tus fichas',         icon: '🕹️', capability: 'ARCADE' },
   { id: 'loans',   label: 'SmartLoans', desc: 'Pedir o dar un préstamo',         icon: '💰' },
+  { id: 'factory', label: 'Factory AI', desc: 'Software a la medida con IA',     icon: '🤖', capability: 'FACTORY_AI' },
 ];
+
+// SmartLoans membership granted once the client row has its company (step
+// "Acceso"). "Ambos" = two rows, never a combined value.
+const SMARTLOANS_CAPS_BY_CLIENT_TYPE: Record<ClientType, ClientCapability[]> = {
+  borrower: ['SMARTLOANS_BORROWER'],
+  lender:   ['SMARTLOANS_LENDER'],
+  both:     ['SMARTLOANS_BORROWER', 'SMARTLOANS_LENDER'],
+  lawyer:   ['SMARTLOANS_JURIDICAL'],
+  pos:      [],
+};
 
 // For SmartLoans the access role is fully determined by the loan client type
 // chosen in step "Perfil" — asking "Rol de acceso" again in step "Acceso" just
@@ -153,7 +164,10 @@ const ROLE_BY_CLIENT_TYPE: Record<ClientType, RoleCode> = {
   borrower: 'borrower',
   lender:   'lender',
   both:     'borrower', // primary role; the lender view is a toggle inside the app
-  lawyer:   'viewer',   // legal advisor — read-only, no dedicated role code
+  // Legal advisor. Was 'viewer' — but viewer is a STAFF role (company
+  // Ingresos/Egresos + any clientId by URL). 'pos' is the interim non-staff
+  // role until a dedicated juridical role exists in dbo.roles.
+  lawyer:   'pos',
   // 'pos' realistically never reaches this table — a POS retail customer is
   // created through the independent POS profile role picker (see
   // DEFAULT_ROLE_BY_PROFILE above), not this loans-profile derivation. Kept
@@ -886,6 +900,24 @@ const CreateAccount: React.FC = () => {
             }],
           });
           console.log('[handleStep3Submit] client companyId patch response', clientData);
+
+          // Now that the client belongs to a company, record its memberships:
+          // the SmartLoans type chosen at "Perfil" plus the ticked interests
+          // (step "Perfil" could only grant those when a company was already
+          // known). Grants are idempotent. Best-effort, like step "Perfil".
+          if (selectedProfile === 'customer') {
+            const caps: ClientCapability[] = [
+              ...(wantsLoans ? SMARTLOANS_CAPS_BY_CLIENT_TYPE[clientType] : []),
+              ...INTEREST_OPTIONS.filter(o => selectedInterests.includes(o.id) && o.capability).map(o => o.capability!),
+            ];
+            for (const capability of caps) {
+              try {
+                await grantClientCapability(selectedCompany.companyId, createdClientId, capability);
+              } catch (capErr) {
+                console.warn('[handleStep3Submit] grantClientCapability failed for', capability, capErr);
+              }
+            }
+          }
         } catch (clientErr) {
           console.error('[handleStep3Submit] client companyId patch ERROR', clientErr);
         }

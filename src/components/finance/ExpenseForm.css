@@ -89,20 +89,16 @@
    FORM FIELDS
    ========================================================================== */
 .expense-form-item {
-  --background: transparent;
-  --padding-start: 0;
-  --inner-padding-end: 0;
+  display: block;
+  width: 100%;
   margin-bottom: 14px;
+  --border-radius: 12px;
+  --border-color: #E2E8F0;
+  --highlight-color-focused: #0056D2;
 }
 
 .expense-form-item:last-child {
   margin-bottom: 0;
-}
-
-.expense-form-item ion-select,
-.expense-form-item ion-input {
-  width: 100%;
-  --border-radius: 12px;
 }
 
 /* ==========================================================================

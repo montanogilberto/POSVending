@@ -44,6 +44,8 @@ export interface IncomePayload {
     clientId: number;
     companyId: number;
     promotionCode?: string | null;
+    // Card terminal (dbo.commissionTerminals) that charged this sale — tarjeta only.
+    commissionTerminalId?: number | null;
     products: Array<{
       productId: number;
       quantity: number;

@@ -402,6 +402,13 @@
      white-space: nowrap;
    }
 
+   .summary-tile-sub {
+     font-size: 0.7rem;
+     font-weight: 600;
+     color: #DC2626;
+     white-space: nowrap;
+   }
+
    @media (max-width: 480px) {
      .summary-tile-value {
        font-size: 0.95rem;
@@ -419,8 +426,27 @@
 
    .cobros-row {
      display: flex;
+     flex-wrap: wrap;
      align-items: center;
      gap: 10px;
+   }
+
+   /* Card-terminal commission under the Tarjeta row (icon 18px + gap 10px indent) */
+   .cobros-row-commission {
+     flex-basis: 100%;
+     display: flex;
+     justify-content: space-between;
+     gap: 8px;
+     margin-top: -4px;
+     padding-left: 28px;
+     font-size: 0.75rem;
+     color: #DC2626;
+   }
+
+   .cobros-row-net {
+     color: #16A34A;
+     font-weight: 700;
+     white-space: nowrap;
    }
 
    .cobros-row-icon {
