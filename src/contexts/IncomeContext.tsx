@@ -7,6 +7,10 @@ interface Income {
   total: number;
   discountAmount: number; // Discount from promotions (2x1, etc.)
   paymentMethod: string;
+  // Card-terminal commission stamped at sale time (see utils/incomeMoney.ts).
+  commissionTerminalId?: number | null;
+  commissionRatePct?: number | null;
+  commissionAmount?: number | null;
   paymentDate: string;
   userId: number;
   clientId: number;

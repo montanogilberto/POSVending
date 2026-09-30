@@ -6,10 +6,17 @@ import { isCashRegisterOpen, closeCashRegister } from '../../../api/cashRegister
 import { fetchTicket } from '../../../api/ticketApi';
 import { fetchAllExpenses, Expense } from '../../../api/expensesApi';
 import { toHermosilloDate } from '../../../utils/format';
+import { getAllCommissionTerminals, CommissionTerminal } from '../../../api/commissionTerminalsApi';
+import {
+  PaymentMethodLabel,
+  normalizePaymentMethod,
+  activeCardTerminal,
+  incomeCommission,
+} from '../../../utils/incomeMoney';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
 import { Transaction, CartItem } from '../types';
 
-type PaymentMethod = 'Efectivo' | 'Transferencia' | 'Tarjeta';
+type PaymentMethod = PaymentMethodLabel;
 
 const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
 
@@ -38,6 +45,8 @@ export const useDashboard = () => {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [loadingReceiptId, setLoadingReceiptId] = useState<number | null>(null);
+  // Only used to price a card sale the backend has not stamped yet.
+  const [cardTerminal, setCardTerminal] = useState<CommissionTerminal | null>(null);
   //const [pieData, setPieData] = useState<any>(null);
 
   const refreshDashboardData = () => {
@@ -50,6 +59,12 @@ export const useDashboard = () => {
         if (!controller.signal.aborted) setAllExpenses(expenses);
       })
       .catch((err) => console.warn('[Dashboard] fetchAllExpenses failed:', err));
+
+    getAllCommissionTerminals()
+      .then((terminals) => {
+        if (!controller.signal.aborted) setCardTerminal(activeCardTerminal(terminals));
+      })
+      .catch((err) => console.warn('[Dashboard] getAllCommissionTerminals failed:', err));
 
     return () => controller.abort();
   };
@@ -95,21 +110,14 @@ export const useDashboard = () => {
 
     if (!monthly.length) return [];
 
-    const methodMap: Record<string, PaymentMethod> = {
-      efectivo: 'Efectivo',
-      tarjeta: 'Tarjeta',
-      transferencia: 'Transferencia',
-    };
-
-    const totals = monthly.reduce(
-      (acc: Record<PaymentMethod, number>, income: any) => {
-        const method = methodMap[(income.paymentMethod || '').toLowerCase()];
-        if (!method) return acc;
-        acc[method] += Number(income.total) || 0;
-        return acc;
-      },
-      { Efectivo: 0, Transferencia: 0, Tarjeta: 0 }
-    );
+    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
+    const commissions: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
+    monthly.forEach((income) => {
+      const method = normalizePaymentMethod(income.paymentMethod);
+      if (!method) return;
+      totals[method] += Number(income.total) || 0;
+      commissions[method] += incomeCommission(income, cardTerminal);
+    });
 
     const total = PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
     if (total === 0) return [];
@@ -117,10 +125,11 @@ export const useDashboard = () => {
     return PAYMENT_METHODS.map((method) => ({
       method,
       amount: totals[method],
+      commission: commissions[method],
       percent: (totals[method] / total) * 100,
       color: PAYMENT_COLORS[method],
     }));
-  }, [allIncome]);
+  }, [allIncome, cardTerminal]);
 
   // ✅ METRICS
   const calculateTotal = () =>
@@ -137,9 +146,21 @@ export const useDashboard = () => {
         const d = toHermosilloDate(i.paymentDate);
         return d.toISOString().split('T')[0] === today;
       })
-      .reduce((sum, i) => {
-        return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
-      }, 0);
+      // income.total is already the charged (post-discount) amount — the cart
+      // sends the promo total and sp_income stores it — so no second subtraction.
+      .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+  };
+
+  // Card-terminal commissions on today's sales — a cost, not a sale: Neto deducts it.
+  const calculateDailyCommissions = () => {
+    const today = toHermosilloDate(new Date().toISOString())
+      .toISOString()
+      .split('T')[0];
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => toHermosilloDate(i.paymentDate).toISOString().split('T')[0] === today)
+      .reduce((sum, i) => sum + incomeCommission(i, cardTerminal), 0);
   };
 
   const calculateDailySalesCount = () => {
@@ -177,9 +198,9 @@ export const useDashboard = () => {
           d.getFullYear() === hermosilloNow.getFullYear()
         );
       })
-      .reduce((sum, i) => {
-        return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
-      }, 0);
+      // income.total is already the charged (post-discount) amount — the cart
+      // sends the promo total and sp_income stores it — so no second subtraction.
+      .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
   };
 
   const calculateExpensesMonthlyTotal = () => {
@@ -220,9 +241,7 @@ export const useDashboard = () => {
           const d = toHermosilloDate(i.paymentDate);
           return d.toISOString().split('T')[0] === dateKey;
         })
-        .reduce((sum, i) => {
-          return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
-        }, 0);
+        .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
 
     const todayTotal = getNet(todayKey);
     const yesterdayTotal = getNet(yesterdayKey);
@@ -330,6 +349,7 @@ export const useDashboard = () => {
     calculateTotal,
     calculateDailySales,
     calculateDailySalesCount,
+    calculateDailyCommissions,
     calculateExpensesDailyTotal,
     calculateMonthlyTotal,
     calculateExpensesMonthlyTotal,

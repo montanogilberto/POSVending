@@ -14,6 +14,7 @@ import {
   IonLabel,
   IonChip,
   IonInput,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import { addCircle, card, wallet, business, receipt, cart, person, pricetag, qrCodeOutline, giftOutline } from 'ionicons/icons';
 import { useCart } from '../../contexts/CartContext';
@@ -25,6 +26,8 @@ import { submitOrder } from '../../api/cartApi';
 import useInactivityTimer from '../../hooks/useInactivityTimer';
 import { fetchTicket } from '../../api/ticketApi';
 import { postIncome } from '../../api/incomeApi';
+import { getAllCommissionTerminals, CommissionTerminal } from '../../api/commissionTerminalsApi';
+import { activeCardTerminal, terminalCommission } from '../../utils/incomeMoney';
 import { useIncome } from '../../contexts/IncomeContext';
 import { Client } from '../../api/clientsApi';
 import { posRewardsApi, PosRewardBalance } from '../../api/posRewardsApi';
@@ -67,6 +70,15 @@ const CartPage: React.FC = () => {
   const [showClientSelector, setShowClientSelector] = useState(false);
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [clientBalance, setClientBalance] = useState<PosRewardBalance | null>(null);
+  // Card terminal (commission catalog) — previews the commission the business
+  // absorbs on a card sale; the customer still pays `total`.
+  const [cardTerminal, setCardTerminal] = useState<CommissionTerminal | null>(null);
+
+  useIonViewWillEnter(() => {
+    getAllCommissionTerminals()
+      .then((terminals) => setCardTerminal(activeCardTerminal(terminals)))
+      .catch((e) => console.warn('[Cart] Could not load commission terminals', e));
+  });
   const [clientBalanceLoading, setClientBalanceLoading] = useState(false);
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
   const [newPointsBalance, setNewPointsBalance] = useState<number | null>(null);
@@ -275,6 +287,19 @@ const CartPage: React.FC = () => {
 
           const promoCodeValue = promoActive ? WELCOME_COUPON_CODE : null;
 
+          // Card sales record which terminal charged them so accounting can
+          // apply its commission. Never block the sale if the catalog is down.
+          let commissionTerminalId: number | null = null;
+          if (paymentMethod === 'Tarjeta') {
+            try {
+              const terminal = cardTerminal ?? activeCardTerminal(await getAllCommissionTerminals());
+              commissionTerminalId = terminal?.commissionTerminalId ?? null;
+              if (!terminal) console.warn('[Cart] No active card terminal in catalog; backend will use its default');
+            } catch (e) {
+              console.warn('[Cart] Could not load commission terminals; backend will use its default terminal', e);
+            }
+          }
+
           const payload = {
             income: [
               {
@@ -288,6 +313,7 @@ const CartPage: React.FC = () => {
                 clientId: selectedClient?.clientId ?? 1,
                 companyId,
                 promotionCode: promoCodeValue,
+                commissionTerminalId,
                 products: cartItems.map((item) => ({
                   productId: parseInt(item.productId),
                   quantity: item.quantity,
@@ -576,6 +602,22 @@ const CartPage: React.FC = () => {
                     </IonButton>
                   </div>
                 </div>
+
+                {/* Card-terminal commission (absorbed by the business, not charged to the client) */}
+                {paymentMethod === 'Tarjeta' && cardTerminal && total > 0 && (
+                  <div className="terminal-commission">
+                    <div className="terminal-commission-row">
+                      <span>Comisión terminal ({Number(cardTerminal.commissionRatePct)}%)</span>
+                      <span className="terminal-commission-amount">
+                        −{formatPrice(terminalCommission(total, cardTerminal))}
+                      </span>
+                    </div>
+                    <div className="terminal-commission-row terminal-commission-row--net">
+                      <span>Recibes</span>
+                      <span>{formatPrice(total - terminalCommission(total, cardTerminal))}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Cash Input */}
                 {paymentMethod === 'Efectivo' && (

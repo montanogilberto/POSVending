@@ -104,3 +104,9 @@ export const FOLLOW_UP_STATUS: Record<string, StatusMeta> = {
   completed: { label: 'Completado', color: 'success' },
   cancelled: { label: 'Cancelado',  color: 'medium' },
 };
+
+/** Empleados (dbo.status vía employees.statusId). */
+export const EMPLOYEE_STATUS: Record<string, StatusMeta> = {
+  active:   { label: 'Activo',   color: 'success' },
+  inactive: { label: 'Inactivo', color: 'medium' },
+};

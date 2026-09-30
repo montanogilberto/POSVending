@@ -195,6 +195,40 @@
   margin-right: 6px;
 }
 
+.more-button {
+  white-space: nowrap;
+}
+
+.more-button ion-icon {
+  margin-right: 0;
+  margin-left: 4px;
+}
+
+.portfolio-button {
+  --border-color: #15803d;
+  --color: #15803d;
+}
+
+.expediente-button {
+  --border-color: #b45309;
+  --color: #b45309;
+}
+
+/* Secondary actions, shown under the card when "Más" is open */
+.client-actions-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.client-actions-more .action-button {
+  flex: 1 1 140px;
+  margin: 0;
+}
+
 /* ==========================================================================
    Empty State & Loading State
    ========================================================================== */

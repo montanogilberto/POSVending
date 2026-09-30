@@ -4,6 +4,9 @@ interface Income {
   total: number;
   discountAmount: number;
   paymentMethod: string;
+  commissionTerminalId?: number | null;
+  commissionRatePct?: number | null;
+  commissionAmount?: number | null;
   paymentDate: string;
   userId: number;
   clientId: number;

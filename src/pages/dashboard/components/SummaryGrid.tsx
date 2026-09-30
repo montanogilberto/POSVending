@@ -5,12 +5,13 @@ import { fmtMXN, fmtInt } from '../../../utils/format';
 
 interface SummaryGridProps {
   ventas: number;
+  comisiones: number; // card-terminal commissions — a cost the business absorbs
   egresos: number;
   operaciones: number;
 }
 
-const SummaryGrid: React.FC<SummaryGridProps> = ({ ventas, egresos, operaciones }) => {
-  const neto = ventas - egresos;
+const SummaryGrid: React.FC<SummaryGridProps> = ({ ventas, comisiones, egresos, operaciones }) => {
+  const neto = ventas - comisiones - egresos;
 
   return (
     <IonCard className="dashboard-summary-card">
@@ -44,6 +45,9 @@ const SummaryGrid: React.FC<SummaryGridProps> = ({ ventas, egresos, operaciones 
             <div>
               <div className="summary-tile-label">Neto</div>
               <div className="summary-tile-value">{fmtMXN(neto)}</div>
+              {comisiones > 0 && (
+                <div className="summary-tile-sub">incl. −{fmtMXN(comisiones)} comisión</div>
+              )}
             </div>
           </div>
 

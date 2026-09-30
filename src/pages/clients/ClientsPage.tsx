@@ -66,6 +66,8 @@ import {
   close,
   giftOutline,
   banOutline,
+  chevronDown,
+  chevronUp,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
@@ -213,6 +215,8 @@ const ClientsPage: React.FC = () => {
   const [selectedForDelete, setSelectedForDelete] = useState<Client | null>(null);
   const [deletingClientId, setDeletingClientId] = useState<number | null>(null);
   const [togglingActiveId, setTogglingActiveId] = useState<number | null>(null);
+  // Only one card shows its secondary actions at a time — keeps the list scannable.
+  const [expandedActionsId, setExpandedActionsId] = useState<number | null>(null);
   const pops = usePopovers();
 
   // ── Wizard state ───────────────────────────────────────────────────────────
@@ -1929,6 +1933,23 @@ const ClientsPage: React.FC = () => {
                     <IonButton fill="outline" size="small" color="success" onClick={() => { setQrModalClient(client); setShowQrModal(true); }} className="action-button">
                       <IonIcon icon={qrCodeOutline} slot="start" /> QR
                     </IonButton>
+                    <IonButton fill="outline" size="small" color="primary" onClick={() => handleEdit(client)} className="action-button edit-button">
+                      <IonIcon icon={pencil} slot="start" /> Editar
+                    </IonButton>
+                    <IonButton
+                      fill="clear"
+                      size="small"
+                      color="medium"
+                      onClick={() => setExpandedActionsId(expandedActionsId === client.clientId ? null : client.clientId)}
+                      className="action-button more-button"
+                    >
+                      {expandedActionsId === client.clientId ? 'Menos' : 'Más'}
+                      <IonIcon icon={expandedActionsId === client.clientId ? chevronUp : chevronDown} slot="end" />
+                    </IonButton>
+                  </div>
+                </div>
+                {expandedActionsId === client.clientId && (
+                  <div className="client-actions-more">
                     <IonButton fill="outline" size="small" color="medium" onClick={() => { setShareClient(client); setShowShareModal(true); }} className="action-button">
                       <IonIcon icon={shareOutline} slot="start" /> Invitar
                     </IonButton>
@@ -1939,7 +1960,7 @@ const ClientsPage: React.FC = () => {
                       </IonButton>
                     )}
                     {(client.clientType === 'lender' || client.clientType === 'both') && (
-                      <IonButton fill="outline" size="small" style={{ '--color': '#15803d', '--border-color': '#15803d' }} onClick={() => history.push(`/lender-dashboard/${client.clientId}`)} className="action-button">
+                      <IonButton fill="outline" size="small" onClick={() => history.push(`/lender-dashboard/${client.clientId}`)} className="action-button portfolio-button">
                         <IonIcon icon={walletOutline} slot="start" /> Portfolio
                       </IonButton>
                     )}
@@ -1951,11 +1972,8 @@ const ClientsPage: React.FC = () => {
                     <IonButton fill="outline" size="small" color="warning" onClick={() => history.push(`/client-followup/${client.clientId}`)} className="action-button">
                       <IonIcon icon={calendarOutline} slot="start" /> Seguimiento
                     </IonButton>
-                    <IonButton fill="outline" size="small" style={{ '--color': '#b45309', '--border-color': '#b45309' }} onClick={() => history.push(`/client-expediente/${client.clientId}`)} className="action-button">
+                    <IonButton fill="outline" size="small" onClick={() => history.push(`/client-expediente/${client.clientId}`)} className="action-button expediente-button">
                       <IonIcon icon={documentTextOutline} slot="start" /> Expediente
-                    </IonButton>
-                    <IonButton fill="outline" size="small" color="primary" onClick={() => handleEdit(client)} className="action-button edit-button">
-                      <IonIcon icon={pencil} slot="start" /> Editar
                     </IonButton>
                     <IonButton fill="outline" size="small" color={client.isActive === false ? 'success' : 'medium'} disabled={togglingActiveId === client.clientId} onClick={() => handleToggleActive(client)} className="action-button">
                       {togglingActiveId === client.clientId
@@ -1970,7 +1988,7 @@ const ClientsPage: React.FC = () => {
                         : <><IonIcon icon={trash} slot="start" /> Eliminar</>}
                     </IonButton>
                   </div>
-                </div>
+                )}
               </IonCardContent>
             </IonCard>
           ))}
