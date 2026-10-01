@@ -7,7 +7,6 @@ import {
   IonToolbar,
   IonButtons,
   IonButton,
-  IonBackButton,
   IonItem,
   IonLabel,
   IonInput,
@@ -39,7 +38,17 @@ import { getAllEmployees, Employee } from '../../api/employeesApi';
 import { categorizeExpense, ExpenseCategorization } from '../../api/expenseAgentApi';
 import { pickExpenseReceiptPhoto } from '../../utils/pickAvatarPhoto';
 import { useUser } from '../../contexts/UserContext';
-import { fmtMXN } from '../../utils/format';
+import { useToast } from '../../hooks/useToast';
+import NewSupplierModal from './NewSupplierModal';
+import { fmtMXN, toHermosilloDate } from '../../utils/format';
+
+// The picker gives a Hermosillo calendar day ('YYYY-MM-DD'). Today must be
+// Hermosillo's today (UTC rolls over at 17:00 local), and the stored timestamp
+// is that day's noon in Hermosillo (UTC-7 → 19:00Z): `new Date('2026-09-29')`
+// is UTC midnight = Sept 28 17:00 local, which showed every expense a day
+// early and put the 1st of a month into the previous month.
+const hermosilloToday = () => toHermosilloDate(new Date().toISOString()).toISOString().split('T')[0];
+const hermosilloNoonUtc = (day: string) => `${day}T19:00:00.000Z`;
 import './ExpenseForm.css';
 
 interface Product {
@@ -79,11 +88,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierId, setSupplierId] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(hermosilloToday);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
+  const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
+  const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [usingFallbackData, setUsingFallbackData] = useState(false);
   const [lastError, setLastError] = useState<string>('');
   const [receiptPhoto, setReceiptPhoto] = useState<string | null>(null);
@@ -108,8 +117,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
       const result = await categorizeExpense({ companyId, description, total, paymentMethod });
       setAgentReview(result);
       if (!result) {
-        setToastMessage('No se pudo revisar el egreso con el agente');
-        setShowToast(true);
+        showToast('No se pudo revisar el egreso con el agente');
       }
     } finally {
       setAgentReviewing(false);
@@ -194,8 +202,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
 
       // Only show toast if not using fallback data
       if (!usingFallbackData) {
-        setToastMessage(errorMsg);
-        setShowToast(true);
+        showToast(errorMsg);
       }
 
     } finally {
@@ -212,8 +219,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
     // Check if product is already selected
     const isAlreadySelected = selectedProducts.some(p => p.productId === product.productId);
     if (isAlreadySelected) {
-      setToastMessage('El producto ya está seleccionado');
-      setShowToast(true);
+      showToast('El producto ya está seleccionado');
       return;
     }
 
@@ -245,32 +251,27 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
 
   const handleSubmit = async () => {
     if (expenseType === 'inventory' && selectedProducts.length === 0) {
-      setToastMessage('Debe seleccionar al menos un producto');
-      setShowToast(true);
+      showToast('Debe seleccionar al menos un producto');
       return;
     }
 
     if (expenseType === 'payroll') {
       if (employeeId === 0) {
-        setToastMessage('Debe seleccionar un empleado');
-        setShowToast(true);
+        showToast('Debe seleccionar un empleado');
         return;
       }
     } else if (supplierId === 0) {
-      setToastMessage('Debe seleccionar un proveedor');
-      setShowToast(true);
+      showToast('Debe seleccionar un proveedor');
       return;
     }
 
     if (!paymentMethod) {
-      setToastMessage('Debe seleccionar un método de pago');
-      setShowToast(true);
+      showToast('Debe seleccionar un método de pago');
       return;
     }
 
     if (expenseType !== 'inventory' && total <= 0) {
-      setToastMessage('Debe ingresar un total mayor a cero');
-      setShowToast(true);
+      showToast('Debe ingresar un total mayor a cero');
       return;
     }
 
@@ -299,7 +300,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
           action: 1,
           total: total,
           paymentMethod: paymentMethod,
-          paymentDate: new Date(paymentDate).toISOString(),
+          paymentDate: hermosilloNoonUtc(paymentDate),
           userId,
           companyId,
           expenseType,
@@ -322,7 +323,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
       setSupplierId(0);
       setEmployeeId(0);
       setPaymentMethod('');
-      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentDate(hermosilloToday());
       setTotal(0);
       setNotes('');
       setExpenseType('inventory');
@@ -331,8 +332,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
       onClose();
     } catch (error) {
       console.error('Error creating expense:', error);
-      setToastMessage('Error al crear el egreso');
-      setShowToast(true);
+      showToast('Error al crear el egreso');
     } finally {
       setLoading(false);
     }
@@ -481,10 +481,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                     label="Empleado"
                     labelPlacement="floating"
                     placeholder="Seleccionar empleado"
-                    value={employeeId}
-                    onIonChange={(e) => setEmployeeId(e.detail.value)}
+                    interface="popover"
+                    value={employeeId || undefined}
+                    onIonChange={(e) => setEmployeeId(Number(e.detail.value) || 0)}
                   >
-                    <IonSelectOption value={0}>Seleccionar...</IonSelectOption>
                     {employees.map(employee => (
                       <IonSelectOption key={employee.employeeId} value={employee.employeeId}>
                         {employee.firstName} {employee.lastName}
@@ -498,10 +498,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                     label="Proveedor"
                     labelPlacement="floating"
                     placeholder="Seleccionar proveedor"
-                    value={supplierId}
-                    onIonChange={(e) => setSupplierId(e.detail.value)}
+                    interface="popover"
+                    value={supplierId || undefined}
+                    onIonChange={(e) => setSupplierId(Number(e.detail.value) || 0)}
                   >
-                    <IonSelectOption value={0}>Seleccionar...</IonSelectOption>
                     {suppliers.map(supplier => (
                       <IonSelectOption key={supplier.supplierId} value={supplier.supplierId}>
                         {supplier.supplierName}
@@ -510,13 +510,22 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                   </IonSelect>
                 )}
 
+                {expenseType !== 'payroll' && (
+                  <IonButton fill="clear" size="small" className="expense-form-new-supplier"
+                    onClick={() => setShowNewSupplier(true)}>
+                    <IonIcon slot="start" icon={addOutline} />
+                    Nuevo proveedor
+                  </IonButton>
+                )}
+
                 <IonSelect
                   className="expense-form-item"
                   fill="outline"
                   label="Método de Pago"
                   labelPlacement="floating"
                   placeholder="Seleccionar método"
-                  value={paymentMethod}
+                  interface="popover"
+                  value={paymentMethod || undefined}
                   onIonChange={(e) => setPaymentMethod(e.detail.value)}
                 >
                   <IonSelectOption value="Efectivo">Efectivo</IonSelectOption>
@@ -677,12 +686,19 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
         </IonContent>
       </IonModal>
 
-      <IonToast
-        isOpen={showToast}
-        onDidDismiss={() => setShowToast(false)}
-        message={toastMessage}
-        duration={3000}
+      <NewSupplierModal
+        isOpen={showNewSupplier}
+        companyId={companyId}
+        onClose={() => setShowNewSupplier(false)}
+        onCreated={(supplier, list) => {
+          setSuppliers(list);
+          setSupplierId(supplier.supplierId);
+          setShowNewSupplier(false);
+          showToast(`Proveedor "${supplier.supplierName}" creado y seleccionado`, 'success');
+        }}
       />
+
+      <IonToast {...toastProps} />
     </>
   );
 };

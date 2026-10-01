@@ -384,6 +384,11 @@
      color: #16A34A;
    }
 
+   .summary-tile-icon.blue {
+    background: #DCFCE7;
+    color: #1679a3;
+  }
+
    .summary-tile-icon.pink {
      background: #FEE2E2;
      color: #DC2626;
@@ -674,4 +679,18 @@
   .activity-icon-badge ion-icon {
     font-size: 18px;
   }
+}
+
+.monthly-summary-period {
+  text-transform: capitalize;
+  margin: 0 0 12px 4px;
+}
+
+.monthly-summary-link {
+  display: block;
+  margin: 4px auto 0;
+  width: fit-content;
+  --color: #007BFF;
+  text-transform: none;
+  font-weight: 600;
 }

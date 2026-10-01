@@ -6,6 +6,7 @@ import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonInput,
   IonSelect, IonSelectOption, IonTextarea, IonAlert, IonSpinner,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   arrowBack, addOutline, closeOutline, callOutline, homeOutline,
   cardOutline, documentTextOutline, alertCircleOutline, checkmarkCircleOutline,
@@ -61,6 +62,7 @@ const blank = (companyId: number, clientId: number): Omit<ClientFollowUp, 'follo
 const ClientFollowUpPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const { companyId, userId } = useUser();
   const clientId = Number(clientIdParam);
 
@@ -177,7 +179,7 @@ const ClientFollowUpPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBack} slot="icon-only" />
             </IonButton>
           </IonButtons>

@@ -30,6 +30,7 @@ import {
   setupIonicReact,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
+import { ExitConfirmProvider } from './contexts/ExitConfirmContext';
 import {
   cash,
   settings,
@@ -70,6 +71,7 @@ import {
   diamondOutline,
   trendingUpOutline,
   trendingDownOutline,
+  statsChartOutline,
   paperPlaneOutline,
   checkmarkCircle,
   compassOutline,
@@ -83,6 +85,7 @@ import {
 import Setting from './pages/system/Setting';
 //mport Sells from './pages/dashboard/Sells';
 import Dashboard from './pages/dashboard/Dashboard';
+import MonthlySummaryPage from './pages/dashboard/MonthlySummaryPage';
 //import ScannerQR from './pages/dashboard/ScannerQR';
 import Category from './pages/category/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
@@ -102,6 +105,7 @@ import CategoriesPage from './pages/category/CategoriesPage';
 import UsersPage from './pages/admin/UsersPage';
 import IncomesPage from './pages/finance/IncomesPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
+import ExpensesDetailPage from './pages/finance/ExpensesDetailPage';
 import AccountingPage from './pages/finance/AccountingPage';
 import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
@@ -735,6 +739,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'ingresos') && (
+              <IonItem button routerLink="/monthly-summary" title="Resumen mensual">
+                <IonIcon icon={statsChartOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Resumen mensual</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'loans') && (
               <IonItem button routerLink="/loans" title="Préstamos">
                 <IonIcon icon={cashOutline} slot="start" />
@@ -902,7 +915,8 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/setting" feature="settings" component={Setting} />
             
             <PrivateRoute exact path="/dashboard" component={Dashboard} />
-            
+            <PrivateRoute exact path="/monthly-summary" component={MonthlySummaryPage} />
+
 
             <PrivateRoute exact path="/category" component={Category} />
             <PrivateRoute exact path="/products/:productId" component={ProductDetailPage} />
@@ -924,6 +938,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/users" feature="users" component={UsersPage} />
             <PrivateRoute exact path="/ingresos" feature="ingresos" component={IncomesPage} />
             <PrivateRoute exact path="/egresos" feature="egresos" component={ExpensesPage} />
+            <PrivateRoute exact path="/egresos/detalle" feature="egresos" component={ExpensesDetailPage} />
             <PrivateRoute exact path="/accounting" feature="accounting" component={AccountingPage} />
             <PrivateRoute exact path="/water-tanks" feature="iot" component={WaterTanksPage} />
             <PrivateRoute exact path="/water-tanks-history/:tankId" feature="iot" component={WaterTanksHistoryPage} />
@@ -1260,20 +1275,22 @@ const App: React.FC = () => {
       <ProductProvider>
         <IonApp>
           <IonReactRouter>
-            <BiometricLockGate>
-              <IonRouterOutlet id="root-outlet">
-                <Route exact path="/login" component={Login} />
-                <Route exact path="/forgot-password" component={ForgotPassword} />
-                <Route exact path="/create-account" component={CreateAccount} />
-                <Route exact path="/client-login" component={ClientLogin} />
+            <ExitConfirmProvider>
+              <BiometricLockGate>
+                <IonRouterOutlet id="root-outlet">
+                  <Route exact path="/login" component={Login} />
+                  <Route exact path="/forgot-password" component={ForgotPassword} />
+                  <Route exact path="/create-account" component={CreateAccount} />
+                  <Route exact path="/client-login" component={ClientLogin} />
 
-                <Route exact path="/">
-                  <Redirect to="/login" />
-                </Route>
+                  <Route exact path="/">
+                    <Redirect to="/login" />
+                  </Route>
 
-                <Route component={AppShell} />
-              </IonRouterOutlet>
-            </BiometricLockGate>
+                  <Route component={AppShell} />
+                </IonRouterOutlet>
+              </BiometricLockGate>
+            </ExitConfirmProvider>
           </IonReactRouter>
         </IonApp>
       </ProductProvider>

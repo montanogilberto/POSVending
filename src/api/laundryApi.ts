@@ -49,11 +49,8 @@ const normalizeError = (error: unknown) => {
 // before which the SP ignores the period and returns the current month.
 // (GET /all_income is NOT filtered by company — its wrapper was removed
 // 2026-09-29; don't reintroduce it.)
-export interface IncomePeriod {
-  year: number;
-  /** 1-12 */
-  month: number;
-}
+import type { MonthPeriod } from '../utils/monthPeriod';
+export type IncomePeriod = MonthPeriod;
 
 export const fetchMonthlyLaundry = async (
   companyId: number,

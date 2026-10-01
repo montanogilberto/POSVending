@@ -48,6 +48,19 @@
   font-weight: 600;
 }
 
+/* Month picker: ‹ Septiembre de 2026 › */
+.expenses-period {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expenses-period ion-button {
+  --padding-start: 4px;
+  --padding-end: 4px;
+  margin: 0;
+}
+
 .expenses-summary-amount-row {
   display: flex;
   align-items: center;
@@ -127,13 +140,6 @@
   padding: 0;
 }
 
-.expenses-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .expenses-filters-toggle {
   --border-radius: 12px !important;
   font-weight: 600;
@@ -145,21 +151,65 @@
   margin-left: 6px;
 }
 
-.expenses-sort-select {
-  --border-radius: 12px;
-  --padding-start: 14px;
-  --padding-end: 14px;
-  background: #F3F4F6;
-  border-radius: 12px;
-  font-weight: 600;
-  min-width: 150px;
-}
-
 .expenses-add-button {
   --border-radius: 12px !important;
   --background: #0056D2 !important;
   font-weight: 700;
   text-transform: none;
+  min-height: 50px;
+  margin: 0 0 20px;
+}
+
+/* ==========================================================================
+   OVERVIEW — Actividad Reciente (same card as /dashboard)
+   ========================================================================== */
+.expenses-activity-card {
+  margin: 0;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02), 0 2px 8px rgba(0, 0, 0, 0.01);
+}
+
+.expenses-activity-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #1A202C;
+}
+
+.expenses-see-all {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.expenses-see-all ion-button {
+  font-weight: 700;
+  text-transform: none;
+}
+
+.expenses-loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+/* ==========================================================================
+   DETAIL — month + total header
+   ========================================================================== */
+.expenses-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.expenses-detail-total {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1A202C;
 }
 
 /* ==========================================================================
@@ -190,75 +240,6 @@
   --color: #DC2626;
   font-weight: 600;
   text-transform: none;
-}
-
-/* ==========================================================================
-   TABLE
-   ========================================================================== */
-.expenses-table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.expenses-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: 'Inter', sans-serif;
-}
-
-.expenses-table-header {
-  text-align: left;
-  padding: 12px 16px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #718096;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-  border-bottom: 1px solid #EDF2F7;
-}
-
-.expenses-table-header:focus-visible {
-  outline: 2px solid #0056D2;
-  outline-offset: -2px;
-}
-
-.expenses-sort-icon {
-  font-size: 14px;
-  margin-left: 4px;
-  vertical-align: middle;
-  color: #A0AEC0;
-}
-
-.expenses-sort-icon.active {
-  color: #0056D2;
-}
-
-.expenses-table tbody tr {
-  border-bottom: 1px solid #F3F4F6;
-  transition: background 0.15s;
-}
-
-.expenses-table tbody tr:hover {
-  background: #F9FAFB;
-}
-
-.expenses-table td {
-  padding: 14px 16px;
-  font-size: 0.95rem;
-  color: #1A202C;
-}
-
-.expenses-id-cell {
-  font-weight: 600;
-  color: #4A5568;
-}
-
-.expenses-total-cell {
-  font-weight: 700;
-  color: #1A202C;
 }
 
 .expenses-empty {
@@ -327,75 +308,9 @@
     --padding-bottom: 20px !important;
   }
 
-  .expenses-toolbar-actions {
-    width: 100%;
-  }
-
-  .expenses-sort-select {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .expenses-add-button {
-    flex: 1 1 100%;
-  }
 }
 
-/* Below this width a bordered table with 5 columns can't fit — render each
-   row as a labeled card instead of forcing horizontal scroll. */
 @media (max-width: 640px) {
-  .expenses-table-wrapper {
-    overflow-x: visible;
-  }
-
-  .expenses-table thead {
-    display: none;
-  }
-
-  .expenses-table,
-  .expenses-table tbody,
-  .expenses-table tr,
-  .expenses-table td {
-    display: block;
-    width: 100%;
-  }
-
-  .expenses-table tbody tr {
-    border: 1px solid #EDF2F7;
-    border-radius: 14px;
-    padding: 4px 14px;
-    margin-bottom: 12px;
-  }
-
-  .expenses-table tbody tr:hover {
-    background: transparent;
-  }
-
-  .expenses-table td {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid #F3F4F6;
-    text-align: right;
-  }
-
-  .expenses-table tr td:last-child {
-    border-bottom: none;
-  }
-
-  .expenses-table td::before {
-    content: attr(data-label);
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: #718096;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    text-align: left;
-    flex-shrink: 0;
-  }
-
   .expenses-pagination {
     flex-direction: column;
     align-items: stretch;
@@ -408,4 +323,57 @@
   .expenses-pagination-size {
     justify-content: center;
   }
+}
+
+/* ==========================================================================
+   EXPENSE DETAIL MODAL
+   ========================================================================== */
+.expense-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.expense-detail-row-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.expense-detail-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.expense-detail-value {
+  font-size: 0.95rem;
+  color: #1A202C;
+  text-align: right;
+}
+
+.expense-detail-total {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.expense-detail-notes {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #1A202C;
+  white-space: pre-wrap;
+}
+
+.expense-detail-receipt {
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
 }

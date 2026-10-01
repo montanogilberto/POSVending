@@ -3,6 +3,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonToast, IonSpinner, IonBadge, IonChip, IonLabel,
 } from '@ionic/react';
+import { useExitConfirm } from '../../../contexts/ExitConfirmContext';
 import { arrowBackOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import ProvablyFairSheet from '../../../components/ui/ProvablyFairSheet';
 import RoundResultModal from '../../../components/ui/RoundResultModal';
@@ -29,62 +30,65 @@ interface GameShellProps {
 
 const GameShell: React.FC<GameShellProps> = ({
   vm, title, resultDetail, onPlayAgain, children,
-}) => (
-  <IonPage>
-    <IonHeader>
-      <IonToolbar>
-        <IonButtons slot="start">
-          <IonButton onClick={() => vm.history.goBack()}>
-            <IonIcon icon={arrowBackOutline} slot="icon-only" />
-          </IonButton>
-        </IonButtons>
-        <IonTitle>{title}</IonTitle>
-        <IonButtons slot="end">
-          <IonButton onClick={() => vm.setFairOpen(true)} title="Juego limpio">
-            <IonIcon icon={shieldCheckmarkOutline} slot="icon-only" />
-          </IonButton>
-        </IonButtons>
-      </IonToolbar>
-    </IonHeader>
+}) => {
+  const { confirmBack } = useExitConfirm();
+  return (
+    <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonButtons slot="start">
+            <IonButton onClick={() => confirmBack()}>
+              <IonIcon icon={arrowBackOutline} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
+          <IonTitle>{title}</IonTitle>
+          <IonButtons slot="end">
+            <IonButton onClick={() => vm.setFairOpen(true)} title="Juego limpio">
+              <IonIcon icon={shieldCheckmarkOutline} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
+        </IonToolbar>
+      </IonHeader>
 
-    <IonContent className="ag-content">
-      <IonToast {...vm.toastProps} />
+      <IonContent className="ag-content">
+        <IonToast {...vm.toastProps} />
 
-      {vm.loading ? (
-        <div className="ag-loading"><IonSpinner name="dots" /></div>
-      ) : (
-        <>
-          <div className="ag-topbar">
-            <IonChip outline color="warning">
-              <IonLabel>{fmtInt(vm.coinBalance)} fichas</IonLabel>
-            </IonChip>
-            {vm.game && (
-              <IonBadge color="medium">RTP {(vm.game.rtp * 100).toFixed(1)}%</IonBadge>
-            )}
-          </div>
-          {children}
-        </>
-      )}
+        {vm.loading ? (
+          <div className="ag-loading"><IonSpinner name="dots" /></div>
+        ) : (
+          <>
+            <div className="ag-topbar">
+              <IonChip outline color="warning">
+                <IonLabel>{fmtInt(vm.coinBalance)} fichas</IonLabel>
+              </IonChip>
+              {vm.game && (
+                <IonBadge color="medium">RTP {(vm.game.rtp * 100).toFixed(1)}%</IonBadge>
+              )}
+            </div>
+            {children}
+          </>
+        )}
 
-      <RoundResultModal
-        result={vm.result}
-        coinBalance={vm.coinBalance}
-        onPlayAgain={onPlayAgain ?? vm.reset}
-        onDismiss={vm.reset}
-        detail={resultDetail}
-      />
+        <RoundResultModal
+          result={vm.result}
+          coinBalance={vm.coinBalance}
+          onPlayAgain={onPlayAgain ?? vm.reset}
+          onDismiss={vm.reset}
+          detail={resultDetail}
+        />
 
-      <ProvablyFairSheet
-        isOpen={vm.fairOpen}
-        onDismiss={() => vm.setFairOpen(false)}
-        serverSeedHash={vm.fair.serverSeedHash}
-        serverSeed={vm.fair.serverSeed}
-        clientSeed={vm.fair.clientSeed}
-        nonce={vm.fair.nonce}
-        rtp={vm.game?.rtp}
-      />
-    </IonContent>
-  </IonPage>
-);
+        <ProvablyFairSheet
+          isOpen={vm.fairOpen}
+          onDismiss={() => vm.setFairOpen(false)}
+          serverSeedHash={vm.fair.serverSeedHash}
+          serverSeed={vm.fair.serverSeed}
+          clientSeed={vm.fair.clientSeed}
+          nonce={vm.fair.nonce}
+          rtp={vm.game?.rtp}
+        />
+      </IonContent>
+    </IonPage>
+  );
+};
 
 export default GameShell;

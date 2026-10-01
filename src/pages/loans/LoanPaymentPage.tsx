@@ -22,6 +22,7 @@ import {
   IonIcon, IonToast, IonLoading, IonBadge, IonProgressBar, IonInput, IonChip,
   IonSpinner, IonText, IonCheckbox,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   arrowBackOutline, checkmarkCircle, cardOutline, lockClosedOutline,
   walletOutline, refreshOutline, alertCircleOutline, receiptOutline,
@@ -129,6 +130,7 @@ type Step = 'kyc' | 'amount' | 'card' | 'processing' | 'success' | 'error';
 // ── component ─────────────────────────────────────────────────────────────────
 const LoanPaymentPage: React.FC = () => {
   const history  = useHistory();
+  const { confirmBack } = useExitConfirm();
   const location = useLocation();
   const { clientId, companyId, username, roleCode } = useUser();
 
@@ -368,7 +370,7 @@ const LoanPaymentPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()} disabled={step === 'processing'}>
+            <IonButton onClick={() => confirmBack()} disabled={step === 'processing'}>
               <IonIcon icon={arrowBackOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>
@@ -641,7 +643,7 @@ const LoanPaymentPage: React.FC = () => {
               <IonIcon icon={refreshOutline} slot="start" />
               Intentar de nuevo
             </IonButton>
-            <IonButton expand="block" fill="outline" onClick={() => history.goBack()}>
+            <IonButton expand="block" fill="outline" onClick={() => confirmBack()}>
               Cancelar
             </IonButton>
           </div>

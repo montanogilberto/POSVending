@@ -8,15 +8,16 @@ interface SummaryGridProps {
   comisiones: number; // card-terminal commissions — a cost the business absorbs
   egresos: number;
   operaciones: number;
+  title?: string;
 }
 
-const SummaryGrid: React.FC<SummaryGridProps> = ({ ventas, comisiones, egresos, operaciones }) => {
+const SummaryGrid: React.FC<SummaryGridProps> = ({ ventas, comisiones, egresos, operaciones, title = 'RESUMEN DE HOY' }) => {
   const neto = ventas - comisiones - egresos;
 
   return (
     <IonCard className="dashboard-summary-card">
       <IonCardContent className="summary-card-content">
-        <div className="summary-card-title">RESUMEN</div>
+        <div className="summary-card-title">{title}</div>
         <div className="summary-grid">
           <div className="summary-tile">
             <div className="summary-tile-icon green">
@@ -52,7 +53,7 @@ const SummaryGrid: React.FC<SummaryGridProps> = ({ ventas, comisiones, egresos, 
           </div>
 
           <div className="summary-tile">
-            <div className="summary-tile-icon pink">
+            <div className="summary-tile-icon blue">
               <IonIcon icon={swapHorizontalOutline} />
             </div>
             <div>

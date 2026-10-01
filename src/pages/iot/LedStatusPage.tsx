@@ -7,7 +7,6 @@ import {
   IonToolbar,
   IonButton,
   IonButtons,
-  IonBackButton,
   IonCard,
   IonCardContent,
   IonCardHeader,
@@ -16,6 +15,7 @@ import {
   IonRow,
   IonCol,
 } from '@ionic/react';
+import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
 
 const LedStatusPage: React.FC = () => {
   const [ledStatus, setLedStatus] = useState<'on' | 'off'>('off');
@@ -44,7 +44,7 @@ const LedStatusPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/" />
+            <ConfirmBackButton defaultHref="/" />
           </IonButtons>
           <IonTitle>LED Status</IonTitle>
         </IonToolbar>

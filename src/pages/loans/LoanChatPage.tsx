@@ -9,6 +9,7 @@ import {
   IonButtons, IonButton, IonIcon, IonToast, IonLoading, IonSpinner,
   IonModal, IonInput, IonBadge, IonChip, IonLabel, IonActionSheet,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   arrowBack, sendOutline, cashOutline, checkmarkCircle, closeCircle,
   refreshOutline, createOutline, documentTextOutline, alertCircleOutline,
@@ -74,6 +75,7 @@ const ProposalCard: React.FC<ProposalCardProps> = ({ msg, isOwn, convStatus, onA
 // ── Main Component ────────────────────────────────────────────────────────────
 const LoanChatPage: React.FC = () => {
   const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const { conversationId: convIdParam } = useParams<{ conversationId: string }>();
   const location = useLocation();
   const { companyId, clientId, userId, roleCode, activeProduct } = useUser();
@@ -644,7 +646,7 @@ const LoanChatPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBack} slot="icon-only" />
             </IonButton>
           </IonButtons>

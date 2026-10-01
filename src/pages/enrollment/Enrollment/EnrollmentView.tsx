@@ -6,19 +6,21 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonIcon,
   IonCheckbox, IonCard, IonCardContent, IonSpinner, IonToast,
 } from '@ionic/react';
+import { useExitConfirm } from '../../../contexts/ExitConfirmContext';
 import { arrowBackOutline, checkmarkCircle, alertCircleOutline } from 'ionicons/icons';
 import EmptyState from '../../../components/ui/EmptyState';
 import { useEnrollment } from './EnrollmentLogic';
 
 const EnrollmentView: React.FC = () => {
   const vm = useEnrollment();
+  const { confirmBack } = useExitConfirm();
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => vm.history.goBack()} aria-label="Regresar">
+            <IonButton onClick={() => confirmBack()} aria-label="Regresar">
               <IonIcon icon={arrowBackOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>

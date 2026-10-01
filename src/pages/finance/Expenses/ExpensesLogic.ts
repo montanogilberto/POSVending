@@ -1,19 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
-import { fetchAllExpenses, createExpense, Expense } from '../../../api/expensesApi';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useIonViewWillEnter } from '@ionic/react';
+import { fetchMonthlyExpenses, createExpense, Expense, ExpenseMonthTotal } from '../../../api/expensesApi';
 import { getAllSuppliers, Supplier } from '../../../api/supplierApi';
 import { getAllEmployees, Employee } from '../../../api/employeesApi';
 import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
-import { fmtMXN, mxDate, toHermosilloDate } from '../../../utils/format';
-import { EnrichedExpense, ExpensesSortField, SortDirection, TrendsChartData } from './ExpensesTypes';
+import { EXPENSE_TYPE } from '../../../components/ui/statusMaps';
+import { fmtMXN, mxDate } from '../../../utils/format';
+import { notifyDataChanged, onDataChanged } from '../../../utils/refreshBus';
+import {
+  MonthPeriod, currentPeriod, hermosilloPeriod, periodLabel, periodShortLabel, samePeriod, shiftPeriod,
+} from '../../../utils/monthPeriod';
+import { EnrichedExpense, TrendsChartData } from './ExpensesTypes';
 
-const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+/** Rows in the overview's "Actividad Reciente" (same idea as the /dashboard widget). */
+const RECENT_COUNT = 8;
 const TRENDS_MONTHS = 12;
 
 export const useExpenses = () => {
   const { companyId } = useUser();
 
+  // One company + one month (sp_expense_monthly) — never the full history.
+  const [period, setPeriod] = useState<MonthPeriod>(currentPeriod);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const [monthlyTotals, setMonthlyTotals] = useState<ExpenseMonthTotal[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,46 +32,59 @@ export const useExpenses = () => {
   const [searchText, setSearchText] = useState('');
   const [filterPaymentMethod, setFilterPaymentMethod] = useState('');
   const [filterSupplierId, setFilterSupplierId] = useState('');
+  const [filterType, setFilterType] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-
-  const [sortField, setSortField] = useState<ExpensesSortField>('paymentDate');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
   const [showTrendsModal, setShowTrendsModal] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<EnrichedExpense | null>(null);
 
   const { showToast, toastProps } = useToast();
 
-  const loadExpenses = async () => {
+  const loadExpenses = useCallback(async () => {
+    if (!companyId) return;
     setLoading(true);
     try {
-      const [expenses, supplierList, employeeList] = await Promise.all([
-        fetchAllExpenses(),
+      const [monthly, supplierList, employeeList] = await Promise.all([
+        fetchMonthlyExpenses(companyId, period),
         companyId ? getAllSuppliers(companyId) : Promise.resolve([]),
         (companyId ? getAllEmployees(companyId) : Promise.resolve([])).catch((error) => {
           console.error('[useExpenses] getAllEmployees failed:', error);
           return [];
         }),
       ]);
-      setAllExpenses(expenses);
+      // Guard: never list a row outside the requested month under its label.
+      setAllExpenses(monthly.expenses.filter((e) => e?.paymentDate && samePeriod(hermosilloPeriod(e.paymentDate), period)));
+      setMonthlyTotals(monthly.monthlyTotals);
       setSuppliers(supplierList);
       setEmployees(employeeList);
     } catch (error) {
       console.error('[useExpenses] loadExpenses failed:', error);
+      showToast('No se pudieron cargar los egresos', 'danger');
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId, period, showToast]);
 
-  useEffect(() => {
+  // Ionic keeps the page mounted: reload on re-entry and on data-changed.
+  useEffect(() => { loadExpenses(); }, [loadExpenses]);
+  useIonViewWillEnter(() => { loadExpenses(); });
+  useEffect(() => onDataChanged((reason) => {
+    console.log('[useExpenses] data-changed →', reason);
     loadExpenses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId]);
+  }), [loadExpenses]);
+
+  // A new month or a new filter starts on page 1.
+  useEffect(() => { setPage(1); }, [period, searchText, filterType, filterPaymentMethod, filterSupplierId, filterDateFrom, filterDateTo]);
+
+  const isCurrentPeriod = samePeriod(period, currentPeriod());
+  const prevMonth = () => setPeriod((p) => shiftPeriod(p, -1));
+  const nextMonth = () => { if (!isCurrentPeriod) setPeriod((p) => shiftPeriod(p, 1)); };
 
   const supplierNameById = useMemo(() => {
     const map = new Map<number, string>();
@@ -74,21 +98,26 @@ export const useExpenses = () => {
     return map;
   }, [employees]);
 
+  // Newest first everywhere (same order as /movements and the dashboard).
   const enrichedExpenses: EnrichedExpense[] = useMemo(
     () =>
-      allExpenses.map((e) => {
-        const supplierName =
-          e.expenseType === 'payroll'
-            ? (e.employeeId != null ? employeeNameById.get(e.employeeId) : undefined) ??
-              (e.employeeId != null ? `Empleado ${e.employeeId}` : 'Nómina')
-            : (e.supplierId != null ? supplierNameById.get(e.supplierId) : undefined) ??
-              (e.supplierId != null ? `Proveedor ${e.supplierId}` : '—');
-        return { ...e, supplierName };
-      }),
+      [...allExpenses]
+        .sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())
+        .map((e) => {
+          const supplierName =
+            e.expenseType === 'payroll'
+              ? (e.employeeId != null ? employeeNameById.get(e.employeeId) : undefined) ??
+                (e.employeeId != null ? `Empleado ${e.employeeId}` : 'Nómina')
+              : (e.supplierId != null ? supplierNameById.get(e.supplierId) : undefined) ??
+                (e.supplierId != null ? `Proveedor ${e.supplierId}` : '—');
+          const expenseType = e.expenseType ?? 'inventory';
+          const payeeKind = expenseType === 'payroll' ? 'Empleado' : 'Proveedor';
+          return { ...e, expenseType, supplierName, payeeKind };
+        }),
     [allExpenses, supplierNameById, employeeNameById]
   );
 
-  const activeFilterCount = [filterPaymentMethod, filterSupplierId, filterDateFrom, filterDateTo].filter(Boolean).length;
+  const activeFilterCount = [filterType, filterPaymentMethod, filterSupplierId, filterDateFrom, filterDateTo].filter(Boolean).length;
 
   const filteredExpenses = useMemo(() => {
     const search = searchText.trim().toLowerCase();
@@ -96,33 +125,22 @@ export const useExpenses = () => {
     return enrichedExpenses.filter((expense) => {
       const matchesSearch =
         !search ||
-        expense.expenseId.toString().includes(search) ||
         expense.total.toString().includes(search) ||
-        expense.supplierName.toLowerCase().includes(search);
+        expense.supplierName.toLowerCase().includes(search) ||
+        (EXPENSE_TYPE[expense.expenseType ?? '']?.label ?? '').toLowerCase().includes(search) ||
+        (expense.notes ?? '').toLowerCase().includes(search);
 
+      const matchesType = !filterType || expense.expenseType === filterType;
       const matchesPayment = !filterPaymentMethod || expense.paymentMethod === filterPaymentMethod;
       const matchesSupplier = !filterSupplierId || expense.supplierId?.toString() === filterSupplierId;
       const matchesDateFrom = !filterDateFrom || new Date(expense.paymentDate) >= new Date(filterDateFrom);
       const matchesDateTo = !filterDateTo || new Date(expense.paymentDate) <= new Date(filterDateTo);
 
-      return matchesSearch && matchesPayment && matchesSupplier && matchesDateFrom && matchesDateTo;
+      return matchesSearch && matchesType && matchesPayment && matchesSupplier && matchesDateFrom && matchesDateTo;
     });
-  }, [enrichedExpenses, searchText, filterPaymentMethod, filterSupplierId, filterDateFrom, filterDateTo]);
+  }, [enrichedExpenses, searchText, filterType, filterPaymentMethod, filterSupplierId, filterDateFrom, filterDateTo]);
 
-  const sortedExpenses = useMemo(() => {
-    const sorted = [...filteredExpenses].sort((a, b) => {
-      let result = 0;
-      if (sortField === 'paymentDate') {
-        result = new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime();
-      } else if (sortField === 'total') {
-        result = a.total - b.total;
-      } else {
-        result = String(a[sortField]).localeCompare(String(b[sortField]));
-      }
-      return sortDirection === 'asc' ? result : -result;
-    });
-    return sorted;
-  }, [filteredExpenses, sortField, sortDirection]);
+  const sortedExpenses = filteredExpenses;
 
   const totalPages = Math.max(1, Math.ceil(sortedExpenses.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -132,69 +150,31 @@ export const useExpenses = () => {
     [sortedExpenses, currentPage, pageSize]
   );
 
-  const toggleSort = (field: ExpensesSortField) => {
-    if (field === sortField) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
-  };
-
-  const currentMonthYear = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-
-  const currentMonthExpenses = useMemo(() => {
-    const now = toHermosilloDate(new Date().toISOString());
-    return allExpenses
-      .filter((e) => e?.paymentDate)
-      .filter((e) => {
-        const d = toHermosilloDate(e.paymentDate);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      });
-  }, [allExpenses]);
-
+  // Every loaded row is already in `period`.
   const monthlyTotal = useMemo(
-    () => currentMonthExpenses.reduce((sum, e) => sum + (Number(e.total) || 0), 0),
-    [currentMonthExpenses]
+    () => allExpenses.reduce((sum, e) => sum + (Number(e.total) || 0), 0),
+    [allExpenses]
   );
-
-  const monthlyCount = currentMonthExpenses.length;
+  const monthlyCount = allExpenses.length;
 
   const trendsData: TrendsChartData | null = useMemo(() => {
-    if (!allExpenses.length) return null;
-
-    const now = toHermosilloDate(new Date().toISOString());
-    const buckets: { key: string; label: string; total: number }[] = [];
-    for (let i = TRENDS_MONTHS - 1; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      buckets.push({
-        key: `${d.getFullYear()}-${d.getMonth()}`,
-        label: d.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' }),
-        total: 0,
-      });
-    }
-    const bucketByKey = new Map(buckets.map((b) => [b.key, b]));
-
-    allExpenses.forEach((e) => {
-      if (!e?.paymentDate) return;
-      const d = toHermosilloDate(e.paymentDate);
-      const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const bucket = bucketByKey.get(key);
-      if (bucket) bucket.total += Number(e.total) || 0;
-    });
+    if (!monthlyTotals.length) return null;
+    const buckets = Array.from({ length: TRENDS_MONTHS }, (_, i) => shiftPeriod(period, i - (TRENDS_MONTHS - 1)));
+    const totalFor = (b: MonthPeriod) =>
+      Number(monthlyTotals.find((t) => samePeriod(t, b))?.total) || 0;
 
     return {
-      labels: buckets.map((b) => b.label),
-      datasets: [{ label: 'Egresos', data: buckets.map((b) => b.total), backgroundColor: '#DC2626' }],
+      labels: buckets.map(periodShortLabel),
+      datasets: [{ label: 'Egresos', data: buckets.map(totalFor), backgroundColor: '#DC2626' }],
     };
-  }, [allExpenses]);
+  }, [monthlyTotals, period]);
 
   const handleCreateExpense = async (expenseData: any) => {
     try {
       await createExpense(expenseData);
       showToast('Egreso creado exitosamente');
       setShowExpenseForm(false);
-      await loadExpenses();
+      notifyDataChanged('expense-created'); // reloads this page + /dashboard KPIs
     } catch (error) {
       console.error('[useExpenses] handleCreateExpense failed:', error);
       showToast('Error al crear el egreso', 'danger');
@@ -206,6 +186,7 @@ export const useExpenses = () => {
     loading,
     suppliers,
     expenses: paginatedExpenses,
+    recentExpenses: enrichedExpenses.slice(0, RECENT_COUNT),
     totalResults: sortedExpenses.length,
 
     searchText,
@@ -213,6 +194,8 @@ export const useExpenses = () => {
     filterPaymentMethod,
     setFilterPaymentMethod,
     filterSupplierId,
+    filterType,
+    setFilterType,
     setFilterSupplierId,
     filterDateFrom,
     setFilterDateFrom,
@@ -221,10 +204,6 @@ export const useExpenses = () => {
     showFilters,
     setShowFilters,
     activeFilterCount,
-
-    sortField,
-    sortDirection,
-    toggleSort,
 
     page: currentPage,
     setPage,
@@ -237,6 +216,10 @@ export const useExpenses = () => {
     setShowTrendsModal,
     trendsData,
 
+    selectedExpense,
+    openExpenseDetail: setSelectedExpense,
+    closeExpenseDetail: () => setSelectedExpense(null),
+
     showExpenseForm,
     setShowExpenseForm,
     handleCreateExpense,
@@ -245,7 +228,11 @@ export const useExpenses = () => {
     monthlyTotal,
     monthlyTotalFormatted: fmtMXN(monthlyTotal),
     monthlyCount,
-    currentMonthYear,
+    period,
+    periodLabel: periodLabel(period),
+    isCurrentPeriod,
+    prevMonth,
+    nextMonth,
     mxDate,
 
     refresh: loadExpenses,

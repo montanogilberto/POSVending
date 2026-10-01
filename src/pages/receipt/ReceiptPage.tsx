@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useHistory, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { IonPage, IonContent, IonLoading, IonToast, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonList, IonItem, IonLabel, IonText } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import { closeOutline } from 'ionicons/icons';
 import { ReceiptService } from '../../services/ReceiptService';
 import ReceiptHeader from './components/ReceiptHeader';
@@ -14,7 +15,7 @@ interface LocationState {
 }
 
 const ReceiptPage: React.FC = () => {
-  const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const location = useLocation<LocationState>();
   const [receiptData, setReceiptData] = useState<any>(null);
   const [loading, setLoading] = useState(() => !location.state?.ticketData);
@@ -81,9 +82,7 @@ const ReceiptPage: React.FC = () => {
     }
   });
 
-  const handleClose = () => {
-    history.goBack();
-  };
+  const handleClose = () => confirmBack('/dashboard');
 
   const statusColor = (ok: boolean) => (ok ? 'success' : 'danger');
 

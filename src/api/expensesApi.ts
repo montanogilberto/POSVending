@@ -1,3 +1,5 @@
+import type { MonthPeriod } from '../utils/monthPeriod';
+
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 export type ExpenseType = 'inventory' | 'general' | 'payroll';
@@ -58,30 +60,49 @@ export interface ExpensePayload {
   }>;
 }
 
-export const fetchAllExpenses = async (): Promise<Expense[]> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/all_expense`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
+export interface ExpenseMonthTotal {
+  year: number;
+  /** 1-12 */
+  month: number;
+  total: number;
+  count: number;
+}
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+export interface MonthlyExpenses {
+  /** The requested month's rows, newest first. */
+  expenses: Expense[];
+  /** Totals for the 12 months ending at the requested month (months with rows only). */
+  monthlyTotals: ExpenseMonthTotal[];
+}
 
-    const data = await response.json();
-    
-    // Handle response structure: { expenses: [...] }
-    if (data.expenses && Array.isArray(data.expenses)) {
-      return data.expenses;
-    } else {
-      console.warn('Unexpected API response structure:', data);
-      return [];
-    }
-  } catch (error) {
-    console.error('Error fetching expenses:', error);
-    throw error;
+/**
+ * POST /monthly_expense — one company, one Hermosillo month (sp_expense_monthly).
+ * Omit `period` for the current month. Replaces GET /all_expense, which is NOT
+ * filtered by company — don't reintroduce a wrapper for it.
+ */
+export const fetchMonthlyExpenses = async (
+  companyId: number,
+  period?: MonthPeriod,
+  signal?: AbortSignal
+): Promise<MonthlyExpenses> => {
+  const response = await fetch(`${API_BASE_URL}/monthly_expense`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expenses: [{ companyId, ...(period ?? {}) }] }),
+    ...(signal ? { signal } : {}),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
+
+  const data = await response.json();
+  const result: MonthlyExpenses = {
+    expenses: Array.isArray(data?.expenses) ? data.expenses : [],
+    monthlyTotals: Array.isArray(data?.monthlyTotals) ? data.monthlyTotals : [],
+  };
+  console.log('[expensesApi] monthly_expense companyId=%d period=%o rows=%d', companyId, period ?? 'current', result.expenses.length);
+  return result;
 };
 
 /**

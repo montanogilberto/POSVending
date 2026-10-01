@@ -7,6 +7,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonToast, IonSpinner, IonChip, IonLabel,
 } from '@ionic/react';
+import { useExitConfirm } from '../../../contexts/ExitConfirmContext';
 import {
   arrowBackOutline, phonePortraitOutline, informationCircle, lockClosedOutline,
   cardOutline,
@@ -20,13 +21,14 @@ import StripeChipSheet from './components/StripeChipSheet';
 
 const ChipStoreView: React.FC = () => {
   const vm = useChipStore();
+  const { confirmBack } = useExitConfirm();
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => vm.history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBackOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>

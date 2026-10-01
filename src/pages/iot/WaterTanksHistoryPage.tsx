@@ -12,12 +12,12 @@ import {
   IonText,
   IonIcon,
   IonToast,
-  IonBackButton,
   IonButtons,
   IonToolbar,
   IonTitle,
   IonHeader,
 } from '@ionic/react';
+import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
 import { waterOutline, timeOutline, barChartOutline } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { fetchWaterTanks, WaterTank, TankWaterDetail } from '../../api/waterTanksApi';
@@ -81,7 +81,7 @@ const WaterTanksHistoryPage: React.FC = () => {
         <IonHeader>
           <IonToolbar>
             <IonButtons slot="start">
-              <IonBackButton defaultHref="/water-tanks" />
+              <ConfirmBackButton defaultHref="/water-tanks" />
             </IonButtons>
             <IonTitle>Historial del Tanque</IonTitle>
           </IonToolbar>
@@ -101,7 +101,7 @@ const WaterTanksHistoryPage: React.FC = () => {
         <IonHeader>
           <IonToolbar>
             <IonButtons slot="start">
-              <IonBackButton defaultHref="/water-tanks" />
+              <ConfirmBackButton defaultHref="/water-tanks" />
             </IonButtons>
             <IonTitle>Historial del Tanque</IonTitle>
           </IonToolbar>
@@ -120,7 +120,7 @@ const WaterTanksHistoryPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/water-tanks" />
+            <ConfirmBackButton defaultHref="/water-tanks" />
           </IonButtons>
           <IonTitle>Historial - {tank.name}</IonTitle>
         </IonToolbar>

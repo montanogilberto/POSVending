@@ -4,7 +4,7 @@ import '../shared-card-list.css';
 import {
   IonPage, IonContent, IonList, IonLabel, IonCard, IonCardHeader,
   IonCardTitle, IonCardContent, IonFab, IonFabButton, IonIcon, IonModal,
-  IonInput, IonButton, IonAlert, IonLoading, IonToast, IonSearchbar,
+  IonInput, IonButton, IonLoading, IonToast, IonSearchbar,
   IonInfiniteScroll, IonInfiniteScrollContent, IonTextarea, IonToggle,
   IonHeader, IonToolbar, IonButtons, IonTitle, IonText
 } from '@ionic/react';
@@ -41,8 +41,7 @@ const SupplierPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Partial<Supplier> | null>(null);
-  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
   const [page, setPage] = useState(0);
 
   const { companyId } = useUser();
@@ -132,14 +131,13 @@ const SupplierPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
-    if (!supplierToDelete?.supplierId) return;
+  const handleDelete = async (supplier: Supplier) => {
+    if (!supplier.supplierId) return;
     setLoading(true);
     setError('');
     try {
-      await deleteSupplier(supplierToDelete.supplierId);
-      setShowDeleteAlert(false);
-      setSupplierToDelete(null);
+      await deleteSupplier(supplier.supplierId);
+      setSuccessMessage(`Proveedor "${supplier.supplierName}" eliminado.`);
       await loadSuppliers();
     } catch (err) {
       setError((err as Error).message ?? 'Error al eliminar proveedor.');
@@ -160,6 +158,13 @@ const SupplierPage: React.FC = () => {
         onDidDismiss={() => setError('')}
         duration={5000}
         color="danger"
+      />
+      <IonToast
+        isOpen={!!successMessage}
+        message={successMessage}
+        onDidDismiss={() => setSuccessMessage('')}
+        duration={3000}
+        color="success"
       />
 
       <IonContent fullscreen className="supplier-page">
@@ -224,7 +229,7 @@ const SupplierPage: React.FC = () => {
                         <IonIcon icon={pencil} slot="start" /> Editar
                       </IonButton>
                       <IonButton fill="outline" size="small" color="danger" className="action-button delete-button"
-                        onClick={() => { setSupplierToDelete(supplier); setShowDeleteAlert(true); }}>
+                        onClick={() => handleDelete(supplier)}>
                         <IonIcon icon={trash} slot="start" /> Eliminar
                       </IonButton>
                     </div>
@@ -336,17 +341,6 @@ const SupplierPage: React.FC = () => {
           </IonContent>
         </IonModal>
 
-        {/* Delete Confirmation Alert */}
-        <IonAlert
-          isOpen={showDeleteAlert}
-          onDidDismiss={() => setShowDeleteAlert(false)}
-          header={'Confirmar Eliminación'}
-          message={`¿Estás seguro de que quieres eliminar a ${supplierToDelete?.supplierName}?`}
-          buttons={[
-            { text: 'Cancelar', role: 'cancel' },
-            { text: 'Eliminar', handler: handleDelete, cssClass: 'danger' }
-          ]}
-        />
       </IonContent>
     </IonPage>
   );

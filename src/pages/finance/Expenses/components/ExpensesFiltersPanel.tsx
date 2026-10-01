@@ -1,5 +1,6 @@
 import React from 'react';
 import { IonCard, IonCardContent, IonItem, IonLabel, IonSelect, IonSelectOption, IonInput, IonButton } from '@ionic/react';
+import { EXPENSE_TYPE } from '../../../../components/ui/statusMaps';
 import { ExpensesVM } from '../ExpensesLogic';
 
 interface Props {
@@ -10,6 +11,7 @@ const ExpensesFiltersPanel: React.FC<Props> = ({ vm }) => {
   if (!vm.showFilters) return null;
 
   const clearFilters = () => {
+    vm.setFilterType('');
     vm.setFilterPaymentMethod('');
     vm.setFilterSupplierId('');
     vm.setFilterDateFrom('');
@@ -19,6 +21,21 @@ const ExpensesFiltersPanel: React.FC<Props> = ({ vm }) => {
   return (
     <IonCard className="expenses-filters-panel">
       <IonCardContent className="expenses-filters-content">
+        <IonItem lines="none" className="expenses-filter-item">
+          <IonLabel>Tipo de gasto</IonLabel>
+          <IonSelect
+            interface="popover"
+            value={vm.filterType}
+            placeholder="Todos"
+            onIonChange={(e) => vm.setFilterType(e.detail.value ?? '')}
+          >
+            <IonSelectOption value="">Todos</IonSelectOption>
+            {Object.entries(EXPENSE_TYPE).map(([value, meta]) => (
+              <IonSelectOption key={value} value={value}>{meta.label}</IonSelectOption>
+            ))}
+          </IonSelect>
+        </IonItem>
+
         <IonItem lines="none" className="expenses-filter-item">
           <IonLabel>Método de Pago</IonLabel>
           <IonSelect
@@ -35,7 +52,7 @@ const ExpensesFiltersPanel: React.FC<Props> = ({ vm }) => {
         </IonItem>
 
         <IonItem lines="none" className="expenses-filter-item">
-          <IonLabel>Empresa</IonLabel>
+          <IonLabel>Proveedor</IonLabel>
           <IonSelect
             interface="popover"
             value={vm.filterSupplierId}
