@@ -18,7 +18,7 @@ const EmployeesView: React.FC = () => {
 
   return (
     <IonPage>
-      <Header {...vm.pops.headerProps} screenTitle="Empleados — POS GMO" />
+      <Header {...vm.pops.headerProps} screenTitle={vm.screenTitle} />
       <AlertPopover {...vm.pops.alertPopoverProps} />
       <MailPopover {...vm.pops.mailPopoverProps} />
       <IonToast {...vm.toastProps} />

@@ -14,6 +14,7 @@ import {
   IonModal, IonImg,
   useIonViewWillEnter,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   arrowBack, cashOutline, trendingUpOutline, timeOutline, personCircleOutline,
   checkmarkCircle, ellipseOutline, arrowDownOutline, arrowUpOutline, refreshOutline,
@@ -47,6 +48,7 @@ const LoanDetailPage: React.FC = () => {
   const { loanId: loanIdParam } = useParams<{ loanId: string }>();
   const loanId = Number(loanIdParam);
   const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const { companyId, clientId, userId, roleCode, activeProduct } = useUser();
 
   const [loan, setLoan] = useState<Loan | null>(null);
@@ -353,7 +355,7 @@ const LoanDetailPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}><IonIcon icon={arrowBack} slot="icon-only" /></IonButton>
+            <IonButton onClick={() => confirmBack()}><IonIcon icon={arrowBack} slot="icon-only" /></IonButton>
           </IonButtons>
           <IonTitle>{loan?.loanNumber ?? 'Préstamo'}</IonTitle>
           <IonButtons slot="end">

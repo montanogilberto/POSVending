@@ -28,6 +28,7 @@ import IncomesFilters from '../../components/finance/IncomesFilters';
 import IncomeMovementList from '../../components/finance/IncomeMovementList';
 import EmptyState from '../../components/ui/EmptyState';
 import { fetchMonthlyLaundry, IncomePeriod } from '../../api/laundryApi';
+import { hermosilloPeriod, currentPeriod, samePeriod, shiftPeriod, periodLabel } from '../../utils/monthPeriod';
 import { useUser } from '../../contexts/UserContext';
 import { toHermosilloDate } from '../../utils/format';
 import { onDataChanged } from '../../utils/refreshBus';
@@ -52,22 +53,6 @@ interface Income {
 
 // Rows rendered per infinite-scroll step.
 const PAGE_SIZE = 30;
-
-/** Hermosillo (UTC-7) year/month of a UTC timestamp — same boundary as sp_income_monthly. */
-const hermosilloPeriod = (utc: string): IncomePeriod => {
-  const d = toHermosilloDate(utc);
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
-};
-const currentPeriod = (): IncomePeriod => hermosilloPeriod(new Date().toISOString());
-const samePeriod = (a: IncomePeriod, b: IncomePeriod) => a.year === b.year && a.month === b.month;
-const shiftPeriod = ({ year, month }: IncomePeriod, delta: number): IncomePeriod => {
-  const idx = year * 12 + (month - 1) + delta;
-  return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
-};
-const periodLabel = ({ year, month }: IncomePeriod) => {
-  const raw = new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('es-MX', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
-};
 
 const IncomesPage: React.FC = () => {
   const history = useHistory();

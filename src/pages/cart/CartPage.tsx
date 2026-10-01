@@ -5,7 +5,6 @@ import {
   IonTitle,
   IonContent,
   IonButtons,
-  IonBackButton,
   IonToast,
   IonAlert,
   IonButton,
@@ -16,6 +15,7 @@ import {
   IonInput,
   useIonViewWillEnter,
 } from '@ionic/react';
+import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
 import { addCircle, card, wallet, business, receipt, cart, person, pricetag, qrCodeOutline, giftOutline } from 'ionicons/icons';
 import { useCart } from '../../contexts/CartContext';
 import { useProduct } from '../../contexts/ProductContext';
@@ -402,7 +402,7 @@ const CartPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/dashboard" />
+            <ConfirmBackButton defaultHref="/dashboard" />
           </IonButtons>
           <IonTitle>Carrito</IonTitle>
           <IonButtons slot="end">

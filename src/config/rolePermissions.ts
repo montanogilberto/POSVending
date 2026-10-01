@@ -104,7 +104,6 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   ],
   employee: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
-    'employees',
     'rewards', 'game', 'arcade',
   ],
   borrower: [

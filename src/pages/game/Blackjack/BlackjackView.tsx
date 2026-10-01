@@ -8,6 +8,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonToast, IonSpinner, IonBadge, IonChip, IonLabel,
 } from '@ionic/react';
+import { useExitConfirm } from '../../../contexts/ExitConfirmContext';
 import { arrowBackOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import BetSelector from '../../../components/ui/BetSelector';
 import ProvablyFairSheet from '../../../components/ui/ProvablyFairSheet';
@@ -18,6 +19,7 @@ import HandRow from './components/HandRow';
 
 const BlackjackView: React.FC = () => {
   const vm = useBlackjack();
+  const { confirmBack } = useExitConfirm();
   const { state, game } = vm;
 
   return (
@@ -25,7 +27,7 @@ const BlackjackView: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => vm.history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBackOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>

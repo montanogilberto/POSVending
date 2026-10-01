@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBackButton, IonBadge, IonMenuButton } from '@ionic/react';
+import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBadge, IonMenuButton } from '@ionic/react';
+import ConfirmBackButton from '../ui/ConfirmBackButton';
 import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline } from 'ionicons/icons';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -91,7 +92,7 @@ const Header: React.FC<HeaderProps> = ({
       <IonToolbar color="light">
         <IonButtons slot="start">
           {showBackButton ? (
-            <IonBackButton text={backButtonText} defaultHref={backButtonHref} />
+            <ConfirmBackButton text={backButtonText} defaultHref={backButtonHref} />
           ) : (
             <IonMenuButton
               menu="main-menu"

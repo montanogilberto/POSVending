@@ -4,7 +4,7 @@ import { useIncome } from '../../../contexts/IncomeContext';
 import { useUser } from '../../../contexts/UserContext';
 import { isCashRegisterOpen, closeCashRegister } from '../../../api/cashRegisterApi';
 import { fetchTicket } from '../../../api/ticketApi';
-import { fetchAllExpenses, Expense } from '../../../api/expensesApi';
+import { fetchMonthlyExpenses, Expense } from '../../../api/expensesApi';
 import { toHermosilloDate } from '../../../utils/format';
 import { getAllCommissionTerminals, CommissionTerminal } from '../../../api/commissionTerminalsApi';
 import {
@@ -54,11 +54,17 @@ export const useDashboard = () => {
     const controller = new AbortController();
     loadIncomes(companyId, controller.signal).catch(() => {});
 
-    fetchAllExpenses()
-      .then((expenses) => {
-        if (!controller.signal.aborted) setAllExpenses(expenses);
-      })
-      .catch((err) => console.warn('[Dashboard] fetchAllExpenses failed:', err));
+    // Egresos KPIs (hoy / mes): this company's current Hermosillo month only —
+    // /all_expense summed every company's history.
+    if (companyId) {
+      fetchMonthlyExpenses(companyId, undefined, controller.signal)
+        .then(({ expenses }) => {
+          if (!controller.signal.aborted) setAllExpenses(expenses);
+        })
+        .catch((err) => {
+          if (!controller.signal.aborted) console.warn('[Dashboard] fetchMonthlyExpenses failed:', err);
+        });
+    }
 
     getAllCommissionTerminals()
       .then((terminals) => {
@@ -201,6 +207,39 @@ export const useDashboard = () => {
       // income.total is already the charged (post-discount) amount — the cart
       // sends the promo total and sp_income stores it — so no second subtraction.
       .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+  };
+
+  // Card-terminal commissions on this month's sales — mirrors calculateDailyCommissions.
+  const calculateMonthlyCommissions = () => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => {
+        const d = toHermosilloDate(i.paymentDate);
+        return (
+          d.getMonth() === hermosilloNow.getMonth() &&
+          d.getFullYear() === hermosilloNow.getFullYear()
+        );
+      })
+      .reduce((sum, i) => sum + incomeCommission(i, cardTerminal), 0);
+  };
+
+  const calculateMonthlySalesCount = () => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => {
+        const d = toHermosilloDate(i.paymentDate);
+        return (
+          d.getMonth() === hermosilloNow.getMonth() &&
+          d.getFullYear() === hermosilloNow.getFullYear()
+        );
+      })
+      .length;
   };
 
   const calculateExpensesMonthlyTotal = () => {
@@ -352,6 +391,8 @@ export const useDashboard = () => {
     calculateDailyCommissions,
     calculateExpensesDailyTotal,
     calculateMonthlyTotal,
+    calculateMonthlyCommissions,
+    calculateMonthlySalesCount,
     calculateExpensesMonthlyTotal,
     currentMonthYear,
 

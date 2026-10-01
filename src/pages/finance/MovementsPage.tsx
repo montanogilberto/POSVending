@@ -7,7 +7,6 @@ import {
   IonToolbar,
   IonButtons,
   IonButton,
-  IonBackButton,
   IonCard,
   IonCardHeader,
   IonCardTitle,
@@ -19,6 +18,7 @@ import {
   IonChip,
   IonToast,
 } from '@ionic/react';
+import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
 import { useHistory } from 'react-router-dom';
 import { waterOutline, calendarOutline, chevronForwardOutline, closeOutline, receiptOutline, cashOutline, appsOutline, cardOutline, swapHorizontalOutline, helpCircleOutline } from 'ionicons/icons';
 import { toHermosilloDate, fmtMXN } from '../../utils/format';
@@ -198,7 +198,7 @@ const MovementsPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/" />
+            <ConfirmBackButton defaultHref="/" />
           </IonButtons>
           <IonTitle>Movimientos</IonTitle>
           <IonButtons slot="end">

@@ -1,11 +1,11 @@
 import { Expense } from '../../../api/expensesApi';
 
 export interface EnrichedExpense extends Expense {
+  /** Who was paid: the employee for payroll, the supplier otherwise. */
   supplierName: string;
+  payeeKind: 'Empleado' | 'Proveedor';
 }
 
-export type ExpensesSortField = 'expenseId' | 'supplierName' | 'paymentMethod' | 'paymentDate' | 'total';
-export type SortDirection = 'asc' | 'desc';
 
 export interface TrendsChartData {
   labels: string[];

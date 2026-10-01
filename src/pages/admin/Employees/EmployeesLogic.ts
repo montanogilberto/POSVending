@@ -22,7 +22,7 @@ const errorText = (err: unknown, fallback: string) => {
 };
 
 export const useEmployees = () => {
-  const { companyId } = useUser();
+  const { companyId, companyName, branchName } = useUser();
   const pops = usePopovers();
   const { showToast, toastProps } = useToast();
 
@@ -179,6 +179,10 @@ export const useEmployees = () => {
     });
   };
 
+  // companyName/branchName come from the login flow's company selection
+  // (dbo.companies / dbo.companyBranches) — never hardcode "POS GMO" here.
+  const screenTitle = `Empleados — ${companyName || 'POS GMO'}${companyName && branchName ? ` · ${branchName}` : ''}`;
+
   return {
     loading, employees: filtered, counts,
     departments, employmentTypes, statuses,
@@ -186,7 +190,7 @@ export const useEmployees = () => {
     draft, openCreate, openEdit, closeForm, setField, formError, save, saving,
     deactivateFromForm,
     toDelete, setToDelete, confirmDelete, deletingId,
-    pops, toastProps,
+    pops, toastProps, screenTitle,
   };
 };
 

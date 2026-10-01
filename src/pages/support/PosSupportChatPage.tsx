@@ -21,6 +21,7 @@ import {
   IonButtons, IonButton, IonIcon, IonTextarea, IonSpinner, IonList, IonItem, IonLabel, IonToast,
   IonFab, IonFabButton,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   arrowBack, refreshOutline, sendOutline, chatbubbleEllipsesOutline,
   trashOutline, peopleOutline, cashOutline, receiptOutline, calculatorOutline, chevronForward,
@@ -125,6 +126,7 @@ const buildRenderItems = (msgs: PosSupportMessage[]): RenderItem[] => {
 
 const PosSupportChatPage: React.FC = () => {
   const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const { topic: topicParam } = useParams<{ topic?: string }>();
   const isPicker = !topicParam;
   const TOPIC: PosSupportTopic = (!isPicker && topicParam! in TOPIC_META) ? (topicParam as PosSupportTopic) : 'clients';
@@ -393,7 +395,7 @@ const PosSupportChatPage: React.FC = () => {
         <IonHeader>
           <IonToolbar>
             <IonButtons slot="start">
-              <IonButton onClick={() => history.goBack()}>
+              <IonButton onClick={() => confirmBack()}>
                 <IonIcon icon={arrowBack} slot="icon-only" />
               </IonButton>
             </IonButtons>
@@ -426,7 +428,7 @@ const PosSupportChatPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBack} slot="icon-only" />
             </IonButton>
           </IonButtons>

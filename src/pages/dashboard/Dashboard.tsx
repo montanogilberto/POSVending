@@ -3,8 +3,11 @@ import {
   IonContent,
   IonToast,
   IonPage,
+  IonButton,
+  IonIcon,
   useIonViewWillEnter,
 } from '@ionic/react';
+import { chevronForwardOutline } from 'ionicons/icons';
 import './Dashboard.css';
 
 import Header from '../../components/layout/Header';
@@ -16,7 +19,6 @@ import { useDashboard } from './hooks/useDashboard';
 import { usePopovers } from '../../hooks/usePopovers';
 import MetricsGrid from './components/MetricsGrid';
 import SummaryGrid from './components/SummaryGrid';
-import PaymentBreakdown from './components/PaymentBreakdown';
 import CartSummary from './components/CartSummary';
 import RecentActivity from './components/RecentActivity';
 import ReservationsWidget from './components/ReservationsWidget';
@@ -36,7 +38,6 @@ const Dashboard: React.FC = () => {
     setShowCart,
     showLogoutAlert,
     setShowLogoutAlert,
-    paymentBreakdown,
     handleStartSeller,
     handleConfirmSale,
     calculateDailySales,
@@ -96,8 +97,15 @@ const Dashboard: React.FC = () => {
             operaciones={calculateDailySalesCount()}
           />
 
-          {/* ✅ Cobros: desglose por método de pago (mes actual) */}
-          <PaymentBreakdown breakdown={paymentBreakdown} />
+          <IonButton
+            fill="clear"
+            size="small"
+            className="monthly-summary-link"
+            onClick={() => history.push('/monthly-summary')}
+          >
+            Ver resumen mensual
+            <IonIcon icon={chevronForwardOutline} slot="end" />
+          </IonButton>
 
           {/* ✅ Cart Summary */}
           {showCart && cart.length > 0 && (

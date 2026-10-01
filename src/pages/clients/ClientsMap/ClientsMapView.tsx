@@ -1,8 +1,9 @@
 import React from 'react';
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton,
+  IonPage, IonHeader, IonToolbar, IonTitle, IonButtons,
   IonContent, IonSpinner, IonIcon, IonRefresher, IonRefresherContent,
 } from '@ionic/react';
+import ConfirmBackButton from '../../../components/ui/ConfirmBackButton';
 import { locationOutline, alertCircleOutline } from 'ionicons/icons';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -35,7 +36,7 @@ const ClientsMapView: React.FC<{ vm: ClientsMapVM }> = ({ vm }) => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/clients" />
+            <ConfirmBackButton defaultHref="/clients" />
           </IonButtons>
           <IonTitle>Mapa de clientes</IonTitle>
         </IonToolbar>

@@ -6,6 +6,7 @@ import {
   IonToast, IonLoading, IonFab, IonFabButton, IonSegment, IonSegmentButton,
   IonGrid, IonRow, IonCol,
 } from '@ionic/react';
+import { useExitConfirm } from '../../../contexts/ExitConfirmContext';
 import {
   addOutline, arrowBack, trophyOutline, starOutline, giftOutline, cashOutline,
   createOutline, trashOutline, refreshOutline, checkmarkCircleOutline, removeCircleOutline,
@@ -25,6 +26,7 @@ interface Props {
 
 const PosRewardsView: React.FC<Props> = ({ vm }) => {
   const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const {
     isAdmin, tab, setTab, loading, toastProps,
     summary, balances, catalog, ledger,
@@ -182,7 +184,7 @@ const PosRewardsView: React.FC<Props> = ({ vm }) => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBack} slot="icon-only" />
             </IonButton>
           </IonButtons>

@@ -7,6 +7,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
   IonIcon, IonToast, IonLoading, IonProgressBar, IonBadge,
 } from '@ionic/react';
+import { useExitConfirm } from '../../../contexts/ExitConfirmContext';
 import { arrowBackOutline } from 'ionicons/icons';
 import { useBorrowerOnboarding } from './BorrowerOnboardingLogic';
 import { p2pLendingRoute } from '../../../utils/routes';
@@ -17,6 +18,7 @@ import ContractStep from './components/ContractStep';
 
 const BorrowerOnboardingView: React.FC = () => {
   const vm = useBorrowerOnboarding();
+  const { confirmBack } = useExitConfirm();
 
   const renderStep = () => {
     switch (vm.step) {
@@ -31,7 +33,7 @@ const BorrowerOnboardingView: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => vm.history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBackOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>

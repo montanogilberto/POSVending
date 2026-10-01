@@ -83,6 +83,13 @@ export const PAYMENT_METHOD: Record<string, StatusMeta> = {
   transferencia: { label: 'Transferencia', color: 'tertiary' },
 };
 
+/** Tipo de egreso (expenses.expenseType). */
+export const EXPENSE_TYPE: Record<string, StatusMeta> = {
+  inventory: { label: 'Inventario', color: 'primary' },
+  general:   { label: 'General',    color: 'medium'  },
+  payroll:   { label: 'Nómina',     color: 'tertiary' },
+};
+
 /** Tipo de movimiento del ledger de puntos POS (posRewardTransactions.txType, comparar en minúsculas). */
 export const POS_REWARD_TX_TYPE: Record<string, StatusMeta> = {
   earn:       { label: 'Ganados',   color: 'success' },

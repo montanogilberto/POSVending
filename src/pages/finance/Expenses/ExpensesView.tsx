@@ -1,5 +1,6 @@
 import React from 'react';
-import { IonPage, IonContent, IonToast, IonLoading } from '@ionic/react';
+import { IonPage, IonContent, IonToast, IonButton, IonIcon } from '@ionic/react';
+import { addOutline } from 'ionicons/icons';
 import Header from '../../../components/layout/Header';
 import AlertPopover from '../../../components/popovers/AlertPopover';
 import MailPopover from '../../../components/popovers/MailPopover';
@@ -7,12 +8,11 @@ import ExpenseForm from '../../../components/finance/ExpenseForm';
 import { usePopovers } from '../../../hooks/usePopovers';
 import { useExpenses } from './ExpensesLogic';
 import ExpensesSummaryCard from './components/ExpensesSummaryCard';
-import ExpensesToolbar from './components/ExpensesToolbar';
-import ExpensesFiltersPanel from './components/ExpensesFiltersPanel';
-import ExpensesTable from './components/ExpensesTable';
-import ExpensesPagination from './components/ExpensesPagination';
+import ExpensesRecentActivity from './components/ExpensesRecentActivity';
 import ExpensesTrendsModal from './components/ExpensesTrendsModal';
+import ExpenseDetailModal from './components/ExpenseDetailModal';
 
+/** /egresos — overview in the /dashboard layout: total · nuevo egreso · actividad reciente. */
 const ExpensesView: React.FC = () => {
   const vm = useExpenses();
   const pops = usePopovers();
@@ -24,20 +24,18 @@ const ExpensesView: React.FC = () => {
         <div className="expenses-container">
           <ExpensesSummaryCard vm={vm} />
 
-          <div className="expenses-list-card">
-            <ExpensesToolbar vm={vm} />
-            <ExpensesFiltersPanel vm={vm} />
-            <ExpensesTable vm={vm} />
-            <ExpensesPagination vm={vm} />
-          </div>
+          <IonButton expand="block" className="expenses-add-button" onClick={() => vm.setShowExpenseForm(true)}>
+            <IonIcon slot="start" icon={addOutline} />
+            Nuevo Egreso
+          </IonButton>
+
+          <ExpensesRecentActivity vm={vm} />
         </div>
 
         <ExpensesTrendsModal vm={vm} />
-
+        <ExpenseDetailModal vm={vm} />
         <ExpenseForm isOpen={vm.showExpenseForm} onClose={() => vm.setShowExpenseForm(false)} onSubmit={vm.handleCreateExpense} />
-
         <IonToast {...vm.toastProps} />
-        <IonLoading isOpen={vm.loading} message="Cargando..." />
       </IonContent>
 
       <AlertPopover {...pops.alertPopoverProps} />

@@ -19,6 +19,7 @@ import {
   IonCheckbox, IonSpinner, IonImg,
   useIonViewWillEnter,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   refreshOutline, addOutline, arrowBackOutline, checkmarkCircle, closeCircle,
   walletOutline, personOutline, timeOutline, alertCircleOutline,
@@ -250,6 +251,7 @@ function movementLabel(entryType: string): string {
 
 const P2PLendingPage: React.FC = () => {
   const history  = useHistory();
+  const { confirmBack } = useExitConfirm();
   // /p2p-lending/:clientId (igual que client-dashboard/lender-dashboard). La
   // variante sin id sigue viva, así que el param solo gana cuando existe y el
   // contexto de sesión es el fallback.
@@ -1424,7 +1426,7 @@ const P2PLendingPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBackOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { IonCard, IonCardContent, IonIcon, IonButton, IonText } from '@ionic/react';
 import { cashOutline, trendingUpOutline, receiptOutline } from 'ionicons/icons';
+import ExpensesPeriodPicker from './ExpensesPeriodPicker';
 import { ExpensesVM } from '../ExpensesLogic';
 
 interface Props {
@@ -14,9 +15,7 @@ const ExpensesSummaryCard: React.FC<Props> = ({ vm }) => (
         <IonText className="expenses-summary-title">
           <h1>Total de Egresos</h1>
         </IonText>
-        <IonText className="expenses-summary-subtitle">
-          <span>{vm.currentMonthYear} • Todos los usuarios</span>
-        </IonText>
+        <ExpensesPeriodPicker vm={vm} suffix="Todos los usuarios" />
         <div className="expenses-summary-amount-row">
           <div className="expenses-summary-icon">
             <IonIcon icon={cashOutline} />
@@ -27,7 +26,7 @@ const ExpensesSummaryCard: React.FC<Props> = ({ vm }) => (
         </div>
         <div className="expenses-summary-count-row">
           <IonIcon icon={receiptOutline} />
-          <span>{vm.monthlyCount} operacion{vm.monthlyCount !== 1 ? 'es' : ''}</span>
+          <span>{vm.monthlyCount} {vm.monthlyCount !== 1 ? 'operaciones' : 'operación'}</span>
         </div>
       </div>
 
