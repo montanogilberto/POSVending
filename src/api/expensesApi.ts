@@ -10,8 +10,10 @@ export interface Expense {
   paymentMethod: string;
   paymentDate: string;
   userId: number;
-  /** Required for 'inventory'/'general'; absent for 'payroll' (see employeeId). */
+  /** Required for 'inventory'; absent for 'general'/'payroll' (see serviceId/employeeId). */
   supplierId?: number;
+  /** Required for 'general' (a recurring bill — CFE, agua, internet, renta); absent for 'inventory'/'payroll'. */
+  serviceId?: number;
   companyId: number;
   // Optional fields that might be available in some responses
   products?: ExpenseProduct[];

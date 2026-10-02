@@ -1,18 +1,35 @@
-.expense-form-modal {
-  --background: #F9FAFB;
-}
-
 .expense-form-content {
   --background: #F9FAFB;
 }
 
+/* Routed page (/egresos/nuevo), not a modal -- sized like the rest of the
+   app's full pages (see theme/variables.css's .page-padding breakpoints),
+   not the cramped single-column width a modal needed. */
 .expense-form-body {
-  max-width: 560px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .expense-form-body {
+    padding: 24px;
+    gap: 20px;
+  }
+}
+
+@media (min-width: 992px) {
+  .expense-form-body {
+    max-width: 840px;
+    padding: 28px 32px;
+  }
+
+  .expense-form-card-title {
+    font-size: 1.15rem !important;
+  }
 }
 
 /* ==========================================================================
@@ -143,9 +160,16 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  max-width: 560px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 14px 20px 0 20px;
+}
+
+@media (min-width: 992px) {
+  .expense-form-total-row {
+    max-width: 840px;
+    padding: 14px 32px 0 32px;
+  }
 }
 
 .expense-form-total-label {
@@ -166,11 +190,18 @@
 .expense-form-submit {
   --border-radius: 14px !important;
   --background: #0056D2 !important;
-  max-width: 560px;
+  max-width: 720px;
   margin: 12px auto !important;
   width: calc(100% - 40px);
   font-weight: 700;
   height: 50px;
+}
+
+@media (min-width: 992px) {
+  .expense-form-submit {
+    max-width: 840px;
+    width: calc(100% - 64px);
+  }
 }
 
 .expense-form-submit ion-spinner {

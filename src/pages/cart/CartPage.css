@@ -237,6 +237,109 @@
   letter-spacing: 0.03em;
 }
 
+.cart-payment-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.cart-payment-label-row .cart-payment-label {
+  margin-bottom: 0;
+}
+
+.split-payment-toggle {
+  --color: #2563eb;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: none;
+  margin: 0;
+}
+
+.split-payment-toggle.active {
+  --color: #dc2626;
+}
+
+.split-payment-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.split-payment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.split-payment-icon {
+  font-size: 1.1rem;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.split-payment-method-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
+  width: 76px;
+  flex-shrink: 0;
+}
+
+.split-payment-input-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.split-payment-input-wrapper .currency-symbol {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+  z-index: 1;
+}
+
+.split-payment-input {
+  width: 100%;
+  --border-radius: 10px;
+  --border-width: 1.5px;
+  --border-color: #e5e7eb;
+  --padding-start: 30px;
+  --padding-end: 12px;
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.split-payment-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fef2f2;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #991b1b;
+}
+
+.split-payment-summary.complete {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.split-payment-remaining {
+  font-weight: 700;
+}
+
 .payment-method-selector {
   display: flex;
   gap: 8px;
@@ -693,6 +796,52 @@
 .welcome-coupon-chip.applied {
   --background: #d1fae5;
   --color: #065f46;
+}
+
+.rewards-available-section {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.rewards-available-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #065f46;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+
+.reward-available-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.reward-available-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.reward-available-info ion-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #065f46;
+  white-space: normal;
+}
+
+.rewards-limit-hint {
+  font-size: 0.75rem;
+  color: #047857;
+  margin-top: 4px;
+  font-style: italic;
 }
 
 .client-actions-row {

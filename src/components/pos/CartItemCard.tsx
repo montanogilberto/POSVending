@@ -10,6 +10,14 @@ interface CartItemCardProps {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  /** Pre-discount line total, only passed when discountAmount > 0 -- lets
+   * the card show "was/now" pricing instead of just the already-discounted
+   * number with no explanation of why it's lower. */
+  originalPrice?: number;
+  discountAmount?: number;
+  /** Why this line is discounted -- a specific applied reward's name (e.g.
+   * "Servicio de lavado gratis (3x1)") or the welcome coupon label. */
+  discountLabel?: string;
   selectedOptionLabels?: { [key: string]: string | string[] };
   pieces?: Piezas;
   onRemove: (id: string) => void;
@@ -21,6 +29,9 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
   quantity,
   unitPrice,
   totalPrice,
+  originalPrice,
+  discountAmount,
+  discountLabel,
   selectedOptionLabels,
   pieces,
   onRemove,
@@ -86,7 +97,14 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
           <span className="quantity-badge">x{quantity}</span>
         </div>
         <div className="product-total">
-          <span className="total-price">{formatPrice(totalPrice)}</span>
+          {discountAmount && discountAmount > 0 && originalPrice != null ? (
+            <>
+              <span className="original-price">{formatPrice(originalPrice)}</span>
+              <span className="total-price discounted">{formatPrice(totalPrice)}</span>
+            </>
+          ) : (
+            <span className="total-price">{formatPrice(totalPrice)}</span>
+          )}
         </div>
         <IonButton
           fill="clear"
@@ -96,6 +114,14 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
           <IonIcon icon={close} slot="icon-only" />
         </IonButton>
       </div>
+
+      {/* Why this line's price dropped -- which reward/coupon was applied */}
+      {discountAmount && discountAmount > 0 && discountLabel && (
+        <div className="card-discount-row">
+          <span className="discount-badge">🎁 {discountLabel}</span>
+          <span className="discount-amount">-{formatPrice(discountAmount)}</span>
+        </div>
+      )}
 
       {/* Option labels (e.g. "Ciclo: Basico", or "Servicio Completo" and other products) */}
       {formatOptionLabels() && (

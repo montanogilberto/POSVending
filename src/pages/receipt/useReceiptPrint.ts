@@ -1,8 +1,6 @@
 import { useCallback } from 'react';
 import { postOneTicketTracking, saveTicketHtml } from '../../api/ticketApi';
-import { dispatchNotification } from '../../api/notificationDispatchApi';
 import { ReceiptService } from '../../services/ReceiptService';
-import { APP_DOWNLOAD_NUDGE } from '../../utils/appLinks';
 
 export interface ReceiptActionStatus {
   ok: boolean;
@@ -73,7 +71,6 @@ export function useReceiptPrint({
     console.log('[ReceiptPrint][TRACK] Goal checklist', {
         uploadHtmlToAzure: true,
         generateHtmlLink: true,
-        dispatchNotification: true,
         updateDatabaseTables: true,
         physicalPrint: true
       });
@@ -93,7 +90,6 @@ export function useReceiptPrint({
       ).trim();
       const normalizedPhoneDigits = rawClientPhone.replace(/\D/g, '');
       const clientPhone = normalizedPhoneDigits ? `+${normalizedPhoneDigits}` : '';
-      const clientId = Number(ticketData?.client?.clientId ?? 0);
       summary.phone = clientPhone;
       const safeIncomeForFile = incomeId > 0 ? incomeId : Date.now();
       const fileName = `receipt_${safeIncomeForFile}.html`;
@@ -129,11 +125,6 @@ export function useReceiptPrint({
 
         const existingTicket = validateResponse?.tickets?.[0];
         const existingReceiptUrl = normalizeReceiptUrl(String(existingTicket?.receiptUrl || '').trim());
-        // sp_ticket_tracking sets printed=1 the first time action='print' runs for
-        // this incomeId (see finally block below). Reprints (staple copy, lost
-        // receipt, etc.) are legitimate, but the client should only be notified
-        // once -- re-dispatching push/whatsapp/sms on every reprint spams them.
-        const alreadyPrinted = Boolean(existingTicket?.printed);
 
         if (existingReceiptUrl) {
           receiptUrl = existingReceiptUrl;
@@ -230,80 +221,13 @@ export function useReceiptPrint({
           }
         }
 
-        if (alreadyPrinted) {
-          console.log('[ReceiptPrint] Ticket already printed before (printed=1) — reprint only, skipping notification dispatch.');
-          summary.push = { ok: false, message: 'No reenviado: el recibo ya fue notificado en una impresión anterior' };
-          summary.whatsapp = { ok: false, message: 'No reenviado: el recibo ya fue notificado en una impresión anterior' };
-          summary.sms = { ok: false, message: 'No reenviado: el recibo ya fue notificado en una impresión anterior' };
-          onToast('Reimpresión: el cliente ya fue notificado antes, no se reenvía.');
-        } else if (receiptUrl && clientPhone) {
-          const message = `Aquí está su recibo. ${APP_DOWNLOAD_NUDGE}`;
-
-          console.log('[ReceiptPrint] Dispatching notification (push -> whatsapp -> sms)...', {
-            incomeId,
-            companyId,
-            clientId,
-            phone: clientPhone,
-            message,
-            receiptUrl
-          });
-
-          try {
-            const dispatchResult = await dispatchNotification({
-              companyId,
-              sourceType: 'ticket',
-              sourceId: incomeId,
-              recipientType: 'client',
-              recipientId: clientId,
-              eventName: 'ticket_ready',
-              phone: clientPhone,
-              pushTitle: 'Recibo listo',
-              pushMessage: message,
-              waSmsMessage: message,
-              messagePreview: message,
-              receiptUrl
-            });
-            console.log('[ReceiptPrint] Dispatch result', dispatchResult);
-
-            const { selectedChannel, status: dispatchStatus } = dispatchResult;
-            const sent = dispatchStatus === 'sent';
-            const channelLabel = selectedChannel === 'push' ? 'notificación push'
-              : selectedChannel === 'whatsapp' ? 'WhatsApp'
-              : 'SMS';
-
-            summary.push = selectedChannel === 'push'
-              ? { ok: sent, message: sent ? 'Notificación push enviada correctamente' : 'No se pudo enviar push' }
-              : { ok: false, message: 'No fue necesario (otro canal usado)' };
-            summary.whatsapp = selectedChannel === 'whatsapp'
-              ? { ok: sent, message: sent ? 'WhatsApp enviado correctamente' : 'No se pudo enviar WhatsApp' }
-              : { ok: false, message: 'No fue necesario (otro canal usado)' };
-            summary.sms = selectedChannel === 'sms'
-              ? { ok: sent, message: sent ? 'SMS enviado correctamente' : 'No se pudo enviar SMS' }
-              : { ok: false, message: 'No fue necesario (otro canal usado)' };
-
-            onToast(sent ? `Recibo enviado por ${channelLabel}` : 'No se pudo enviar el recibo por ningún canal');
-          } catch (dispatchError: any) {
-            console.error('[ReceiptPrint] dispatchNotification failed', dispatchError);
-            summary.push = { ok: false, message: 'No se pudo enviar', error: dispatchError?.message || String(dispatchError) };
-            summary.whatsapp = { ok: false, message: 'No se pudo enviar', error: dispatchError?.message || String(dispatchError) };
-            summary.sms = { ok: false, message: 'No se pudo enviar', error: dispatchError?.message || String(dispatchError) };
-            onToast('No se pudo enviar el recibo');
-          }
-        } else if (receiptUrl && !clientPhone) {
-          console.warn('[ReceiptPrint] No client phone available, skipping notification dispatch');
-          summary.push = { ok: false, message: 'No enviado: cliente sin teléfono' };
-          summary.whatsapp = { ok: false, message: 'No enviado: cliente sin teléfono' };
-          summary.sms = { ok: false, message: 'No enviado: cliente sin teléfono' };
-          onToast('Recibo guardado. Cliente sin teléfono para envío');
-        } else {
-          console.warn('[ReceiptPrint] No receiptUrl available; skipping notification dispatch.');
-          if (!summary.azureHtml.message || summary.azureHtml.message === 'No ejecutado') {
-            summary.azureHtml = { ok: false, message: 'No se obtuvo URL del recibo' };
-          }
-          summary.push = { ok: false, message: 'No enviado: sin URL de recibo' };
-          summary.whatsapp = { ok: false, message: 'No enviado: sin URL de recibo' };
-          summary.sms = { ok: false, message: 'No enviado: sin URL de recibo' };
-        }
+        // The customer is notified once, by the backend, when the sale is
+        // saved (income_created in modules/income.py). Printing only prints:
+        // dispatching here as well sent the same customer a second message.
+        const notifiedAtSale = { ok: false, message: 'Se envía al registrar la venta, no al imprimir' };
+        summary.push = notifiedAtSale;
+        summary.whatsapp = notifiedAtSale;
+        summary.sms = notifiedAtSale;
       } else {
         console.warn('[ReceiptPrint] Skipping save/track: invalid incomeId in ticketData', {
           incomeId,

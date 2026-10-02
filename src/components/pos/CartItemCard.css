@@ -65,6 +65,48 @@
   white-space: nowrap;
 }
 
+.product-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.original-price {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #9ca3af;
+  text-decoration: line-through;
+  white-space: nowrap;
+}
+
+.total-price.discounted {
+  color: #059669;
+}
+
+.card-discount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ecfdf5;
+  border-radius: 8px;
+  padding: 5px 10px;
+  margin-bottom: 6px;
+}
+
+.discount-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #065f46;
+}
+
+.discount-amount {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #059669;
+  white-space: nowrap;
+}
+
 .remove-button {
   --color: #9ca3af;
   --color-hover: #ef4444;

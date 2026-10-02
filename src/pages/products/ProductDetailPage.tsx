@@ -13,7 +13,6 @@ import {
   IonSelect,
   IonSelectOption,
   IonButton,
-  IonAlert,
   IonCardSubtitle,
   IonCard,
   IonGrid,
@@ -57,8 +56,6 @@ const ProductDetailPage: React.FC = () => {
   const [product, setProduct] = useState<Product | undefined>(undefined);
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState<Record<number, SelectedOptionValue>>({});
-  const [showAlert, setShowAlert] = useState(false);
-  const [missingMessage, setMissingMessage] = useState('');
   const pops = usePopovers();
 
   // Pieces state for "Servicio Completo" product
@@ -68,8 +65,12 @@ const ProductDetailPage: React.FC = () => {
     otros: 0,
   });
 
-  const [showPiecesToast, setShowPiecesToast] = useState(false);
-  const [piecesToastMessage, setPiecesToastMessage] = useState('');
+  // Shared validation toast (missing required options, pieces, etc.) —
+  // was two separate near-dead mechanisms (an IonAlert for missing options,
+  // an unused "pieces" toast) collapsed into one, matching this app's
+  // shared useToast()-style pattern instead of a modal-blocking alert.
+  const [showValidationToast, setShowValidationToast] = useState(false);
+  const [validationToastMessage, setValidationToastMessage] = useState('');
 
   // Helper to check if product is "Servicio Completo"
   const isServicioCompleto = product?.name?.toLowerCase().includes('servicio completo');
@@ -300,12 +301,12 @@ const ProductDetailPage: React.FC = () => {
     });
 
     if (missingGroups.length > 0) {
-      setMissingMessage(
+      setValidationToastMessage(
         `Falta seleccionar ${missingGroups.length === 1 ? 'la opción' : 'las opciones'}: ${missingGroups
           .map(name => `"${name}"`)
           .join(', ')}.`
       );
-      setShowAlert(true);
+      setShowValidationToast(true);
       return;
     }
 
@@ -613,19 +614,10 @@ const ProductDetailPage: React.FC = () => {
           </div>
         </div>
 
-        <IonAlert
-          isOpen={showAlert}
-          onDidDismiss={() => setShowAlert(false)}
-          header="Opciones requeridas"
-          message={missingMessage}
-          buttons={['OK']}
-          translucent={true}
-        />
-
         <IonToast
-          isOpen={showPiecesToast}
-          onDidDismiss={() => setShowPiecesToast(false)}
-          message={piecesToastMessage}
+          isOpen={showValidationToast}
+          onDidDismiss={() => setShowValidationToast(false)}
+          message={validationToastMessage}
           color="warning"
           position="bottom"
           duration={3000}

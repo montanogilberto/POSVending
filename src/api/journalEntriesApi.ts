@@ -1,7 +1,7 @@
 const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 export type JournalEntryStatus = 'POSTED' | 'VOID';
-export type ReferenceType = 'income' | 'expense' | 'manual' | 'adjustment' | 'opening_balance';
+export type ReferenceType = 'income' | 'income_commission' | 'expense' | 'manual' | 'adjustment' | 'opening_balance';
 
 export interface JournalEntry {
   entryId: number;

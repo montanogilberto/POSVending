@@ -15,6 +15,9 @@ interface BreakdownEntry {
 
 interface PaymentBreakdownProps {
   breakdown: BreakdownEntry[];
+  /** 'COBROS' (income, default) or 'PAGOS' (expenses). */
+  title?: string;
+  emptyText?: string;
 }
 
 const METHOD_ICONS: Record<PaymentMethod, string> = {
@@ -23,13 +26,17 @@ const METHOD_ICONS: Record<PaymentMethod, string> = {
   Transferencia: swapHorizontalOutline,
 };
 
-const PaymentBreakdown: React.FC<PaymentBreakdownProps> = ({ breakdown }) => {
+const PaymentBreakdown: React.FC<PaymentBreakdownProps> = ({
+  breakdown,
+  title = 'COBROS',
+  emptyText = 'No hay datos de pagos para este mes.',
+}) => {
   if (!breakdown.length) {
     return (
       <IonCard className="dashboard-summary-card">
         <IonCardContent className="summary-card-content">
-          <div className="summary-card-title">COBROS</div>
-          <p className="secondary-text">No hay datos de pagos para este mes.</p>
+          <div className="summary-card-title">{title}</div>
+          <p className="secondary-text">{emptyText}</p>
         </IonCardContent>
       </IonCard>
     );
@@ -38,7 +45,7 @@ const PaymentBreakdown: React.FC<PaymentBreakdownProps> = ({ breakdown }) => {
   return (
     <IonCard className="dashboard-summary-card">
       <IonCardContent className="summary-card-content">
-        <div className="summary-card-title">COBROS</div>
+        <div className="summary-card-title">{title}</div>
         <div className="cobros-list">
           {breakdown.map((entry) => (
             <div

@@ -148,6 +148,16 @@ export interface InsufficientProductUnitsError {
   available: number;
 }
 
+/** Per-product purchase/redemption tally for a client — "available" = units
+ * purchased minus units already consumed by applied free_product
+ * redemptions. Drives the stamp-card ("compra 3, el 4to gratis") UI. */
+export interface PosRewardProductCount {
+  productId: number;
+  unitsPurchased: number;
+  unitsConsumed: number;
+  unitsAvailable: number;
+}
+
 export interface PosRewardDashboardSummary {
   pointsIssued: number;
   pointsRedeemed: number;
@@ -205,6 +215,14 @@ export const posRewardsApi = {
     post<PosRewardDashboardSummary>('/posRewardBalances/dashboard-summary', {
       posRewardBalances: [{ companyId, startDate, endDate }],
     }),
+
+  // Per-product counts (stamp cards — see sp_posRewardProductCounts)
+  getProductCounts: async (companyId: number, clientId: number): Promise<PosRewardProductCount[]> => {
+    const data = await crud<{ result?: Array<{ posRewardProductCounts?: PosRewardProductCount[] }> }>(
+      'posRewardProductCounts', 0, { companyId, clientId }
+    );
+    return data?.result?.[0]?.posRewardProductCounts ?? [];
+  },
 
   // Catalog (see PRD prd_posRewardCatalogItem.json)
   listCatalog: async (companyId: number, activeOnly = false): Promise<PosRewardCatalogItem[]> => {

@@ -58,7 +58,7 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
               <div className="kpi-info-block">
                 <div className="kpi-date-text">Hoy · {todayLabel}</div>
                 <IonText className="kpi-label-text">
-                  <span>Ventas Hoy</span>
+                  <span>Ingresos Hoy</span>
                 </IonText>
                 <IonText className="kpi-amount-text">
                   <h1>{fmtMXN(calculateDailySales())}</h1>
