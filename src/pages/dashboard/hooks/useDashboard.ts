@@ -20,6 +20,13 @@ type PaymentMethod = PaymentMethodLabel;
 
 const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
 
+// PAGOS (expenses) uses the expense red of the Egresos trends chart.
+const EXPENSE_PAYMENT_COLORS: Record<PaymentMethod, string> = {
+  Efectivo: '#DC2626',
+  Transferencia: '#F87171',
+  Tarjeta: '#FCA5A5',
+};
+
 const PAYMENT_COLORS: Record<PaymentMethod, string> = {
   Efectivo: '#16A34A',
   Transferencia: '#22C55E',
@@ -136,6 +143,28 @@ export const useDashboard = () => {
       color: PAYMENT_COLORS[method],
     }));
   }, [allIncome, cardTerminal]);
+
+  // PAGOS: expenses of the current month by payment method — same shape as
+  // COBROS (no terminal commission on money going out). allExpenses is
+  // already this company's current month (fetchMonthlyExpenses).
+  const expenseBreakdown = useMemo(() => {
+    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
+    allExpenses.forEach((expense) => {
+      const method = normalizePaymentMethod(expense.paymentMethod);
+      if (method) totals[method] += Number(expense.total) || 0;
+    });
+
+    const total = PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
+    if (total === 0) return [];
+
+    return PAYMENT_METHODS.map((method) => ({
+      method,
+      amount: totals[method],
+      commission: 0,
+      percent: (totals[method] / total) * 100,
+      color: EXPENSE_PAYMENT_COLORS[method],
+    }));
+  }, [allExpenses]);
 
   // ✅ METRICS
   const calculateTotal = () =>
@@ -384,6 +413,7 @@ export const useDashboard = () => {
     receiptData,
     setReceiptData,
     paymentBreakdown,
+    expenseBreakdown,
 
     calculateTotal,
     calculateDailySales,

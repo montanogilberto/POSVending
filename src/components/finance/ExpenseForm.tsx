@@ -30,16 +30,20 @@ import {
   IonSegmentButton,
   IonTextarea,
 } from '@ionic/react';
-import { addOutline, removeOutline, searchOutline, closeOutline, alertCircleOutline, refreshOutline, cameraOutline, receiptOutline, cardOutline, sparklesOutline, warningOutline, cubeOutline, documentTextOutline, peopleOutline } from 'ionicons/icons';
+import { addOutline, removeOutline, searchOutline, closeOutline, arrowBack, alertCircleOutline, refreshOutline, cameraOutline, receiptOutline, cardOutline, sparklesOutline, warningOutline, cubeOutline, documentTextOutline, peopleOutline } from 'ionicons/icons';
+import { useHistory } from 'react-router-dom';
 import { getProductsByCompany } from '../../api/productsApi';
-import { ExpenseProduct, ExpenseType, uploadExpenseReceiptImage } from '../../api/expensesApi';
+import { ExpenseProduct, ExpenseType, createExpense, uploadExpenseReceiptImage } from '../../api/expensesApi';
 import { getAllSuppliers, Supplier } from '../../api/supplierApi';
+import { getAllServices, Service } from '../../api/serviceApi';
 import { getAllEmployees, Employee } from '../../api/employeesApi';
 import { categorizeExpense, ExpenseCategorization } from '../../api/expenseAgentApi';
 import { pickExpenseReceiptPhoto } from '../../utils/pickAvatarPhoto';
 import { useUser } from '../../contexts/UserContext';
 import { useToast } from '../../hooks/useToast';
+import { notifyDataChanged } from '../../utils/refreshBus';
 import NewSupplierModal from './NewSupplierModal';
+import NewServiceModal from './NewServiceModal';
 import { fmtMXN, toHermosilloDate } from '../../utils/format';
 
 // The picker gives a Hermosillo calendar day ('YYYY-MM-DD'). Today must be
@@ -73,20 +77,19 @@ interface SelectedProduct {
   };
 }
 
-interface ExpenseFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (expenseData: any) => Promise<void>;
-}
-
-const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) => {
+const ExpenseForm: React.FC = () => {
   const { companyId, userId } = useUser();
+  const history = useHistory();
+  const goToExpenses = () => history.push('/egresos');
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [searchText, setSearchText] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierId, setSupplierId] = useState<number>(0);
+  const [services, setServices] = useState<Service[]>([]);
+  const [serviceId, setServiceId] = useState<number>(0);
+  const [showNewService, setShowNewService] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentDate, setPaymentDate] = useState(hermosilloToday);
   const [total, setTotal] = useState(0);
@@ -125,12 +128,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
   };
 
   useEffect(() => {
-    if (isOpen && companyId) {
+    if (companyId) {
       loadProducts();
       loadSuppliers();
+      loadServices();
       loadEmployees();
     }
-  }, [isOpen, companyId]);
+  }, [companyId]);
 
   useEffect(() => {
     // Calculate total whenever products change
@@ -142,6 +146,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
     // leftover supplierId silently riding along into a payroll payload.
     setSelectedProducts([]);
     setSupplierId(0);
+    setServiceId(0);
     setEmployeeId(0);
     setTotal(0);
     setNotes('');
@@ -154,6 +159,16 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
     } catch (error) {
       console.error('Error loading suppliers:', error);
       setSuppliers([]);
+    }
+  };
+
+  const loadServices = async () => {
+    try {
+      const serviceList = await getAllServices(companyId);
+      setServices(serviceList);
+    } catch (error) {
+      console.error('Error loading services:', error);
+      setServices([]);
     }
   };
 
@@ -260,6 +275,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
         showToast('Debe seleccionar un empleado');
         return;
       }
+    } else if (expenseType === 'general') {
+      if (serviceId === 0) {
+        showToast('Debe seleccionar un servicio');
+        return;
+      }
     } else if (supplierId === 0) {
       showToast('Debe seleccionar un proveedor');
       return;
@@ -304,7 +324,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
           userId,
           companyId,
           expenseType,
-          ...(expenseType === 'payroll' ? { employeeId } : { supplierId }),
+          ...(expenseType === 'payroll' ? { employeeId } : expenseType === 'general' ? { serviceId } : { supplierId }),
           ...(expenseType === 'inventory'
             ? {
                 products: selectedProducts.map(product => ({
@@ -317,10 +337,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
         }]
       };
 
-      await onSubmit(expenseData);
+      await createExpense(expenseData);
+      notifyDataChanged('expense-created'); // reloads the Egresos list + /dashboard KPIs
+      showToast('Egreso creado exitosamente', 'success');
       // Reset form
       setSelectedProducts([]);
       setSupplierId(0);
+      setServiceId(0);
       setEmployeeId(0);
       setPaymentMethod('');
       setPaymentDate(hermosilloToday());
@@ -329,7 +352,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
       setExpenseType('inventory');
       setReceiptPhoto(null);
       setAgentReview(null);
-      onClose();
+      setTimeout(goToExpenses, 600);
     } catch (error) {
       console.error('Error creating expense:', error);
       showToast('Error al crear el egreso');
@@ -339,19 +362,18 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
   };
 
   return (
-    <>
-      <IonModal isOpen={isOpen} onDidDismiss={onClose} className="expense-form-modal">
-        <IonHeader>
-          <IonToolbar>
-            <IonButtons slot="start">
-              <IonButton onClick={onClose}>
-                <IonIcon icon={closeOutline} slot="icon-only" />
-              </IonButton>
-            </IonButtons>
-            <IonTitle>Nuevo Egreso</IonTitle>
-          </IonToolbar>
-        </IonHeader>
-        <IonContent className="expense-form-content">
+    <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonButtons slot="start">
+            <IonButton onClick={goToExpenses}>
+              <IonIcon icon={arrowBack} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
+          <IonTitle>Nuevo Egreso</IonTitle>
+        </IonToolbar>
+      </IonHeader>
+      <IonContent className="expense-form-content">
           <IonLoading isOpen={loading} message="Guardando..." />
 
           <div className="expense-form-body">
@@ -476,6 +498,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
               <IonCardContent>
                 {expenseType === 'payroll' ? (
                   <IonSelect
+                    key="employee-select"
                     className="expense-form-item"
                     fill="outline"
                     label="Empleado"
@@ -491,8 +514,27 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                       </IonSelectOption>
                     ))}
                   </IonSelect>
+                ) : expenseType === 'general' ? (
+                  <IonSelect
+                    key="service-select"
+                    className="expense-form-item"
+                    fill="outline"
+                    label="Servicio"
+                    labelPlacement="floating"
+                    placeholder="Seleccionar servicio"
+                    interface="popover"
+                    value={serviceId || undefined}
+                    onIonChange={(e) => setServiceId(Number(e.detail.value) || 0)}
+                  >
+                    {services.map(service => (
+                      <IonSelectOption key={service.serviceId} value={service.serviceId}>
+                        {service.serviceName}
+                      </IonSelectOption>
+                    ))}
+                  </IonSelect>
                 ) : (
                   <IonSelect
+                    key="supplier-select"
                     className="expense-form-item"
                     fill="outline"
                     label="Proveedor"
@@ -510,7 +552,15 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
                   </IonSelect>
                 )}
 
-                {expenseType !== 'payroll' && (
+                {expenseType === 'general' && (
+                  <IonButton fill="clear" size="small" className="expense-form-new-supplier"
+                    onClick={() => setShowNewService(true)}>
+                    <IonIcon slot="start" icon={addOutline} />
+                    Nuevo servicio
+                  </IonButton>
+                )}
+
+                {expenseType === 'inventory' && (
                   <IonButton fill="clear" size="small" className="expense-form-new-supplier"
                     onClick={() => setShowNewSupplier(true)}>
                     <IonIcon slot="start" icon={addOutline} />
@@ -645,14 +695,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
               loading ||
               !paymentMethod ||
               (expenseType === 'inventory' && (selectedProducts.length === 0 || supplierId === 0)) ||
-              (expenseType === 'general' && (supplierId === 0 || total <= 0)) ||
+              (expenseType === 'general' && (serviceId === 0 || total <= 0)) ||
               (expenseType === 'payroll' && (employeeId === 0 || total <= 0))
             }
           >
             {loading ? <IonSpinner name="dots" /> : 'Crear Egreso'}
           </IonButton>
         </IonFooter>
-      </IonModal>
 
       {/* Product Selection Modal */}
       <IonModal isOpen={showProductModal} onDidDismiss={() => setShowProductModal(false)}>
@@ -698,8 +747,20 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit }) 
         }}
       />
 
+      <NewServiceModal
+        isOpen={showNewService}
+        companyId={companyId}
+        onClose={() => setShowNewService(false)}
+        onCreated={(service, list) => {
+          setServices(list);
+          setServiceId(service.serviceId);
+          setShowNewService(false);
+          showToast(`Servicio "${service.serviceName}" creado y seleccionado`, 'success');
+        }}
+      />
+
       <IonToast {...toastProps} />
-    </>
+    </IonPage>
   );
 };
 

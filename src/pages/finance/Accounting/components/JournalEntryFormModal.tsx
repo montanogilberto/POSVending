@@ -6,7 +6,7 @@ import {
 import { addOutline, trashOutline } from 'ionicons/icons';
 import { ChartOfAccount } from '../../../../api/chartOfAccountsApi';
 import { CreateJournalEntryRequest } from '../../../../api/journalEntriesApi';
-import { fmtMXN } from '../../../../utils/format';
+import { fmtMXN, toHermosilloDate } from '../../../../utils/format';
 import { NewLineDraft } from '../AccountingTypes';
 
 interface Props {
@@ -17,9 +17,16 @@ interface Props {
 }
 
 const emptyLine = (): NewLineDraft => ({ accountId: '', debit: '', credit: '', lineDescription: '' });
-const todayIso = () => new Date().toISOString().slice(0, 10);
+// Hermosillo's today — new Date().toISOString() is UTC and rolls to tomorrow after 17:00 local.
+const todayIso = () => toHermosilloDate(new Date().toISOString()).toISOString().slice(0, 10);
+
+type EntryKind = 'manual' | 'opening_balance';
+/** Books open 2026-09-01 (owner decision Q1) — the opening entry's effective date. */
+const BOOKS_OPENING_DATE = '2026-09-01';
+const BALANCE_SHEET_TYPES = ['ASSET', 'LIABILITY', 'EQUITY'];
 
 const JournalEntryFormModal: React.FC<Props> = ({ isOpen, accounts, onClose, onSubmit }) => {
+  const [kind, setKind] = useState<EntryKind>('manual');
   const [entryDate, setEntryDate] = useState(todayIso());
   const [description, setDescription] = useState('');
   const [lines, setLines] = useState<NewLineDraft[]>([emptyLine(), emptyLine()]);
@@ -31,7 +38,26 @@ const JournalEntryFormModal: React.FC<Props> = ({ isOpen, accounts, onClose, onS
     return { debit, credit, balanced: Math.abs(debit - credit) < 0.005 && debit > 0 };
   }, [lines]);
 
+  // Saldos iniciales: balance-sheet accounts only (the SP enforces it too).
+  const selectableAccounts = useMemo(
+    () => (kind === 'opening_balance' ? accounts.filter((a) => BALANCE_SHEET_TYPES.includes(a.accountType)) : accounts),
+    [accounts, kind],
+  );
+
+  const changeKind = (next: EntryKind) => {
+    setKind(next);
+    if (next === 'opening_balance') {
+      setEntryDate(BOOKS_OPENING_DATE);
+      setDescription((d) => d || 'Saldos iniciales');
+      setLines((prev) => prev.map((l) =>
+        accounts.some((a) => a.accountId === l.accountId && BALANCE_SHEET_TYPES.includes(a.accountType)) ? l : { ...l, accountId: '' }));
+    } else {
+      setEntryDate(todayIso());
+    }
+  };
+
   const reset = () => {
+    setKind('manual');
     setEntryDate(todayIso());
     setDescription('');
     setLines([emptyLine(), emptyLine()]);
@@ -50,7 +76,7 @@ const JournalEntryFormModal: React.FC<Props> = ({ isOpen, accounts, onClose, onS
       await onSubmit({
         entryDate,
         description: description.trim(),
-        referenceType: 'manual',
+        referenceType: kind,
         lines: lines
           .filter((l) => l.accountId !== '')
           .map((l) => ({
@@ -79,6 +105,21 @@ const JournalEntryFormModal: React.FC<Props> = ({ isOpen, accounts, onClose, onS
       <IonContent className="ion-padding">
         <IonList>
           <IonItem>
+            <IonLabel position="stacked">Tipo de asiento</IonLabel>
+            <IonSelect value={kind} interface="popover" onIonChange={(e) => changeKind(e.detail.value)}>
+              <IonSelectOption value="manual">Asiento manual</IonSelectOption>
+              <IonSelectOption value="opening_balance">Saldos iniciales (apertura)</IonSelectOption>
+            </IonSelect>
+          </IonItem>
+          {kind === 'opening_balance' && (
+            <IonItem lines="none">
+              <IonText color="medium" className="accounting-opening-hint">
+                Un solo asiento de apertura por empresa, solo cuentas de Activo, Pasivo y Capital.
+                Capital social = Caja + Bancos − Deudas.
+              </IonText>
+            </IonItem>
+          )}
+          <IonItem>
             <IonLabel position="stacked">Fecha</IonLabel>
             <IonInput type="date" value={entryDate} onIonInput={(e) => setEntryDate(e.detail.value ?? todayIso())} />
           </IonItem>
@@ -98,7 +139,7 @@ const JournalEntryFormModal: React.FC<Props> = ({ isOpen, accounts, onClose, onS
                 placeholder="Selecciona una cuenta"
                 onIonChange={(e) => updateLine(index, { accountId: e.detail.value })}
               >
-                {accounts.map((a) => (
+                {selectableAccounts.map((a) => (
                   <IonSelectOption key={a.accountId} value={a.accountId}>{a.code} · {a.name}</IonSelectOption>
                 ))}
               </IonSelect>

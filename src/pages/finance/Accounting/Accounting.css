@@ -50,3 +50,10 @@
 .accounting-refresh-btn {
   margin: 0 4px 8px;
 }
+
+/* Saldos iniciales hint in the new-entry form (Step 6). */
+.accounting-opening-hint {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  padding: 4px 0 8px;
+}

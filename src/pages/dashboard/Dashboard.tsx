@@ -5,7 +5,6 @@ import {
   IonPage,
   IonButton,
   IonIcon,
-  useIonViewWillEnter,
 } from '@ionic/react';
 import { chevronForwardOutline } from 'ionicons/icons';
 import './Dashboard.css';
@@ -17,6 +16,8 @@ import MailPopover from '../../components/popovers/MailPopover';
 
 import { useDashboard } from './hooks/useDashboard';
 import { usePopovers } from '../../hooks/usePopovers';
+import { useViewEnterLoad } from '../../hooks/useViewEnterLoad';
+import { useUser } from '../../contexts/UserContext';
 import MetricsGrid from './components/MetricsGrid';
 import SummaryGrid from './components/SummaryGrid';
 import CartSummary from './components/CartSummary';
@@ -54,9 +55,9 @@ const Dashboard: React.FC = () => {
 
   const pops = usePopovers();
 
-  useIonViewWillEnter(() => {
-    refreshDashboardData();
-  });
+  const { companyId } = useUser();
+  // First entry (also on a direct reload) + every re-entry, fetched once each.
+  useViewEnterLoad(refreshDashboardData, !!companyId);
 
   // Refresco global: cualquier transacción/acción (o push recibido) recarga
   // el dashboard aunque ya esté en pantalla.
@@ -89,9 +90,9 @@ const Dashboard: React.FC = () => {
             onRefresh={handleManualRefresh}
           />
 
-          {/* ✅ Resumen: Ventas / Egresos / Neto (después de comisión terminal) / Operaciones (hoy) */}
+          {/* ✅ Resumen: Ingresos / Egresos / Neto (después de comisión terminal) / Operaciones (hoy) */}
           <SummaryGrid
-            ventas={calculateDailySales()}
+            ingresos={calculateDailySales()}
             comisiones={calculateDailyCommissions()}
             egresos={calculateExpensesDailyTotal()}
             operaciones={calculateDailySalesCount()}

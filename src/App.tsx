@@ -48,6 +48,7 @@ import {
   person,
   water,
   storefrontOutline,
+  receiptOutline,
   idCardOutline,
   cashOutline,
   peopleOutline,
@@ -105,6 +106,7 @@ import CategoriesPage from './pages/category/CategoriesPage';
 import UsersPage from './pages/admin/UsersPage';
 import IncomesPage from './pages/finance/IncomesPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
+import NewExpensePage from './pages/finance/NewExpensePage';
 import ExpensesDetailPage from './pages/finance/ExpensesDetailPage';
 import AccountingPage from './pages/finance/AccountingPage';
 import WaterTanksPage from './pages/iot/WaterTanksPage';
@@ -115,6 +117,7 @@ import ForgotPassword from './pages/authentication/ForgotPassword';
 import CreateAccount from './pages/authentication/CreateAccount';
 import ClientLogin from './pages/authentication/ClientLogin';
 import SupplierPage from './pages/admin/SupplierPage';
+import ServicePage from './pages/admin/ServicePage';
 import EmployeesPage from './pages/admin/EmployeesPage';
 import LoanPage from './pages/loans/LoanPage';
 import ProfilePage from './pages/profile/ProfilePage';
@@ -232,7 +235,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/expense-categories', '/expense-products', '/expense-cart',
   '/movements', '/led-status', '/clients', '/products-management',
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
-  '/accounting', '/water-tanks', '/receipt', '/suppliers', '/employees',
+  '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
   '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
@@ -672,6 +675,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'services') && (
+              <IonItem button routerLink="/services" title="Servicios">
+                <IonIcon icon={receiptOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Servicios</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'employees') && (
               <IonItem button routerLink="/employees" title="Empleados">
                 <IonIcon icon={idCardOutline} slot="start" />
@@ -938,6 +950,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/users" feature="users" component={UsersPage} />
             <PrivateRoute exact path="/ingresos" feature="ingresos" component={IncomesPage} />
             <PrivateRoute exact path="/egresos" feature="egresos" component={ExpensesPage} />
+            <PrivateRoute exact path="/egresos/nuevo" feature="egresos" component={NewExpensePage} />
             <PrivateRoute exact path="/egresos/detalle" feature="egresos" component={ExpensesDetailPage} />
             <PrivateRoute exact path="/accounting" feature="accounting" component={AccountingPage} />
             <PrivateRoute exact path="/water-tanks" feature="iot" component={WaterTanksPage} />
@@ -949,6 +962,7 @@ const AppShell: React.FC = () => {
               <Redirect to="/login" />
             </Route>
             <PrivateRoute exact path="/suppliers" feature="suppliers" component={SupplierPage} />
+            <PrivateRoute exact path="/services" feature="services" component={ServicePage} />
             <PrivateRoute exact path="/employees" feature="employees" component={EmployeesPage} />
             <PrivateRoute exact path="/loans" feature="loans" component={LoanPage} />
             <PrivateRoute exact path="/profile" component={ProfilePage} />

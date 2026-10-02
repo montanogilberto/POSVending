@@ -1,5 +1,5 @@
 import React from 'react';
-import { IonContent, IonPage, useIonViewWillEnter } from '@ionic/react';
+import { IonContent, IonPage } from '@ionic/react';
 import './Dashboard.css';
 
 import Header from '../../components/layout/Header';
@@ -8,11 +8,14 @@ import MailPopover from '../../components/popovers/MailPopover';
 
 import { useDashboard } from './hooks/useDashboard';
 import { usePopovers } from '../../hooks/usePopovers';
+import { useViewEnterLoad } from '../../hooks/useViewEnterLoad';
+import { useUser } from '../../contexts/UserContext';
 import SummaryGrid from './components/SummaryGrid';
 import PaymentBreakdown from './components/PaymentBreakdown';
 
 /**
- * RESUMEN card as on Dashboard.tsx plus the COBROS breakdown (only here), scoped to the current month
+ * RESUMEN card as on Dashboard.tsx plus COBROS (income) and PAGOS (expenses) by
+ * payment method (only here), scoped to the current month
  * instead of today — Dashboard stays daily-only on purpose (§6: staff need
  * "how's today going", not last week buried under it). This page is where
  * "how's this month going" lives instead of mixing both scopes into one card.
@@ -20,6 +23,7 @@ import PaymentBreakdown from './components/PaymentBreakdown';
 const MonthlySummaryPage: React.FC = () => {
   const {
     paymentBreakdown,
+    expenseBreakdown,
     calculateMonthlyTotal,
     calculateMonthlyCommissions,
     calculateMonthlySalesCount,
@@ -30,9 +34,9 @@ const MonthlySummaryPage: React.FC = () => {
 
   const pops = usePopovers();
 
-  useIonViewWillEnter(() => {
-    refreshDashboardData();
-  });
+  const { companyId } = useUser();
+  // Direct load (reload / deep link) too, not only when reached from /dashboard.
+  useViewEnterLoad(refreshDashboardData, !!companyId);
 
   return (
     <IonPage>
@@ -51,13 +55,15 @@ const MonthlySummaryPage: React.FC = () => {
 
           <SummaryGrid
             title="RESUMEN DEL MES"
-            ventas={calculateMonthlyTotal()}
+            ingresos={calculateMonthlyTotal()}
             comisiones={calculateMonthlyCommissions()}
             egresos={calculateExpensesMonthlyTotal()}
             operaciones={calculateMonthlySalesCount()}
           />
 
           <PaymentBreakdown breakdown={paymentBreakdown} />
+
+          <PaymentBreakdown title="PAGOS" breakdown={expenseBreakdown} emptyText="No hay egresos este mes." />
         </div>
       </IonContent>
     </IonPage>

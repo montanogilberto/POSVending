@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIonViewWillEnter } from '@ionic/react';
-import { fetchMonthlyExpenses, createExpense, Expense, ExpenseMonthTotal } from '../../../api/expensesApi';
+import { fetchMonthlyExpenses, Expense, ExpenseMonthTotal } from '../../../api/expensesApi';
 import { getAllSuppliers, Supplier } from '../../../api/supplierApi';
 import { getAllEmployees, Employee } from '../../../api/employeesApi';
 import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
 import { EXPENSE_TYPE } from '../../../components/ui/statusMaps';
 import { fmtMXN, mxDate } from '../../../utils/format';
-import { notifyDataChanged, onDataChanged } from '../../../utils/refreshBus';
+import { onDataChanged } from '../../../utils/refreshBus';
 import {
   MonthPeriod, currentPeriod, hermosilloPeriod, periodLabel, periodShortLabel, samePeriod, shiftPeriod,
 } from '../../../utils/monthPeriod';
@@ -41,7 +41,6 @@ export const useExpenses = () => {
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
   const [showTrendsModal, setShowTrendsModal] = useState(false);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<EnrichedExpense | null>(null);
 
   const { showToast, toastProps } = useToast();
@@ -169,19 +168,6 @@ export const useExpenses = () => {
     };
   }, [monthlyTotals, period]);
 
-  const handleCreateExpense = async (expenseData: any) => {
-    try {
-      await createExpense(expenseData);
-      showToast('Egreso creado exitosamente');
-      setShowExpenseForm(false);
-      notifyDataChanged('expense-created'); // reloads this page + /dashboard KPIs
-    } catch (error) {
-      console.error('[useExpenses] handleCreateExpense failed:', error);
-      showToast('Error al crear el egreso', 'danger');
-      throw error;
-    }
-  };
-
   return {
     loading,
     suppliers,
@@ -220,9 +206,6 @@ export const useExpenses = () => {
     openExpenseDetail: setSelectedExpense,
     closeExpenseDetail: () => setSelectedExpense(null),
 
-    showExpenseForm,
-    setShowExpenseForm,
-    handleCreateExpense,
     toastProps,
 
     monthlyTotal,

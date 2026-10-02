@@ -6,13 +6,13 @@ import {
   IonContent,
   IonButtons,
   IonToast,
-  IonAlert,
   IonButton,
   IonIcon,
   IonLoading,
   IonLabel,
   IonChip,
   IonInput,
+  IonSpinner,
   useIonViewWillEnter,
 } from '@ionic/react';
 import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
@@ -30,7 +30,7 @@ import { getAllCommissionTerminals, CommissionTerminal } from '../../api/commiss
 import { activeCardTerminal, terminalCommission } from '../../utils/incomeMoney';
 import { useIncome } from '../../contexts/IncomeContext';
 import { Client } from '../../api/clientsApi';
-import { posRewardsApi, PosRewardBalance } from '../../api/posRewardsApi';
+import { posRewardsApi, PosRewardBalance, PosRewardCatalogItem, PosRewardProductCount } from '../../api/posRewardsApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
 
 import '../../styles/dashboard.css';
@@ -57,7 +57,16 @@ const CartPage: React.FC = () => {
 
   const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta' | 'Transferir' | ''>('');
   const [cashPaid, setCashPaid] = useState<string>('');
-  const [showAlert, setShowAlert] = useState(false);
+
+  // Split payment (e.g. 60% Efectivo + 40% Tarjeta on one ticket). Separate
+  // UI mode from the single-method selector above -- toggling it on hides
+  // that selector and shows one amount input per method instead. KNOWN GAP:
+  // a split sale's Tarjeta portion doesn't get a terminal-commission journal
+  // entry yet (see modules/incomePayments.py's docstring) -- v1 scope.
+  const [splitPaymentEnabled, setSplitPaymentEnabled] = useState(false);
+  const [splitAmounts, setSplitAmounts] = useState<Record<'Efectivo' | 'Tarjeta' | 'Transferir', string>>({
+    Efectivo: '', Tarjeta: '', Transferir: '',
+  });
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastColor, setToastColor] = useState<'success' | 'danger' | 'warning'>('danger');
@@ -83,6 +92,17 @@ const CartPage: React.FC = () => {
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
   const [newPointsBalance, setNewPointsBalance] = useState<number | null>(null);
 
+  // Rewards redemption (free_product "stamp card" rewards, e.g. "compra 3,
+  // el 4to gratis") -- lets the cashier actually apply a reward the client
+  // sees on their own Rewards Dashboard/kiosk, instead of only showing a
+  // points badge with no way to use it.
+  const [rewardsCatalog, setRewardsCatalog] = useState<PosRewardCatalogItem[]>([]);
+  const [productCounts, setProductCounts] = useState<PosRewardProductCount[]>([]);
+  const [appliedRedemptions, setAppliedRedemptions] = useState<
+    Array<{ catalogItemId: number; productId: number; redemptionId: number }>
+  >([]);
+  const [applyingCatalogItemId, setApplyingCatalogItemId] = useState<number | null>(null);
+
   // Welcome coupon: every client gets one 2x1 on their first purchase.
   // "First purchase" = zero lifetime POS-reward points earned so far — no
   // new backend table needed, it reuses the ledger that's already updated
@@ -101,6 +121,12 @@ const CartPage: React.FC = () => {
 
   const promoActive = welcomeCouponApplied && welcomeCouponEligible;
 
+  const freeUnitsByProduct = useMemo(() => {
+    const map = new Map<number, number>();
+    appliedRedemptions.forEach(r => map.set(r.productId, (map.get(r.productId) ?? 0) + 1));
+    return map;
+  }, [appliedRedemptions]);
+
   // Compute totals with promotion preview
   const totals = useMemo(() => {
     // Guard: if no cart items, return zeros
@@ -114,43 +140,54 @@ const CartPage: React.FC = () => {
       // item.price is already the line total (price * quantity)
       const lineTotal = Number(item.price) || 0;
       const qty = Number(item.quantity) || 1;
-      
+
       subtotal += lineTotal;
-      
-      if (!promoActive) {
-        return { ...item, payQty: qty, promoLineTotal: lineTotal, discount: 0 };
+
+      const payQtyPromo = promoActive ? payQty2x1(qty) : qty;
+      const freeUnits = freeUnitsByProduct.get(Number(item.productId)) ?? 0;
+      const payQty = Math.max(0, payQtyPromo - freeUnits);
+
+      if (payQty === qty) {
+        // Nothing discounted on this line -- skip the divide/round round-trip
+        // so an undiscounted price never drifts by a rounding cent.
+        totalPromo += lineTotal;
+        return { ...item, payQty, promoLineTotal: lineTotal, discount: 0 };
       }
-      
-      const payQty = payQty2x1(qty);
-      const promoLineTotal = qty > 0 
-        ? Math.round((lineTotal * (payQty / qty)) * 100) / 100 
+
+      const promoLineTotal = qty > 0
+        ? Math.round((lineTotal * (payQty / qty)) * 100) / 100
         : lineTotal;
       const discount = Math.round((lineTotal - promoLineTotal) * 100) / 100;
-      
+
       totalPromo += promoLineTotal;
-      
+
       return { ...item, payQty, promoLineTotal, discount };
     });
 
     const discount = Math.round((subtotal - totalPromo) * 100) / 100;
-    const finalTotal = promoActive ? totalPromo : subtotal;
 
-    return { 
-      lines, 
-      subtotal: Math.round(subtotal * 100) / 100, 
-      total: Math.round(finalTotal * 100) / 100, 
+    return {
+      lines,
+      subtotal: Math.round(subtotal * 100) / 100,
+      total: Math.round(totalPromo * 100) / 100,
       discount: Math.round(discount * 100) / 100
     };
-  }, [cartItems, promoActive]);
+  }, [cartItems, promoActive, freeUnitsByProduct]);
 
   // Calculate total (use promo-adjusted total)
   const total = totals.total;
   const cashNumber = parseFloat(cashPaid);
 
-  const isCheckoutEnabled =
-    !!paymentMethod &&
-    (paymentMethod !== 'Efectivo' ||
-      (!isNaN(cashNumber) && cashNumber >= total));
+  const splitTotal = (['Efectivo', 'Tarjeta', 'Transferir'] as const)
+    .reduce((sum, m) => sum + (parseFloat(splitAmounts[m]) || 0), 0);
+  const splitRemaining = Math.round((total - splitTotal) * 100) / 100;
+  const splitComplete = splitTotal > 0 && Math.abs(splitRemaining) < 0.01;
+
+  const isCheckoutEnabled = splitPaymentEnabled
+    ? splitComplete
+    : !!paymentMethod &&
+      (paymentMethod !== 'Efectivo' ||
+        (!isNaN(cashNumber) && cashNumber >= total));
 
   const isCheckoutEnabledFinal = isCheckoutEnabled;
 
@@ -180,6 +217,83 @@ const CartPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [selectedClient?.clientId]);
 
+  // A reward applied for one customer must never carry over to the next.
+  useEffect(() => {
+    setAppliedRedemptions([]);
+    if (!selectedClient?.clientId) {
+      setRewardsCatalog([]);
+      setProductCounts([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      posRewardsApi.listCatalog(companyId, true),
+      posRewardsApi.getProductCounts(companyId, selectedClient.clientId),
+    ])
+      .then(([catalog, counts]) => {
+        if (cancelled) return;
+        setRewardsCatalog(catalog);
+        setProductCounts(counts);
+      })
+      .catch(err => console.error('[CartPage] Failed to load rewards catalog', err));
+    return () => { cancelled = true; };
+  }, [selectedClient?.clientId, companyId]);
+
+  const cartProductIds = useMemo(
+    () => new Set(cartItems.map(item => Number(item.productId))),
+    [cartItems]
+  );
+
+  // Only show rewards the client can actually use on THIS order (the free
+  // product is in the cart) and has enough purchase history for (server-
+  // computed unitsAvailable, already net of previously-applied redemptions).
+  const eligibleRewards = useMemo(() => {
+    return rewardsCatalog.filter(item => {
+      if (item.rewardType !== 'free_product' || item.freeProductId == null) return false;
+      if (!cartProductIds.has(item.freeProductId)) return false;
+      const available = productCounts.find(p => p.productId === item.freeProductId)?.unitsAvailable ?? 0;
+      return available >= item.requiredPoints;
+    });
+  }, [rewardsCatalog, productCounts, cartProductIds]);
+
+  // One reward redemption per sale -- once any has been applied this cart
+  // session, every other "Aplicar" button is disabled, not just the one
+  // already used.
+  const hasAppliedReward = appliedRedemptions.length > 0;
+
+  const handleApplyReward = async (item: PosRewardCatalogItem) => {
+    if (!selectedClient?.clientId || !item.catalogItemId || item.freeProductId == null) return;
+    if (hasAppliedReward) return;
+    setApplyingCatalogItemId(item.catalogItemId);
+    try {
+      const result = await posRewardsApi.redeem(companyId, selectedClient.clientId, item.catalogItemId, userId);
+      if ('status' in result && result.status === 'applied') {
+        setAppliedRedemptions(prev => [
+          ...prev,
+          { catalogItemId: item.catalogItemId!, productId: item.freeProductId!, redemptionId: result.redemptionId },
+        ]);
+        showErrorToast(`Recompensa aplicada: ${item.name}`, 'success');
+        // Refresh so eligibility/badges reflect the unit this redemption just consumed.
+        const [bal, counts] = await Promise.all([
+          posRewardsApi.getBalance(companyId, selectedClient.clientId),
+          posRewardsApi.getProductCounts(companyId, selectedClient.clientId),
+        ]);
+        setClientBalance(bal);
+        setProductCounts(counts);
+      } else if ('error' in result && result.error === 'insufficient_product_units') {
+        showErrorToast(`Compras insuficientes de este producto (${result.purchased}/${result.required}).`);
+      } else if ('error' in result && result.error === 'insufficient_points') {
+        showErrorToast(`Puntos insuficientes (saldo: ${result.balance}).`);
+      } else {
+        showErrorToast('No se pudo aplicar la recompensa.');
+      }
+    } catch (err) {
+      showErrorToast(err instanceof Error ? err.message : 'No se pudo aplicar la recompensa.');
+    } finally {
+      setApplyingCatalogItemId(null);
+    }
+  };
+
   const showErrorToast = (message: string, color: 'success' | 'danger' | 'warning' = 'danger') => {
     setToastMessage(message);
     setToastColor(color);
@@ -195,8 +309,17 @@ const CartPage: React.FC = () => {
   };
 
   const handleCheckout = async () => {
-    if (!paymentMethod) {
-      setShowAlert(true);
+    if (splitPaymentEnabled) {
+      if (!splitComplete) {
+        showErrorToast(
+          splitRemaining > 0
+            ? `Falta ${formatPrice(splitRemaining)} por asignar.`
+            : `Asignaste ${formatPrice(-splitRemaining)} de más.`
+        );
+        return;
+      }
+    } else if (!paymentMethod) {
+      showErrorToast('Debe seleccionar un método de pago.');
       return;
     }
 
@@ -204,7 +327,7 @@ const CartPage: React.FC = () => {
     setNewPointsBalance(null);
 
 
-    if (paymentMethod === 'Efectivo') {
+    if (!splitPaymentEnabled && paymentMethod === 'Efectivo') {
       const cash = parseFloat(cashPaid);
       if (isNaN(cash) || cash < total) {
         showErrorToast('El efectivo pagado debe ser igual o mayor al total.');
@@ -213,6 +336,13 @@ const CartPage: React.FC = () => {
     }
 
     setLoading(true);
+
+    const effectivePaymentMethod = splitPaymentEnabled ? 'Dividido' : paymentMethod;
+    const splitPaymentLines = splitPaymentEnabled
+      ? (['Efectivo', 'Tarjeta', 'Transferir'] as const)
+          .filter(m => (parseFloat(splitAmounts[m]) || 0) > 0)
+          .map(m => ({ method: m.toLowerCase(), amount: parseFloat(splitAmounts[m]) }))
+      : undefined;
 
     const orderData = {
       orders: cartItems.map((item) => {
@@ -228,7 +358,7 @@ const CartPage: React.FC = () => {
         return {
           productId: item.productId,
           quantity: item.quantity,
-          paymentMethod: paymentMethod,
+          paymentMethod: effectivePaymentMethod,
           orderNumber: Math.floor(Math.random() * 10000),
           tableNumber: 5,
           userId,
@@ -289,8 +419,11 @@ const CartPage: React.FC = () => {
 
           // Card sales record which terminal charged them so accounting can
           // apply its commission. Never block the sale if the catalog is down.
+          // Split sales skip this entirely (v1 known gap -- see
+          // modules/incomePayments.py): a split's Tarjeta portion doesn't
+          // get a commission journal entry yet.
           let commissionTerminalId: number | null = null;
-          if (paymentMethod === 'Tarjeta') {
+          if (!splitPaymentEnabled && paymentMethod === 'Tarjeta') {
             try {
               const terminal = cardTerminal ?? activeCardTerminal(await getAllCommissionTerminals());
               commissionTerminalId = terminal?.commissionTerminalId ?? null;
@@ -305,9 +438,12 @@ const CartPage: React.FC = () => {
               {
                 action: 1,
                 total: total,
-                paymentMethod: paymentMethod.toLowerCase(),
-                cashPaid: paymentMethod === 'Efectivo' ? cashNumber : 0,
-                cashReturn: paymentMethod === 'Efectivo' ? changeAmount : 0,
+                paymentMethod: effectivePaymentMethod.toLowerCase(),
+                cashPaid: splitPaymentEnabled
+                  ? (parseFloat(splitAmounts.Efectivo) || 0)
+                  : (paymentMethod === 'Efectivo' ? cashNumber : 0),
+                cashReturn: splitPaymentEnabled ? 0 : (paymentMethod === 'Efectivo' ? changeAmount : 0),
+                ...(splitPaymentLines && { payments: splitPaymentLines }),
                 paymentDate: new Date().toISOString(),
                 userId,
                 clientId: selectedClient?.clientId ?? 1,
@@ -375,6 +511,9 @@ const CartPage: React.FC = () => {
         clearCart();
         clearAllProducts();
         setWelcomeCouponApplied(false);
+        setAppliedRedemptions([]);
+        setSplitPaymentEnabled(false);
+        setSplitAmounts({ Efectivo: '', Tarjeta: '', Transferir: '' });
         setShowSuccessToast(true);
       } else {
         showErrorToast('Ocurrió un error al procesar el pedido.');
@@ -395,6 +534,25 @@ const CartPage: React.FC = () => {
     if (method !== 'Efectivo') {
       setCashPaid('');
     }
+  };
+
+  const toggleSplitPayment = () => {
+    setSplitPaymentEnabled(prev => {
+      const next = !prev;
+      if (next) {
+        // Switching into split mode -- the single-method selection no
+        // longer applies.
+        setPaymentMethod('');
+        setCashPaid('');
+      } else {
+        setSplitAmounts({ Efectivo: '', Tarjeta: '', Transferir: '' });
+      }
+      return next;
+    });
+  };
+
+  const handleSplitAmountChange = (method: 'Efectivo' | 'Tarjeta' | 'Transferir', value: string) => {
+    setSplitAmounts(prev => ({ ...prev, [method]: value }));
   };
 
   return (
@@ -444,19 +602,32 @@ const CartPage: React.FC = () => {
               <>
                 {/* Cart Items List */}
                 <div className="cart-items-list">
-                  {cartItems.map((item) => (
-                    <CartItemCard
-                      key={item.id}
-                      id={item.id}
-                      name={item.name}
-                      quantity={item.quantity}
-                      unitPrice={item.price / item.quantity}
-                      totalPrice={item.price}
-                      selectedOptionLabels={item.selectedOptionLabels}
-                      pieces={item.pieces}
-                      onRemove={removeFromCart}
-                    />
-                  ))}
+                  {totals.lines.map((item) => {
+                    const discountAmount = item.discount ?? 0;
+                    const rewardNames = appliedRedemptions
+                      .filter(r => r.productId === Number(item.productId))
+                      .map(r => rewardsCatalog.find(c => c.catalogItemId === r.catalogItemId)?.name)
+                      .filter((n): n is string => !!n);
+                    const discountLabel = rewardNames.length > 0
+                      ? Array.from(new Set(rewardNames)).join(', ')
+                      : (discountAmount > 0 ? 'Cupón de bienvenida 2x1' : undefined);
+                    return (
+                      <CartItemCard
+                        key={item.id}
+                        id={item.id}
+                        name={item.name}
+                        quantity={item.quantity}
+                        unitPrice={item.price / item.quantity}
+                        totalPrice={item.promoLineTotal}
+                        originalPrice={item.price}
+                        discountAmount={discountAmount}
+                        discountLabel={discountLabel}
+                        selectedOptionLabels={item.selectedOptionLabels}
+                        pieces={item.pieces}
+                        onRemove={removeFromCart}
+                      />
+                    );
+                  })}
                 </div>
 
                 {/* Detail Footer */}
@@ -552,6 +723,35 @@ const CartPage: React.FC = () => {
                     </div>
                   )}
 
+                  {eligibleRewards.length > 0 && (
+                    <div className="rewards-available-section">
+                      <div className="rewards-available-label">Recompensas disponibles</div>
+                      {eligibleRewards.map(item => {
+                        const already = appliedRedemptions.some(r => r.catalogItemId === item.catalogItemId);
+                        const applying = applyingCatalogItemId === item.catalogItemId;
+                        return (
+                          <div key={item.catalogItemId} className="reward-available-row">
+                            <div className="reward-available-info">
+                              <IonIcon icon={giftOutline} color="success" />
+                              <IonLabel>{item.name}</IonLabel>
+                            </div>
+                            <IonButton
+                              size="small"
+                              color="success"
+                              disabled={already || applying || (hasAppliedReward && !already)}
+                              onClick={() => handleApplyReward(item)}
+                            >
+                              {applying ? <IonSpinner name="dots" /> : already ? 'Aplicada' : 'Aplicar'}
+                            </IonButton>
+                          </div>
+                        );
+                      })}
+                      {hasAppliedReward && (
+                        <div className="rewards-limit-hint">Solo se puede aplicar una recompensa por venta.</div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="client-actions-row">
                     <IonButton
                       fill="outline"
@@ -574,37 +774,87 @@ const CartPage: React.FC = () => {
 
                 {/* Payment Method */}
                 <div className="cart-payment-section">
-                  <div className="cart-payment-label">Método de pago</div>
-                  <div className="payment-method-selector">
+                  <div className="cart-payment-label-row">
+                    <div className="cart-payment-label">Método de pago</div>
                     <IonButton
-                      fill="outline"
-                      className={`payment-method-btn ${paymentMethod === 'Efectivo' ? 'selected' : ''}`}
-                      onClick={() => handlePaymentMethodSelect('Efectivo')}
+                      fill="clear"
+                      size="small"
+                      className={`split-payment-toggle ${splitPaymentEnabled ? 'active' : ''}`}
+                      onClick={toggleSplitPayment}
                     >
-                      <IonIcon icon={wallet} slot="start" className="icon" />
-                      Efectivo
-                    </IonButton>
-                    <IonButton
-                      fill="outline"
-                      className={`payment-method-btn ${paymentMethod === 'Tarjeta' ? 'selected' : ''}`}
-                      onClick={() => handlePaymentMethodSelect('Tarjeta')}
-                    >
-                      <IonIcon icon={card} slot="start" className="icon" />
-                      Tarjeta
-                    </IonButton>
-                    <IonButton
-                      fill="outline"
-                      className={`payment-method-btn ${paymentMethod === 'Transferir' ? 'selected' : ''}`}
-                      onClick={() => handlePaymentMethodSelect('Transferir')}
-                    >
-                      <IonIcon icon={business} slot="start" className="icon" />
-                      Transferir
+                      {splitPaymentEnabled ? 'Un solo método' : 'Pago dividido'}
                     </IonButton>
                   </div>
+
+                  {!splitPaymentEnabled ? (
+                    <div className="payment-method-selector">
+                      <IonButton
+                        fill="outline"
+                        className={`payment-method-btn ${paymentMethod === 'Efectivo' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('Efectivo')}
+                      >
+                        <IonIcon icon={wallet} slot="start" className="icon" />
+                        Efectivo
+                      </IonButton>
+                      <IonButton
+                        fill="outline"
+                        className={`payment-method-btn ${paymentMethod === 'Tarjeta' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('Tarjeta')}
+                      >
+                        <IonIcon icon={card} slot="start" className="icon" />
+                        Tarjeta
+                      </IonButton>
+                      <IonButton
+                        fill="outline"
+                        className={`payment-method-btn ${paymentMethod === 'Transferir' ? 'selected' : ''}`}
+                        onClick={() => handlePaymentMethodSelect('Transferir')}
+                      >
+                        <IonIcon icon={business} slot="start" className="icon" />
+                        Transferir
+                      </IonButton>
+                    </div>
+                  ) : (
+                    <div className="split-payment-section">
+                      {([
+                        { key: 'Efectivo' as const, icon: wallet },
+                        { key: 'Tarjeta' as const, icon: card },
+                        { key: 'Transferir' as const, icon: business },
+                      ]).map(({ key, icon }) => (
+                        <div key={key} className="split-payment-row">
+                          <IonIcon icon={icon} className="split-payment-icon" />
+                          <IonLabel className="split-payment-method-label">{key}</IonLabel>
+                          <div className="split-payment-input-wrapper">
+                            <span className="currency-symbol">$</span>
+                            <IonInput
+                              type="number"
+                              inputmode="decimal"
+                              fill="outline"
+                              value={splitAmounts[key]}
+                              onIonInput={(e) => handleSplitAmountChange(key, e.detail.value ?? '')}
+                              placeholder="0.00"
+                              min={0}
+                              step="0.01"
+                              className="split-payment-input"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <div className={`split-payment-summary ${splitComplete ? 'complete' : ''}`}>
+                        <span>Asignado: {formatPrice(splitTotal)} / {formatPrice(total)}</span>
+                        {!splitComplete && (
+                          <span className="split-payment-remaining">
+                            {splitRemaining > 0
+                              ? `Falta ${formatPrice(splitRemaining)}`
+                              : `Sobran ${formatPrice(-splitRemaining)}`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Card-terminal commission (absorbed by the business, not charged to the client) */}
-                {paymentMethod === 'Tarjeta' && cardTerminal && total > 0 && (
+                {!splitPaymentEnabled && paymentMethod === 'Tarjeta' && cardTerminal && total > 0 && (
                   <div className="terminal-commission">
                     <div className="terminal-commission-row">
                       <span>Comisión terminal ({Number(cardTerminal.commissionRatePct)}%)</span>
@@ -620,7 +870,7 @@ const CartPage: React.FC = () => {
                 )}
 
                 {/* Cash Input */}
-                {paymentMethod === 'Efectivo' && (
+                {!splitPaymentEnabled && paymentMethod === 'Efectivo' && (
                   <div className="cash-input-section">
                     <div className="cash-input-wrapper">
                       <span className="currency-symbol">$</span>
@@ -672,14 +922,6 @@ const CartPage: React.FC = () => {
           color={toastColor}
           position="bottom"
           buttons={[{ text: 'OK', role: 'cancel' }]}
-        />
-
-        <IonAlert
-          isOpen={showAlert}
-          onDidDismiss={() => setShowAlert(false)}
-          header="Validación"
-          message="Debe seleccionar un método de pago."
-          buttons={['OK']}
         />
 
         <IonToast
