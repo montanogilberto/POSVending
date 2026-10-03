@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBadge, IonMenuButton } from '@ionic/react';
 import ConfirmBackButton from '../ui/ConfirmBackButton';
+import TokenBalanceChip from './TokenBalanceChip';
 import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline } from 'ionicons/icons';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
@@ -109,6 +110,8 @@ const Header: React.FC<HeaderProps> = ({
           {IS_DEV_BUILD && <IonBadge color="warning" className="header-env-badge">{APP_ENV.toUpperCase()}</IonBadge>}
         </IonTitle>
         <IonButtons slot="end">
+          {/* Company AI-token balance — POS experience only (hidden until the balance is known). */}
+          {!isSmartLoansRole && <TokenBalanceChip />}
           {/* Cart is the cashier's checkout — only roles with POS access. */}
           {!isSmartLoansRole && canAccess(roleCode, 'pos') && (
             <IonButton onClick={handleCartClick} title="Cart" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>

@@ -160,6 +160,17 @@
   margin: 0 0 20px;
 }
 
+/* "Agente de egresos": secondary action under Nuevo Egreso (the container's gap spaces it) */
+.expenses-agent-button {
+  --border-radius: 12px !important;
+  --border-color: #0056D2;
+  --color: #0056D2;
+  font-weight: 700;
+  text-transform: none;
+  min-height: 50px;
+  margin: -4px 0 20px;
+}
+
 /* ==========================================================================
    OVERVIEW — Actividad Reciente (same card as /dashboard)
    ========================================================================== */

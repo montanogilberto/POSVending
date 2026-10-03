@@ -15,6 +15,18 @@ export const fmtNum = (n: number) =>
 /** 1,234 — número sin decimales forzados (puntos, conteos). */
 export const fmtInt = (n: number) => n.toLocaleString('es-MX');
 
+/** 842 · 48.2K · 1.24M — tokens en forma compacta para espacios chicos (header). */
+export const fmtTokens = (n: number): string => {
+  const sign = n < 0 ? '-' : '';
+  const v = Math.abs(Math.round(n));
+  if (v < 1_000) return `${sign}${v}`;
+  if (v < 1_000_000) {
+    const k = v / 1_000;
+    return `${sign}${k >= 100 ? Math.round(k) : (Math.round(k * 10) / 10).toString()}K`;
+  }
+  return `${sign}${(Math.round((v / 1_000_000) * 100) / 100).toString()}M`;
+};
+
 /** Los timestamps del backend llegan sin zona: interpretarlos como UTC. */
 const asUtc = (s: string) =>
   new Date(s.includes('Z') || s.includes('+') ? s : `${s}Z`);

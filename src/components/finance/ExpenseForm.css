@@ -187,6 +187,27 @@
   letter-spacing: -0.02em;
 }
 
+.expense-form-missing-hint {
+  max-width: 720px;
+  margin: 6px auto 0;
+  padding: 0 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #B45309;
+}
+
+@media (min-width: 992px) {
+  .expense-form-missing-hint {
+    max-width: 840px;
+    padding: 0 32px;
+  }
+}
+
+.expense-form-card--invalid {
+  box-shadow: 0 0 0 2px #DC2626;
+}
+
 .expense-form-submit {
   --border-radius: 14px !important;
   --background: #0056D2 !important;
@@ -206,4 +227,38 @@
 
 .expense-form-submit ion-spinner {
   color: #ffffff;
+}
+
+.expense-required {
+  color: #DC2626;
+  font-weight: 700;
+}
+
+.expense-agent-card {
+  border: 1px solid #BFDBFE;
+  background: #EFF6FF;
+}
+
+.expense-agent-copy {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  font-family: 'Inter', sans-serif;
+  color: #1A202C;
+}
+
+.expense-agent-copy ion-icon {
+  flex: none;
+  font-size: 1.6rem;
+  color: #0056D2;
+}
+
+.expense-agent-copy strong { font-size: 1rem; }
+
+.expense-agent-copy p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: #4A5568;
+  line-height: 1.4;
 }

@@ -62,6 +62,11 @@ function ExpenseMovementList<T extends ExpenseMovement>({ expenses, onOpen }: Ex
             {rows.map(expense => {
               const type = expense.expenseType ?? 'inventory';
               const typeLabel = EXPENSE_TYPE[type]?.label ?? 'Egreso';
+              // A service bill's identity IS the service (Renta, CFE, Internet) —
+              // "General" says nothing. Fall back to the type label until the
+              // service name resolves.
+              const hasService = type === 'general' && expense.supplierName && expense.supplierName !== '—';
+              const title = hasService ? expense.supplierName : typeLabel;
               return (
                 <IonItem
                   key={expense.expenseId}
@@ -74,8 +79,10 @@ function ExpenseMovementList<T extends ExpenseMovement>({ expenses, onOpen }: Ex
                     <IonIcon icon={TYPE_ICON[type] ?? receiptOutline} />
                   </div>
                   <IonLabel>
-                    <div className="imv-amount">{typeLabel} — {fmtMXN(Number(expense.total) || 0)}</div>
-                    <div className="imv-meta emv-meta">{expense.supplierName} · {expense.paymentMethod}</div>
+                    <div className="imv-amount">{title} — {fmtMXN(Number(expense.total) || 0)}</div>
+                    <div className="imv-meta emv-meta">
+                      {hasService ? `${typeLabel} · ` : `${expense.supplierName} · `}{expense.paymentMethod}
+                    </div>
                   </IonLabel>
                   <div slot="end" className="imv-ticket">
                     <IonIcon icon={eyeOutline} />
