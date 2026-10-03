@@ -108,6 +108,7 @@ import IncomesPage from './pages/finance/IncomesPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
 import NewExpensePage from './pages/finance/NewExpensePage';
 import ExpensesDetailPage from './pages/finance/ExpensesDetailPage';
+import OperationReviewPage from './pages/finance/OperationReviewPage';
 import AccountingPage from './pages/finance/AccountingPage';
 import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
@@ -951,6 +952,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/ingresos" feature="ingresos" component={IncomesPage} />
             <PrivateRoute exact path="/egresos" feature="egresos" component={ExpensesPage} />
             <PrivateRoute exact path="/egresos/nuevo" feature="egresos" component={NewExpensePage} />
+            <PrivateRoute exact path="/egresos/resumen" feature="egresos" component={OperationReviewPage} />
             <PrivateRoute exact path="/egresos/detalle" feature="egresos" component={ExpensesDetailPage} />
             <PrivateRoute exact path="/accounting" feature="accounting" component={AccountingPage} />
             <PrivateRoute exact path="/water-tanks" feature="iot" component={WaterTanksPage} />

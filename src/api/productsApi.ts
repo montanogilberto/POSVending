@@ -110,6 +110,7 @@ export interface CreateProductRequest {
     productOptions?: ProductOptionPayload[];
     // Backward-compatible fields for existing API behavior
     productFormId?: number;
+    isSupply?: boolean;
   }>;
 }
 
@@ -423,4 +424,48 @@ export const deleteProduct = async (data: DeleteProductRequest): Promise<DeleteP
   }
 
   throw lastError ?? new Error('Failed to delete product');
+};
+
+/**
+ * Every product of the company, supplies included. getProductsByCompany
+ * (the POS list) only returns sellable products — those with options — so a
+ * purchase needs this one instead.
+ */
+export const getCompanyProducts = async (companyId: number): Promise<Product[]> => {
+  const all = await getAllProducts();
+  return all.filter((p) => Number(p?.companyId) === Number(companyId));
+};
+
+/**
+ * Creates a supply product (isSupply=true) straight from the expense form.
+ * Created WITHOUT options/price on purpose: sp_products_by_company only lists
+ * products that have options, so it never shows up in the POS sales menu.
+ * sp_products_save returns the new productId in result[0].value.
+ */
+export const createSupplyProduct = async (params: {
+  companyId: number;
+  categoryId: number;
+  name: string;
+  code?: string;
+}): Promise<number> => {
+  const res = await createOrUpdateProduct({
+    products: [{
+      action: 1,
+      productId: null,
+      companyId: params.companyId,
+      categoryId: params.categoryId,
+      name: params.name,
+      barCode: '',
+      code: params.code ?? '',
+      dateOfExpire: null,
+      manufactureId: null,
+      description: '',
+      isSupply: true,
+    }],
+  });
+  const productId = Number(res.result?.[0]?.value);
+  if (!Number.isFinite(productId) || productId <= 0) {
+    throw new Error('El producto se creó pero no se recibió su id; recarga la lista.');
+  }
+  return productId;
 };
