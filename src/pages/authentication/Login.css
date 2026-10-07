@@ -208,11 +208,11 @@
 
 /* ── Submit button ── */
 .login-submit-btn {
-  --background: #2563EB;
-  --background-activated: #1D4ED8;
-  --background-hover: #1D4ED8;
+  --background: var(--login-accent, #2563EB);
+  --background-activated: var(--login-accent-dark, #1D4ED8);
+  --background-hover: var(--login-accent-dark, #1D4ED8);
   --border-radius: 12px;
-  --box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  --box-shadow: 0 4px 14px var(--login-accent-glow, rgba(37, 99, 235, 0.4));
   --padding-top: 14px;
   --padding-bottom: 14px;
   font-size: 15px;
@@ -336,3 +336,68 @@
   .login-brand { padding: 56px 0 36px; }
   .login-card  { padding: 36px 32px 28px; }
 }
+
+
+/* ── App picker (SmartLoans · POS · Arcade · Rewards) ── */
+.login-brand {
+  padding-bottom: 20px;
+}
+
+.login-apps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.login-app-tile {
+  --color: rgba(255, 255, 255, 0.85);
+  --background: rgba(255, 255, 255, 0.12);
+  --background-hover: rgba(255, 255, 255, 0.2);
+  --border-radius: 16px;
+  --ripple-color: transparent;
+  --padding-start: 4px;
+  --padding-end: 4px;
+  margin: 0;
+  height: auto;
+  min-height: 64px;
+  text-transform: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.login-app-tile::part(native) {
+  border: 2px solid transparent;
+}
+
+.login-app-tile-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.login-app-tile-inner ion-icon {
+  font-size: 22px;
+}
+
+.login-app-tile--active {
+  --color: #111827;
+  --background: #ffffff;
+  --background-hover: #ffffff;
+}
+
+.login-app-tile--active::part(native) {
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+/* Each app tints the page, so it is obvious where you are about to sign in. */
+.login-app--pos        { --background: linear-gradient(160deg, #1E3A8A 0%, #2563EB 50%, #3B82F6 100%); }
+.login-app--smartloans { --background: linear-gradient(160deg, #064E3B 0%, #059669 55%, #34D399 100%); }
+.login-app--arcade     { --background: linear-gradient(160deg, #3B0764 0%, #7C3AED 55%, #A78BFA 100%); }
+.login-app--rewards    { --background: linear-gradient(160deg, #7C2D12 0%, #EA580C 55%, #FB923C 100%); }
+
+.login-app--smartloans { --login-accent: #059669; --login-accent-dark: #047857; --login-accent-glow: rgba(5, 150, 105, 0.4); }
+.login-app--arcade     { --login-accent: #7C3AED; --login-accent-dark: #6D28D9; --login-accent-glow: rgba(124, 58, 237, 0.4); }
+.login-app--rewards    { --login-accent: #EA580C; --login-accent-dark: #C2410C; --login-accent-glow: rgba(234, 88, 12, 0.4); }

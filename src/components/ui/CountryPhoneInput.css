@@ -1,0 +1,26 @@
+.cpi {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* ion-select defaults to width:100%; pin it so the number field keeps the rest of the row. */
+.cpi-country {
+  flex: 0 0 116px;
+  width: 116px;
+  min-width: 116px;
+  max-width: 116px;
+  padding: 0 10px;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  background: #F9FAFB;
+  color: #111827;
+  --placeholder-color: #6B7280;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cpi-number {
+  flex: 1 1 0;
+  min-width: 0;
+}

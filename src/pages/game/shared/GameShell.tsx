@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonToast, IonSpinner, IonBadge, IonChip, IonLabel,
@@ -8,7 +8,9 @@ import { arrowBackOutline, shieldCheckmarkOutline } from 'ionicons/icons';
 import ProvablyFairSheet from '../../../components/ui/ProvablyFairSheet';
 import RoundResultModal from '../../../components/ui/RoundResultModal';
 import { fmtInt } from '../../../utils/format';
+import { useReveal } from './scenes/useReveal';
 import './ArcadeGame.css';
+import './scenes/GameScenes.css';
 
 /**
  * Marco comun de los juegos: barra superior, saldo, RTP, resultado y hoja de
@@ -25,13 +27,23 @@ interface GameShellProps {
   /** Detalle bajo el importe en el modal de resultado. */
   resultDetail?: React.ReactNode;
   onPlayAgain?: () => void;
+  /** Espera antes de abrir el modal de resultado, para que la escena termine de animarse. */
+  revealDelayMs?: number;
   children: React.ReactNode;
 }
 
 const GameShell: React.FC<GameShellProps> = ({
-  vm, title, resultDetail, onPlayAgain, children,
+  vm, title, resultDetail, onPlayAgain, revealDelayMs = 0, children,
 }) => {
   const { confirmBack } = useExitConfirm();
+  const shownResult = useReveal(vm.result, revealDelayMs);
+  // El saldo tambien se retiene: si cambiara antes de que acabe la animacion
+  // delataria el resultado.
+  const [shownBalance, setShownBalance] = useState<number>(vm.coinBalance);
+  useEffect(() => {
+    if (vm.result && !shownResult) return;
+    setShownBalance(vm.coinBalance);
+  }, [vm.coinBalance, vm.result, shownResult]);
   return (
     <IonPage>
       <IonHeader>
@@ -59,7 +71,7 @@ const GameShell: React.FC<GameShellProps> = ({
           <>
             <div className="ag-topbar">
               <IonChip outline color="warning">
-                <IonLabel>{fmtInt(vm.coinBalance)} fichas</IonLabel>
+                <IonLabel>{fmtInt(shownBalance)} fichas</IonLabel>
               </IonChip>
               {vm.game && (
                 <IonBadge color="medium">RTP {(vm.game.rtp * 100).toFixed(1)}%</IonBadge>
@@ -70,7 +82,7 @@ const GameShell: React.FC<GameShellProps> = ({
         )}
 
         <RoundResultModal
-          result={vm.result}
+          result={shownResult}
           coinBalance={vm.coinBalance}
           onPlayAgain={onPlayAgain ?? vm.reset}
           onDismiss={vm.reset}
