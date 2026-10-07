@@ -45,36 +45,10 @@ export function useReceiptPrint({
   onToast,
   onSummary
 }: UseReceiptPrintParams) {
-  const handlePrint = useCallback(async () => {
-    const summary: ReceiptPrintSummary = {
-      azureHtml: { ok: false, message: 'No ejecutado' },
-      push: { ok: false, message: 'No ejecutado' },
-      whatsapp: { ok: false, message: 'No ejecutado' },
-      sms: { ok: false, message: 'No ejecutado' },
-      print: { ok: false, message: 'No ejecutado' },
-      receiptUrl: '',
-      phone: ''
-    };
-
-    if (!receiptData) {
-      console.log('[ReceiptPrint] No receiptData, print aborted');
-      summary.azureHtml = { ok: false, message: 'Sin datos de recibo', error: 'No receiptData' };
-      summary.push = { ok: false, message: 'No ejecutado por falta de recibo' };
-      summary.whatsapp = { ok: false, message: 'No ejecutado por falta de recibo' };
-      summary.sms = { ok: false, message: 'No ejecutado por falta de recibo' };
-      summary.print = { ok: false, message: 'No ejecutado por falta de recibo' };
-      onSummary?.(summary);
-      return;
-    }
-
-    console.log('[ReceiptPrint] Print flow started');
-    console.log('[ReceiptPrint][TRACK] Goal checklist', {
-        uploadHtmlToAzure: true,
-        generateHtmlLink: true,
-        updateDatabaseTables: true,
-        physicalPrint: true
-      });
-
+  // Generates the receipt HTML, uploads it to Azure and tracks it. Idempotent:
+  // 'validate' reuses the stored URL, so it runs right after the sale (the
+  // customer's /recibo link shows the full ticket) and again on print.
+  const uploadReceipt = useCallback(async (summary: ReceiptPrintSummary) => {
     try {
       const directIncomeId = Number(ticketData?.incomeId ?? 0);
       const fallbackIncomeId = Number(ticketData?.id ?? ticketData?.income?.incomeId ?? 0);
@@ -251,6 +225,54 @@ export function useReceiptPrint({
         error: uploadError?.message || String(uploadError)
       };
       onToast('Error al guardar el HTML del recibo');
+    }
+  }, [receiptData, ticketData, onSavedUrl, onToast]);
+
+  const saveReceipt = useCallback(async () => {
+    if (!receiptData) return;
+    await uploadReceipt({
+      azureHtml: { ok: false, message: 'No ejecutado' },
+      push: { ok: false, message: 'No ejecutado' },
+      whatsapp: { ok: false, message: 'No ejecutado' },
+      sms: { ok: false, message: 'No ejecutado' },
+      print: { ok: false, message: 'No ejecutado' },
+      receiptUrl: '',
+      phone: ''
+    });
+  }, [receiptData, uploadReceipt]);
+
+  const handlePrint = useCallback(async () => {
+    const summary: ReceiptPrintSummary = {
+      azureHtml: { ok: false, message: 'No ejecutado' },
+      push: { ok: false, message: 'No ejecutado' },
+      whatsapp: { ok: false, message: 'No ejecutado' },
+      sms: { ok: false, message: 'No ejecutado' },
+      print: { ok: false, message: 'No ejecutado' },
+      receiptUrl: '',
+      phone: ''
+    };
+
+    if (!receiptData) {
+      console.log('[ReceiptPrint] No receiptData, print aborted');
+      summary.azureHtml = { ok: false, message: 'Sin datos de recibo', error: 'No receiptData' };
+      summary.push = { ok: false, message: 'No ejecutado por falta de recibo' };
+      summary.whatsapp = { ok: false, message: 'No ejecutado por falta de recibo' };
+      summary.sms = { ok: false, message: 'No ejecutado por falta de recibo' };
+      summary.print = { ok: false, message: 'No ejecutado por falta de recibo' };
+      onSummary?.(summary);
+      return;
+    }
+
+    console.log('[ReceiptPrint] Print flow started');
+    console.log('[ReceiptPrint][TRACK] Goal checklist', {
+        uploadHtmlToAzure: true,
+        generateHtmlLink: true,
+        updateDatabaseTables: true,
+        physicalPrint: true
+      });
+
+    try {
+      await uploadReceipt(summary);
     } finally {
       console.log('[ReceiptPrint][PHYSICAL_PRINT] Triggering physical print');
       try {
@@ -311,7 +333,7 @@ export function useReceiptPrint({
       onSummary?.(summary);
       console.log('[ReceiptPrint] Print flow finished', summary);
     }
-  }, [receiptData, ticketData, onSavedUrl, onToast, onSummary]);
+  }, [receiptData, ticketData, uploadReceipt, onSummary]);
 
-  return { handlePrint };
+  return { handlePrint, saveReceipt };
 }

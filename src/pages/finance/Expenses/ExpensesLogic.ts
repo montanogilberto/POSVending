@@ -3,6 +3,7 @@ import { useIonViewWillEnter } from '@ionic/react';
 import { fetchMonthlyExpenses, Expense, ExpenseMonthTotal } from '../../../api/expensesApi';
 import { getAllSuppliers, Supplier } from '../../../api/supplierApi';
 import { getAllEmployees, Employee } from '../../../api/employeesApi';
+import { getAllServices, Service } from '../../../api/serviceApi';
 import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
 import { EXPENSE_TYPE } from '../../../components/ui/statusMaps';
@@ -27,6 +28,7 @@ export const useExpenses = () => {
   const [monthlyTotals, setMonthlyTotals] = useState<ExpenseMonthTotal[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [searchText, setSearchText] = useState('');
@@ -49,11 +51,15 @@ export const useExpenses = () => {
     if (!companyId) return;
     setLoading(true);
     try {
-      const [monthly, supplierList, employeeList] = await Promise.all([
+      const [monthly, supplierList, employeeList, serviceList] = await Promise.all([
         fetchMonthlyExpenses(companyId, period),
         companyId ? getAllSuppliers(companyId) : Promise.resolve([]),
         (companyId ? getAllEmployees(companyId) : Promise.resolve([])).catch((error) => {
           console.error('[useExpenses] getAllEmployees failed:', error);
+          return [];
+        }),
+        getAllServices(companyId).catch((error) => {
+          console.error('[useExpenses] getAllServices failed:', error);
           return [];
         }),
       ]);
@@ -62,6 +68,7 @@ export const useExpenses = () => {
       setMonthlyTotals(monthly.monthlyTotals);
       setSuppliers(supplierList);
       setEmployees(employeeList);
+      setServices(serviceList);
     } catch (error) {
       console.error('[useExpenses] loadExpenses failed:', error);
       showToast('No se pudieron cargar los egresos', 'danger');
@@ -97,6 +104,12 @@ export const useExpenses = () => {
     return map;
   }, [employees]);
 
+  const serviceNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    services.forEach((s) => map.set(s.serviceId, s.serviceName));
+    return map;
+  }, [services]);
+
   // Newest first everywhere (same order as /movements and the dashboard).
   const enrichedExpenses: EnrichedExpense[] = useMemo(
     () =>
@@ -107,13 +120,16 @@ export const useExpenses = () => {
             e.expenseType === 'payroll'
               ? (e.employeeId != null ? employeeNameById.get(e.employeeId) : undefined) ??
                 (e.employeeId != null ? `Empleado ${e.employeeId}` : 'Nómina')
+              : e.expenseType === 'general'
+              ? (e.serviceId != null ? serviceNameById.get(e.serviceId) : undefined) ??
+                (e.serviceId != null ? `Servicio ${e.serviceId}` : '—')
               : (e.supplierId != null ? supplierNameById.get(e.supplierId) : undefined) ??
                 (e.supplierId != null ? `Proveedor ${e.supplierId}` : '—');
           const expenseType = e.expenseType ?? 'inventory';
-          const payeeKind = expenseType === 'payroll' ? 'Empleado' : 'Proveedor';
+          const payeeKind = expenseType === 'payroll' ? 'Empleado' : expenseType === 'general' ? 'Servicio' : 'Proveedor';
           return { ...e, expenseType, supplierName, payeeKind };
         }),
-    [allExpenses, supplierNameById, employeeNameById]
+    [allExpenses, supplierNameById, employeeNameById, serviceNameById]
   );
 
   const activeFilterCount = [filterType, filterPaymentMethod, filterSupplierId, filterDateFrom, filterDateTo].filter(Boolean).length;

@@ -1,0 +1,107 @@
+.trc-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #4A5568;
+}
+
+.trc-note {
+  margin: 0 0 8px;
+  color: #4A5568;
+  font-size: 0.9rem;
+}
+
+.trc-hint {
+  margin: 10px 0 0;
+  color: #718096;
+  font-size: 0.8rem;
+}
+
+.trc-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0 0 10px;
+  font-size: 0.92rem;
+}
+
+.trc-summary dt {
+  color: #718096;
+}
+
+.trc-summary dd {
+  margin: 0;
+  font-weight: 600;
+  color: #1A202C;
+  text-align: right;
+}
+
+.trc-choice {
+  margin: 6px 0;
+}
+
+.trc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trc-lines {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+}
+
+.trc-line {
+  border-top: 1px solid #E2E8F0;
+  padding: 8px 0;
+}
+
+.trc-line-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.trc-line-name {
+  font-weight: 600;
+  color: #1A202C;
+  line-height: 1.3;
+}
+
+.trc-line-amount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.trc-line-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: #718096;
+  font-size: 0.85rem;
+}
+
+.trc-issues {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  background: #FFFAF0;
+  border-radius: 10px;
+  color: #975A16;
+  font-size: 0.85rem;
+}
+
+.trc-issues li {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 2px 0;
+}
+
+.trc-review {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #E2E8F0;
+}

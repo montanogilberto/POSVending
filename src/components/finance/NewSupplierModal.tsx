@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonContent,
   IonInput, IonSpinner, IonToast,
@@ -12,6 +12,8 @@ import './NewSupplierModal.css';
 interface NewSupplierModalProps {
   isOpen: boolean;
   companyId: number;
+  /** Prefills the name, e.g. the merchant read off a ticket. */
+  initialName?: string;
   onClose: () => void;
   /** The created supplier (re-read from /all_suppliers) — the caller selects it. */
   onCreated: (supplier: Supplier, suppliers: Supplier[]) => void;
@@ -24,10 +26,14 @@ const EMPTY = { supplierName: '', contactName: '', phone: '', email: '' };
  * the user to /suppliers and back. Same backend as SupplierPage (sp_suppliers
  * rejects duplicate name/email/phone per company; its message is shown as-is).
  */
-const NewSupplierModal: React.FC<NewSupplierModalProps> = ({ isOpen, companyId, onClose, onCreated }) => {
+const NewSupplierModal: React.FC<NewSupplierModalProps> = ({ isOpen, companyId, initialName = '', onClose, onCreated }) => {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
+
+  useEffect(() => {
+    if (isOpen) setForm(f => ({ ...f, supplierName: initialName }));
+  }, [isOpen, initialName]);
 
   const set = (key: keyof typeof EMPTY) => (e: CustomEvent) =>
     setForm(f => ({ ...f, [key]: String(e.detail.value ?? '') }));

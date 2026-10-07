@@ -59,6 +59,8 @@ export interface Product {
   barCode: string;
   categoryId: number;
   companyId: number;
+  /** Consumable bought for the business (detergent, soap…), never sold in the POS menu. */
+  isSupply?: boolean;
   options?: ProductOption[];
   details?: ProductDetail[];
   descriptions?: ProductDescription[];

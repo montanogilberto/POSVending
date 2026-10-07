@@ -26,6 +26,7 @@ import {
   IonPage,
   IonButton,
   IonButtons,
+  IonBadge,
   useIonAlert,
   setupIonicReact,
 } from '@ionic/react';
@@ -108,6 +109,7 @@ import IncomesPage from './pages/finance/IncomesPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
 import NewExpensePage from './pages/finance/NewExpensePage';
 import ExpensesDetailPage from './pages/finance/ExpensesDetailPage';
+import OperationReviewPage from './pages/finance/OperationReviewPage';
 import AccountingPage from './pages/finance/AccountingPage';
 import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
@@ -179,6 +181,7 @@ import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess, UiFeature } from './config/rolePermissions';
+import { useNotificationAttention } from './hooks/useNotificationAttention';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
 import BiometricLockScreen from './components/BiometricLockScreen';
@@ -264,6 +267,7 @@ const AppShell: React.FC = () => {
     pos: storefrontOutline, borrower: walletOutline, lender: walletOutline,
     juridical: briefcaseOutline, factory: sparklesOutline,
   } as const;
+  const notificationAttention = useNotificationAttention(companyId, canAccess(roleCode, 'notificationDispatchLog'));
   const discover = discoverProducts(roleCode, clientCapabilities);
   const [discoverOpen, setDiscoverOpen] = useState<DiscoverProduct | null>(null);
   const switchProduct = (product: typeof availableProducts[number]) => {
@@ -649,9 +653,12 @@ const AppShell: React.FC = () => {
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'notificationDispatchLog') && (
-              <IonItem button routerLink="/notification-dispatch-log" title="Historial de Notificaciones">
+              <IonItem button routerLink="/notification-dispatch-log" title="Notificaciones">
                 <IonIcon icon={paperPlaneOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Historial de Notificaciones</IonLabel>}
+                {!menuCollapsed && <IonLabel>Notificaciones</IonLabel>}
+                {notificationAttention > 0 && (
+                  <IonBadge slot="end" color="danger" title="Mensajes fallidos o pendientes (últimos 7 días)">{notificationAttention}</IonBadge>
+                )}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -951,6 +958,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/ingresos" feature="ingresos" component={IncomesPage} />
             <PrivateRoute exact path="/egresos" feature="egresos" component={ExpensesPage} />
             <PrivateRoute exact path="/egresos/nuevo" feature="egresos" component={NewExpensePage} />
+            <PrivateRoute exact path="/egresos/resumen" feature="egresos" component={OperationReviewPage} />
             <PrivateRoute exact path="/egresos/detalle" feature="egresos" component={ExpensesDetailPage} />
             <PrivateRoute exact path="/accounting" feature="accounting" component={AccountingPage} />
             <PrivateRoute exact path="/water-tanks" feature="iot" component={WaterTanksPage} />

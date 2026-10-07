@@ -32,7 +32,11 @@ export interface Expense {
 
 export interface ExpenseProduct {
   productId: number;
-  options: {
+  /** Units bought on this line (sp_expense defaults to 1 if omitted). */
+  quantity?: number;
+  /** Purchase cost PER UNIT, in MXN. */
+  unitCost?: number;
+  options?: {
     productOptionId: number;
     choices: Array<{
       productOptionChoiceId: number;
