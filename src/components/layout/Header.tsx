@@ -92,15 +92,17 @@ const Header: React.FC<HeaderProps> = ({
     <IonHeader className="dashboard-header">
       <IonToolbar color="light">
         <IonButtons slot="start">
-          {showBackButton ? (
+          {/* The menu button stays reachable on phone widths even on pages that
+              show a back button (the split-pane menu is only permanent on wide
+              screens), otherwise those pages have no way to open the side menu. */}
+          <IonMenuButton
+            menu="main-menu"
+            autoHide={false}
+            className="only-mobile header-menu-button"
+            aria-label="Abrir menú"
+          />
+          {showBackButton && (
             <ConfirmBackButton text={backButtonText} defaultHref={backButtonHref} />
-          ) : (
-            <IonMenuButton
-              menu="main-menu"
-              autoHide={false}
-              className="only-mobile header-menu-button"
-              aria-label="Abrir menú"
-            />
           )}
         </IonButtons>
         <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>

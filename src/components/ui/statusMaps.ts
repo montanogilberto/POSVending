@@ -59,6 +59,8 @@ export const NOTIFICATION_DISPATCH_STATUS: Record<string, StatusMeta> = {
   sent:      { label: 'Enviada',    color: 'success' },
   confirmed: { label: 'Confirmada', color: 'primary' },
   failed:    { label: 'Fallida',    color: 'danger'  },
+  // Derived on the client (notificationStats.deliveryState): accepted by the provider, delivery never confirmed.
+  unconfirmed: { label: 'Sin confirmar', color: 'warning' },
 };
 
 /** Canal de envío (notificationDispatches.selectedChannel) — verde=gratis, ambar=medio, rojo=caro. */

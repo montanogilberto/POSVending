@@ -238,7 +238,7 @@ const unifiedReceiptData = React.useMemo(() => {
     return result;
   }, [repairedTicketData, paymentMethod, cashPaid, changeAmount, promotionCode, discountAmount]);
 
-  const { handlePrint } = useReceiptPrint({
+  const { handlePrint, saveReceipt } = useReceiptPrint({
     receiptData: unifiedReceiptData,
     ticketData: repairedTicketData,
     onSavedUrl: (url) => console.log('[ReceiptDisplay] receipt HTML saved at:', url),
@@ -253,6 +253,17 @@ const unifiedReceiptData = React.useMemo(() => {
       console.log('[ReceiptDisplay] print summary:', summary);
     }
   });
+
+  // Upload the ticket as soon as the sale is shown, not only on print: the
+  // WhatsApp sent at sale time links to it (/recibo), and without the upload
+  // the customer only sees a summary page.
+  const savedIncomeRef = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    const incomeId = Number(repairedTicketData?.incomeId ?? repairedTicketData?.id ?? 0);
+    if (!unifiedReceiptData || incomeId <= 0 || savedIncomeRef.current === incomeId) return;
+    savedIncomeRef.current = incomeId;
+    saveReceipt();
+  }, [unifiedReceiptData, repairedTicketData, saveReceipt]);
 
   const handleClose = async () => {
     if (closing) return; // ✅ prevent double click

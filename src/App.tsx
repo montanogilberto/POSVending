@@ -26,6 +26,7 @@ import {
   IonPage,
   IonButton,
   IonButtons,
+  IonBadge,
   useIonAlert,
   setupIonicReact,
 } from '@ionic/react';
@@ -180,6 +181,7 @@ import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess, UiFeature } from './config/rolePermissions';
+import { useNotificationAttention } from './hooks/useNotificationAttention';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
 import BiometricLockScreen from './components/BiometricLockScreen';
@@ -265,6 +267,7 @@ const AppShell: React.FC = () => {
     pos: storefrontOutline, borrower: walletOutline, lender: walletOutline,
     juridical: briefcaseOutline, factory: sparklesOutline,
   } as const;
+  const notificationAttention = useNotificationAttention(companyId, canAccess(roleCode, 'notificationDispatchLog'));
   const discover = discoverProducts(roleCode, clientCapabilities);
   const [discoverOpen, setDiscoverOpen] = useState<DiscoverProduct | null>(null);
   const switchProduct = (product: typeof availableProducts[number]) => {
@@ -650,9 +653,12 @@ const AppShell: React.FC = () => {
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'notificationDispatchLog') && (
-              <IonItem button routerLink="/notification-dispatch-log" title="Historial de Notificaciones">
+              <IonItem button routerLink="/notification-dispatch-log" title="Notificaciones">
                 <IonIcon icon={paperPlaneOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Historial de Notificaciones</IonLabel>}
+                {!menuCollapsed && <IonLabel>Notificaciones</IonLabel>}
+                {notificationAttention > 0 && (
+                  <IonBadge slot="end" color="danger" title="Mensajes fallidos o pendientes (últimos 7 días)">{notificationAttention}</IonBadge>
+                )}
               </IonItem>
               )}
             </IonMenuToggle>

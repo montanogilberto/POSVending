@@ -107,3 +107,37 @@ export async function getOneNotificationDispatch(
   const data = await res.json();
   return data.notificationDispatches?.[0] ?? null;
 }
+
+/** What the PROVIDER (Twilio) reports for this month — see backend modules/notificationUsage.py. */
+export interface NotificationUsage {
+  ok: true;
+  source: 'twilio';
+  period: 'this_month';
+  whatsapp: {
+    outboundMessages: number;
+    inboundMessages: number;
+    conversations: number;
+    freeConversations: number;
+    billableConversations: number;
+    price: number;
+    priceUnit: string;
+    /** null when the owner has not configured the free allowance on the backend. */
+    limit: number | null;
+    remaining: number | null;
+  };
+  sms: { outboundMessages: number };
+}
+
+// GET /notifications/usage. null when the provider can't be reached: the screen then
+// falls back to its own counts and says so, it never invents provider numbers.
+export async function fetchNotificationUsage(): Promise<NotificationUsage | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/notifications/usage`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.ok ? (data as NotificationUsage) : null;
+  } catch (err) {
+    console.log('[NotificationDispatch] usage unavailable', String(err));
+    return null;
+  }
+}
