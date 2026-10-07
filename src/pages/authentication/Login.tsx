@@ -6,14 +6,17 @@ import {
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import {
-  eye, eyeOff, fingerPrintOutline, cartOutline, personOutline, lockClosedOutline,
+  eye, eyeOff, fingerPrintOutline, personOutline, lockClosedOutline,
   logInOutline, callOutline, personAddOutline, headsetOutline, chevronForward,
 } from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
 import { canAccess, normalizeRoleCode } from '../../config/rolePermissions';
-import { getPostLoginRoute } from '../../utils/postLoginRoute';
+import { appDestination, LOGIN_APPS, LoginApp, readLastLoginApp, saveLastLoginApp } from '../../utils/loginApps';
+import LoginAppPicker from './LoginAppPicker';
+import PhoneAppLogin from './clientphone/PhoneAppLogin';
+import { LOGIN_APP_ICONS } from './loginAppIcons';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/pos/companySelector/CompanySelector';
 import {
@@ -35,6 +38,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const usernameRef = useRef<string>('');
   const passwordRef = useRef<string>('');
 
+  const [app, setApp]                               = useState<LoginApp>(readLastLoginApp);
   const [loading, setLoading]                       = useState(false);
   const [message, setMessage]                       = useState<string | null>(null);
   const [showPassword, setShowPassword]             = useState(false);
@@ -60,6 +64,14 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     roleCode: ReturnType<typeof normalizeRoleCode>;
     roleName: string;
   } | null>(null);
+
+  const selectApp = (next: LoginApp) => {
+    setApp(next);
+    saveLastLoginApp(next);
+  };
+  const appInfo = LOGIN_APPS.find(a => a.id === app) ?? LOGIN_APPS[0];
+  // Arcade and Rewards are customer apps: phone number only, no username/password.
+  const phoneApp = app === 'arcade' || app === 'rewards';
 
   useEffect(() => {
     (async () => {
@@ -88,7 +100,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     // instead of asking them to type credentials again.
     if (nextValue && isAuthenticated) {
       console.log('[Login] handleBiometricToggle: already authenticated, redirecting by role =', roleCode);
-      history.push(getPostLoginRoute(roleCode, clientId));
+      history.push(appDestination(app, roleCode, clientId).route);
     } else {
       console.log('[Login] handleBiometricToggle: not redirecting (nextValue/isAuthenticated false)');
     }
@@ -250,7 +262,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     if ((pending?.roleCode === 'borrower' || pending?.roleCode === 'lender') && !pending?.clientId) {
       console.warn('[Login] borrower/lender with no clientId — falling back to /dashboard', pending);
     }
-    history.push(getPostLoginRoute(pending?.roleCode, pending?.clientId));
+    const destination = appDestination(app, pending?.roleCode, pending?.clientId);
+    if (!destination.granted) {
+      console.log('[Login] account has no access to', app, '→ landing on', destination.route);
+    }
+    history.push(destination.route);
   };
 
   const handleSkipOpenCash = () => {
@@ -301,7 +317,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <IonPage>
-      <IonContent className="ion-padding login-page-content">
+      <IonContent className={`ion-padding login-page-content login-app--${app}`}>
         <IonGrid>
           <IonRow className="ion-justify-content-center">
             <IonCol size="12" sizeSm="8" sizeMd="6" sizeLg="4">
@@ -309,11 +325,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               {/* Logo / Brand */}
               <div className="login-brand">
                 <div className="login-logo">
-                  <IonIcon icon={cartOutline} aria-hidden="true" />
+                  <IonIcon icon={LOGIN_APP_ICONS[app]} aria-hidden="true" />
                 </div>
-                <h1 className="login-title">POS GMO</h1>
-                <p className="login-subtitle">Sistema de punto de venta</p>
+                <h1 className="login-title">{appInfo.label}</h1>
+                <p className="login-subtitle">{appInfo.subtitle}</p>
               </div>
+
+              <LoginAppPicker value={app} onChange={selectApp} disabled={loading} />
 
               <IonToast
                 isOpen={!!message}
@@ -324,6 +342,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 position="bottom"
               />
 
+              {phoneApp ? (
+                <PhoneAppLogin app={app} onUseStaffLogin={() => selectApp('pos')} />
+              ) : (
               <div className="login-card">
                 <h2 className="login-card-title">Iniciar sesión</h2>
                 <p className="login-card-subtitle">Ingresa a tu cuenta para continuar</p>
@@ -419,6 +440,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   <IonIcon icon={chevronForward} aria-hidden="true" className="login-client-banner-chevron" />
                 </IonRouterLink>
               </div>
+              )}
 
             </IonCol>
           </IonRow>
