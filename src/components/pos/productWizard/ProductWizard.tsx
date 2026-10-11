@@ -6,6 +6,8 @@ import { useProduct } from '../../../contexts/ProductContext';
 import { useUser } from '../../../contexts/UserContext';
 import { Product } from '../../../data/type_products';
 import { fmtMXN } from '../../../utils/format';
+import { ProductLabelReading } from '../../../api/productAgentApi';
+import ProductLabelReader from './ProductLabelReader';
 import './ProductWizard.css';
 
 interface OptionChoice { name: string; extraPrice: number; }
@@ -158,7 +160,31 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     if (!saleTouched && cost > 0) upd('salePrice', shelfPrice(cost, TARGET_MARGIN).toFixed(2));
   };
   const updSale = (v: string) => { setSaleTouched(true); upd('salePrice', v); };
-  const fmt = (v: string) => v ? new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(parseFloat(v)||0) : '—';
+
+  /** Product label agent -> form. Only fills fields that are still empty, so it
+   *  never overwrites what the user typed; Código, category and prices stay manual. */
+  const applyLabelReading = (r: ProductLabelReading): string[] => {
+    const filled: string[] = [];
+    const fill = (f: keyof WizardData, value: string, label: string) => {
+      if (!value || String(data[f] ?? '').trim()) return;
+      upd(f, value);
+      filled.push(label);
+    };
+    fill('name', r.suggestedName, 'Nombre');
+    fill('barCode', r.barCode, 'Código de barras');
+    fill('description', r.description, 'Descripción');
+    if (r.netContent > 0 && r.unitOfMeasure && !data.netContent && !data.unitOfMeasure) {
+      upd('netContent', String(r.netContent));
+      upd('unitOfMeasure', r.unitOfMeasure);
+      filled.push('Contenido neto');
+    }
+    if (r.expirationDate && !data.dateOfExpire && !data.noExpire) {
+      upd('dateOfExpire', r.expirationDate);
+      filled.push('Fecha de expiración');
+    }
+    return filled;
+  };
+  const fmt =(v: string) => v ? new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(parseFloat(v)||0) : '—';
 
   const validate = () => {
     const e: Record<string,string> = {};
@@ -451,6 +477,9 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         <h2 className="wizard-step-title">Información del producto</h2>
         <p className="wizard-step-subtitle">Datos básicos de identificación</p>
       </div>
+      {!isReadOnly && effectiveMode !== 'edit' && (
+        <ProductLabelReader companyId={Number(companyId)} onApply={applyLabelReading} />
+      )}
       <div className="wizard-form">
         <div className="wizard-field">
           <label className="wizard-label">Nombre <span className="required">*</span></label>

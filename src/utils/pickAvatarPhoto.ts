@@ -35,3 +35,7 @@ export const pickEvidencePhoto = (): Promise<string | null> =>
 /** Foto del ticket/recibo físico como evidencia de un egreso. */
 export const pickExpenseReceiptPhoto = (): Promise<string | null> =>
   pickPhoto({ header: 'Ticket del egreso', logTag: 'pickExpenseReceiptPhoto' });
+
+/** Foto de la etiqueta de un producto (frente / reverso con código de barras) para el agente que llena "Nuevo Producto". */
+export const pickProductLabelPhoto = (): Promise<string | null> =>
+  pickPhoto({ header: 'Foto del producto', logTag: 'pickProductLabelPhoto' });
