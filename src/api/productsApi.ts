@@ -102,6 +102,13 @@ export interface CreateProductRequest {
     barCode: string;
     code: string;
     dateOfExpire: string | null;
+    /** true = explicitly no expiration (clears dateOfExpire on update). */
+    noExpire?: boolean;
+    /** Net content per unit sold, e.g. 500 + 'g'. */
+    netContent?: number | null;
+    unitOfMeasure?: string | null;
+    /** Competitor/market shelf price, reference only. */
+    referencePrice?: number | null;
     manufactureId: number | null;
     description: string;
     productForm?: ProductFormPayload | null;

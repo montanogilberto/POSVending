@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonContent } from '@ionic/react';
+import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonContent, IonCheckbox, IonInput, IonSegment, IonSegmentButton, IonLabel, IonChip } from '@ionic/react';
 import { close, add, trash, checkmarkCircle, chevronForward, checkmark } from 'ionicons/icons';
 import { fetchCategoriesByCompany } from '../../../utils/apiUtils';
 import { useProduct } from '../../../contexts/ProductContext';
 import { useUser } from '../../../contexts/UserContext';
 import { Product } from '../../../data/type_products';
+import { fmtMXN } from '../../../utils/format';
 import './ProductWizard.css';
 
 interface OptionChoice { name: string; extraPrice: number; }
 interface ProductOptionData { name: string; optionType: 'radio' | 'checkbox'; choices: OptionChoice[]; }
 interface WizardData {
   categoryId: number; categoryName: string;
-  name: string; code: string; barCode: string; description: string; dateOfExpire: string;
+  name: string; code: string; barCode: string; description: string; dateOfExpire: string; noExpire: boolean;
+  netContent: string; unitOfMeasure: string;
   salePrice: string; unitPrice: string; stockQuantity: string;
+  /** Precio al que lo vende la competencia (OXXO, súper…) — referencia, no se cobra. */
+  referencePrice: string;
   options: ProductOptionData[];
   formQuantity: string; additionalDescription: string; packingName: string; packingPresentationName: string;
 }
@@ -26,9 +30,36 @@ export interface ProductWizardProps {
 }
 
 const STEPS = ['Categoría','Producto','Precio','Opciones','Adicional','Resumen'];
+const UNITS = [
+  { value: 'g',  label: 'g'  },
+  { value: 'kg', label: 'kg' },
+  { value: 'ml', label: 'ml' },
+  { value: 'L',  label: 'L'  },
+  { value: 'pz', label: 'pz' },
+];
+/** Margen mínimo de utilidad sobre el precio de venta: (venta - costo) / venta. */
+const TARGET_MARGIN = 0.30;
+/** Precio mínimo para el margen objetivo, redondeado hacia arriba al centavo. */
+const suggestedPrice = (cost: number) => Math.ceil(Number((cost / (1 - TARGET_MARGIN) * 100).toFixed(6))) / 100;
+const marginOf = (sale: number, cost: number) => (sale > 0 ? (sale - cost) / sale : 0);
+/** Márgenes ofrecidos como sugerencia rápida (el primero es el mínimo). */
+const MARGIN_PRESETS = [0.30, 0.35, 0.40, 0.50];
+/** Precio "de anaquel": redondea hacia arriba al siguiente $0.50, nunca baja del margen. */
+const shelfPrice = (cost: number, margin: number) =>
+  Math.ceil(Number((cost / (1 - margin) * 2).toFixed(6))) / 2;
+/** Precio por kg / L (o por pieza) a partir del contenido neto. */
+const pricePerBaseUnit = (sale: number, content: number, unit: string) => {
+  if (!(sale > 0) || !(content > 0)) return null;
+  if (unit === 'g')  return { value: sale / content * 1000, unit: 'kg' };
+  if (unit === 'ml') return { value: sale / content * 1000, unit: 'L' };
+  if (unit === 'kg' || unit === 'L') return { value: sale / content, unit };
+  if (unit === 'pz') return { value: sale / content, unit: 'pz' };
+  return null;
+};
 const INIT: WizardData = {
-  categoryId:0, categoryName:'', name:'', code:'', barCode:'', description:'', dateOfExpire:'',
-  salePrice:'', unitPrice:'', stockQuantity:'', options:[],
+  categoryId:0, categoryName:'', name:'', code:'', barCode:'', description:'', dateOfExpire:'', noExpire:false,
+  netContent:'', unitOfMeasure:'',
+  salePrice:'', unitPrice:'', stockQuantity:'', referencePrice:'', options:[],
   formQuantity:'', additionalDescription:'', packingName:'', packingPresentationName:'',
 };
 
@@ -43,6 +74,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [openOpt, setOpenOpt] = useState<Record<number,boolean>>({});
+  const [saleTouched, setSaleTouched] = useState(false);
   const effectiveMode: 'create' | 'view' | 'edit' = mode ?? (product?.productId ? 'edit' : 'create');
   const isReadOnly = effectiveMode === 'view';
 
@@ -54,6 +86,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     setShowSuccess(false);
     setSubmitError('');
     setOpenOpt({});
+    setSaleTouched(Boolean(product));
     loadCats();
 
     if (product) {
@@ -86,9 +119,13 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         barCode: String((product as any).barCode ?? ''),
         description: String((product as any).description ?? ''),
         dateOfExpire: normalizedDateOfExpire,
+        noExpire: !normalizedDateOfExpire,
+        netContent: anyProduct.netContent != null && Number(anyProduct.netContent) > 0 ? String(Number(anyProduct.netContent)) : '',
+        unitOfMeasure: String(anyProduct.unitOfMeasure ?? ''),
         salePrice: details?.salePrice != null ? String(details.salePrice) : '0',
         unitPrice: details?.unitPrice != null ? String(details.unitPrice) : '0',
         stockQuantity: details?.stockQuantity != null ? String(details.stockQuantity) : '0',
+        referencePrice: anyProduct.referencePrice != null && Number(anyProduct.referencePrice) > 0 ? String(Number(anyProduct.referencePrice)) : '',
         options: mappedOptions,
         formQuantity: product.form?.quantity ?? '',
         additionalDescription: principalDescription?.Dosage ?? '',
@@ -115,13 +152,32 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   };
 
   const upd = (f: keyof WizardData, v: any) => { setData(p => ({...p,[f]:v})); setErrors(p => ({...p,[f]:''})); };
+  const updCost = (v: string) => {
+    upd('unitPrice', v);
+    const cost = parseFloat(v);
+    if (!saleTouched && cost > 0) upd('salePrice', shelfPrice(cost, TARGET_MARGIN).toFixed(2));
+  };
+  const updSale = (v: string) => { setSaleTouched(true); upd('salePrice', v); };
   const fmt = (v: string) => v ? new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(parseFloat(v)||0) : '—';
 
   const validate = () => {
     const e: Record<string,string> = {};
     if (step===0 && !data.categoryId) e.categoryId='Selecciona una categoría';
-    if (step===1) { if(!data.name.trim()) e.name='El nombre es requerido'; if(!data.code.trim()) e.code='El código es requerido'; }
-    if (step===2 && (!data.salePrice || parseFloat(data.salePrice)<0)) e.salePrice='Ingresa un precio válido';
+    if (step===1) {
+      if(!data.name.trim()) e.name='El nombre es requerido';
+      if(!data.code.trim()) e.code='El código es requerido';
+      if(!data.noExpire && !data.dateOfExpire) e.dateOfExpire='Elige una fecha o marca "Sin fecha de expiración"';
+      const content = parseFloat(data.netContent);
+      if (data.netContent && !(content > 0)) e.netContent='Ingresa una cantidad mayor a 0';
+      else if (data.netContent && !data.unitOfMeasure) e.netContent='Selecciona la unidad';
+      else if (!data.netContent && data.unitOfMeasure) e.netContent='Ingresa la cantidad';
+    }
+    if (step===2) {
+      const sale = parseFloat(data.salePrice);
+      const cost = parseFloat(data.unitPrice) || 0;
+      if (!data.salePrice || !(sale >= 0)) e.salePrice='Ingresa un precio válido';
+      else if (cost > 0 && sale < suggestedPrice(cost)) e.salePrice=`El margen mínimo es ${TARGET_MARGIN*100}%. Precio mínimo: ${fmtMXN(suggestedPrice(cost))}`;
+    }
     setErrors(e); return Object.keys(e).length===0;
   };
 
@@ -275,7 +331,11 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         code: data.code.trim(),
         barCode: data.barCode.trim(),
         description: data.description.trim(),
-        dateOfExpire: data.dateOfExpire || '',
+        dateOfExpire: data.noExpire ? '' : data.dateOfExpire,
+        noExpire: data.noExpire,
+        netContent: data.netContent ? Number(data.netContent) : null,
+        referencePrice: data.referencePrice ? Number(data.referencePrice) : null,
+        unitOfMeasure: data.netContent ? data.unitOfMeasure : null,
         categoryId: data.categoryId,
         companyId: normalizedCompanyId,
         productFormId: product?.productFormId ?? 0,
@@ -413,8 +473,29 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
           <textarea className="wizard-textarea" placeholder="Describe brevemente el producto..." rows={3} value={data.description} onChange={e=>upd('description',e.target.value)} disabled={isReadOnly}/>
         </div>
         <div className="wizard-field">
+          <label className="wizard-label">Contenido neto</label>
+          <div className="wizard-content-row">
+            <IonInput className={`wizard-ion-input${errors.netContent?' error':''}`} type="number" inputmode="decimal" min="0" placeholder="Ej. 500"
+              value={data.netContent} onIonInput={e=>upd('netContent',String(e.detail.value ?? ''))} disabled={isReadOnly}/>
+            <IonSegment className="wizard-unit-segment" value={data.unitOfMeasure}
+              onIonChange={e=>{ upd('unitOfMeasure',String(e.detail.value ?? '')); setErrors(p=>({...p,netContent:''})); }} disabled={isReadOnly}>
+              {UNITS.map(u=>(
+                <IonSegmentButton key={u.value} value={u.value}><IonLabel>{u.label}</IonLabel></IonSegmentButton>
+              ))}
+            </IonSegment>
+          </div>
+          {errors.netContent && <span className="wizard-field-error">{errors.netContent}</span>}
+        </div>
+        <div className="wizard-field">
           <label className="wizard-label">Fecha de expiración</label>
-          <input className="wizard-input" type="date" value={data.dateOfExpire} onChange={e=>upd('dateOfExpire',e.target.value)} disabled={isReadOnly}/>
+          {!data.noExpire && (
+            <input className={`wizard-input${errors.dateOfExpire?' error':''}`} type="date" value={data.dateOfExpire} onChange={e=>upd('dateOfExpire',e.target.value)} disabled={isReadOnly}/>
+          )}
+          <IonCheckbox className="wizard-checkbox" labelPlacement="end" justify="start" checked={data.noExpire} disabled={isReadOnly}
+            onIonChange={e=>{ upd('noExpire',e.detail.checked); setErrors(p=>({...p,dateOfExpire:''})); }}>
+            Sin fecha de expiración
+          </IonCheckbox>
+          {errors.dateOfExpire && <span className="wizard-field-error">{errors.dateOfExpire}</span>}
         </div>
       </div>
     </div>
@@ -422,28 +503,75 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
 
   /* ── Step 3: Price ── */
   const renderS3 = () => {
-    const margin = data.salePrice && data.unitPrice ? (parseFloat(data.salePrice)||0)-(parseFloat(data.unitPrice)||0) : null;
+    const sale = parseFloat(data.salePrice) || 0;
+    const cost = parseFloat(data.unitPrice) || 0;
+    const minPrice = cost > 0 ? suggestedPrice(cost) : null;
+    const margin = data.salePrice && cost > 0 ? sale - cost : null;
+    const marginPct = margin !== null ? marginOf(sale, cost) : null;
+    const belowTarget = minPrice !== null && data.salePrice !== '' && sale < minPrice;
+    const perUnit = pricePerBaseUnit(sale, parseFloat(data.netContent), data.unitOfMeasure);
+    const ref = parseFloat(data.referencePrice) || 0;
+    const refMargin = ref > 0 && cost > 0 ? marginOf(ref, cost) : null;
+    /** Costo máximo para vender al precio de mercado con el margen objetivo. */
+    const maxCostAtRef = ref > 0 ? Math.floor(ref * (1 - TARGET_MARGIN) * 100) / 100 : null;
+    const vsRef = ref > 0 && sale > 0 ? (sale - ref) / ref : null;
     return (
       <div>
         <div className="wizard-step-header">
           <h2 className="wizard-step-title">Precio y disponibilidad</h2>
-          <p className="wizard-step-subtitle">Define el precio de venta y el stock inicial</p>
+          <p className="wizard-step-subtitle">Captura el costo y sugerimos el precio con {TARGET_MARGIN*100}% de margen</p>
         </div>
         <div className="wizard-form">
+          <div className="wizard-field">
+            <label className="wizard-label">Costo unitario (MXN)</label>
+            <div className="wizard-input-prefix">
+              <span className="prefix">$</span>
+              <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="0.00" value={data.unitPrice} onChange={e=>updCost(e.target.value)} disabled={isReadOnly}/>
+            </div>
+          </div>
           <div className="wizard-field">
             <label className="wizard-label">Precio de venta (MXN) <span className="required">*</span></label>
             <div className="wizard-input-prefix">
               <span className="prefix">$</span>
-              <input className={`wizard-input with-prefix${errors.salePrice?' error':''}`} type="number" min="0" step="0.01" placeholder="0.00" value={data.salePrice} onChange={e=>upd('salePrice',e.target.value)} disabled={isReadOnly}/>
+              <input className={`wizard-input with-prefix${errors.salePrice || belowTarget ?' error':''}`} type="number" min="0" step="0.01" placeholder="0.00" value={data.salePrice} onChange={e=>updSale(e.target.value)} disabled={isReadOnly}/>
             </div>
+            {minPrice !== null && !isReadOnly && (
+              <div className="wizard-suggested-price">
+                <span>Sugerencias según el costo (mínimo {TARGET_MARGIN*100}% → <strong>{fmtMXN(minPrice)}</strong>)</span>
+                <div className="wizard-price-chips">
+                  {MARGIN_PRESETS.map(m => {
+                    const price = shelfPrice(cost, m);
+                    return (
+                      <IonChip key={m} className={`wizard-price-chip${sale === price ? ' selected' : ''}`}
+                        onClick={()=>{ updSale(price.toFixed(2)); }}>
+                        <strong>{fmtMXN(price)}</strong>&nbsp;· {Math.round(m*100)}%
+                      </IonChip>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {errors.salePrice && <span className="wizard-field-error">{errors.salePrice}</span>}
           </div>
           <div className="wizard-field">
-            <label className="wizard-label">Precio unitario / Costo (MXN)</label>
+            <label className="wizard-label">Precio en el mercado (MXN)</label>
             <div className="wizard-input-prefix">
               <span className="prefix">$</span>
-              <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="0.00" value={data.unitPrice} onChange={e=>upd('unitPrice',e.target.value)} disabled={isReadOnly}/>
+              <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="Ej. precio en OXXO" value={data.referencePrice} onChange={e=>upd('referencePrice',e.target.value)} disabled={isReadOnly}/>
             </div>
+            {ref > 0 && (
+              <div className={`wizard-market-hint${refMargin !== null && refMargin < TARGET_MARGIN ? ' warn' : ''}`}>
+                {vsRef !== null && (
+                  <p>Tu precio está <strong>{vsRef >= 0 ? `${(vsRef*100).toFixed(1)}% arriba` : `${(-vsRef*100).toFixed(1)}% abajo`}</strong> del mercado ({fmtMXN(Math.abs(sale - ref))}).</p>
+                )}
+                {refMargin !== null && (
+                  <p>Al precio de mercado tu margen sería <strong>{(refMargin*100).toFixed(1)}%</strong>.</p>
+                )}
+                {refMargin !== null && refMargin < TARGET_MARGIN && maxCostAtRef !== null && (
+                  <p>Para competir con {TARGET_MARGIN*100}% de margen necesitas comprarlo a <strong>{fmtMXN(maxCostAtRef)}</strong> o menos.</p>
+                )}
+              </div>
+            )}
           </div>
           <div className="wizard-field">
             <label className="wizard-label">Cantidad en stock</label>
@@ -452,7 +580,13 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
           {data.salePrice && (
             <div className="wizard-price-summary">
               <div className="price-summary-row"><span>Precio de venta</span><strong className="price-green">{fmt(data.salePrice)}</strong></div>
-              {margin!==null && data.unitPrice && <div className="price-summary-row"><span>Margen estimado</span><strong className={margin>=0?'price-green':'price-blue'}>{fmt(margin.toString())}</strong></div>}
+              {margin!==null && marginPct!==null && (
+                <div className="price-summary-row">
+                  <span>Margen</span>
+                  <strong className={belowTarget?'price-red':'price-green'}>{fmt(margin.toString())} ({(marginPct*100).toFixed(1)}%)</strong>
+                </div>
+              )}
+              {perUnit && <div className="price-summary-row"><span>Precio por {perUnit.unit}</span><strong className="price-blue">{fmtMXN(perUnit.value)}</strong></div>}
               {data.stockQuantity && <div className="price-summary-row"><span>Valor en inventario</span><strong className="price-blue">{fmt(((parseFloat(data.salePrice)||0)*(parseInt(data.stockQuantity)||0)).toString())}</strong></div>}
             </div>
           )}
@@ -561,8 +695,8 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   /* ── Step 6: Review ── */
   const renderS6 = () => {
     const rows1 = [{k:'Categoría',v:data.categoryName}];
-    const rows2 = [{k:'Nombre',v:data.name},{k:'Código',v:data.code},{k:'Código de barras',v:data.barCode},{k:'Descripción',v:data.description},{k:'Fecha expiración',v:data.dateOfExpire}];
-    const rows3 = [{k:'Precio de venta',v:data.salePrice?fmt(data.salePrice):''},{k:'Costo unitario',v:data.unitPrice?fmt(data.unitPrice):''},{k:'Stock inicial',v:data.stockQuantity}];
+    const rows2 = [{k:'Nombre',v:data.name},{k:'Código',v:data.code},{k:'Código de barras',v:data.barCode},{k:'Descripción',v:data.description},{k:'Contenido neto',v:data.netContent?`${data.netContent} ${data.unitOfMeasure}`:''},{k:'Fecha expiración',v:data.noExpire?'Sin expiración':data.dateOfExpire}];
+    const rows3 = [{k:'Precio de venta',v:data.salePrice?fmt(data.salePrice):''},{k:'Costo unitario',v:data.unitPrice?fmt(data.unitPrice):''},{k:'Margen',v:parseFloat(data.unitPrice)>0&&data.salePrice?`${(marginOf(parseFloat(data.salePrice)||0,parseFloat(data.unitPrice))*100).toFixed(1)}%`:''},{k:'Precio en mercado',v:data.referencePrice?fmt(data.referencePrice):''},{k:'Stock inicial',v:data.stockQuantity}];
     const ReviewCard = ({title,rows,editStep}:{title:string;rows:{k:string;v:string}[];editStep:number}) => (
       <div className="wizard-review-card">
         <div className="wizard-review-card-header">

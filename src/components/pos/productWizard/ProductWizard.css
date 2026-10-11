@@ -872,3 +872,124 @@
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
 }
+
+/* ── Net content (amount + unit) ── */
+.wizard-content-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.wizard-ion-input {
+  flex: 0 0 140px;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --color: #111827;
+  --placeholder-color: #9CA3AF;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  background: #ffffff;
+  font-size: 15px;
+  min-height: 46px;
+}
+
+.wizard-ion-input.has-focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.wizard-ion-input.error {
+  border-color: #EF4444;
+}
+
+.wizard-unit-segment {
+  flex: 1;
+  --background: #F3F4F6;
+  border-radius: 12px;
+}
+
+.wizard-unit-segment ion-segment-button {
+  --indicator-color: #2563EB;
+  --color: #4B5563;
+  --color-checked: #ffffff;
+  min-width: 0;
+  font-weight: 600;
+}
+
+/* ── No-expiry checkbox ── */
+.wizard-checkbox {
+  --size: 20px;
+  --checkbox-background-checked: #2563EB;
+  --border-color-checked: #2563EB;
+  margin-top: 10px;
+  font-size: 14px;
+  color: #374151;
+}
+
+/* ── 30% margin suggestion ── */
+.wizard-suggested-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.wizard-suggested-price strong {
+  color: #059669;
+}
+
+.wizard-price-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* doubled class: Ionic injects ion-chip styles after this file */
+.wizard-price-chip.wizard-price-chip {
+  --background: #ffffff;
+  --color: #374151;
+  margin: 0;
+  border: 1.5px solid #E5E7EB;
+  font-size: 13px;
+}
+
+.wizard-price-chip.wizard-price-chip.selected {
+  --background: #ECFDF5;
+  --color: #047857;
+  border-color: #059669;
+}
+
+.price-red { color: #DC2626; font-size: 16px; }
+
+@media (max-width: 480px) {
+  .wizard-content-row { flex-direction: column; }
+  .wizard-ion-input { flex-basis: auto; }
+}
+
+/* ── Market reference price ── */
+.wizard-market-hint {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  font-size: 13px;
+  color: #065F46;
+}
+
+.wizard-market-hint.warn {
+  background: #FFFBEB;
+  border-color: #FCD34D;
+  color: #92400E;
+}
+
+.wizard-market-hint p {
+  margin: 0;
+}
+
+.wizard-market-hint p + p {
+  margin-top: 4px;
+}
