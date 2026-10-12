@@ -51,6 +51,10 @@ export interface Product {
   name: string;
   code: string;
   dateOfExpire: string;
+  netContent?: number | null;
+  unitOfMeasure?: string | null;
+  referencePrice?: number | null;
+  imageUrl?: string | null;
   productFormId: number;
   manufactureId: number;
   description: string;

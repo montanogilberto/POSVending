@@ -300,6 +300,10 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
       const requestData = {
         clients: [{
           clientId: 0,
+          // The store registering the client owns it. Without this the row was
+          // saved with companyId NULL, so it never showed up in the store's
+          // client list, rewards or reports (found 2026-10-06, clientId 2260).
+          companyId,
           first_name: newClient.first_name!,
           last_name: newClient.last_name!,
           cellphone: formattedCellphone,

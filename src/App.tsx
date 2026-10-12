@@ -116,7 +116,6 @@ import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/receipt/ReceiptPage';
 import Login from './pages/authentication/Login';
 import ForgotPassword from './pages/authentication/ForgotPassword';
-import CreateAccount from './pages/authentication/CreateAccount';
 import ClientLogin from './pages/authentication/ClientLogin';
 import SupplierPage from './pages/admin/SupplierPage';
 import ServicePage from './pages/admin/ServicePage';
@@ -1302,7 +1301,8 @@ const App: React.FC = () => {
                 <IonRouterOutlet id="root-outlet">
                   <Route exact path="/login" component={Login} />
                   <Route exact path="/forgot-password" component={ForgotPassword} />
-                  <Route exact path="/create-account" component={CreateAccount} />
+                  {/* Self sign-up disabled — accounts are created by an admin. */}
+                  <Route exact path="/create-account"><Redirect to="/login" /></Route>
                   <Route exact path="/client-login" component={ClientLogin} />
 
                   <Route exact path="/">

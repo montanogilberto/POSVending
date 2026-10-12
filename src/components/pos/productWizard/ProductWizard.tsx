@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonContent } from '@ionic/react';
-import { close, add, trash, checkmarkCircle, chevronForward, checkmark } from 'ionicons/icons';
+import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonContent, IonCheckbox, IonInput, IonSegment, IonSegmentButton, IonLabel, IonChip, IonImg, IonSpinner } from '@ionic/react';
+import { close, add, trash, checkmarkCircle, chevronForward, checkmark, createOutline } from 'ionicons/icons';
+import { createCategory, updateCategory } from '../../../api/categoriesApi';
 import { fetchCategoriesByCompany } from '../../../utils/apiUtils';
 import { useProduct } from '../../../contexts/ProductContext';
 import { useUser } from '../../../contexts/UserContext';
 import { Product } from '../../../data/type_products';
+import { fmtMXN } from '../../../utils/format';
+import { ProductLabelReading } from '../../../api/productAgentApi';
+import ProductLabelReader from './ProductLabelReader';
+import { uploadProductImage } from '../../../api/productsApi';
+import { pickProductLabelPhoto } from '../../../utils/pickAvatarPhoto';
 import './ProductWizard.css';
 
 interface OptionChoice { name: string; extraPrice: number; }
 interface ProductOptionData { name: string; optionType: 'radio' | 'checkbox'; choices: OptionChoice[]; }
 interface WizardData {
   categoryId: number; categoryName: string;
-  name: string; code: string; barCode: string; description: string; dateOfExpire: string;
+  name: string; code: string; barCode: string; description: string; dateOfExpire: string; noExpire: boolean;
+  netContent: string; unitOfMeasure: string;
   salePrice: string; unitPrice: string; stockQuantity: string;
+  /** Precio al que lo vende la competencia (OXXO, súper…) — referencia, no se cobra. */
+  referencePrice: string;
+  /** Saved product photo (blob URL). */
+  imageUrl: string;
   options: ProductOptionData[];
   formQuantity: string; additionalDescription: string; packingName: string; packingPresentationName: string;
 }
@@ -26,9 +37,36 @@ export interface ProductWizardProps {
 }
 
 const STEPS = ['Categoría','Producto','Precio','Opciones','Adicional','Resumen'];
+const UNITS = [
+  { value: 'g',  label: 'g'  },
+  { value: 'kg', label: 'kg' },
+  { value: 'ml', label: 'ml' },
+  { value: 'L',  label: 'L'  },
+  { value: 'pz', label: 'pz' },
+];
+/** Margen mínimo de utilidad sobre el precio de venta: (venta - costo) / venta. */
+const TARGET_MARGIN = 0.30;
+/** Precio mínimo para el margen objetivo, redondeado hacia arriba al centavo. */
+const suggestedPrice = (cost: number) => Math.ceil(Number((cost / (1 - TARGET_MARGIN) * 100).toFixed(6))) / 100;
+const marginOf = (sale: number, cost: number) => (sale > 0 ? (sale - cost) / sale : 0);
+/** Márgenes ofrecidos como sugerencia rápida (el primero es el mínimo). */
+const MARGIN_PRESETS = [0.30, 0.35, 0.40, 0.50];
+/** Precio "de anaquel": redondea hacia arriba al siguiente $0.50, nunca baja del margen. */
+const shelfPrice = (cost: number, margin: number) =>
+  Math.ceil(Number((cost / (1 - margin) * 2).toFixed(6))) / 2;
+/** Precio por kg / L (o por pieza) a partir del contenido neto. */
+const pricePerBaseUnit = (sale: number, content: number, unit: string) => {
+  if (!(sale > 0) || !(content > 0)) return null;
+  if (unit === 'g')  return { value: sale / content * 1000, unit: 'kg' };
+  if (unit === 'ml') return { value: sale / content * 1000, unit: 'L' };
+  if (unit === 'kg' || unit === 'L') return { value: sale / content, unit };
+  if (unit === 'pz') return { value: sale / content, unit: 'pz' };
+  return null;
+};
 const INIT: WizardData = {
-  categoryId:0, categoryName:'', name:'', code:'', barCode:'', description:'', dateOfExpire:'',
-  salePrice:'', unitPrice:'', stockQuantity:'', options:[],
+  categoryId:0, categoryName:'', name:'', code:'', barCode:'', description:'', dateOfExpire:'', noExpire:false,
+  netContent:'', unitOfMeasure:'',
+  salePrice:'', unitPrice:'', stockQuantity:'', referencePrice:'', imageUrl:'', options:[],
   formQuantity:'', additionalDescription:'', packingName:'', packingPresentationName:'',
 };
 
@@ -39,10 +77,22 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const [data, setData] = useState<WizardData>(INIT);
   const [cats, setCats] = useState<CategoryItem[]>([]);
   const [catLoading, setCatLoading] = useState(false);
+  /** Inline category form: id null = new category. */
+  const [catEdit, setCatEdit] = useState<{ id: number | null; name: string } | null>(null);
+  const [catSaving, setCatSaving] = useState(false);
+  const [catError, setCatError] = useState('');
   const [errors, setErrors] = useState<Record<string,string>>({});
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [openOpt, setOpenOpt] = useState<Record<number,boolean>>({});
+  const [saleTouched, setSaleTouched] = useState(false);
+  /** Photos taken in the label reader; one of them becomes the product image. */
+  const [labelPhotos, setLabelPhotos] = useState<string[]>([]);
+  /** Product image not uploaded yet (data URL) — uploaded on submit. */
+  const [pendingImage, setPendingImage] = useState('');
+  /** true once the user picked the image by hand, so new reader photos don't replace it. */
+  const [imageChosen, setImageChosen] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const effectiveMode: 'create' | 'view' | 'edit' = mode ?? (product?.productId ? 'edit' : 'create');
   const isReadOnly = effectiveMode === 'view';
 
@@ -54,6 +104,10 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     setShowSuccess(false);
     setSubmitError('');
     setOpenOpt({});
+    setSaleTouched(Boolean(product));
+    setLabelPhotos([]);
+    setPendingImage('');
+    setImageChosen(false);
     loadCats();
 
     if (product) {
@@ -86,9 +140,14 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         barCode: String((product as any).barCode ?? ''),
         description: String((product as any).description ?? ''),
         dateOfExpire: normalizedDateOfExpire,
+        noExpire: !normalizedDateOfExpire,
+        netContent: anyProduct.netContent != null && Number(anyProduct.netContent) > 0 ? String(Number(anyProduct.netContent)) : '',
+        unitOfMeasure: String(anyProduct.unitOfMeasure ?? ''),
         salePrice: details?.salePrice != null ? String(details.salePrice) : '0',
         unitPrice: details?.unitPrice != null ? String(details.unitPrice) : '0',
         stockQuantity: details?.stockQuantity != null ? String(details.stockQuantity) : '0',
+        imageUrl: String(anyProduct.imageUrl ?? anyProduct.image ?? ''),
+        referencePrice: anyProduct.referencePrice != null && Number(anyProduct.referencePrice) > 0 ? String(Number(anyProduct.referencePrice)) : '',
         options: mappedOptions,
         formQuantity: product.form?.quantity ?? '',
         additionalDescription: principalDescription?.Dosage ?? '',
@@ -101,27 +160,113 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     setData(INIT);
   }, [isOpen, product]);
 
-  const loadCats = async () => {
+  const loadCats = async (): Promise<CategoryItem[]> => {
     setCatLoading(true);
     try {
       const normalizedCompanyId = Number(companyId);
       if (!Number.isFinite(normalizedCompanyId) || normalizedCompanyId <= 0) {
         setCats([]);
-        return;
+        return [];
       }
       const res = await fetchCategoriesByCompany(String(normalizedCompanyId));
-      setCats(res.map((c: any) => ({ categoryId: c.categoryId ?? c.productCategoryId ?? 0, name: c.name ?? '' })));
-    } catch(e) { console.error(e); } finally { setCatLoading(false); }
+      const list: CategoryItem[] = res.map((c: any) => ({ categoryId: c.categoryId ?? c.productCategoryId ?? 0, name: c.name ?? '' }));
+      setCats(list);
+      return list;
+    } catch(e) { console.error(e); return []; } finally { setCatLoading(false); }
+  };
+
+  /* Create / rename a category without leaving the wizard (same CRUD as CategoriesPage). */
+  const startNewCat = () => { setCatEdit({ id: null, name: '' }); setCatError(''); };
+  const startRenameCat = (cat: CategoryItem) => { setCatEdit({ id: cat.categoryId, name: cat.name }); setCatError(''); };
+  const saveCat = async () => {
+    if (!catEdit) return;
+    const name = catEdit.name.trim();
+    if (!name) { setCatError('Escribe el nombre de la categoría'); return; }
+    const duplicate = cats.some(c => c.categoryId !== catEdit.id && c.name.trim().toLowerCase() === name.toLowerCase());
+    if (duplicate) { setCatError('Ya existe una categoría con ese nombre'); return; }
+    setCatSaving(true);
+    setCatError('');
+    try {
+      const cid = Number(companyId);
+      if (catEdit.id === null) await createCategory(name, '', cid);
+      else await updateCategory(catEdit.id, name, '', cid);
+      const list = await loadCats();
+      // Select what was just created/renamed so the user can continue right away.
+      const saved = catEdit.id !== null
+        ? list.find(c => c.categoryId === catEdit.id)
+        : list.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
+      if (saved) { upd('categoryId', saved.categoryId); upd('categoryName', saved.name); }
+      setCatEdit(null);
+    } catch (e: any) {
+      console.error('[ProductWizard] saveCat:error', e);
+      setCatError('No se pudo guardar la categoría. Intenta de nuevo.');
+    } finally {
+      setCatSaving(false);
+    }
   };
 
   const upd = (f: keyof WizardData, v: any) => { setData(p => ({...p,[f]:v})); setErrors(p => ({...p,[f]:''})); };
-  const fmt = (v: string) => v ? new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(parseFloat(v)||0) : '—';
+  const updCost = (v: string) => {
+    upd('unitPrice', v);
+    const cost = parseFloat(v);
+    if (!saleTouched && cost > 0) upd('salePrice', shelfPrice(cost, TARGET_MARGIN).toFixed(2));
+  };
+  const updSale = (v: string) => { setSaleTouched(true); upd('salePrice', v); };
+
+  /** Product label agent -> form. Only fills fields that are still empty, so it
+   *  never overwrites what the user typed; Código, category and prices stay manual. */
+  const applyLabelReading = (r: ProductLabelReading): string[] => {
+    const filled: string[] = [];
+    const fill = (f: keyof WizardData, value: string, label: string) => {
+      if (!value || String(data[f] ?? '').trim()) return;
+      upd(f, value);
+      filled.push(label);
+    };
+    fill('name', r.suggestedName, 'Nombre');
+    fill('barCode', r.barCode, 'Código de barras');
+    fill('description', r.description, 'Descripción');
+    if (r.netContent > 0 && r.unitOfMeasure && !data.netContent && !data.unitOfMeasure) {
+      upd('netContent', String(r.netContent));
+      upd('unitOfMeasure', r.unitOfMeasure);
+      filled.push('Contenido neto');
+    }
+    if (r.expirationDate && !data.dateOfExpire && !data.noExpire) {
+      upd('dateOfExpire', r.expirationDate);
+      filled.push('Fecha de expiración');
+    }
+    return filled;
+  };
+  /** Reader photos changed: default the product image to the first one (the front). */
+  const onLabelPhotos = (photos: string[]) => {
+    setLabelPhotos(photos);
+    if (!imageChosen) setPendingImage(photos[0] ?? '');
+    else if (pendingImage && !photos.includes(pendingImage) && labelPhotos.includes(pendingImage)) setPendingImage(photos[0] ?? '');
+  };
+  const chooseImage = (src: string) => { setPendingImage(src); setImageChosen(true); };
+  const takeImage = async () => {
+    const dataUrl = await pickProductLabelPhoto();
+    if (dataUrl) chooseImage(dataUrl);
+  };
+  const imagePreview = pendingImage || data.imageUrl;
+  const fmt =(v: string) => v ? new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(parseFloat(v)||0) : '—';
 
   const validate = () => {
     const e: Record<string,string> = {};
     if (step===0 && !data.categoryId) e.categoryId='Selecciona una categoría';
-    if (step===1) { if(!data.name.trim()) e.name='El nombre es requerido'; if(!data.code.trim()) e.code='El código es requerido'; }
-    if (step===2 && (!data.salePrice || parseFloat(data.salePrice)<0)) e.salePrice='Ingresa un precio válido';
+    if (step===1) {
+      if(!data.name.trim()) e.name='El nombre es requerido';
+      if(!data.noExpire && !data.dateOfExpire) e.dateOfExpire='Elige una fecha o marca "Sin fecha de expiración"';
+      const content = parseFloat(data.netContent);
+      if (data.netContent && !(content > 0)) e.netContent='Ingresa una cantidad mayor a 0';
+      else if (data.netContent && !data.unitOfMeasure) e.netContent='Selecciona la unidad';
+      else if (!data.netContent && data.unitOfMeasure) e.netContent='Ingresa la cantidad';
+    }
+    if (step===2) {
+      const sale = parseFloat(data.salePrice);
+      const cost = parseFloat(data.unitPrice) || 0;
+      if (!data.salePrice || !(sale >= 0)) e.salePrice='Ingresa un precio válido';
+      else if (cost > 0 && sale < suggestedPrice(cost)) e.salePrice=`El margen mínimo es ${TARGET_MARGIN*100}%. Precio mínimo: ${fmtMXN(suggestedPrice(cost))}`;
+    }
     setErrors(e); return Object.keys(e).length===0;
   };
 
@@ -192,12 +337,8 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
 
       console.log('[ProductWizard] handleSubmit:sanitizedOptions', sanitizedOptions);
 
-      if (sanitizedOptions.length === 0) {
-        const msg = 'Debes agregar al menos una opción de producto.';
-        console.warn('[ProductWizard] handleSubmit:validationError:noOptions', { message: msg });
-        setSubmitError(msg);
-        return;
-      }
+      // Options are optional: a drink/snack is a plain product (barcode, stock, price).
+      // Options are only for real modifiers (size, flavor of a prepared item).
 
       const invalidOptionIndex = sanitizedOptions.findIndex(
         (opt) => !opt.name || !opt.optionKey || !opt.type || !Array.isArray(opt.optionChoices) || opt.optionChoices.length === 0
@@ -269,13 +410,28 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
 
       const isEdit = Boolean(product?.productId);
 
+      let imageUrl = data.imageUrl || null;
+      if (pendingImage) {
+        setUploadingImage(true);
+        try {
+          imageUrl = await uploadProductImage({ companyId: normalizedCompanyId, imageBase64: pendingImage });
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+
       const payload = {
         productId: product?.productId ?? null,
         name: data.name.trim(),
         code: data.code.trim(),
         barCode: data.barCode.trim(),
         description: data.description.trim(),
-        dateOfExpire: data.dateOfExpire || '',
+        dateOfExpire: data.noExpire ? '' : data.dateOfExpire,
+        noExpire: data.noExpire,
+        netContent: data.netContent ? Number(data.netContent) : null,
+        referencePrice: data.referencePrice ? Number(data.referencePrice) : null,
+        imageUrl,
+        unitOfMeasure: data.netContent ? data.unitOfMeasure : null,
         categoryId: data.categoryId,
         companyId: normalizedCompanyId,
         productFormId: product?.productFormId ?? 0,
@@ -371,15 +527,47 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
        cats.length===0 ? <div className="wizard-no-cats"><p>No se encontraron categorías</p></div> :
        <div className="wizard-category-grid">
          {cats.map(cat=>(
-             <button key={cat.categoryId} className={`wizard-category-card${data.categoryId===cat.categoryId?' selected':''}`}
-             onClick={()=>{ if (isReadOnly) return; upd('categoryId',cat.categoryId); upd('categoryName',cat.name); }}
-             disabled={isReadOnly}>
-             <div className="wizard-cat-icon">🏷️</div>
-             <span className="wizard-cat-name">{cat.name}</span>
-             {data.categoryId===cat.categoryId && <div className="wizard-cat-check"><IonIcon icon={checkmarkCircle}/></div>}
-           </button>
+           <div key={cat.categoryId} className="wizard-category-cell">
+             <button className={`wizard-category-card${data.categoryId===cat.categoryId?' selected':''}`}
+               onClick={()=>{ if (isReadOnly) return; upd('categoryId',cat.categoryId); upd('categoryName',cat.name); }}
+               disabled={isReadOnly}>
+               <div className="wizard-cat-icon">🏷️</div>
+               <span className="wizard-cat-name">{cat.name}</span>
+               {data.categoryId===cat.categoryId && <div className="wizard-cat-check"><IonIcon icon={checkmarkCircle}/></div>}
+             </button>
+             {!isReadOnly && (
+               <IonButton fill="clear" size="small" className="wizard-cat-edit" aria-label={`Renombrar ${cat.name}`}
+                 onClick={()=>startRenameCat(cat)} disabled={catSaving}>
+                 <IonIcon slot="icon-only" icon={createOutline}/>
+               </IonButton>
+             )}
+           </div>
          ))}
        </div>}
+      {!isReadOnly && !catLoading && (
+        catEdit ? (
+          <div className="wizard-cat-form">
+            <p className="wizard-cat-form-title">{catEdit.id === null ? 'Nueva categoría' : 'Renombrar categoría'}</p>
+            <IonInput className={`wizard-ion-input wizard-cat-input${catError ? ' error' : ''}`} placeholder="Ej. Bebidas"
+              value={catEdit.name} maxlength={50} disabled={catSaving}
+              onIonInput={e=>{ setCatEdit({ ...catEdit, name: String(e.detail.value ?? '') }); setCatError(''); }}
+              onKeyDown={e=>{ if (e.key === 'Enter') saveCat(); }}/>
+            {catError && <span className="wizard-field-error">{catError}</span>}
+            <div className="wizard-cat-form-actions">
+              <IonButton fill="clear" color="medium" size="small" onClick={()=>{ setCatEdit(null); setCatError(''); }} disabled={catSaving}>
+                Cancelar
+              </IonButton>
+              <IonButton size="small" onClick={saveCat} disabled={catSaving}>
+                {catSaving ? <IonSpinner name="dots"/> : 'Guardar'}
+              </IonButton>
+            </div>
+          </div>
+        ) : (
+          <IonButton fill="outline" size="small" className="wizard-cat-add" onClick={startNewCat}>
+            <IonIcon slot="start" icon={add}/> Nueva categoría
+          </IonButton>
+        )
+      )}
       {errors.categoryId && <p className="wizard-field-error" style={{marginTop:12}}>{errors.categoryId}</p>}
     </div>
   );
@@ -391,7 +579,40 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         <h2 className="wizard-step-title">Información del producto</h2>
         <p className="wizard-step-subtitle">Datos básicos de identificación</p>
       </div>
+      {!isReadOnly && effectiveMode !== 'edit' && (
+        <ProductLabelReader companyId={Number(companyId)} onApply={applyLabelReading} onPhotosChange={onLabelPhotos} />
+      )}
       <div className="wizard-form">
+        <div className="wizard-field">
+          <label className="wizard-label">Imagen del producto</label>
+          <div className="wizard-image-row">
+            {imagePreview
+              ? <IonImg className="wizard-image-preview" src={imagePreview} alt="Imagen del producto" />
+              : <div className="wizard-image-empty">Sin imagen</div>}
+            {!isReadOnly && (
+              <div className="wizard-image-actions">
+                {labelPhotos.length > 1 && (
+                  <div className="wizard-image-choices">
+                    {labelPhotos.map((src, i) => (
+                      <IonChip key={i} className={`wizard-image-chip${pendingImage === src ? ' selected' : ''}`} onClick={() => chooseImage(src)}>
+                        Foto {i + 1}
+                      </IonChip>
+                    ))}
+                  </div>
+                )}
+                <IonButton size="small" fill="outline" onClick={takeImage}>
+                  {imagePreview ? 'Cambiar imagen' : 'Agregar imagen'}
+                </IonButton>
+                {pendingImage && (
+                  <IonButton size="small" fill="clear" color="medium" onClick={() => { setPendingImage(''); setImageChosen(true); }}>
+                    Quitar
+                  </IonButton>
+                )}
+              </div>
+            )}
+          </div>
+          {pendingImage && <span className="wizard-image-hint">Se sube al guardar el producto.</span>}
+        </div>
         <div className="wizard-field">
           <label className="wizard-label">Nombre <span className="required">*</span></label>
           <input className={`wizard-input${errors.name?' error':''}`} placeholder="Ej. El Buchón" value={data.name} onChange={e=>upd('name',e.target.value)} disabled={isReadOnly}/>
@@ -399,9 +620,9 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         </div>
         <div className="wizard-field-row">
           <div className="wizard-field">
-            <label className="wizard-label">Código <span className="required">*</span></label>
-            <input className={`wizard-input${errors.code?' error':''}`} placeholder="Ej. PROD001" value={data.code} onChange={e=>upd('code',e.target.value)} disabled={isReadOnly}/>
-            {errors.code && <span className="wizard-field-error">{errors.code}</span>}
+            <label className="wizard-label">Código</label>
+            {/* Assigned by sp_products_save on insert: MAX(numeric code) + 1 for the company. */}
+            <div className="wizard-auto-code">{data.code || 'Automático al guardar'}</div>
           </div>
           <div className="wizard-field">
             <label className="wizard-label">Código de barras</label>
@@ -413,8 +634,29 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
           <textarea className="wizard-textarea" placeholder="Describe brevemente el producto..." rows={3} value={data.description} onChange={e=>upd('description',e.target.value)} disabled={isReadOnly}/>
         </div>
         <div className="wizard-field">
+          <label className="wizard-label">Contenido neto</label>
+          <div className="wizard-content-row">
+            <IonInput className={`wizard-ion-input${errors.netContent?' error':''}`} type="number" inputmode="decimal" min="0" placeholder="Ej. 500"
+              value={data.netContent} onIonInput={e=>upd('netContent',String(e.detail.value ?? ''))} disabled={isReadOnly}/>
+            <IonSegment className="wizard-unit-segment" value={data.unitOfMeasure}
+              onIonChange={e=>{ upd('unitOfMeasure',String(e.detail.value ?? '')); setErrors(p=>({...p,netContent:''})); }} disabled={isReadOnly}>
+              {UNITS.map(u=>(
+                <IonSegmentButton key={u.value} value={u.value}><IonLabel>{u.label}</IonLabel></IonSegmentButton>
+              ))}
+            </IonSegment>
+          </div>
+          {errors.netContent && <span className="wizard-field-error">{errors.netContent}</span>}
+        </div>
+        <div className="wizard-field">
           <label className="wizard-label">Fecha de expiración</label>
-          <input className="wizard-input" type="date" value={data.dateOfExpire} onChange={e=>upd('dateOfExpire',e.target.value)} disabled={isReadOnly}/>
+          {!data.noExpire && (
+            <input className={`wizard-input${errors.dateOfExpire?' error':''}`} type="date" value={data.dateOfExpire} onChange={e=>upd('dateOfExpire',e.target.value)} disabled={isReadOnly}/>
+          )}
+          <IonCheckbox className="wizard-checkbox" labelPlacement="end" justify="start" checked={data.noExpire} disabled={isReadOnly}
+            onIonChange={e=>{ upd('noExpire',e.detail.checked); setErrors(p=>({...p,dateOfExpire:''})); }}>
+            Sin fecha de expiración
+          </IonCheckbox>
+          {errors.dateOfExpire && <span className="wizard-field-error">{errors.dateOfExpire}</span>}
         </div>
       </div>
     </div>
@@ -422,28 +664,75 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
 
   /* ── Step 3: Price ── */
   const renderS3 = () => {
-    const margin = data.salePrice && data.unitPrice ? (parseFloat(data.salePrice)||0)-(parseFloat(data.unitPrice)||0) : null;
+    const sale = parseFloat(data.salePrice) || 0;
+    const cost = parseFloat(data.unitPrice) || 0;
+    const minPrice = cost > 0 ? suggestedPrice(cost) : null;
+    const margin = data.salePrice && cost > 0 ? sale - cost : null;
+    const marginPct = margin !== null ? marginOf(sale, cost) : null;
+    const belowTarget = minPrice !== null && data.salePrice !== '' && sale < minPrice;
+    const perUnit = pricePerBaseUnit(sale, parseFloat(data.netContent), data.unitOfMeasure);
+    const ref = parseFloat(data.referencePrice) || 0;
+    const refMargin = ref > 0 && cost > 0 ? marginOf(ref, cost) : null;
+    /** Costo máximo para vender al precio de mercado con el margen objetivo. */
+    const maxCostAtRef = ref > 0 ? Math.floor(ref * (1 - TARGET_MARGIN) * 100) / 100 : null;
+    const vsRef = ref > 0 && sale > 0 ? (sale - ref) / ref : null;
     return (
       <div>
         <div className="wizard-step-header">
           <h2 className="wizard-step-title">Precio y disponibilidad</h2>
-          <p className="wizard-step-subtitle">Define el precio de venta y el stock inicial</p>
+          <p className="wizard-step-subtitle">Captura el costo y sugerimos el precio con {TARGET_MARGIN*100}% de margen</p>
         </div>
         <div className="wizard-form">
+          <div className="wizard-field">
+            <label className="wizard-label">Costo unitario (MXN)</label>
+            <div className="wizard-input-prefix">
+              <span className="prefix">$</span>
+              <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="0.00" value={data.unitPrice} onChange={e=>updCost(e.target.value)} disabled={isReadOnly}/>
+            </div>
+          </div>
           <div className="wizard-field">
             <label className="wizard-label">Precio de venta (MXN) <span className="required">*</span></label>
             <div className="wizard-input-prefix">
               <span className="prefix">$</span>
-              <input className={`wizard-input with-prefix${errors.salePrice?' error':''}`} type="number" min="0" step="0.01" placeholder="0.00" value={data.salePrice} onChange={e=>upd('salePrice',e.target.value)} disabled={isReadOnly}/>
+              <input className={`wizard-input with-prefix${errors.salePrice || belowTarget ?' error':''}`} type="number" min="0" step="0.01" placeholder="0.00" value={data.salePrice} onChange={e=>updSale(e.target.value)} disabled={isReadOnly}/>
             </div>
+            {minPrice !== null && !isReadOnly && (
+              <div className="wizard-suggested-price">
+                <span>Sugerencias según el costo (mínimo {TARGET_MARGIN*100}% → <strong>{fmtMXN(minPrice)}</strong>)</span>
+                <div className="wizard-price-chips">
+                  {MARGIN_PRESETS.map(m => {
+                    const price = shelfPrice(cost, m);
+                    return (
+                      <IonChip key={m} className={`wizard-price-chip${sale === price ? ' selected' : ''}`}
+                        onClick={()=>{ updSale(price.toFixed(2)); }}>
+                        <strong>{fmtMXN(price)}</strong>&nbsp;· {Math.round(m*100)}%
+                      </IonChip>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {errors.salePrice && <span className="wizard-field-error">{errors.salePrice}</span>}
           </div>
           <div className="wizard-field">
-            <label className="wizard-label">Precio unitario / Costo (MXN)</label>
+            <label className="wizard-label">Precio en el mercado (MXN)</label>
             <div className="wizard-input-prefix">
               <span className="prefix">$</span>
-              <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="0.00" value={data.unitPrice} onChange={e=>upd('unitPrice',e.target.value)} disabled={isReadOnly}/>
+              <input className="wizard-input with-prefix" type="number" min="0" step="0.01" placeholder="Ej. precio en OXXO" value={data.referencePrice} onChange={e=>upd('referencePrice',e.target.value)} disabled={isReadOnly}/>
             </div>
+            {ref > 0 && (
+              <div className={`wizard-market-hint${refMargin !== null && refMargin < TARGET_MARGIN ? ' warn' : ''}`}>
+                {vsRef !== null && (
+                  <p>Tu precio está <strong>{vsRef >= 0 ? `${(vsRef*100).toFixed(1)}% arriba` : `${(-vsRef*100).toFixed(1)}% abajo`}</strong> del mercado ({fmtMXN(Math.abs(sale - ref))}).</p>
+                )}
+                {refMargin !== null && (
+                  <p>Al precio de mercado tu margen sería <strong>{(refMargin*100).toFixed(1)}%</strong>.</p>
+                )}
+                {refMargin !== null && refMargin < TARGET_MARGIN && maxCostAtRef !== null && (
+                  <p>Para competir con {TARGET_MARGIN*100}% de margen necesitas comprarlo a <strong>{fmtMXN(maxCostAtRef)}</strong> o menos.</p>
+                )}
+              </div>
+            )}
           </div>
           <div className="wizard-field">
             <label className="wizard-label">Cantidad en stock</label>
@@ -452,7 +741,13 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
           {data.salePrice && (
             <div className="wizard-price-summary">
               <div className="price-summary-row"><span>Precio de venta</span><strong className="price-green">{fmt(data.salePrice)}</strong></div>
-              {margin!==null && data.unitPrice && <div className="price-summary-row"><span>Margen estimado</span><strong className={margin>=0?'price-green':'price-blue'}>{fmt(margin.toString())}</strong></div>}
+              {margin!==null && marginPct!==null && (
+                <div className="price-summary-row">
+                  <span>Margen</span>
+                  <strong className={belowTarget?'price-red':'price-green'}>{fmt(margin.toString())} ({(marginPct*100).toFixed(1)}%)</strong>
+                </div>
+              )}
+              {perUnit && <div className="price-summary-row"><span>Precio por {perUnit.unit}</span><strong className="price-blue">{fmtMXN(perUnit.value)}</strong></div>}
               {data.stockQuantity && <div className="price-summary-row"><span>Valor en inventario</span><strong className="price-blue">{fmt(((parseFloat(data.salePrice)||0)*(parseInt(data.stockQuantity)||0)).toString())}</strong></div>}
             </div>
           )}
@@ -561,8 +856,8 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   /* ── Step 6: Review ── */
   const renderS6 = () => {
     const rows1 = [{k:'Categoría',v:data.categoryName}];
-    const rows2 = [{k:'Nombre',v:data.name},{k:'Código',v:data.code},{k:'Código de barras',v:data.barCode},{k:'Descripción',v:data.description},{k:'Fecha expiración',v:data.dateOfExpire}];
-    const rows3 = [{k:'Precio de venta',v:data.salePrice?fmt(data.salePrice):''},{k:'Costo unitario',v:data.unitPrice?fmt(data.unitPrice):''},{k:'Stock inicial',v:data.stockQuantity}];
+    const rows2 = [{k:'Nombre',v:data.name},{k:'Código',v:data.code},{k:'Código de barras',v:data.barCode},{k:'Descripción',v:data.description},{k:'Contenido neto',v:data.netContent?`${data.netContent} ${data.unitOfMeasure}`:''},{k:'Fecha expiración',v:data.noExpire?'Sin expiración':data.dateOfExpire}];
+    const rows3 = [{k:'Precio de venta',v:data.salePrice?fmt(data.salePrice):''},{k:'Costo unitario',v:data.unitPrice?fmt(data.unitPrice):''},{k:'Margen',v:parseFloat(data.unitPrice)>0&&data.salePrice?`${(marginOf(parseFloat(data.salePrice)||0,parseFloat(data.unitPrice))*100).toFixed(1)}%`:''},{k:'Precio en mercado',v:data.referencePrice?fmt(data.referencePrice):''},{k:'Stock inicial',v:data.stockQuantity}];
     const ReviewCard = ({title,rows,editStep}:{title:string;rows:{k:string;v:string}[];editStep:number}) => (
       <div className="wizard-review-card">
         <div className="wizard-review-card-header">
@@ -662,8 +957,10 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         </button>
       )}
       {isLastStep && !showSuccess && !isReadOnly && (
-        <button className="wizard-footer-submit" onClick={handleSubmit} disabled={loading}>
-          {loading ? (isEditMode ? 'Guardando...' : 'Creando...') : (isEditMode ? '✓ Guardar cambios' : '✓ Crear producto')}
+        <button className="wizard-footer-submit" onClick={handleSubmit} disabled={loading || uploadingImage}>
+          {uploadingImage ? <><IonSpinner name="dots" /> Subiendo imagen…</>
+            : loading ? <><IonSpinner name="dots" /> {isEditMode ? 'Guardando…' : 'Creando…'}</>
+            : (isEditMode ? '✓ Guardar cambios' : '✓ Crear producto')}
         </button>
       )}
     </div>
