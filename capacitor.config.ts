@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.lavanderia.gmo',
+  appId: 'com.factoryIA.gmo',
   appName: 'Factory AI GMO',
   webDir: 'dist',
   android: {
