@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonContent, IonCheckbox, IonInput, IonSegment, IonSegmentButton, IonLabel, IonChip } from '@ionic/react';
-import { close, add, trash, checkmarkCircle, chevronForward, checkmark } from 'ionicons/icons';
+import { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonContent, IonCheckbox, IonInput, IonSegment, IonSegmentButton, IonLabel, IonChip, IonImg, IonSpinner } from '@ionic/react';
+import { close, add, trash, checkmarkCircle, chevronForward, checkmark, createOutline } from 'ionicons/icons';
+import { createCategory, updateCategory } from '../../../api/categoriesApi';
 import { fetchCategoriesByCompany } from '../../../utils/apiUtils';
 import { useProduct } from '../../../contexts/ProductContext';
 import { useUser } from '../../../contexts/UserContext';
@@ -8,6 +9,8 @@ import { Product } from '../../../data/type_products';
 import { fmtMXN } from '../../../utils/format';
 import { ProductLabelReading } from '../../../api/productAgentApi';
 import ProductLabelReader from './ProductLabelReader';
+import { uploadProductImage } from '../../../api/productsApi';
+import { pickProductLabelPhoto } from '../../../utils/pickAvatarPhoto';
 import './ProductWizard.css';
 
 interface OptionChoice { name: string; extraPrice: number; }
@@ -19,6 +22,8 @@ interface WizardData {
   salePrice: string; unitPrice: string; stockQuantity: string;
   /** Precio al que lo vende la competencia (OXXO, súper…) — referencia, no se cobra. */
   referencePrice: string;
+  /** Saved product photo (blob URL). */
+  imageUrl: string;
   options: ProductOptionData[];
   formQuantity: string; additionalDescription: string; packingName: string; packingPresentationName: string;
 }
@@ -61,7 +66,7 @@ const pricePerBaseUnit = (sale: number, content: number, unit: string) => {
 const INIT: WizardData = {
   categoryId:0, categoryName:'', name:'', code:'', barCode:'', description:'', dateOfExpire:'', noExpire:false,
   netContent:'', unitOfMeasure:'',
-  salePrice:'', unitPrice:'', stockQuantity:'', referencePrice:'', options:[],
+  salePrice:'', unitPrice:'', stockQuantity:'', referencePrice:'', imageUrl:'', options:[],
   formQuantity:'', additionalDescription:'', packingName:'', packingPresentationName:'',
 };
 
@@ -72,11 +77,22 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const [data, setData] = useState<WizardData>(INIT);
   const [cats, setCats] = useState<CategoryItem[]>([]);
   const [catLoading, setCatLoading] = useState(false);
+  /** Inline category form: id null = new category. */
+  const [catEdit, setCatEdit] = useState<{ id: number | null; name: string } | null>(null);
+  const [catSaving, setCatSaving] = useState(false);
+  const [catError, setCatError] = useState('');
   const [errors, setErrors] = useState<Record<string,string>>({});
   const [showSuccess, setShowSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [openOpt, setOpenOpt] = useState<Record<number,boolean>>({});
   const [saleTouched, setSaleTouched] = useState(false);
+  /** Photos taken in the label reader; one of them becomes the product image. */
+  const [labelPhotos, setLabelPhotos] = useState<string[]>([]);
+  /** Product image not uploaded yet (data URL) — uploaded on submit. */
+  const [pendingImage, setPendingImage] = useState('');
+  /** true once the user picked the image by hand, so new reader photos don't replace it. */
+  const [imageChosen, setImageChosen] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const effectiveMode: 'create' | 'view' | 'edit' = mode ?? (product?.productId ? 'edit' : 'create');
   const isReadOnly = effectiveMode === 'view';
 
@@ -89,6 +105,9 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     setSubmitError('');
     setOpenOpt({});
     setSaleTouched(Boolean(product));
+    setLabelPhotos([]);
+    setPendingImage('');
+    setImageChosen(false);
     loadCats();
 
     if (product) {
@@ -127,6 +146,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         salePrice: details?.salePrice != null ? String(details.salePrice) : '0',
         unitPrice: details?.unitPrice != null ? String(details.unitPrice) : '0',
         stockQuantity: details?.stockQuantity != null ? String(details.stockQuantity) : '0',
+        imageUrl: String(anyProduct.imageUrl ?? anyProduct.image ?? ''),
         referencePrice: anyProduct.referencePrice != null && Number(anyProduct.referencePrice) > 0 ? String(Number(anyProduct.referencePrice)) : '',
         options: mappedOptions,
         formQuantity: product.form?.quantity ?? '',
@@ -140,17 +160,49 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     setData(INIT);
   }, [isOpen, product]);
 
-  const loadCats = async () => {
+  const loadCats = async (): Promise<CategoryItem[]> => {
     setCatLoading(true);
     try {
       const normalizedCompanyId = Number(companyId);
       if (!Number.isFinite(normalizedCompanyId) || normalizedCompanyId <= 0) {
         setCats([]);
-        return;
+        return [];
       }
       const res = await fetchCategoriesByCompany(String(normalizedCompanyId));
-      setCats(res.map((c: any) => ({ categoryId: c.categoryId ?? c.productCategoryId ?? 0, name: c.name ?? '' })));
-    } catch(e) { console.error(e); } finally { setCatLoading(false); }
+      const list: CategoryItem[] = res.map((c: any) => ({ categoryId: c.categoryId ?? c.productCategoryId ?? 0, name: c.name ?? '' }));
+      setCats(list);
+      return list;
+    } catch(e) { console.error(e); return []; } finally { setCatLoading(false); }
+  };
+
+  /* Create / rename a category without leaving the wizard (same CRUD as CategoriesPage). */
+  const startNewCat = () => { setCatEdit({ id: null, name: '' }); setCatError(''); };
+  const startRenameCat = (cat: CategoryItem) => { setCatEdit({ id: cat.categoryId, name: cat.name }); setCatError(''); };
+  const saveCat = async () => {
+    if (!catEdit) return;
+    const name = catEdit.name.trim();
+    if (!name) { setCatError('Escribe el nombre de la categoría'); return; }
+    const duplicate = cats.some(c => c.categoryId !== catEdit.id && c.name.trim().toLowerCase() === name.toLowerCase());
+    if (duplicate) { setCatError('Ya existe una categoría con ese nombre'); return; }
+    setCatSaving(true);
+    setCatError('');
+    try {
+      const cid = Number(companyId);
+      if (catEdit.id === null) await createCategory(name, '', cid);
+      else await updateCategory(catEdit.id, name, '', cid);
+      const list = await loadCats();
+      // Select what was just created/renamed so the user can continue right away.
+      const saved = catEdit.id !== null
+        ? list.find(c => c.categoryId === catEdit.id)
+        : list.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
+      if (saved) { upd('categoryId', saved.categoryId); upd('categoryName', saved.name); }
+      setCatEdit(null);
+    } catch (e: any) {
+      console.error('[ProductWizard] saveCat:error', e);
+      setCatError('No se pudo guardar la categoría. Intenta de nuevo.');
+    } finally {
+      setCatSaving(false);
+    }
   };
 
   const upd = (f: keyof WizardData, v: any) => { setData(p => ({...p,[f]:v})); setErrors(p => ({...p,[f]:''})); };
@@ -184,6 +236,18 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     }
     return filled;
   };
+  /** Reader photos changed: default the product image to the first one (the front). */
+  const onLabelPhotos = (photos: string[]) => {
+    setLabelPhotos(photos);
+    if (!imageChosen) setPendingImage(photos[0] ?? '');
+    else if (pendingImage && !photos.includes(pendingImage) && labelPhotos.includes(pendingImage)) setPendingImage(photos[0] ?? '');
+  };
+  const chooseImage = (src: string) => { setPendingImage(src); setImageChosen(true); };
+  const takeImage = async () => {
+    const dataUrl = await pickProductLabelPhoto();
+    if (dataUrl) chooseImage(dataUrl);
+  };
+  const imagePreview = pendingImage || data.imageUrl;
   const fmt =(v: string) => v ? new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(parseFloat(v)||0) : '—';
 
   const validate = () => {
@@ -191,7 +255,6 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     if (step===0 && !data.categoryId) e.categoryId='Selecciona una categoría';
     if (step===1) {
       if(!data.name.trim()) e.name='El nombre es requerido';
-      if(!data.code.trim()) e.code='El código es requerido';
       if(!data.noExpire && !data.dateOfExpire) e.dateOfExpire='Elige una fecha o marca "Sin fecha de expiración"';
       const content = parseFloat(data.netContent);
       if (data.netContent && !(content > 0)) e.netContent='Ingresa una cantidad mayor a 0';
@@ -274,12 +337,8 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
 
       console.log('[ProductWizard] handleSubmit:sanitizedOptions', sanitizedOptions);
 
-      if (sanitizedOptions.length === 0) {
-        const msg = 'Debes agregar al menos una opción de producto.';
-        console.warn('[ProductWizard] handleSubmit:validationError:noOptions', { message: msg });
-        setSubmitError(msg);
-        return;
-      }
+      // Options are optional: a drink/snack is a plain product (barcode, stock, price).
+      // Options are only for real modifiers (size, flavor of a prepared item).
 
       const invalidOptionIndex = sanitizedOptions.findIndex(
         (opt) => !opt.name || !opt.optionKey || !opt.type || !Array.isArray(opt.optionChoices) || opt.optionChoices.length === 0
@@ -351,6 +410,16 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
 
       const isEdit = Boolean(product?.productId);
 
+      let imageUrl = data.imageUrl || null;
+      if (pendingImage) {
+        setUploadingImage(true);
+        try {
+          imageUrl = await uploadProductImage({ companyId: normalizedCompanyId, imageBase64: pendingImage });
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+
       const payload = {
         productId: product?.productId ?? null,
         name: data.name.trim(),
@@ -361,6 +430,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         noExpire: data.noExpire,
         netContent: data.netContent ? Number(data.netContent) : null,
         referencePrice: data.referencePrice ? Number(data.referencePrice) : null,
+        imageUrl,
         unitOfMeasure: data.netContent ? data.unitOfMeasure : null,
         categoryId: data.categoryId,
         companyId: normalizedCompanyId,
@@ -457,15 +527,47 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
        cats.length===0 ? <div className="wizard-no-cats"><p>No se encontraron categorías</p></div> :
        <div className="wizard-category-grid">
          {cats.map(cat=>(
-             <button key={cat.categoryId} className={`wizard-category-card${data.categoryId===cat.categoryId?' selected':''}`}
-             onClick={()=>{ if (isReadOnly) return; upd('categoryId',cat.categoryId); upd('categoryName',cat.name); }}
-             disabled={isReadOnly}>
-             <div className="wizard-cat-icon">🏷️</div>
-             <span className="wizard-cat-name">{cat.name}</span>
-             {data.categoryId===cat.categoryId && <div className="wizard-cat-check"><IonIcon icon={checkmarkCircle}/></div>}
-           </button>
+           <div key={cat.categoryId} className="wizard-category-cell">
+             <button className={`wizard-category-card${data.categoryId===cat.categoryId?' selected':''}`}
+               onClick={()=>{ if (isReadOnly) return; upd('categoryId',cat.categoryId); upd('categoryName',cat.name); }}
+               disabled={isReadOnly}>
+               <div className="wizard-cat-icon">🏷️</div>
+               <span className="wizard-cat-name">{cat.name}</span>
+               {data.categoryId===cat.categoryId && <div className="wizard-cat-check"><IonIcon icon={checkmarkCircle}/></div>}
+             </button>
+             {!isReadOnly && (
+               <IonButton fill="clear" size="small" className="wizard-cat-edit" aria-label={`Renombrar ${cat.name}`}
+                 onClick={()=>startRenameCat(cat)} disabled={catSaving}>
+                 <IonIcon slot="icon-only" icon={createOutline}/>
+               </IonButton>
+             )}
+           </div>
          ))}
        </div>}
+      {!isReadOnly && !catLoading && (
+        catEdit ? (
+          <div className="wizard-cat-form">
+            <p className="wizard-cat-form-title">{catEdit.id === null ? 'Nueva categoría' : 'Renombrar categoría'}</p>
+            <IonInput className={`wizard-ion-input wizard-cat-input${catError ? ' error' : ''}`} placeholder="Ej. Bebidas"
+              value={catEdit.name} maxlength={50} disabled={catSaving}
+              onIonInput={e=>{ setCatEdit({ ...catEdit, name: String(e.detail.value ?? '') }); setCatError(''); }}
+              onKeyDown={e=>{ if (e.key === 'Enter') saveCat(); }}/>
+            {catError && <span className="wizard-field-error">{catError}</span>}
+            <div className="wizard-cat-form-actions">
+              <IonButton fill="clear" color="medium" size="small" onClick={()=>{ setCatEdit(null); setCatError(''); }} disabled={catSaving}>
+                Cancelar
+              </IonButton>
+              <IonButton size="small" onClick={saveCat} disabled={catSaving}>
+                {catSaving ? <IonSpinner name="dots"/> : 'Guardar'}
+              </IonButton>
+            </div>
+          </div>
+        ) : (
+          <IonButton fill="outline" size="small" className="wizard-cat-add" onClick={startNewCat}>
+            <IonIcon slot="start" icon={add}/> Nueva categoría
+          </IonButton>
+        )
+      )}
       {errors.categoryId && <p className="wizard-field-error" style={{marginTop:12}}>{errors.categoryId}</p>}
     </div>
   );
@@ -478,9 +580,39 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         <p className="wizard-step-subtitle">Datos básicos de identificación</p>
       </div>
       {!isReadOnly && effectiveMode !== 'edit' && (
-        <ProductLabelReader companyId={Number(companyId)} onApply={applyLabelReading} />
+        <ProductLabelReader companyId={Number(companyId)} onApply={applyLabelReading} onPhotosChange={onLabelPhotos} />
       )}
       <div className="wizard-form">
+        <div className="wizard-field">
+          <label className="wizard-label">Imagen del producto</label>
+          <div className="wizard-image-row">
+            {imagePreview
+              ? <IonImg className="wizard-image-preview" src={imagePreview} alt="Imagen del producto" />
+              : <div className="wizard-image-empty">Sin imagen</div>}
+            {!isReadOnly && (
+              <div className="wizard-image-actions">
+                {labelPhotos.length > 1 && (
+                  <div className="wizard-image-choices">
+                    {labelPhotos.map((src, i) => (
+                      <IonChip key={i} className={`wizard-image-chip${pendingImage === src ? ' selected' : ''}`} onClick={() => chooseImage(src)}>
+                        Foto {i + 1}
+                      </IonChip>
+                    ))}
+                  </div>
+                )}
+                <IonButton size="small" fill="outline" onClick={takeImage}>
+                  {imagePreview ? 'Cambiar imagen' : 'Agregar imagen'}
+                </IonButton>
+                {pendingImage && (
+                  <IonButton size="small" fill="clear" color="medium" onClick={() => { setPendingImage(''); setImageChosen(true); }}>
+                    Quitar
+                  </IonButton>
+                )}
+              </div>
+            )}
+          </div>
+          {pendingImage && <span className="wizard-image-hint">Se sube al guardar el producto.</span>}
+        </div>
         <div className="wizard-field">
           <label className="wizard-label">Nombre <span className="required">*</span></label>
           <input className={`wizard-input${errors.name?' error':''}`} placeholder="Ej. El Buchón" value={data.name} onChange={e=>upd('name',e.target.value)} disabled={isReadOnly}/>
@@ -488,9 +620,9 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         </div>
         <div className="wizard-field-row">
           <div className="wizard-field">
-            <label className="wizard-label">Código <span className="required">*</span></label>
-            <input className={`wizard-input${errors.code?' error':''}`} placeholder="Ej. PROD001" value={data.code} onChange={e=>upd('code',e.target.value)} disabled={isReadOnly}/>
-            {errors.code && <span className="wizard-field-error">{errors.code}</span>}
+            <label className="wizard-label">Código</label>
+            {/* Assigned by sp_products_save on insert: MAX(numeric code) + 1 for the company. */}
+            <div className="wizard-auto-code">{data.code || 'Automático al guardar'}</div>
           </div>
           <div className="wizard-field">
             <label className="wizard-label">Código de barras</label>
@@ -825,8 +957,10 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         </button>
       )}
       {isLastStep && !showSuccess && !isReadOnly && (
-        <button className="wizard-footer-submit" onClick={handleSubmit} disabled={loading}>
-          {loading ? (isEditMode ? 'Guardando...' : 'Creando...') : (isEditMode ? '✓ Guardar cambios' : '✓ Crear producto')}
+        <button className="wizard-footer-submit" onClick={handleSubmit} disabled={loading || uploadingImage}>
+          {uploadingImage ? <><IonSpinner name="dots" /> Subiendo imagen…</>
+            : loading ? <><IonSpinner name="dots" /> {isEditMode ? 'Guardando…' : 'Creando…'}</>
+            : (isEditMode ? '✓ Guardar cambios' : '✓ Crear producto')}
         </button>
       )}
     </div>

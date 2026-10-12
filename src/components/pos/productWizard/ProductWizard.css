@@ -447,9 +447,16 @@
 
 .wizard-choice-row {
   display: grid;
-  grid-template-columns: 1fr 100px 30px;
+  grid-template-columns: 1fr 130px 36px;
   gap: 8px;
   align-items: center;
+}
+
+/* 100px left ~20px for the number once the $ prefix and padding were taken */
+.wizard-choice-row .wizard-input.with-prefix {
+  padding-left: 12px;
+  padding-right: 8px;
+  text-align: right;
 }
 
 .wizard-add-choice-btn {
@@ -880,7 +887,8 @@
   align-items: stretch;
 }
 
-.wizard-ion-input {
+/* doubled class: Ionic injects ion-input styles after this file */
+.wizard-ion-input.wizard-ion-input {
   flex: 0 0 140px;
   --padding-start: 14px;
   --padding-end: 14px;
@@ -911,7 +919,7 @@
 .wizard-unit-segment ion-segment-button {
   --indicator-color: #2563EB;
   --color: #4B5563;
-  --color-checked: #ffffff;
+  --color-checked: #2563EB;
   min-width: 0;
   font-weight: 600;
 }
@@ -992,4 +1000,141 @@
 
 .wizard-market-hint p + p {
   margin-top: 4px;
+}
+
+/* ── Auto-assigned product code (read-only) ── */
+.wizard-auto-code {
+  padding: 12px 14px;
+  border: 1.5px dashed #E5E7EB;
+  border-radius: 12px;
+  background: #F9FAFB;
+  font-size: 15px;
+  color: #6B7280;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+
+/* ── Product image ── */
+.wizard-image-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.wizard-image-preview,
+.wizard-image-empty {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  border: 1.5px solid #E5E7EB;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.wizard-image-preview::part(image) {
+  object-fit: cover;
+}
+
+.wizard-image-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+.wizard-image-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.wizard-image-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wizard-image-chip.wizard-image-chip {
+  --background: #ffffff;
+  --color: #374151;
+  margin: 0;
+  border: 1.5px solid #E5E7EB;
+  font-size: 13px;
+}
+
+.wizard-image-chip.wizard-image-chip.selected {
+  --background: #EFF6FF;
+  --color: #1D4ED8;
+  border-color: #2563EB;
+}
+
+.wizard-image-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.wizard-footer-submit ion-spinner {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+/* ── Category create / rename (step 1) ── */
+.wizard-category-cell {
+  position: relative;
+}
+
+.wizard-category-cell .wizard-category-card {
+  width: 100%;
+  height: 100%;
+}
+
+.wizard-cat-edit {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  margin: 0;
+  height: auto;
+  min-height: 0;
+  --padding-start: 6px;
+  --padding-end: 6px;
+  --color: #6B7280;
+}
+
+.wizard-cat-add {
+  margin: 16px 0 0;
+}
+
+.wizard-cat-form {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-cat-form-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.wizard-cat-input.wizard-cat-input {
+  flex: none;
+  width: 100%;
+}
+
+.wizard-cat-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

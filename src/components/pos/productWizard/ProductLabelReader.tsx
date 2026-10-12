@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { IonButton, IonCard, IonCardContent, IonIcon, IonImg, IonSpinner } from '@ionic/react';
 import { cameraOutline, closeCircle, sparklesOutline, alertCircleOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import { extractProductLabel, ProductLabelReading } from '../../../api/productAgentApi';
@@ -12,6 +12,8 @@ export interface ProductLabelReaderProps {
   disabled?: boolean;
   /** Fills the form from the reading; returns the labels of the fields it filled. */
   onApply: (reading: ProductLabelReading) => string[];
+  /** Current photos (data URLs) — the wizard offers them as the product image. */
+  onPhotosChange?: (photos: string[]) => void;
 }
 
 type ReaderState = 'idle' | 'loading' | 'done' | 'failed';
@@ -22,12 +24,14 @@ type ReaderState = 'idle' | 'loading' | 'done' | 'failed';
  * Suggestions only — nothing reaches the form until "Aplicar", and the
  * wizard only fills fields that are still empty.
  */
-const ProductLabelReader: React.FC<ProductLabelReaderProps> = ({ companyId, disabled, onApply }) => {
+const ProductLabelReader: React.FC<ProductLabelReaderProps> = ({ companyId, disabled, onApply, onPhotosChange }) => {
   const [photos, setPhotos] = useState<string[]>([]);
   const [state, setState] = useState<ReaderState>('idle');
   const [reading, setReading] = useState<ProductLabelReading | null>(null);
   const [filled, setFilled] = useState<string[] | null>(null);
   const latest = useRef(0);
+
+  useEffect(() => { onPhotosChange?.(photos); }, [photos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetReading = () => {
     latest.current++;

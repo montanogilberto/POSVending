@@ -109,6 +109,8 @@ export interface CreateProductRequest {
     unitOfMeasure?: string | null;
     /** Competitor/market shelf price, reference only. */
     referencePrice?: number | null;
+    /** Product photo blob URL (uploadProductImage). Absent/null keeps the current one. */
+    imageUrl?: string | null;
     manufactureId: number | null;
     description: string;
     productForm?: ProductFormPayload | null;
@@ -475,4 +477,27 @@ export const createSupplyProduct = async (params: {
     throw new Error('El producto se creó pero no se recibió su id; recarga la lista.');
   }
   return productId;
+};
+
+/**
+ * POST /products/upload-image — uploads a product photo (data URL or bare
+ * base64) to blob storage and returns its URL. The URL is saved separately
+ * as products[].imageUrl through createOrUpdateProduct.
+ */
+export const uploadProductImage = async (payload: {
+  companyId: number;
+  imageBase64: string;
+}): Promise<string> => {
+  console.log('[productsApi] uploadProductImage: START', { companyId: payload.companyId });
+  const response = await fetch(`${API_BASE_URL}/products/upload-image`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body?.blobUrl) {
+    console.error('[productsApi] uploadProductImage: FAILED', { status: response.status, error: body?.error });
+    throw new Error('No se pudo subir la imagen del producto.');
+  }
+  return body.blobUrl as string;
 };
