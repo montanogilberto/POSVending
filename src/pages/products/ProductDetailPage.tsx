@@ -492,8 +492,10 @@ const ProductDetailPage: React.FC = () => {
                               }
                             />
 
-                            <IonLabel>
-                              {choice.name} (+${choice.price})
+                            {/* Same text everywhere; on iOS only, the price drops to its own
+                                line (iPhone 11 squeezed it to one word per line). */}
+                            <IonLabel className="choice-label">
+                              {choice.name} <span className="choice-price">(+${choice.price})</span>
                             </IonLabel>
 
                             {/* Quantity: −/+ or type any amount (was a fixed 1–10 select). */}
