@@ -95,7 +95,6 @@ import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/cart/CartPage';
 import MovementsPage from './pages/finance/MovementsPage';
 import LedStatusPage from './pages/iot/LedStatusPage';
-import ClientsPage from './pages/clients/ClientsPage';
 import EnrollmentPage from './pages/enrollment/EnrollmentPage';
 import JuridicalDashboardPage from './pages/juridical/JuridicalDashboardPage';
 import FactoryDashboardPage from './pages/factory/FactoryDashboardPage';
@@ -116,6 +115,7 @@ import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/receipt/ReceiptPage';
 import Login from './pages/authentication/Login';
 import ForgotPassword from './pages/authentication/ForgotPassword';
+import CreateAccount from './pages/authentication/CreateAccount';
 import ClientLogin from './pages/authentication/ClientLogin';
 import SupplierPage from './pages/admin/SupplierPage';
 import ServicePage from './pages/admin/ServicePage';
@@ -127,6 +127,22 @@ import ProfilePage from './pages/profile/ProfilePage';
 // bundle means environments without those credentials can still run the rest
 // of the app; only this route fails to load.
 const ClientFaceRecognitionPage = React.lazy(() => import('./pages/clients/ClientFaceRecognitionPage'));
+// Heavy pages load on first visit, not at startup: ClientsPage pulls in
+// face-api/TensorFlow and the game pulls in three.js. Bundled eagerly they
+// pushed the iOS WebView past its memory limit (WebContent crash → app
+// reload → Face ID again on every module open). Suspense lives inside the
+// component so the routes stay plain children of IonRouterOutlet.
+const lazyPage = <P extends object>(load: () => Promise<{ default: React.ComponentType<P> }>) => {
+  const Page = React.lazy(load);
+  const LazyPage: React.FC<P> = (props) => (
+    <React.Suspense fallback={null}>
+      <Page {...props} />
+    </React.Suspense>
+  );
+  return LazyPage;
+};
+const ClientsPage = lazyPage(() => import('./pages/clients/ClientsPage'));
+const MissionCleanRoomPage = lazyPage(() => import('./pages/game/MissionCleanRoomPage'));
 import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
@@ -147,7 +163,6 @@ import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import LoanDetailPage from './pages/loans/LoanDetailPage';
 import PosSupportChatPage from './pages/support/PosSupportChatPage';
-import MissionCleanRoomPage from './pages/game/MissionCleanRoomPage';
 import ArcadePage from './pages/game/ArcadePage';
 import BlackjackPage from './pages/game/BlackjackPage';
 import MolePage from './pages/game/MolePage';
@@ -1197,6 +1212,13 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
     let cancelled = false;
     let stateChangeHandle: PluginListenerHandle | undefined;
+    // Decide on the way OUT, not on the way back in. The prompt's own
+    // inactive event always fires while the sheet is open (guard reliably
+    // true), but its trailing active event can arrive after the guard's
+    // reset timer on iOS Face ID — re-locking on every success, forever
+    // (confirmed via device logs). So only a pause the prompt didn't cause
+    // arms the re-lock.
+    let leftApp = false;
 
     (async () => {
       const enabled = await isBiometricLockEnabled();
@@ -1209,10 +1231,16 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
       stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
         console.log('[BiometricLockGate] appStateChange fired. isActive =', isActive, 'isBiometricPromptInProgress =', isBiometricPromptInProgress());
-        if (!isActive || isBiometricPromptInProgress()) {
-          console.log('[BiometricLockGate] appStateChange: ignoring (inactive or mid-authenticate)');
+        if (!isActive) {
+          if (!isBiometricPromptInProgress()) leftApp = true;
+          console.log('[BiometricLockGate] appStateChange: inactive, leftApp =', leftApp);
           return;
         }
+        if (!leftApp) {
+          console.log('[BiometricLockGate] appStateChange: ignoring (resume caused by a biometric prompt)');
+          return;
+        }
+        leftApp = false;
         const stillEnabled = await isBiometricLockEnabled();
         console.log('[BiometricLockGate] appStateChange: stillEnabled =', stillEnabled);
         if (stillEnabled) {
@@ -1301,8 +1329,7 @@ const App: React.FC = () => {
                 <IonRouterOutlet id="root-outlet">
                   <Route exact path="/login" component={Login} />
                   <Route exact path="/forgot-password" component={ForgotPassword} />
-                  {/* Self sign-up disabled — accounts are created by an admin. */}
-                  <Route exact path="/create-account"><Redirect to="/login" /></Route>
+                  <Route exact path="/create-account" component={CreateAccount} />
                   <Route exact path="/client-login" component={ClientLogin} />
 
                   <Route exact path="/">

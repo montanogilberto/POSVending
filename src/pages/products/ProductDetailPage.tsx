@@ -10,8 +10,6 @@ import {
   IonRadio,
   IonCheckbox,
   IonList,
-  IonSelect,
-  IonSelectOption,
   IonButton,
   IonCardSubtitle,
   IonCard,
@@ -21,7 +19,10 @@ import {
   IonInput,
   IonText,
   IonToast,
+  IonIcon,
+  useIonViewDidLeave,
 } from '@ionic/react';
+import { addOutline, removeOutline } from 'ionicons/icons';
 
 import { useParams, useHistory, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -33,6 +34,9 @@ import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
 import { getOneProduct } from '../../api/productsApi';
 import '../../styles/dashboard.css';
+import './ProductDetailPage.css';
+
+const MAX_CHOICE_QTY = 999;
 
 interface RouteParams {
   productId: string;
@@ -72,19 +76,40 @@ const ProductDetailPage: React.FC = () => {
   const [showValidationToast, setShowValidationToast] = useState(false);
   const [validationToastMessage, setValidationToastMessage] = useState('');
 
+  // Ionic keeps this page mounted after navigating away, so without this the
+  // last checkboxes/quantities were still selected on the next visit.
+  useIonViewDidLeave(() => {
+    setQuantity(1);
+    setSelectedOptions({});
+    setPieces({ pantalones: 0, prendas: 0, otros: 0 });
+    setShowValidationToast(false);
+  });
+
   // Helper to check if product is "Servicio Completo"
   const isServicioCompleto = product?.name?.toLowerCase().includes('servicio completo');
 
+  // Keyed on productId only: Ionic keeps this page mounted, so leaving it
+  // (e.g. to /cart) changed location.state to undefined and re-fetched the
+  // same product for nothing on every exit.
   useEffect(() => {
     const stateProduct = (location.state as any)?.product;
-    if (stateProduct) {
-      console.log('Product from state:', stateProduct);
+    if (stateProduct && String(stateProduct.productId) === String(productId)) {
+      console.log('[ProductDetail] product from navigation state', JSON.stringify({
+        productId: stateProduct.productId,
+        name: stateProduct.name,
+        salePrice: stateProduct.details?.[0]?.salePrice ?? 0,
+      }));
       setProduct(stateProduct);
     } else {
-      console.warn('Product not found in navigation state, fetching by id:', productId);
+      console.log('[ProductDetail] no product in navigation state, fetching by id', productId);
       const fetchProduct = async () => {
         try {
           const products = await getOneProduct({ products: [{ productId: parseInt(productId) }] });
+          console.log('[ProductDetail] product fetched', JSON.stringify({
+            productId: products[0]?.productId,
+            name: products[0]?.name,
+            salePrice: products[0]?.details?.[0]?.salePrice ?? 0,
+          }));
           setProduct(products[0]);
         } catch (error) {
           console.error('Error fetching product:', error);
@@ -93,7 +118,8 @@ const ProductDetailPage: React.FC = () => {
       };
       fetchProduct();
     }
-  }, [productId, location.state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
 
   if (!product)
     return (
@@ -172,7 +198,11 @@ const ProductDetailPage: React.FC = () => {
 
   const handleCheckboxQuantityChange = (optionId: number, choiceId: string, qty: number) => {
     const prevValue = selectedOptions[optionId];
-    const currentMap = getMapValue(prevValue);
+    // Ticked choices start as a plain id array; carry them into the map at
+    // qty 1, or changing one quantity would silently untick the others.
+    const currentMap = Array.isArray(prevValue)
+      ? Object.fromEntries(prevValue.map(id => [id, 1]))
+      : getMapValue(prevValue);
     const updatedValues = { ...currentMap };
 
     if (qty > 0) {
@@ -315,6 +345,15 @@ const ProductDetailPage: React.FC = () => {
       : 0;
     const optionPrice = calculateOptionPrice();
     const finalPrice = basePrice + optionPrice;
+    // Line price = product base price (added ONCE) + Σ(option price × option qty).
+    console.log('[ProductDetail] add to cart — price breakdown', JSON.stringify({
+      productId: product.productId,
+      name: product.name,
+      basePrice,
+      optionPrice,
+      finalPrice,
+      selectedOptions,
+    }));
 
     const selectedChoices: {
       [key: number]: { id: number; name: string; price: number; quantity: number }[];
@@ -475,30 +514,61 @@ const ProductDetailPage: React.FC = () => {
                               }
                             />
 
-                            <IonLabel>
-                              {choice.name} (+${choice.price})
+                            {/* Same text everywhere; on iOS only, the price drops to its own
+                                line (iPhone 11 squeezed it to one word per line). */}
+                            <IonLabel className="choice-label">
+                              {choice.name} <span className="choice-price">(+${choice.price})</span>
                             </IonLabel>
 
-                            {/* Quantity select for this checkbox option */}
-                            <IonSelect
-                              value={qty}
-                              disabled={!checked}
-                              interface="popover"
-                              style={{ maxWidth: '80px' }}
-                              onIonChange={e =>
-                                handleCheckboxQuantityChange(
-                                  option.productOptionId,
-                                  choiceId,
-                                  Number(e.detail.value)
-                                )
-                              }
-                            >
-                              {[...Array(10)].map((_, i) => (
-                                <IonSelectOption key={i + 1} value={i + 1}>
-                                  {i + 1}
-                                </IonSelectOption>
-                              ))}
-                            </IonSelect>
+                            {/* Quantity: −/+ or type any amount (was a fixed 1–10 select). */}
+                            <div className="qty-stepper" slot="end">
+                              <IonButton
+                                fill="clear"
+                                size="small"
+                                aria-label="Disminuir cantidad"
+                                disabled={!checked || qty <= 1}
+                                onClick={() =>
+                                  handleCheckboxQuantityChange(option.productOptionId, choiceId, qty - 1)
+                                }
+                              >
+                                <IonIcon slot="icon-only" icon={removeOutline} />
+                              </IonButton>
+                              <IonInput
+                                className="qty-input"
+                                type="number"
+                                inputmode="numeric"
+                                min={1}
+                                max={MAX_CHOICE_QTY}
+                                aria-label={`Cantidad ${choice.name}`}
+                                value={qty}
+                                disabled={!checked}
+                                onIonInput={e => {
+                                  const n = parseInt(String(e.detail.value ?? ''), 10);
+                                  if (!isNaN(n) && n >= 1) {
+                                    handleCheckboxQuantityChange(
+                                      option.productOptionId,
+                                      choiceId,
+                                      Math.min(n, MAX_CHOICE_QTY)
+                                    );
+                                  }
+                                }}
+                                onIonBlur={e => {
+                                  // Empty/invalid typing never reaches state — show the real qty again.
+                                  (e.target as HTMLIonInputElement).value = qty;
+                                }}
+                              />
+                              <IonButton
+                                fill="clear"
+                                size="small"
+                                aria-label="Aumentar cantidad"
+                                disabled={!checked || qty >= MAX_CHOICE_QTY}
+                                onClick={() =>
+                                  handleCheckboxQuantityChange(option.productOptionId, choiceId, qty + 1)
+                                }
+                              >
+                                <IonIcon slot="icon-only" icon={addOutline} />
+                              </IonButton>
+                            </div>
                           </IonItem>
                         );
                       })}

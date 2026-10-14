@@ -6,7 +6,7 @@ import {
   IonToast,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { printOutline, closeOutline } from 'ionicons/icons';
+import { printOutline, closeOutline, copyOutline } from 'ionicons/icons';
 import UnifiedReceipt from '../../components/pos/UnifiedReceipt';
 import { ReceiptService } from '../../services/ReceiptService';
 import { useReceiptPrint } from './useReceiptPrint';
@@ -238,9 +238,14 @@ const unifiedReceiptData = React.useMemo(() => {
     return result;
   }, [repairedTicketData, paymentMethod, cashPaid, changeAmount, promotionCode, discountAmount]);
 
+  // After the first print on this screen, further presses print a COPIA
+  // (same rule as /receipt) and keep the original printedDate.
+  const [printedOnce, setPrintedOnce] = React.useState(false);
+
   const { handlePrint, saveReceipt } = useReceiptPrint({
     receiptData: unifiedReceiptData,
     ticketData: repairedTicketData,
+    isReprint: printedOnce,
     onSavedUrl: (url) => console.log('[ReceiptDisplay] receipt HTML saved at:', url),
     onToast: (message) => {
       setToastMessage(message);
@@ -251,6 +256,7 @@ const unifiedReceiptData = React.useMemo(() => {
     // SMS / physical print). Keep it in the console for real debugging.
     onSummary: (summary) => {
       console.log('[ReceiptDisplay] print summary:', summary);
+      if (summary.print.ok) setPrintedOnce(true);
     }
   });
 
@@ -323,8 +329,8 @@ const unifiedReceiptData = React.useMemo(() => {
           onClick={handlePrint}
           style={{ flex: '1 1 180px', minWidth: '160px' }}
         >
-          <IonIcon icon={printOutline} slot="start" />
-          Imprimir
+          <IonIcon icon={printedOnce ? copyOutline : printOutline} slot="start" />
+          {printedOnce ? 'Reimprimir' : 'Imprimir'}
         </IonButton>
 
         <IonButton

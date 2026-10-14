@@ -7,7 +7,7 @@ import {
 import { useHistory } from 'react-router-dom';
 import {
   eye, eyeOff, fingerPrintOutline, personOutline, lockClosedOutline,
-  logInOutline, callOutline, headsetOutline, chevronForward,
+  logInOutline, callOutline, personAddOutline, headsetOutline, chevronForward,
 } from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
@@ -16,7 +16,6 @@ import { canAccess, normalizeRoleCode } from '../../config/rolePermissions';
 import { appDestination, LOGIN_APPS, LoginApp, readLastLoginApp, saveLastLoginApp } from '../../utils/loginApps';
 import LoginAppPicker from './LoginAppPicker';
 import PhoneAppLogin from './clientphone/PhoneAppLogin';
-import { LOGIN_APP_ICONS } from './loginAppIcons';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/pos/companySelector/CompanySelector';
 import {
@@ -324,9 +323,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
               {/* Logo / Brand */}
               <div className="login-brand">
-                <div className="login-logo">
-                  <IonIcon icon={LOGIN_APP_ICONS[app]} aria-hidden="true" />
-                </div>
                 <h1 className="login-title">{appInfo.label}</h1>
                 <p className="login-subtitle">{appInfo.subtitle}</p>
               </div>
@@ -418,6 +414,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <div className="login-help-tile-inner">
                       <IonIcon icon={callOutline} aria-hidden="true" />
                       <span>¿Olvidaste tu contraseña?</span>
+                    </div>
+                  </IonRouterLink>
+                  <IonRouterLink routerLink="/create-account" className="login-help-tile">
+                    <div className="login-help-tile-inner">
+                      <IonIcon icon={personAddOutline} aria-hidden="true" />
+                      <span>Crear cuenta</span>
                     </div>
                   </IonRouterLink>
                   <IonRouterLink routerLink="/client-login" className="login-help-tile">

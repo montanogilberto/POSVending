@@ -139,5 +139,7 @@ export interface PrintOptions {
   thermal?: boolean;
   showPreview?: boolean;
   autoPrint?: boolean;
+  /** Re-print of an already-printed ticket: adds a REIMPRESIÓN/COPIA banner. */
+  reprint?: boolean;
 }
 

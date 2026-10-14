@@ -101,9 +101,6 @@ const Header: React.FC<HeaderProps> = ({
             className="only-mobile header-menu-button"
             aria-label="Abrir menú"
           />
-          {showBackButton && (
-            <ConfirmBackButton text={backButtonText} defaultHref={backButtonHref} />
-          )}
         </IonButtons>
         <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>
           {screenTitle}
@@ -176,6 +173,15 @@ const Header: React.FC<HeaderProps> = ({
 
         </IonButtons>
       </IonToolbar>
+      {/* Back navigation gets its own row under the action bar — in the top
+          toolbar it competed with the menu/action icons for width. */}
+      {showBackButton && (
+        <IonToolbar color="light" className="header-back-bar">
+          <IonButtons slot="start">
+            <ConfirmBackButton text={backButtonText} defaultHref={backButtonHref} />
+          </IonButtons>
+        </IonToolbar>
+      )}
     </IonHeader>
   );
 };

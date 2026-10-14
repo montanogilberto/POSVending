@@ -118,6 +118,18 @@ function generateCompactFooter(data: UnifiedReceiptData): string {
     </div>`;
 }
 
+// A copy handed to the customer later must never pass for the original ticket.
+function generateReprintBanner(): string {
+  const now = new Date().toLocaleString('es-MX', {
+    timeZone: 'America/Hermosillo',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  return `
+    <div class="reprint-banner">*** REIMPRESIÓN / COPIA ***</div>
+    <div class="reprint-date">Reimpreso: ${now}</div>
+    <div class="divider"></div>`;
+}
+
 export function generatePrintHTML(data: UnifiedReceiptData, options: PrintOptions = {}): string {
   const width = options.width || '58mm';
   const isUltraCompact = width === '46mm';
@@ -132,6 +144,7 @@ export function generatePrintHTML(data: UnifiedReceiptData, options: PrintOption
 <body>
   <div class="receipt-container">
     ${generateCompactHeader(data, isUltraCompact)}
+    ${options.reprint ? generateReprintBanner() : ''}
     ${generateCompactClientInfo(data)}
     ${generateCompactProducts(data)}
     ${generateCompactTotals(data)}

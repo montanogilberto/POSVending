@@ -824,7 +824,6 @@ const CartPage: React.FC = () => {
                           <IonIcon icon={icon} className="split-payment-icon" />
                           <IonLabel className="split-payment-method-label">{key}</IonLabel>
                           <div className="split-payment-input-wrapper">
-                            <span className="currency-symbol">$</span>
                             <IonInput
                               type="number"
                               inputmode="decimal"
@@ -835,7 +834,9 @@ const CartPage: React.FC = () => {
                               min={0}
                               step="0.01"
                               className="split-payment-input"
-                            />
+                            >
+                              <span slot="start" className="currency-symbol">$</span>
+                            </IonInput>
                           </div>
                         </div>
                       ))}
@@ -873,7 +874,6 @@ const CartPage: React.FC = () => {
                 {!splitPaymentEnabled && paymentMethod === 'Efectivo' && (
                   <div className="cash-input-section">
                     <div className="cash-input-wrapper">
-                      <span className="currency-symbol">$</span>
                       <IonInput
                         type="number"
                         inputmode="decimal"
@@ -884,7 +884,9 @@ const CartPage: React.FC = () => {
                         min={0}
                         step="0.01"
                         className="cash-input"
-                      />
+                      >
+                        <span slot="start" className="currency-symbol">$</span>
+                      </IonInput>
                     </div>
                     {changeAmount > 0 && (
                       <div className="change-display">

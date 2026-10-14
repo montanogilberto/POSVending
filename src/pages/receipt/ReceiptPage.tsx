@@ -7,7 +7,8 @@ import { ReceiptService } from '../../services/ReceiptService';
 import ReceiptHeader from './components/ReceiptHeader';
 import ReceiptBody from './components/ReceiptBody';
 import ReceiptActions from './components/ReceiptActions';
-import { ReceiptPrintSummary, useReceiptPrint } from './useReceiptPrint';
+import { ReceiptPrintSummary, TicketPrintStatus, useReceiptPrint } from './useReceiptPrint';
+import { toHermosillo } from '../../utils/format';
 import './ReceiptPage.css';
 
 interface LocationState {
@@ -25,6 +26,8 @@ const ReceiptPage: React.FC = () => {
   const [savedReceiptUrl, setSavedReceiptUrl] = useState<string>('');
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [printSummary, setPrintSummary] = useState<ReceiptPrintSummary | null>(null);
+  const [printStatus, setPrintStatus] = useState<TicketPrintStatus>({ printed: false, printedDate: null });
+  const [printing, setPrinting] = useState(false);
 
   const ticketData = location.state?.ticketData;
 
@@ -68,9 +71,12 @@ const ReceiptPage: React.FC = () => {
     loadReceipt();
   }, [ticketData]);
 
-  const { handlePrint } = useReceiptPrint({
+  const isReprint = printStatus.printed;
+
+  const { handlePrint, fetchPrintStatus } = useReceiptPrint({
     receiptData,
     ticketData,
+    isReprint,
     onSavedUrl: (url) => setSavedReceiptUrl(url),
     onToast: (message) => {
       setToastMessage(message);
@@ -79,8 +85,28 @@ const ReceiptPage: React.FC = () => {
     onSummary: (summary) => {
       setPrintSummary(summary);
       setShowSummaryModal(true);
+      // First print done: any further press on this screen is a reprint.
+      if (summary.print.ok && !isReprint) {
+        setPrintStatus({ printed: true, printedDate: new Date().toISOString() });
+      }
     }
   });
+
+  // Already printed (e.g. reopened from Ingresos/Movimientos) → REIMPRIMIR.
+  useEffect(() => {
+    if (!ticketData) return;
+    fetchPrintStatus().then(setPrintStatus);
+  }, [ticketData, fetchPrintStatus]);
+
+  const onPrint = async () => {
+    if (printing) return;
+    setPrinting(true);
+    try {
+      await handlePrint();
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   const handleClose = () => confirmBack('/dashboard');
 
@@ -90,14 +116,17 @@ const ReceiptPage: React.FC = () => {
     <IonPage>
       <IonLoading isOpen={loading} message="Cargando recibo..." backdropDismiss={false} />
 
-      <ReceiptHeader onClose={handleClose} onPrint={handlePrint} />
+      <ReceiptHeader onClose={handleClose} onPrint={onPrint} printing={printing} />
 
       <IonContent className="receipt-page-content">
         <ReceiptBody receiptData={receiptData} savedReceiptUrl={savedReceiptUrl} error={error} />
         <ReceiptActions
           loading={loading}
           hasReceiptData={!!receiptData}
-          onPrint={handlePrint}
+          onPrint={onPrint}
+          printing={printing}
+          isReprint={isReprint}
+          printedAtLabel={printStatus.printedDate ? toHermosillo(printStatus.printedDate) : ''}
           onClose={handleClose}
         />
 

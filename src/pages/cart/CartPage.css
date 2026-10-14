@@ -292,15 +292,13 @@
   flex: 1;
 }
 
+/* $ lives in IonInput's start slot, so Ionic reserves its space — an
+   absolutely-positioned span overlapped the typed digits on outline fill. */
 .split-payment-input-wrapper .currency-symbol {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
   font-size: 0.9rem;
   color: #6b7280;
   font-weight: 500;
-  z-index: 1;
+  margin-inline-end: 4px;
 }
 
 .split-payment-input {
@@ -308,7 +306,7 @@
   --border-radius: 10px;
   --border-width: 1.5px;
   --border-color: #e5e7eb;
-  --padding-start: 30px;
+  --padding-start: 12px;
   --padding-end: 12px;
   --padding-top: 10px;
   --padding-bottom: 10px;
@@ -383,13 +381,10 @@
 }
 
 .cash-input-wrapper .currency-symbol {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
   font-size: 1rem;
   color: #6b7280;
   font-weight: 500;
+  margin-inline-end: 4px;
 }
 
 .cash-input {
@@ -397,7 +392,7 @@
   --border-radius: 10px;
   --border-width: 1.5px;
   --border-color: #e5e7eb;
-  --padding-start: 32px;
+  --padding-start: 14px;
   --padding-end: 14px;
   --padding-top: 14px;
   --padding-bottom: 14px;
@@ -687,7 +682,7 @@
   }
 
   .cash-input {
-    --padding-start: 36px;
+    --padding-start: 14px;
     --padding-end: 14px;
     --padding-top: 16px;
     --padding-bottom: 16px;
