@@ -17,17 +17,19 @@ import {
   IonToolbar,
   IonTitle,
   IonButtons,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import { barcodeOutline, closeOutline, swapVerticalOutline } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { getProducts } from '../../data/products';
 import { Product } from '../../data/type_products';
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
+import { onDataChanged } from '../../utils/refreshBus';
 import '../../styles/dashboard.css';
 import './ProductListPage.css';
 
@@ -46,26 +48,35 @@ const ProductListPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const [sortOrder, setSortOrder] = useState<SortOrder>('az');
-  const hasFetched = useRef(false);
   const pops = usePopovers();
 
   const categoryIdNumber = +categoryId;
 
-  useEffect(() => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-    const fetchData = async () => {
-      try {
-        const data = await getProducts(categoryIdNumber);
-        setProducts(data);
-      } catch {
-        setError('No se pudieron cargar los productos.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+  // Reload on every visit (CLAUDE.md §6): a fetch-once guard kept serving
+  // stale products — a price edited in Gestión de productos never reached
+  // the detail page or the cart.
+  const load = useCallback(async () => {
+    try {
+      const data = await getProducts(categoryIdNumber);
+      console.log('[ProductList] load', JSON.stringify({
+        categoryId: categoryIdNumber,
+        count: data.length,
+        basePrices: data.map(p => ({ id: p.productId, name: p.name, salePrice: p.details?.[0]?.salePrice ?? 0 })),
+      }));
+      setProducts(data);
+      setError(null);
+    } catch {
+      setError('No se pudieron cargar los productos.');
+    } finally {
+      setLoading(false);
+    }
   }, [categoryIdNumber]);
+
+  useIonViewWillEnter(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => onDataChanged(load), [load]);
 
   const handleScan = (result: string) => {
     setShowScanner(false);

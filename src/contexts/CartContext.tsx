@@ -47,6 +47,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Calculate the actual quantity from selected checkbox choices
     // This handles cases where options like "Ciclo Medio (x2)" have quantity > 1
     const computedQuantity = calculateCartItemQuantity(item.selectedChoices);
+    console.log('[Cart] addToCart', JSON.stringify({
+      productId: item.productId,
+      name: item.name,
+      linePrice: item.price,
+      computedQuantity,
+      unitPrice: item.price / computedQuantity,
+      selectedChoices: item.selectedChoices,
+    }));
 
     // Same product + same options (+ same pieces breakdown, when present) must
     // merge into one line with quantity summed, not become a second line at
@@ -70,6 +78,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (existingIndex !== -1) {
         const merged = [...prev];
         const existing = merged[existingIndex];
+        console.log('[Cart] merged into existing line', JSON.stringify({
+          lineId: existing.id,
+          quantity: `${existing.quantity} + ${computedQuantity}`,
+          price: `${existing.price} + ${item.price}`,
+        }));
         merged[existingIndex] = {
           ...existing,
           quantity: existing.quantity + computedQuantity,

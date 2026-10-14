@@ -116,7 +116,8 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       </div>
 
       {/* Why this line's price dropped -- which reward/coupon was applied */}
-      {discountAmount && discountAmount > 0 && discountLabel && (
+      {/* `discountAmount &&` rendered a literal "0" when the discount was 0. */}
+      {discountAmount != null && discountAmount > 0 && discountLabel && (
         <div className="card-discount-row">
           <span className="discount-badge">🎁 {discountLabel}</span>
           <span className="discount-amount">-{formatPrice(discountAmount)}</span>

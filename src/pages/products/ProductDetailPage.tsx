@@ -88,16 +88,28 @@ const ProductDetailPage: React.FC = () => {
   // Helper to check if product is "Servicio Completo"
   const isServicioCompleto = product?.name?.toLowerCase().includes('servicio completo');
 
+  // Keyed on productId only: Ionic keeps this page mounted, so leaving it
+  // (e.g. to /cart) changed location.state to undefined and re-fetched the
+  // same product for nothing on every exit.
   useEffect(() => {
     const stateProduct = (location.state as any)?.product;
-    if (stateProduct) {
-      console.log('Product from state:', stateProduct);
+    if (stateProduct && String(stateProduct.productId) === String(productId)) {
+      console.log('[ProductDetail] product from navigation state', JSON.stringify({
+        productId: stateProduct.productId,
+        name: stateProduct.name,
+        salePrice: stateProduct.details?.[0]?.salePrice ?? 0,
+      }));
       setProduct(stateProduct);
     } else {
-      console.warn('Product not found in navigation state, fetching by id:', productId);
+      console.log('[ProductDetail] no product in navigation state, fetching by id', productId);
       const fetchProduct = async () => {
         try {
           const products = await getOneProduct({ products: [{ productId: parseInt(productId) }] });
+          console.log('[ProductDetail] product fetched', JSON.stringify({
+            productId: products[0]?.productId,
+            name: products[0]?.name,
+            salePrice: products[0]?.details?.[0]?.salePrice ?? 0,
+          }));
           setProduct(products[0]);
         } catch (error) {
           console.error('Error fetching product:', error);
@@ -106,7 +118,8 @@ const ProductDetailPage: React.FC = () => {
       };
       fetchProduct();
     }
-  }, [productId, location.state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
 
   if (!product)
     return (
@@ -332,6 +345,15 @@ const ProductDetailPage: React.FC = () => {
       : 0;
     const optionPrice = calculateOptionPrice();
     const finalPrice = basePrice + optionPrice;
+    // Line price = product base price (added ONCE) + Σ(option price × option qty).
+    console.log('[ProductDetail] add to cart — price breakdown', JSON.stringify({
+      productId: product.productId,
+      name: product.name,
+      basePrice,
+      optionPrice,
+      finalPrice,
+      selectedOptions,
+    }));
 
     const selectedChoices: {
       [key: number]: { id: number; name: string; price: number; quantity: number }[];

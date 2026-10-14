@@ -264,8 +264,11 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     if (step===2) {
       const sale = parseFloat(data.salePrice);
       const cost = parseFloat(data.unitPrice) || 0;
+      // Priced by options (sizes/cycles): the base must be allowed to be $0,
+      // otherwise base + option is charged twice (Garrafón $10 + 19 lts $10).
+      const pricedByOptions = data.options.some(o => o.choices.some(c => Number(c.extraPrice) > 0));
       if (!data.salePrice || !(sale >= 0)) e.salePrice='Ingresa un precio válido';
-      else if (cost > 0 && sale < suggestedPrice(cost)) e.salePrice=`El margen mínimo es ${TARGET_MARGIN*100}%. Precio mínimo: ${fmtMXN(suggestedPrice(cost))}`;
+      else if (!pricedByOptions && cost > 0 && sale < suggestedPrice(cost)) e.salePrice=`El margen mínimo es ${TARGET_MARGIN*100}%. Precio mínimo: ${fmtMXN(suggestedPrice(cost))}`;
     }
     setErrors(e); return Object.keys(e).length===0;
   };
@@ -669,7 +672,8 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     const minPrice = cost > 0 ? suggestedPrice(cost) : null;
     const margin = data.salePrice && cost > 0 ? sale - cost : null;
     const marginPct = margin !== null ? marginOf(sale, cost) : null;
-    const belowTarget = minPrice !== null && data.salePrice !== '' && sale < minPrice;
+    const pricedByOptions = data.options.some(o => o.choices.some(c => Number(c.extraPrice) > 0));
+    const belowTarget = !pricedByOptions && minPrice !== null && data.salePrice !== '' && sale < minPrice;
     const perUnit = pricePerBaseUnit(sale, parseFloat(data.netContent), data.unitOfMeasure);
     const ref = parseFloat(data.referencePrice) || 0;
     const refMargin = ref > 0 && cost > 0 ? marginOf(ref, cost) : null;
