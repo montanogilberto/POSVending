@@ -7,7 +7,7 @@ import {
 import { useHistory } from 'react-router-dom';
 import {
   eye, eyeOff, fingerPrintOutline, personOutline, lockClosedOutline,
-  logInOutline, callOutline, headsetOutline, chevronForward,
+  logInOutline, callOutline, personAddOutline, headsetOutline, chevronForward,
 } from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
@@ -418,6 +418,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <div className="login-help-tile-inner">
                       <IonIcon icon={callOutline} aria-hidden="true" />
                       <span>¿Olvidaste tu contraseña?</span>
+                    </div>
+                  </IonRouterLink>
+                  <IonRouterLink routerLink="/create-account" className="login-help-tile">
+                    <div className="login-help-tile-inner">
+                      <IonIcon icon={personAddOutline} aria-hidden="true" />
+                      <span>Crear cuenta</span>
                     </div>
                   </IonRouterLink>
                   <IonRouterLink routerLink="/client-login" className="login-help-tile">
