@@ -181,7 +181,7 @@ export const useEmployees = () => {
 
   // companyName/branchName come from the login flow's company selection
   // (dbo.companies / dbo.companyBranches) — never hardcode "POS GMO" here.
-  const screenTitle = `Empleados — ${companyName || 'POS GMO'}${companyName && branchName ? ` · ${branchName}` : ''}`;
+  const screenTitle = `Empleados — ${companyName || 'GMO'}${companyName && branchName ? ` · ${branchName}` : ''}`;
 
   return {
     loading, employees: filtered, counts,

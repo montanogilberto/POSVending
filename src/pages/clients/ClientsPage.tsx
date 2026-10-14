@@ -447,12 +447,12 @@ const ClientsPage: React.FC = () => {
     const store = `📱 Android: ${PLAY_STORE_URL}\n🍎 iOS: ${APP_STORE_URL}`;
 
     if (type === 'lender') {
-      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para gestionar tu cartera de préstamos, ver el estado de tus acreditados y más.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta de prestamista y accede a tu dashboard de portfolio.`;
+      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *GMO* para gestionar tu cartera de préstamos, ver el estado de tus acreditados y más.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta de prestamista y accede a tu dashboard de portfolio.`;
     }
     if (type === 'pos') {
-      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para ver tu historial de compras y tus puntos de recompensas.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard de recompensas.`;
+      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *GMO* para ver tu historial de compras y tus puntos de recompensas.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard de recompensas.`;
     }
-    return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para consultar tu préstamo, ver tu estado de cuenta y realizar pagos fácilmente.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard.`;
+    return `Hola ${name} 👋\n\nTe invitamos a descargar la app *GMO* para consultar tu préstamo, ver tu estado de cuenta y realizar pagos fácilmente.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard.`;
   };
 
   const openWhatsApp = (client: Client) => {

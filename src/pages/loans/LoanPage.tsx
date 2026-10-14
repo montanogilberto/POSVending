@@ -210,7 +210,7 @@ const LoanPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header screenTitle="Préstamos — POS GMO" {...pops.headerProps} />
+      <Header screenTitle="Préstamos — GMO" {...pops.headerProps} />
       <AlertPopover {...pops.alertPopoverProps} />
       <MailPopover {...pops.mailPopoverProps} />
 

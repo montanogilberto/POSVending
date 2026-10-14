@@ -162,7 +162,7 @@ const PushNotificationPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header {...pops.headerProps} screenTitle="Notificaciones — POS GMO" />
+      <Header {...pops.headerProps} screenTitle="Notificaciones — GMO" />
       <AlertPopover {...pops.alertPopoverProps} />
       <MailPopover {...pops.mailPopoverProps} />
 

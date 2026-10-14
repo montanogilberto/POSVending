@@ -145,7 +145,7 @@ const ServicePage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header {...pops.headerProps} screenTitle="Servicios — POS GMO" />
+      <Header {...pops.headerProps} screenTitle="Servicios — GMO" />
       <AlertPopover {...pops.alertPopoverProps} />
       <MailPopover {...pops.mailPopoverProps} />
       <IonLoading isOpen={loading} message={'Cargando...'} />

@@ -261,7 +261,7 @@ const AppShell: React.FC = () => {
   // Juridical / Factory AI products: their own dashboard + a small tab bar.
   const isOwnDashboardProduct = activeProduct === 'juridical' || activeProduct === 'factory';
   const shellTitle = activeProduct === 'factory' ? 'Factory AI'
-    : isSmartLoansRole || activeProduct === 'juridical' ? 'SmartLoans' : 'POS GMO';
+    : isSmartLoansRole || activeProduct === 'juridical' ? 'SmartLoans' : 'GMO';
   const PRODUCT_ICONS = {
     pos: storefrontOutline, borrower: walletOutline, lender: walletOutline,
     juridical: briefcaseOutline, factory: sparklesOutline,

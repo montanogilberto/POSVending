@@ -1584,7 +1584,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header {...pops.headerProps} screenTitle="Reconocimiento Facial — POS GMO" />
+      <Header {...pops.headerProps} screenTitle="Reconocimiento Facial — GMO" />
       <AlertPopover {...pops.alertPopoverProps} />
       <MailPopover {...pops.mailPopoverProps} />
 

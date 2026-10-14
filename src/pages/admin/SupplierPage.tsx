@@ -148,7 +148,7 @@ const SupplierPage: React.FC = () => {
 
   return (
     <IonPage>
-      <Header {...pops.headerProps} screenTitle="Proveedores — POS GMO" />
+      <Header {...pops.headerProps} screenTitle="Proveedores — GMO" />
       <AlertPopover {...pops.alertPopoverProps} />
       <MailPopover {...pops.mailPopoverProps} />
       <IonLoading isOpen={loading} message={'Cargando...'} />

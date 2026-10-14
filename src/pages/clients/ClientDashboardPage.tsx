@@ -913,7 +913,7 @@ const ClientDashboardPage: React.FC = () => {
                 />
               </IonAvatar>
               <div>
-                <h2 className="hero-name">{username || 'Cliente POS GMO'}</h2>
+                <h2 className="hero-name">{username || 'Cliente GMO'}</h2>
                 <div className="hero-meta">
                   <IonBadge className="status-badge verified">
                     <IonIcon icon={checkmarkCircle} /> Verificado
@@ -1587,7 +1587,7 @@ const ClientDashboardPage: React.FC = () => {
                 />
               </IonAvatar>
               <div>
-                <h2 className="hero-name">{username || 'Cliente POS GMO'}</h2>
+                <h2 className="hero-name">{username || 'Cliente GMO'}</h2>
                 <div className="hero-meta">
                   <IonBadge className="status-badge verified">
                     <IonIcon icon={checkmarkCircle} /> Verificado

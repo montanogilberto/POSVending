@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.factoryAI.gmo',
-  appName: 'Factory AI GMO',
+  appName: 'GMO',
   webDir: 'dist',
   android: {
     allowMixedContent: true
