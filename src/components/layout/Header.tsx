@@ -32,7 +32,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({
   presentAlertPopover,
   presentMailPopover,
-  screenTitle = 'POS GMO',
+  screenTitle = 'GMO',
   showBackButton = false,
   backButtonText = 'Atrás',
   backButtonHref = '/',

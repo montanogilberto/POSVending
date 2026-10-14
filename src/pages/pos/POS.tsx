@@ -147,7 +147,7 @@ const fetchAllVending = async () => {
         <div className="header-content">
           <div className="header-brand">
             <div className="brand-logo">P</div>
-            <h1 className="brand-text">POS GMO</h1>
+            <h1 className="brand-text">GMO</h1>
           </div>
           <div className="header-actions">
             <IonButton className="action-button" fill="clear">
