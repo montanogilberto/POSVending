@@ -24,6 +24,13 @@ interface UseReceiptPrintParams {
   onSavedUrl: (url: string) => void;
   onToast: (message: string) => void;
   onSummary?: (summary: ReceiptPrintSummary) => void;
+  /** Ticket already printed once: print a marked copy and keep the original printedDate. */
+  isReprint?: boolean;
+}
+
+export interface TicketPrintStatus {
+  printed: boolean;
+  printedDate: string | null;
 }
 
 const normalizeReceiptUrl = (url: string): string => {
@@ -43,8 +50,39 @@ export function useReceiptPrint({
   ticketData,
   onSavedUrl,
   onToast,
-  onSummary
+  onSummary,
+  isReprint = false
 }: UseReceiptPrintParams) {
+  // Reads tickets.printed/printedDate (returned by the existing 'validate'
+  // action) so the page can offer REIMPRIMIR instead of a second original.
+  const fetchPrintStatus = useCallback(async (): Promise<TicketPrintStatus> => {
+    const directIncomeId = Number(ticketData?.incomeId ?? 0);
+    const incomeId = directIncomeId > 0
+      ? directIncomeId
+      : Number(ticketData?.id ?? ticketData?.income?.incomeId ?? 0);
+    if (incomeId <= 0) return { printed: false, printedDate: null };
+    try {
+      const response = await postOneTicketTracking({
+        ticket: [{
+          action: 'validate' as const,
+          incomeId,
+          companyId: Number(ticketData?.companyId ?? 0),
+          fileName: `receipt_${incomeId}.html`,
+          containerName: 'ticketspos',
+          receiptUrl: '',
+          phone: ''
+        }]
+      });
+      const t = response?.tickets?.[0];
+      const status = { printed: Boolean(t?.printed), printedDate: t?.printedDate ?? null };
+      console.log('[ReceiptPrint][STATUS] print status', { incomeId, ...status });
+      return status;
+    } catch (statusError) {
+      console.warn('[ReceiptPrint][STATUS] could not read print status', statusError);
+      return { printed: false, printedDate: null };
+    }
+  }, [ticketData]);
+
   // Generates the receipt HTML, uploads it to Azure and tracks it. Idempotent:
   // 'validate' reuses the stored URL, so it runs right after the sale (the
   // customer's /recibo link shows the full ticket) and again on print.
@@ -279,9 +317,10 @@ export function useReceiptPrint({
         ReceiptService.printReceipt(receiptData, {
           width: '46mm',
           thermal: true,
-          autoPrint: true
+          autoPrint: true,
+          reprint: isReprint
         });
-        summary.print = { ok: true, message: 'Impresión física ejecutada' };
+        summary.print = { ok: true, message: isReprint ? 'Reimpresión (copia) ejecutada' : 'Impresión física ejecutada' };
       } catch (printError: any) {
         summary.print = {
           ok: false,
@@ -307,7 +346,11 @@ export function useReceiptPrint({
         const safeIncomeForFile = incomeId > 0 ? incomeId : Date.now();
         const fileName = `receipt_${safeIncomeForFile}.html`;
 
-        if (incomeId > 0) {
+        // A reprint must not overwrite the original printedDate ('print'
+        // stamps GETDATE()), so only the first print is tracked.
+        if (isReprint) {
+          console.log('[ReceiptPrint][DB_TRACKING] Reprint — original print tracking kept', { incomeId, incomeIdSource });
+        } else if (incomeId > 0) {
           const printTrackingPayload = {
             ticket: [{
               action: 'print' as const,
@@ -333,7 +376,7 @@ export function useReceiptPrint({
       onSummary?.(summary);
       console.log('[ReceiptPrint] Print flow finished', summary);
     }
-  }, [receiptData, ticketData, uploadReceipt, onSummary]);
+  }, [receiptData, ticketData, uploadReceipt, onSummary, isReprint]);
 
-  return { handlePrint, saveReceipt };
+  return { handlePrint, saveReceipt, fetchPrintStatus };
 }

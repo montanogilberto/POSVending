@@ -40,6 +40,19 @@ export function generateCompactPrintStyles(
     line-height: 1.05;
   }
 
+  .reprint-banner {
+    font-size: ${smallFontSize};
+    font-weight: 700;
+    text-align: center;
+    margin: 2px 0 0 0;
+  }
+
+  .reprint-date {
+    font-size: ${smallFontSize};
+    text-align: center;
+    margin: 0 0 1px 0;
+  }
+
   .receipt-subtitle {
     font-size: ${smallFontSize};
     font-weight: 700;

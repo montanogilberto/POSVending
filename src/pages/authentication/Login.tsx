@@ -16,7 +16,6 @@ import { canAccess, normalizeRoleCode } from '../../config/rolePermissions';
 import { appDestination, LOGIN_APPS, LoginApp, readLastLoginApp, saveLastLoginApp } from '../../utils/loginApps';
 import LoginAppPicker from './LoginAppPicker';
 import PhoneAppLogin from './clientphone/PhoneAppLogin';
-import { LOGIN_APP_ICONS } from './loginAppIcons';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/pos/companySelector/CompanySelector';
 import {
@@ -324,9 +323,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
               {/* Logo / Brand */}
               <div className="login-brand">
-                <div className="login-logo">
-                  <IonIcon icon={LOGIN_APP_ICONS[app]} aria-hidden="true" />
-                </div>
                 <h1 className="login-title">{appInfo.label}</h1>
                 <p className="login-subtitle">{appInfo.subtitle}</p>
               </div>

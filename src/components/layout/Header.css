@@ -137,3 +137,18 @@
   vertical-align: middle;
   letter-spacing: 0.5px;
 }
+
+/* Back-navigation row under the action toolbar (pages with showBackButton). */
+.dashboard-header ion-toolbar.header-back-bar {
+  --min-height: 44px;
+  --border-width: 1px 0 0 0;
+  --border-color: var(--ion-color-light-shade, #e5e7eb);
+}
+
+.header-back-bar .confirm-back-button {
+  min-height: 40px;
+  margin: 0;
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0;
+}
