@@ -526,7 +526,7 @@ const CartPage: React.FC = () => {
   };
 
   const handleAddMoreProducts = () => {
-    history.push('/category');
+    history.push('/product');
   };
 
   const handlePaymentMethodSelect = (method: 'Efectivo' | 'Tarjeta' | 'Transferir') => {

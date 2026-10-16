@@ -18,6 +18,8 @@ import { fmtMXN } from '../../utils/format';
 import ProductForm from '../../components/pos/ProductForm';
 import ProductWizard from '../../components/pos/productWizard/ProductWizard';
 import { useProduct } from '../../contexts/ProductContext';
+import CategoryChips from '../../components/pos/CategoryChips';
+import { useProductCategories, categoryIdsFor } from '../../hooks/useProductCategories';
 import { Product } from '../../data/type_products';
 import './ProductsManagementPage.css';
 
@@ -47,6 +49,9 @@ const ProductsManagementPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [sortAsc, setSortAsc] = useState(true);
+  // Same category chips as the POS product list (/product). null = all.
+  const { categories, reload: reloadCategories } = useProductCategories();
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   // ── Popover state ─────────────────────────────────────────────────────
   const pops = usePopovers();
@@ -230,6 +235,12 @@ const ProductsManagementPage: React.FC = () => {
       );
     }
 
+    // Category chips (a category includes its subcategories)
+    const categoryIds = categoryIdsFor(selectedCategoryId, categories);
+    if (categoryIds) {
+      result = result.filter((p) => categoryIds.has(Number(p.categoryId)));
+    }
+
     // Chip filter
     if (activeFilter === 'withBarcode') {
       result = result.filter((p) => p.barCode && p.barCode.trim() !== '');
@@ -247,7 +258,7 @@ const ProductsManagementPage: React.FC = () => {
       visibleCount: result.length,
     });
     return result;
-  }, [productsList, searchText, activeFilter, sortAsc]);
+  }, [productsList, searchText, activeFilter, sortAsc, selectedCategoryId, categories]);
 
   // ── Helpers ───────────────────────────────────────────────────────────
   return (
@@ -265,6 +276,16 @@ const ProductsManagementPage: React.FC = () => {
 
         {/* ── Search & Filter Section ── */}
         <div className="products-search-section">
+          <CategoryChips
+            categories={categories}
+            selectedId={selectedCategoryId}
+            onSelect={(id) => {
+              setSelectedCategoryId(id);
+              // "Sin categoría" and a category are mutually exclusive.
+              if (id !== null && activeFilter === 'noCategory') setActiveFilter('all');
+            }}
+          />
+
           {/* Search bar + icon buttons row */}
           <div className="products-search-row">
             <IonSearchbar
@@ -327,6 +348,7 @@ const ProductsManagementPage: React.FC = () => {
               onClick={() => {
                 console.log('[Products][Management] action:set-filter', { filter: 'noCategory' });
                 setActiveFilter('noCategory');
+                setSelectedCategoryId(null);
               }}
             >
               Sin categoría
@@ -420,7 +442,7 @@ const ProductsManagementPage: React.FC = () => {
                         <span className="product-detail-badge stock">
                           <span className="detail-label">Stock</span>
                           <span className="detail-value">
-                            {product.details[0].stockQuantity}
+                            {product.stockQuantity ?? product.details[0].stockQuantity}
                           </span>
                         </span>
                         {product.details[0].unitPrice !== product.details[0].salePrice && (
@@ -512,7 +534,7 @@ const ProductsManagementPage: React.FC = () => {
         <ProductWizard
           isOpen={showWizard}
           onClose={handleWizardClose}
-          onSuccess={fetchProducts}
+          onSuccess={() => { fetchProducts(); reloadCategories(); }}
           product={editingProduct}
           mode={wizardMode}
         />

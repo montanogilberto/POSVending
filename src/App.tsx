@@ -248,7 +248,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 // routes (loans, p2p-lending, client-followup, borrower-onboarding...) where
 // quick chat access still makes sense.
 const POS_ONLY_ROUTE_PREFIXES = [
-  '/dashboard', '/category', '/products', '/product/', '/cart',
+  '/dashboard', '/category', '/products', '/product', '/cart',
   '/expense-categories', '/expense-products', '/expense-cart',
   '/movements', '/led-status', '/clients', '/products-management',
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
@@ -951,7 +951,9 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/monthly-summary" component={MonthlySummaryPage} />
 
 
-            <PrivateRoute exact path="/category" component={Category} />
+            {/* The sale goes straight to the product list (categories are chips there). */}
+            <Route exact path="/category" render={() => <Redirect to="/product" />} />
+            <PrivateRoute exact path="/product" component={ProductListPage} />
             <PrivateRoute exact path="/products/:productId" component={ProductDetailPage} />
             <PrivateRoute exact path="/product/:categoryId" component={ProductListPage} />
             <PrivateRoute exact path="/cart" component={CartPage} />

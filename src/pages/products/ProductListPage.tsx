@@ -22,6 +22,8 @@ import {
 import { barcodeOutline, closeOutline, swapVerticalOutline } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { getProducts } from '../../data/products';
+import CategoryChips from '../../components/pos/CategoryChips';
+import { useProductCategories, categoryIdsFor } from '../../hooks/useProductCategories';
 import { Product } from '../../data/type_products';
 import { useCallback, useEffect, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
@@ -36,13 +38,14 @@ import './ProductListPage.css';
 type SortOrder = 'az' | 'za';
 
 interface RouteParams {
-  categoryId: string;
+  categoryId?: string;
 }
 
 const ProductListPage: React.FC = () => {
   const { categoryId } = useParams<RouteParams>();
   const history = useHistory();
   const [products, setProducts] = useState<Product[]>([]);
+  const { categories } = useProductCategories();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
@@ -50,16 +53,24 @@ const ProductListPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<SortOrder>('az');
   const pops = usePopovers();
 
-  const categoryIdNumber = +categoryId;
+  // The sale starts here directly (no separate category screen): every product
+  // is listed and categories are filter chips. /product/:categoryId preselects one.
+  const routeCategoryId = categoryId ? Number(categoryId) : NaN;
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    Number.isFinite(routeCategoryId) && routeCategoryId > 0 ? routeCategoryId : null,
+  );
+
+  useEffect(() => {
+    setSelectedCategoryId(Number.isFinite(routeCategoryId) && routeCategoryId > 0 ? routeCategoryId : null);
+  }, [routeCategoryId]);
 
   // Reload on every visit (CLAUDE.md §6): a fetch-once guard kept serving
   // stale products — a price edited in Gestión de productos never reached
   // the detail page or the cart.
   const load = useCallback(async () => {
     try {
-      const data = await getProducts(categoryIdNumber);
+      const data = await getProducts();
       console.log('[ProductList] load', JSON.stringify({
-        categoryId: categoryIdNumber,
         count: data.length,
         basePrices: data.map(p => ({ id: p.productId, name: p.name, salePrice: p.details?.[0]?.salePrice ?? 0 })),
       }));
@@ -70,7 +81,7 @@ const ProductListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [categoryIdNumber]);
+  }, []);
 
   useIonViewWillEnter(() => {
     load();
@@ -83,8 +94,14 @@ const ProductListPage: React.FC = () => {
     setSearchText(result);
   };
 
+  // A category includes its subcategories (same rule as Gestión de productos).
+  const categoryIds = categoryIdsFor(selectedCategoryId, categories);
+  const categoryProducts = categoryIds
+    ? products.filter((p) => categoryIds.has(Number(p.categoryId)))
+    : products;
+
   const filteredProducts = searchText.trim()
-    ? products.filter((p) => {
+    ? categoryProducts.filter((p) => {
         const q = searchText.toLowerCase();
         return (
           p.name?.toLowerCase().includes(q) ||
@@ -93,7 +110,7 @@ const ProductListPage: React.FC = () => {
           p.description?.toLowerCase().includes(q)
         );
       })
-    : products;
+    : categoryProducts;
 
   // Accent/case-insensitive so "Árbol" sorts with the A's.
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -108,8 +125,8 @@ const ProductListPage: React.FC = () => {
           {...pops.headerProps}
           screenTitle=""
           showBackButton={true}
-          backButtonText="Categorías"
-          backButtonHref="/Category"
+          backButtonText="Inicio"
+          backButtonHref="/dashboard"
         />
         <IonContent className="ion-padding">
           <p>Cargando productos...</p>
@@ -124,12 +141,15 @@ const ProductListPage: React.FC = () => {
         {...pops.headerProps}
         screenTitle="Productos"
         showBackButton={true}
-        backButtonText="Categoria Productos"
-        backButtonHref="/Category"
+        backButtonText="Inicio"
+        backButtonHref="/dashboard"
       />
 
       <IonContent fullscreen className="dashboard-content">
         <div className="dashboard-container">
+
+          {/* Category filter (replaces the old /category step) — shared with Gestión de productos */}
+          <CategoryChips categories={categories} selectedId={selectedCategoryId} onSelect={setSelectedCategoryId} />
 
           {/* Search + Scan bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
@@ -214,7 +234,9 @@ const ProductListPage: React.FC = () => {
                 </IonGrid>
               ) : (
                 <p style={{ padding: '16px 0' }}>
-                  {searchText ? 'No se encontraron productos con ese código o nombre.' : 'No hay productos en esta categoría.'}
+                  {searchText
+                    ? 'No se encontraron productos con ese código o nombre.'
+                    : selectedCategoryId === null ? 'No hay productos.' : 'No hay productos en esta categoría.'}
                 </p>
               )}
             </IonCardContent>

@@ -327,7 +327,7 @@ export const useDashboard = () => {
   }, [allIncome]);
 
   // ✅ ACTIONS
-  const handleStartSeller = () => history.push('/category');
+  const handleStartSeller = () => history.push('/product');
 
   const handleConfirmSale = async () => {
     if (!cart.length) {
