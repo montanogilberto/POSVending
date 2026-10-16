@@ -33,6 +33,11 @@ export interface ProductOptionChoice {
   createdAt: string;
   updatedAt: string;
   description: string;
+  /** Size of this choice (19 L, 600 ml); null for services. */
+  quantity?: number | null;
+  measurementId?: number | null;
+  /** Unit code: g, kg, ml, L, pz. */
+  unit?: string | null;
 }
 
 export interface ProductOption {
@@ -41,6 +46,8 @@ export interface ProductOption {
   optionKey: string;
   name: string;
   type: string;
+  /** checkbox options only: at least one choice must be picked. Radio is always required. */
+  isRequired?: boolean;
   createdAt: string;
   updatedAt: string;
   choices?: ProductOptionChoice[];
@@ -65,6 +72,8 @@ export interface Product {
   companyId: number;
   /** Consumable bought for the business (detergent, soap…), never sold in the POS menu. */
   isSupply?: boolean;
+  /** Ledger stock (inventoryStock) returned by by_company_products / products_one. */
+  stockQuantity?: number;
   options?: ProductOption[];
   details?: ProductDetail[];
   descriptions?: ProductDescription[];
@@ -103,6 +112,7 @@ export interface Option {
   productOptionId: number;
   name: string;
   type: 'radio' | 'checkbox';
+  isRequired?: boolean;
   choices?: Choice[];
 }
 

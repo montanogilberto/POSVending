@@ -283,7 +283,8 @@ const ProductDetailPage: React.FC = () => {
       if (!hasChoices(option)) return;
       const value = selectedOptions[option.productOptionId];
 
-      if (option.type === 'radio') {
+      // Radio: always pick one. Checkbox: only when the option is marked "Obligatoria".
+      if (option.type === 'radio' || option.isRequired) {
         const isEmpty =
           !value ||
           (Array.isArray(value) && value.length === 0) ||

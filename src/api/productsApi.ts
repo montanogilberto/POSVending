@@ -60,7 +60,8 @@ export interface ProductFormPayload {
 export interface ProductDetailsPayload {
   action?: number;
   productDetailId: number | null;
-  stockQuantity: number;
+  /** Target stock count; omit unless the user changed it (backend posts the difference). */
+  stockQuantity?: number;
   unitPrice: number;
   salePrice: number;
 }
@@ -81,6 +82,10 @@ export interface ProductOptionChoicePayload {
   name: string;
   price: number;
   description: string;
+  /** Size of this choice (19 L, 600 ml); null for services. */
+  quantity?: number | null;
+  /** Unit code matching measurements.prefix: g, kg, ml, L, pz. */
+  unit?: string | null;
 }
 
 export interface ProductOptionPayload {
@@ -89,6 +94,7 @@ export interface ProductOptionPayload {
   optionKey: string;
   name: string;
   type: string;
+  isRequired?: boolean;
   optionChoices: ProductOptionChoicePayload[];
 }
 

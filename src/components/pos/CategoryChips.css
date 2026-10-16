@@ -1,0 +1,65 @@
+/* Category filter shared by the POS product list and Gestión de productos */
+.category-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+.category-chips-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.category-chips-row::-webkit-scrollbar {
+  display: none;
+}
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #E5E7EB;
+  background: #ffffff;
+  color: #6B7280;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s ease;
+}
+.category-chip.active {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+}
+.category-chip:not(.active):hover {
+  background: #F9FAFB;
+  border-color: #D1D5DB;
+  color: #374151;
+}
+.category-chip:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+}
+/* Subcategory row: smaller, outlined in blue so it reads as "inside" the category */
+.category-chips-row.sub .category-chip {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+  border-color: #BFDBFE;
+  color: #1D4ED8;
+}
+.category-chips-row.sub .category-chip.active {
+  background: #DBEAFE;
+  border-color: #2563EB;
+  color: #1D4ED8;
+  box-shadow: none;
+}

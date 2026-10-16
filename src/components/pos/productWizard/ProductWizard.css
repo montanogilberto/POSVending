@@ -1138,3 +1138,124 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* Category as chips inside "Producto" (replaces the old first step) */
+.wizard-cat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wizard-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #E5E7EB;
+  background: #ffffff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s ease;
+}
+.wizard-cat-chip ion-icon {
+  font-size: 18px;
+}
+.wizard-cat-chip.selected {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #ffffff;
+}
+.wizard-cat-chip.add {
+  border-style: dashed;
+  color: #2563EB;
+}
+.wizard-cat-chip:disabled {
+  cursor: default;
+}
+.wizard-cat-rename-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: #6B7280;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Category actions under the chips (new category / subcategory / rename) */
+.wizard-cat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.wizard-cat-actions .wizard-cat-rename-link {
+  margin-top: 0;
+}
+
+/* "Obligatoria" toggle on an option */
+.wizard-required-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0 12px;
+  cursor: pointer;
+}
+.wizard-required-toggle input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: #2563EB;
+  flex-shrink: 0;
+}
+.wizard-required-toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  color: #111827;
+}
+.wizard-required-toggle small {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+/* Choice row with size: name | quantity + unit | price | remove */
+.wizard-choice-row.with-size {
+  grid-template-columns: 1fr 150px 120px 36px;
+}
+.wizard-choice-size {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 4px;
+}
+.wizard-choice-size .wizard-input,
+.wizard-choice-size .wizard-select {
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 4px;
+}
+@media (max-width: 480px) {
+  .wizard-choice-row.with-size {
+    grid-template-columns: 1fr 1fr 36px;
+  }
+  .wizard-choice-row.with-size > .wizard-input:first-child {
+    grid-column: 1 / -1;
+  }
+}
+.wizard-required-hint {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: #6B7280;
+}
