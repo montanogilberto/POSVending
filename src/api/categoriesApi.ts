@@ -13,7 +13,8 @@ export const fetchCategories = async (companyId: string): Promise<Category[]> =>
   return await fetchCategoriesByCompany(companyId);
 };
 
-export const createCategory = async (name: string, image: string, companyId: number): Promise<void> => {
+/** parentCategoryId: create it as a subcategory of that top-level category. */
+export const createCategory = async (name: string, image: string, companyId: number, parentCategoryId?: number | null): Promise<void> => {
   console.log('name:' + name + 'path' + image)
   try {
     const response = await fetch('https://smartloansbackend.azurewebsites.net/product_categories', {
@@ -28,6 +29,7 @@ export const createCategory = async (name: string, image: string, companyId: num
             name,
             image,
             companyId,
+            ...(parentCategoryId ? { parentCategoryId } : {}),
           },
         ],
       }),
