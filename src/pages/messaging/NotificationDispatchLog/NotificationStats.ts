@@ -16,7 +16,11 @@ export const parseAttempts = (raw: string | undefined): DispatchAttempt[] => {
   try {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
-      ? parsed.map(a => ({ channel: String(a?.channel ?? ''), outcome: String(a?.outcome ?? '') }))
+      ? parsed.map(a => ({
+          channel: String(a?.channel ?? ''),
+          outcome: String(a?.outcome ?? ''),
+          ...(a?.metaFallbackReason ? { metaFallbackReason: String(a.metaFallbackReason) } : {}),
+        }))
       : [];
   } catch {
     return [];

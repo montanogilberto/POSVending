@@ -60,6 +60,8 @@ const ProductDetailPage: React.FC = () => {
   const [product, setProduct] = useState<Product | undefined>(undefined);
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState<Record<number, SelectedOptionValue>>({});
+  // Radio rows get their own −/+ too (Garrafón · Tamaño 19 L x3): optionId → qty of the picked choice.
+  const [radioQty, setRadioQty] = useState<Record<number, number>>({});
   const pops = usePopovers();
 
   // Pieces state for "Servicio Completo" product
@@ -81,6 +83,7 @@ const ProductDetailPage: React.FC = () => {
   useIonViewDidLeave(() => {
     setQuantity(1);
     setSelectedOptions({});
+    setRadioQty({});
     setPieces({ pantalones: 0, prendas: 0, otros: 0 });
     setShowValidationToast(false);
   });
@@ -248,7 +251,7 @@ const ProductDetailPage: React.FC = () => {
         const selected = option.choices.find(
           c => c.productOptionChoiceId.toString() === value
         );
-        extra += selected?.price ?? 0;
+        extra += (selected?.price ?? 0) * (radioQty[option.productOptionId] ?? 1);
       }
 
       if (option.type === 'checkbox') {
@@ -374,7 +377,7 @@ const ProductDetailPage: React.FC = () => {
               id: choice.productOptionChoiceId,
               name: choice.name,
               price: choice.price,
-              quantity: 1,
+              quantity: radioQty[option.productOptionId] ?? 1,
             },
           ];
         }
@@ -604,6 +607,54 @@ const ProductDetailPage: React.FC = () => {
                             slot="start"
                             value={choice.productOptionChoiceId.toString()}
                           />
+                          {(() => {
+                            const optionId = option.productOptionId;
+                            const picked =
+                              selectedOptions[optionId] === choice.productOptionChoiceId.toString();
+                            const qty = picked ? radioQty[optionId] ?? 1 : 1;
+                            const setQty = (n: number) =>
+                              setRadioQty(prev => ({ ...prev, [optionId]: n }));
+                            return (
+                              <div className="qty-stepper" slot="end">
+                                <IonButton
+                                  fill="clear"
+                                  size="small"
+                                  aria-label="Disminuir cantidad"
+                                  disabled={!picked || qty <= 1}
+                                  onClick={() => setQty(qty - 1)}
+                                >
+                                  <IonIcon slot="icon-only" icon={removeOutline} />
+                                </IonButton>
+                                <IonInput
+                                  className="qty-input"
+                                  type="number"
+                                  inputmode="numeric"
+                                  min={1}
+                                  max={MAX_CHOICE_QTY}
+                                  aria-label={`Cantidad ${choice.name}`}
+                                  value={qty}
+                                  disabled={!picked}
+                                  onIonInput={e => {
+                                    const n = parseInt(String(e.detail.value ?? ''), 10);
+                                    if (!isNaN(n) && n >= 1) setQty(Math.min(n, MAX_CHOICE_QTY));
+                                  }}
+                                  onIonBlur={e => {
+                                    // Empty/invalid typing never reaches state — show the real qty again.
+                                    (e.target as HTMLIonInputElement).value = qty;
+                                  }}
+                                />
+                                <IonButton
+                                  fill="clear"
+                                  size="small"
+                                  aria-label="Aumentar cantidad"
+                                  disabled={!picked || qty >= MAX_CHOICE_QTY}
+                                  onClick={() => setQty(qty + 1)}
+                                >
+                                  <IonIcon slot="icon-only" icon={addOutline} />
+                                </IonButton>
+                              </div>
+                            );
+                          })()}
                         </IonItem>
                       ))}
                     </IonRadioGroup>

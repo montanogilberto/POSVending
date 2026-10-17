@@ -119,3 +119,20 @@ export const EMPLOYEE_STATUS: Record<string, StatusMeta> = {
   active:   { label: 'Activo',   color: 'success' },
   inactive: { label: 'Inactivo', color: 'medium' },
 };
+
+/** Tipo de notificación push (pushNotifications.notificationType). */
+export const NOTIFICATION_TYPE: Record<string, StatusMeta> = {
+  info:    { label: 'Información', color: 'primary' },
+  success: { label: 'Éxito',       color: 'success' },
+  warning: { label: 'Aviso',       color: 'warning' },
+  error:   { label: 'Error',       color: 'danger'  },
+  system:  { label: 'Sistema',     color: 'medium'  },
+};
+
+/** Prioridad de notificación push (pushNotifications.priority). */
+export const NOTIFICATION_PRIORITY: Record<string, StatusMeta> = {
+  low:      { label: 'Baja',    color: 'medium'  },
+  normal:   { label: 'Normal',  color: 'primary' },
+  high:     { label: 'Alta',    color: 'warning' },
+  critical: { label: 'Crítica', color: 'danger'  },
+};

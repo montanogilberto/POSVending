@@ -1,0 +1,82 @@
+.ntd-page {
+  --background: var(--ion-background-color, #f4f5f8);
+}
+
+.ntd-loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+.ntd-card {
+  margin: 0 0 16px;
+  border-radius: 14px;
+}
+
+.ntd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.ntd-head-icon {
+  font-size: 28px;
+  color: var(--ion-color-primary);
+}
+
+.ntd-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ntd-inline-spinner {
+  width: 20px;
+  height: 20px;
+}
+
+.ntd-title {
+  margin: 4px 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ion-text-color, #111827);
+}
+
+.ntd-message {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ion-color-step-750, #374151);
+  white-space: pre-wrap;
+}
+
+.ntd-date,
+.ntd-folio {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ion-color-medium);
+}
+
+.ntd-section-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ntd-data {
+  padding: 0;
+}
+
+.ntd-data-row {
+  --padding-start: 16px;
+}
+
+.ntd-data-value {
+  text-align: right;
+  font-weight: 600;
+}
+
+.ntd-action {
+  margin: 0 0 10px;
+}

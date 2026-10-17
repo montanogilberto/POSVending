@@ -6,6 +6,8 @@ export type DeliveryState = 'pending' | 'unconfirmed' | 'confirmed' | 'failed';
 export interface DispatchAttempt {
   channel: string;
   outcome: string;
+  /** WhatsApp sent through Twilio instead of Meta, and why (only on such attempts). */
+  metaFallbackReason?: string;
 }
 
 export interface DispatchRow extends NotificationDispatch {

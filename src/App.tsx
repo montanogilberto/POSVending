@@ -152,6 +152,8 @@ import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
+import NotificationDetailPage from './pages/messaging/NotificationDetailPage';
+import type { NotificationTapState } from './pages/messaging/NotificationDetail/NotificationDetailTypes';
 import P2PLendingPage from './pages/loans/P2PLendingPage';
 import MyLoansPage from './pages/loans/MyLoansPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
@@ -202,7 +204,7 @@ import BiometricLockScreen from './components/BiometricLockScreen';
 import ZoomableImage from './components/ui/ZoomableImage';
 import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
 import { getPostLoginRoute } from './utils/postLoginRoute';
-import { myLoansRoute, p2pLendingRoute, withClientId } from './utils/routes';
+import { myLoansRoute, notificationDetailRoute, p2pLendingRoute } from './utils/routes';
 import { PRODUCT_LABELS, productLandingRoute, discoverProducts, DiscoverProduct } from './utils/productContext';
 import DiscoverProductModal from './components/layout/DiscoverProductModal';
 import './components/layout/DiscoverProductModal.css';
@@ -394,16 +396,24 @@ const AppShell: React.FC = () => {
     let localTapHandle: PluginListenerHandle | undefined;
     let cancelled = false;
 
-    // Tapping a notification must DO something: deep-link to the payload's
-    // navigationRoute (e.g. /loan-chat/12) or fall back to the inbox.
-    const openFromNotification = (data: Record<string, any> | undefined, source: string) => {
-      const route = typeof data?.navigationRoute === 'string' && data.navigationRoute.startsWith('/')
-        // El payload trae '/p2p-lending' sin id (el emisor no conoce el
-        // clientId de quien recibe) — se completa con el de esta sesión.
-        ? withClientId(data.navigationRoute, clientId)
-        : '/notifications';
+    // Tapping a notification opens its info screen (title, body, date, data
+    // and a button to the related record via navigationRoute) instead of
+    // jumping straight to the route or just opening the app.
+    const openFromNotification = (
+      notification: { title?: string; body?: string } | undefined,
+      data: Record<string, any> | undefined,
+      source: 'push' | 'local',
+    ) => {
+      const route = notificationDetailRoute(data?.pushNotificationId);
+      const state: NotificationTapState = {
+        title: notification?.title,
+        body: notification?.body,
+        data: Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])),
+        tappedAt: new Date().toISOString(),
+        source,
+      };
       console.log('[Push] tap →', JSON.stringify({ source, route, data }));
-      history.push(route);
+      history.push(route, state);
     };
 
     const registerPush = async () => {
@@ -481,12 +491,12 @@ const AppShell: React.FC = () => {
 
       // App in background/closed: user taps the system (FCM) notification.
       tapHandle = await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-        openFromNotification(action.notification?.data, 'push');
+        openFromNotification(action.notification, action.notification?.data, 'push');
       });
 
       // App was foreground: user taps the LocalNotifications banner we scheduled.
       localTapHandle = await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
-        openFromNotification(action.notification?.extra, 'local');
+        openFromNotification(action.notification, action.notification?.extra, 'local');
       });
 
       await PushNotifications.register();
@@ -1037,6 +1047,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/pushNotifications" feature="pushNotifications" component={PushNotificationPage} />
             <PrivateRoute exact path="/notification-dispatch-log" feature="notificationDispatchLog" component={NotificationDispatchLogPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
+            <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />
           </IonRouterOutlet>
 
           {/* Custom bottom nav (was IonTabBar/IonTabButton). The SmartLoans

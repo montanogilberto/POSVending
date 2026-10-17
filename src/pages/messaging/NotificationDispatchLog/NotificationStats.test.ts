@@ -28,6 +28,10 @@ describe('parseAttempts', () => {
     expect(parseAttempts('[{"channel":"push","outcome":"NO_DEVICE","at":"x"},{"channel":"whatsapp","outcome":"SENT","at":"y"}]'))
       .toEqual([{ channel: 'push', outcome: 'NO_DEVICE' }, { channel: 'whatsapp', outcome: 'SENT' }]);
   });
+  it('keeps why WhatsApp fell back from Meta to Twilio', () => {
+    expect(parseAttempts('[{"channel":"whatsapp","outcome":"SENT","metaFallbackReason":"META_NOT_CONFIGURED"}]'))
+      .toEqual([{ channel: 'whatsapp', outcome: 'SENT', metaFallbackReason: 'META_NOT_CONFIGURED' }]);
+  });
   it('survives empty or malformed values', () => {
     expect(parseAttempts('')).toEqual([]);
     expect(parseAttempts(undefined)).toEqual([]);
