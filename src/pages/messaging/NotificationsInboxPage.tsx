@@ -22,18 +22,7 @@ import MailPopover from '../../components/popovers/MailPopover';
 import {
   fetchMyNotifications, markNotificationsRead, InboxNotification,
 } from '../../api/myNotificationsApi';
-import { withClientId } from '../../utils/routes';
-
-/**
- * Some backend-issued notifications (e.g. "complete tu registro / cuentas de
- * pago") still carry a staff-only navigationRoute like /clients — those are
- * meant for the requester's own profile, not the agent client-list module.
- * Remap here rather than trusting the stored route blindly for roles that
- * can't reach it.
- */
-const STAFF_ONLY_ROUTES: Record<string, string> = {
-  '/clients': '/profile',
-};
+import { resolveNotificationRoute } from '../../utils/routes';
 
 const TYPE_ICON: Record<string, string> = {
   Success: checkmarkCircleOutline,
@@ -75,15 +64,9 @@ const NotificationsInboxPage: React.FC = () => {
   useIonViewWillEnter(() => { load(true); }, [load]);
 
   const open = (n: InboxNotification) => {
-    let route = n.navigationRoute;
-    if (route && STAFF_ONLY_ROUTES[route] && !canAccess(roleCode, 'clients')) {
-      console.log('[Inbox] open: remapping staff-only route', route, '→', STAFF_ONLY_ROUTES[route], 'for role', roleCode);
-      route = STAFF_ONLY_ROUTES[route];
-    }
-    // Las rutas guardadas vienen sin clientId (el emisor no lo conoce): se
-    // completa con el del lector para que /p2p-lending/:clientId sea igual de
-    // recargable que el resto de los dashboards.
-    if (route) route = withClientId(route, clientId);
+    // Remapeo de rutas de staff + clientId del lector (las rutas guardadas
+    // vienen sin él: el emisor no lo conoce).
+    const route = resolveNotificationRoute(n.navigationRoute, canAccess(roleCode, 'clients'), clientId);
     console.log('[Inbox] open →', n.pushNotificationId, route ?? '(sin ruta)');
     if (route) history.push(route);
   };

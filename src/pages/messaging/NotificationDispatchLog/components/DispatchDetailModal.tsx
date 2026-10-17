@@ -4,7 +4,7 @@ import { closeOutline } from 'ionicons/icons';
 import StatusBadge from '../../../../components/ui/StatusBadge';
 import { NOTIFICATION_CHANNEL, NOTIFICATION_DISPATCH_STATUS } from '../../../../components/ui/statusMaps';
 import { toHermosillo } from '../../../../utils/format';
-import { CHANNEL_LABELS, OUTCOME_LABELS } from '../NotificationDispatchLogConstants';
+import { CHANNEL_LABELS, OUTCOME_LABELS, describeProviderError } from '../NotificationDispatchLogConstants';
 import type { DispatchRow } from '../NotificationDispatchLogTypes';
 
 interface DispatchDetailModalProps {
@@ -38,6 +38,11 @@ const DispatchDetailModal: React.FC<DispatchDetailModalProps> = ({ row, onClose 
           <Field label="Origen">{row.eventName} · {row.sourceType} #{row.sourceId}</Field>
           <Field label="Canal"><StatusBadge status={row.selectedChannel} map={NOTIFICATION_CHANNEL} /></Field>
           <Field label="Estado"><StatusBadge status={row.delivery} map={NOTIFICATION_DISPATCH_STATUS} /></Field>
+          {row.delivery === 'failed' && (
+            <Field label="Motivo del fallo">
+              {describeProviderError(row.providerErrorCode, row.providerErrorMessage)}
+            </Field>
+          )}
           <Field label="Mensaje">{row.messagePreview || '—'}</Field>
           <Field label="Creado">{toHermosillo(row.created_At) || '—'}</Field>
           <Field label="Enviado">{toHermosillo(row.sentAt) || '—'}</Field>
@@ -49,7 +54,10 @@ const DispatchDetailModal: React.FC<DispatchDetailModalProps> = ({ row, onClose 
             {row.attempts.length === 0
               ? '—'
               : row.attempts.map((a, i) => (
-                <div key={i}>{CHANNEL_LABELS[a.channel] ?? a.channel}: {OUTCOME_LABELS[a.outcome] ?? a.outcome.toLowerCase()}</div>
+                <div key={i}>
+                  {CHANNEL_LABELS[a.channel] ?? a.channel}: {OUTCOME_LABELS[a.outcome] ?? a.outcome.toLowerCase()}
+                  {a.metaFallbackReason && <> (vía Twilio, no Meta: {a.metaFallbackReason})</>}
+                </div>
               ))}
           </Field>
           {row.fallbackReason && <Field label="Motivo del cambio de canal">{row.fallbackReason}</Field>}

@@ -24,6 +24,9 @@ export interface NotificationDispatch {
   sentAt?: string;
   confirmedAt?: string;
   failedAt?: string;
+  /** Why a send failed (Twilio ErrorCode / Meta error code). Saved for failures from 2026-10-16 on; '' before. */
+  providerErrorCode?: string;
+  providerErrorMessage?: string;
   created_At: string;
   updated_at?: string;
 }
