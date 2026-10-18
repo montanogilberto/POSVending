@@ -8,4 +8,9 @@ export const EMPTY_CATALOG_ITEM: Partial<PosRewardCatalogItem> = {
   freeProductId: null,
   isActive: true,
   description: '',
+  code: null,
+  startAtUtc: null,
+  endAtUtc: null,
+  firstPurchaseOnly: false,
+  requiredUnits: null,
 };

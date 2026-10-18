@@ -12,7 +12,6 @@ import {
   IonLabel,
   IonChip,
   IonInput,
-  IonSpinner,
   useIonViewWillEnter,
 } from '@ionic/react';
 import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
@@ -20,7 +19,7 @@ import { addCircle, card, wallet, business, receipt, cart, person, pricetag, qrC
 import { useCart } from '../../contexts/CartContext';
 import { useProduct } from '../../contexts/ProductContext';
 import { useUser } from '../../contexts/UserContext';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
 import { submitOrder } from '../../api/cartApi';
 import useInactivityTimer from '../../hooks/useInactivityTimer';
@@ -30,7 +29,9 @@ import { getAllCommissionTerminals, CommissionTerminal } from '../../api/commiss
 import { activeCardTerminal, terminalCommission } from '../../utils/incomeMoney';
 import { useIncome } from '../../contexts/IncomeContext';
 import { Client } from '../../api/clientsApi';
-import { posRewardsApi, PosRewardBalance, PosRewardCatalogItem, PosRewardProductCount } from '../../api/posRewardsApi';
+import {
+  posRewardsApi, PosRewardBalance, PosRewardCatalogItem, PosRewardProductCount, IncomeDiscountsResult, stampUnits,
+} from '../../api/posRewardsApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
 
 import '../../styles/dashboard.css';
@@ -92,46 +93,63 @@ const CartPage: React.FC = () => {
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
   const [newPointsBalance, setNewPointsBalance] = useState<number | null>(null);
 
-  // Rewards redemption (free_product "stamp card" rewards, e.g. "compra 3,
-  // el 4to gratis") -- lets the cashier actually apply a reward the client
-  // sees on their own Rewards Dashboard/kiosk, instead of only showing a
-  // points badge with no way to use it.
+  // Every discount comes from posRewardCatalogItems: coupons (typed at
+  // checkout), stamp cards ("compra 3, el 4to gratis") and points rewards.
+  // The cart only PREVIEWS them: the coupon code and the chosen reward go
+  // with the sale and the backend (sp_income_applyDiscounts) applies them,
+  // redeems the reward and sets the final total -- so an abandoned or failed
+  // sale never uses up a reward.
   const [rewardsCatalog, setRewardsCatalog] = useState<PosRewardCatalogItem[]>([]);
   const [productCounts, setProductCounts] = useState<PosRewardProductCount[]>([]);
-  const [appliedRedemptions, setAppliedRedemptions] = useState<
-    Array<{ catalogItemId: number; productId: number; redemptionId: number }>
-  >([]);
-  const [applyingCatalogItemId, setApplyingCatalogItemId] = useState<number | null>(null);
+  const [selectedRewardId, setSelectedRewardId] = useState<number | null>(null);
+  const [coupons, setCoupons] = useState<PosRewardCatalogItem[]>([]);
+  const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
 
-  // Welcome coupon: every client gets one 2x1 on their first purchase.
-  // "First purchase" = zero lifetime POS-reward points earned so far — no
-  // new backend table needed, it reuses the ledger that's already updated
-  // after every completed sale (see earnFromTicket below).
-  const WELCOME_COUPON_CODE = '2X1';
-  const [promoApplied, setPromoApplied] = useState(false);
-  const [welcomeCouponApplied, setWelcomeCouponApplied] = useState(false);
-
-  const welcomeCouponEligible =
-    !!selectedClient && !clientBalanceLoading && (clientBalance === null || clientBalance.lifetimeEarned === 0);
-
-  // A coupon checked for one customer must never carry over to the next.
+  // Coupons from the catalog (coupon_b2g1). firstPurchaseOnly ones (the 2x1
+  // welcome coupon) need a client who never earned POS points -- the same
+  // rule the backend enforces when it applies the code.
   useEffect(() => {
-    setWelcomeCouponApplied(false);
+    let cancelled = false;
+    posRewardsApi.listCoupons(companyId)
+      .then(list => { if (!cancelled) setCoupons(list); })
+      .catch(err => console.error('[CartPage] Failed to load coupons', err));
+    return () => { cancelled = true; };
+  }, [companyId]);
+
+  const clientIsNew =
+    !!selectedClient && !clientBalanceLoading && (clientBalance === null || clientBalance.lifetimeEarned === 0);
+  const availableCoupons = useMemo(
+    () => coupons.filter(c => !c.firstPurchaseOnly || clientIsNew),
+    [coupons, clientIsNew]
+  );
+  const selectedCoupon = availableCoupons.find(c => c.catalogItemId === selectedCouponId) ?? null;
+  const promoActive = !!selectedCoupon;
+  const couponCovers = useCallback(
+    (productId: number) =>
+      !!selectedCoupon && (selectedCoupon.freeProductId == null || selectedCoupon.freeProductId === productId),
+    [selectedCoupon]
+  );
+
+  // A coupon or reward chosen for one customer must never carry over to the next.
+  useEffect(() => {
+    setSelectedCouponId(null);
+    setSelectedRewardId(null);
   }, [selectedClient?.clientId]);
 
-  const promoActive = welcomeCouponApplied && welcomeCouponEligible;
-
+  const selectedReward = rewardsCatalog.find(c => c.catalogItemId === selectedRewardId) ?? null;
   const freeUnitsByProduct = useMemo(() => {
     const map = new Map<number, number>();
-    appliedRedemptions.forEach(r => map.set(r.productId, (map.get(r.productId) ?? 0) + 1));
+    if (selectedReward?.rewardType === 'free_product' && selectedReward.freeProductId != null) {
+      map.set(selectedReward.freeProductId, 1);
+    }
     return map;
-  }, [appliedRedemptions]);
+  }, [selectedReward]);
 
   // Compute totals with promotion preview
   const totals = useMemo(() => {
     // Guard: if no cart items, return zeros
     if (!cartItems || cartItems.length === 0) {
-      return { lines: [], subtotal: 0, total: 0, discount: 0 };
+      return { lines: [], subtotal: 0, total: 0, discount: 0, pointsDiscount: 0 };
     }
     
     let subtotal = 0;
@@ -143,7 +161,7 @@ const CartPage: React.FC = () => {
 
       subtotal += lineTotal;
 
-      const payQtyPromo = promoActive ? payQty2x1(qty) : qty;
+      const payQtyPromo = couponCovers(Number(item.productId)) ? payQty2x1(qty) : qty;
       const freeUnits = freeUnitsByProduct.get(Number(item.productId)) ?? 0;
       const payQty = Math.max(0, payQtyPromo - freeUnits);
 
@@ -164,15 +182,24 @@ const CartPage: React.FC = () => {
       return { ...item, payQty, promoLineTotal, discount };
     });
 
-    const discount = Math.round((subtotal - totalPromo) * 100) / 100;
+    // Points rewards come off the discounted total, as sp_income_applyDiscounts does.
+    let pointsDiscount = 0;
+    if (selectedReward?.rewardType === 'discount_fixed') {
+      pointsDiscount = Math.min(Number(selectedReward.discountValue) || 0, totalPromo);
+    } else if (selectedReward?.rewardType === 'discount_pct') {
+      pointsDiscount = Math.round(totalPromo * (Number(selectedReward.discountValue) || 0)) / 100;
+    }
+    const finalTotal = Math.max(0, totalPromo - pointsDiscount);
+    const discount = Math.round((subtotal - finalTotal) * 100) / 100;
 
     return {
       lines,
       subtotal: Math.round(subtotal * 100) / 100,
-      total: Math.round(totalPromo * 100) / 100,
-      discount: Math.round(discount * 100) / 100
+      total: Math.round(finalTotal * 100) / 100,
+      discount: Math.round(discount * 100) / 100,
+      pointsDiscount: Math.round(pointsDiscount * 100) / 100,
     };
-  }, [cartItems, promoActive, freeUnitsByProduct]);
+  }, [cartItems, couponCovers, selectedReward, freeUnitsByProduct]);
 
   // Calculate total (use promo-adjusted total)
   const total = totals.total;
@@ -217,9 +244,8 @@ const CartPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [selectedClient?.clientId]);
 
-  // A reward applied for one customer must never carry over to the next.
+  // Rewards catalog (no coupons) + stamp-card progress for the selected client.
   useEffect(() => {
-    setAppliedRedemptions([]);
     if (!selectedClient?.clientId) {
       setRewardsCatalog([]);
       setProductCounts([]);
@@ -244,54 +270,50 @@ const CartPage: React.FC = () => {
     [cartItems]
   );
 
-  // Only show rewards the client can actually use on THIS order (the free
-  // product is in the cart) and has enough purchase history for (server-
-  // computed unitsAvailable, already net of previously-applied redemptions).
+  // Rewards the client can use on THIS order: a stamp card whose product is
+  // in the cart and whose purchases are complete (server-computed
+  // unitsAvailable, net of earlier redemptions), or a points reward the
+  // balance covers. The backend re-checks both when the sale is saved.
   const eligibleRewards = useMemo(() => {
+    if (!selectedClient?.clientId) return [];
     return rewardsCatalog.filter(item => {
-      if (item.rewardType !== 'free_product' || item.freeProductId == null) return false;
-      if (!cartProductIds.has(item.freeProductId)) return false;
-      const available = productCounts.find(p => p.productId === item.freeProductId)?.unitsAvailable ?? 0;
-      return available >= item.requiredPoints;
-    });
-  }, [rewardsCatalog, productCounts, cartProductIds]);
-
-  // One reward redemption per sale -- once any has been applied this cart
-  // session, every other "Aplicar" button is disabled, not just the one
-  // already used.
-  const hasAppliedReward = appliedRedemptions.length > 0;
-
-  const handleApplyReward = async (item: PosRewardCatalogItem) => {
-    if (!selectedClient?.clientId || !item.catalogItemId || item.freeProductId == null) return;
-    if (hasAppliedReward) return;
-    setApplyingCatalogItemId(item.catalogItemId);
-    try {
-      const result = await posRewardsApi.redeem(companyId, selectedClient.clientId, item.catalogItemId, userId);
-      if ('status' in result && result.status === 'applied') {
-        setAppliedRedemptions(prev => [
-          ...prev,
-          { catalogItemId: item.catalogItemId!, productId: item.freeProductId!, redemptionId: result.redemptionId },
-        ]);
-        showErrorToast(`Recompensa aplicada: ${item.name}`, 'success');
-        // Refresh so eligibility/badges reflect the unit this redemption just consumed.
-        const [bal, counts] = await Promise.all([
-          posRewardsApi.getBalance(companyId, selectedClient.clientId),
-          posRewardsApi.getProductCounts(companyId, selectedClient.clientId),
-        ]);
-        setClientBalance(bal);
-        setProductCounts(counts);
-      } else if ('error' in result && result.error === 'insufficient_product_units') {
-        showErrorToast(`Compras insuficientes de este producto (${result.purchased}/${result.required}).`);
-      } else if ('error' in result && result.error === 'insufficient_points') {
-        showErrorToast(`Puntos insuficientes (saldo: ${result.balance}).`);
-      } else {
-        showErrorToast('No se pudo aplicar la recompensa.');
+      if (item.rewardType === 'free_product') {
+        if (item.freeProductId == null || !cartProductIds.has(item.freeProductId)) return false;
+        const available = productCounts.find(p => p.productId === item.freeProductId)?.unitsAvailable ?? 0;
+        return available >= stampUnits(item);
       }
-    } catch (err) {
-      showErrorToast(err instanceof Error ? err.message : 'No se pudo aplicar la recompensa.');
-    } finally {
-      setApplyingCatalogItemId(null);
+      if (item.rewardType === 'discount_fixed' || item.rewardType === 'discount_pct') {
+        return (clientBalance?.balance ?? 0) >= Number(item.requiredPoints);
+      }
+      return false;
+    });
+  }, [rewardsCatalog, productCounts, cartProductIds, clientBalance, selectedClient?.clientId]);
+
+  // Drop a chosen reward the order no longer qualifies for (e.g. its product
+  // was removed from the cart).
+  useEffect(() => {
+    if (selectedRewardId != null && !eligibleRewards.some(r => r.catalogItemId === selectedRewardId)) {
+      setSelectedRewardId(null);
     }
+  }, [eligibleRewards, selectedRewardId]);
+
+  // One reward per sale. Choosing it only previews the discount; it is
+  // redeemed by the backend with the sale.
+  const toggleReward = (item: PosRewardCatalogItem) => {
+    if (!item.catalogItemId) return;
+    setSelectedRewardId(prev => (prev === item.catalogItemId ? null : item.catalogItemId!));
+  };
+
+  const REJECT_REASONS: Record<string, string> = {
+    invalid_or_inactive: 'no está vigente',
+    needs_client: 'requiere un cliente registrado',
+    not_first_purchase: 'solo aplica en la primera compra',
+    no_eligible_lines: 'no hay 2 unidades del mismo producto',
+    no_line_prices: 'la venta no tiene precios por opción',
+    product_not_in_sale: 'el producto no está en la venta',
+    insufficient_product_units: 'faltan compras de ese producto',
+    insufficient_points: 'puntos insuficientes',
+    one_reward_per_sale: 'solo una recompensa por venta',
   };
 
   const showErrorToast = (message: string, color: 'success' | 'danger' | 'warning' = 'danger') => {
@@ -415,7 +437,7 @@ const CartPage: React.FC = () => {
             };
           });
 
-          const promoCodeValue = promoActive ? WELCOME_COUPON_CODE : null;
+          const promoCodeValue = selectedCoupon?.code ?? null;
 
           // Card sales record which terminal charged them so accounting can
           // apply its commission. Never block the sale if the catalog is down.
@@ -449,6 +471,7 @@ const CartPage: React.FC = () => {
                 clientId: selectedClient?.clientId ?? 1,
                 companyId,
                 promotionCode: promoCodeValue,
+                ...(selectedReward?.catalogItemId && { rewardCatalogItemIds: [selectedReward.catalogItemId] }),
                 commissionTerminalId,
                 products: cartItems.map((item) => ({
                   productId: parseInt(item.productId),
@@ -497,21 +520,28 @@ const CartPage: React.FC = () => {
               // Ticket is already recorded — a points failure must not block or undo the sale.
             }
 
-            // sp_income already applies the B2G1 promo (dbo.promotions lookup
-            // by companyId+code) synchronously during the same insert above —
-            // no separate round-trip needed. (There used to be one here, to a
-            // POST /income/apply-promo route that was never implemented
-            // server-side; it always 404'd and was silently swallowed.)
-            if (promoActive && promoCodeValue) {
-              setPromoApplied(true);
+            // The backend applied the coupon/reward and set the final total
+            // (sp_income_applyDiscounts). Tell the cashier if it differs
+            // from the preview, e.g. a reward was no longer valid.
+            const discounts: IncomeDiscountsResult | undefined = rec.discounts;
+            if (discounts) {
+              const names = (r: { catalogItemId?: number; code?: string }) =>
+                r.code ?? [...rewardsCatalog, ...coupons].find(c => c.catalogItemId === r.catalogItemId)?.name ?? 'Descuento';
+              const rejected = discounts.rejected.map(r => `${names(r)}: ${REJECT_REASONS[r.reason] ?? r.reason}`);
+              if (rejected.length > 0 || Math.abs(Number(discounts.total) - total) >= 0.01) {
+                showErrorToast(
+                  `${rejected.length ? `No aplicado — ${rejected.join('; ')}. ` : ''}Total cobrado: ${formatPrice(Number(discounts.total))}`,
+                  'warning'
+                );
+              }
             }
           }
         } catch (incomeError) {}
 
         clearCart();
         clearAllProducts();
-        setWelcomeCouponApplied(false);
-        setAppliedRedemptions([]);
+        setSelectedCouponId(null);
+        setSelectedRewardId(null);
         setSplitPaymentEnabled(false);
         setSplitAmounts({ Efectivo: '', Tarjeta: '', Transferir: '' });
         setShowSuccessToast(true);
@@ -604,13 +634,11 @@ const CartPage: React.FC = () => {
                 <div className="cart-items-list">
                   {totals.lines.map((item) => {
                     const discountAmount = item.discount ?? 0;
-                    const rewardNames = appliedRedemptions
-                      .filter(r => r.productId === Number(item.productId))
-                      .map(r => rewardsCatalog.find(c => c.catalogItemId === r.catalogItemId)?.name)
-                      .filter((n): n is string => !!n);
-                    const discountLabel = rewardNames.length > 0
-                      ? Array.from(new Set(rewardNames)).join(', ')
-                      : (discountAmount > 0 ? 'Cupón de bienvenida 2x1' : undefined);
+                    const labels = [
+                      couponCovers(Number(item.productId)) && discountAmount > 0 ? selectedCoupon?.name : undefined,
+                      freeUnitsByProduct.has(Number(item.productId)) ? selectedReward?.name : undefined,
+                    ].filter((n): n is string => !!n);
+                    const discountLabel = labels.length > 0 ? labels.join(' + ') : undefined;
                     return (
                       <CartItemCard
                         key={item.id}
@@ -641,19 +669,20 @@ const CartPage: React.FC = () => {
                     Agregar más
                   </IonButton>
                   <div className="detail-total">
-                    {promoActive && totals.discount > 0 && (
+                    {totals.discount > 0 && (
                       <>
                         <span className="detail-subtotal-label">
                           Subtotal: {formatPrice(totals.subtotal)}
                         </span>
                         <span className="detail-discount-label">
-                          2x1 bienvenida: -{formatPrice(totals.discount)}
+                          {[selectedCoupon?.name, selectedReward?.name].filter(Boolean).join(' + ') || 'Descuento'}:
+                          {' '}-{formatPrice(totals.discount)}
                         </span>
                       </>
                     )}
-                    {promoActive && totals.discount === 0 && (
+                    {promoActive && !totals.lines.some(l => couponCovers(Number(l.productId)) && (l.discount ?? 0) > 0) && (
                       <span className="detail-discount-label detail-discount-label--pending">
-                        Cupón 2x1 activo: agrega otra unidad del mismo producto para el descuento
+                        {selectedCoupon?.name}: agrega otra unidad del mismo producto para el descuento
                       </span>
                     )}
                     <span className="detail-total-label">Total</span>
@@ -693,33 +722,40 @@ const CartPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {welcomeCouponEligible && (
+                  {availableCoupons.length > 0 && (
                     <div className="welcome-coupon-row">
-                      <IonChip
-                        className={`welcome-coupon-chip ${welcomeCouponApplied ? 'applied' : ''}`}
-                        onClick={() => {
-                          const next = !welcomeCouponApplied;
-                          setWelcomeCouponApplied(next);
-                          // 2x1 only discounts a line once it has 2+ units of the SAME
-                          // product+options — a cart of single, distinct items produces
-                          // a $0 discount even though the chip now reads "aplicado".
-                          // Without this, that looks like a bug instead of the coupon
-                          // correctly having nothing to apply to yet.
-                          if (next && !cartItems.some((item) => Number(item.quantity) >= 2)) {
-                            showErrorToast(
-                              'El cupón 2x1 aplica cuando llevas 2 unidades del mismo producto — agrega otra para ver el descuento.',
-                              'warning'
-                            );
-                          }
-                        }}
-                      >
-                        <IonIcon icon={giftOutline} />
-                        <IonLabel>
-                          {welcomeCouponApplied
-                            ? 'Cupón de bienvenida 2x1 aplicado'
-                            : 'Cliente nuevo: cupón 2x1 disponible — toca para aplicar'}
-                        </IonLabel>
-                      </IonChip>
+                      {availableCoupons.map(coupon => {
+                        const applied = coupon.catalogItemId === selectedCouponId;
+                        return (
+                          <IonChip
+                            key={coupon.catalogItemId}
+                            className={`welcome-coupon-chip ${applied ? 'applied' : ''}`}
+                            onClick={() => {
+                              setSelectedCouponId(applied ? null : coupon.catalogItemId ?? null);
+                              // 2x1 only discounts a line once it has 2+ units of the SAME
+                              // product+options — a cart of single, distinct items produces
+                              // a $0 discount even though the chip now reads "aplicado".
+                              const covered = (item: { productId: string | number }) =>
+                                coupon.freeProductId == null || coupon.freeProductId === Number(item.productId);
+                              if (!applied && !cartItems.some(item => covered(item) && Number(item.quantity) >= 2)) {
+                                showErrorToast(
+                                  `${coupon.name} aplica cuando llevas 2 unidades del mismo producto — agrega otra para ver el descuento.`,
+                                  'warning'
+                                );
+                              }
+                            }}
+                          >
+                            <IonIcon icon={giftOutline} />
+                            <IonLabel>
+                              {applied
+                                ? `${coupon.name} aplicado`
+                                : coupon.firstPurchaseOnly
+                                  ? `Cliente nuevo: ${coupon.name} disponible — toca para aplicar`
+                                  : `${coupon.name} — toca para aplicar`}
+                            </IonLabel>
+                          </IonChip>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -727,26 +763,26 @@ const CartPage: React.FC = () => {
                     <div className="rewards-available-section">
                       <div className="rewards-available-label">Recompensas disponibles</div>
                       {eligibleRewards.map(item => {
-                        const already = appliedRedemptions.some(r => r.catalogItemId === item.catalogItemId);
-                        const applying = applyingCatalogItemId === item.catalogItemId;
+                        const chosen = item.catalogItemId === selectedRewardId;
+                        const cost = item.rewardType === 'free_product' ? '' : ` · ${item.requiredPoints} pts`;
                         return (
                           <div key={item.catalogItemId} className="reward-available-row">
                             <div className="reward-available-info">
                               <IonIcon icon={giftOutline} color="success" />
-                              <IonLabel>{item.name}</IonLabel>
+                              <IonLabel>{item.name}{cost}</IonLabel>
                             </div>
                             <IonButton
                               size="small"
-                              color="success"
-                              disabled={already || applying || (hasAppliedReward && !already)}
-                              onClick={() => handleApplyReward(item)}
+                              color={chosen ? 'medium' : 'success'}
+                              disabled={selectedRewardId != null && !chosen}
+                              onClick={() => toggleReward(item)}
                             >
-                              {applying ? <IonSpinner name="dots" /> : already ? 'Aplicada' : 'Aplicar'}
+                              {chosen ? 'Quitar' : 'Aplicar'}
                             </IonButton>
                           </div>
                         );
                       })}
-                      {hasAppliedReward && (
+                      {selectedRewardId != null && (
                         <div className="rewards-limit-hint">Solo se puede aplicar una recompensa por venta.</div>
                       )}
                     </div>
@@ -965,8 +1001,6 @@ const CartPage: React.FC = () => {
             changeAmount={changeAmount}
             clearCart={clearCart}
             setTicketData={setTicketData}
-            promotionCode={promoActive ? WELCOME_COUPON_CODE : undefined}
-            discountAmount={promoActive ? totals.discount : undefined}
             pointsEarned={pointsEarned}
             newPointsBalance={newPointsBalance}
           />
