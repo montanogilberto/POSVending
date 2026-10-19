@@ -100,6 +100,17 @@ function generateCompactPayment(data: UnifiedReceiptData): string {
     <div class="divider"></div>`;
 }
 
+// POS points: the same lines the client gets in the sale message.
+function generateCompactRewards(data: UnifiedReceiptData): string {
+  const lines = data.rewards?.lines ?? [];
+  if (lines.length === 0) return '';
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `
+    <div class="section-title">Recompensas</div>
+    ${lines.map(line => `<div class="receipt-field"><span>${esc(line)}</span></div>`).join('')}
+    <div class="divider"></div>`;
+}
+
 function generateCompactFooter(data: UnifiedReceiptData): string {
   const qrImageSrc = 'https://imageprofile.blob.core.windows.net/profile/qr_gmolavanderia.png';
 
@@ -149,6 +160,7 @@ export function generatePrintHTML(data: UnifiedReceiptData, options: PrintOption
     ${generateCompactProducts(data)}
     ${generateCompactTotals(data)}
     ${generateCompactPayment(data)}
+    ${generateCompactRewards(data)}
     ${generateCompactFooter(data)}
   </div>
 </body>

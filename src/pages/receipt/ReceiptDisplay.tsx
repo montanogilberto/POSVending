@@ -307,7 +307,9 @@ const unifiedReceiptData = React.useMemo(() => {
         options={{ width: '46mm', thermal: true }}
       />
 
-      {pointsEarned != null && (
+      {/* Fallback when the ticket came without its rewards block (the receipt
+          itself shows it otherwise). */}
+      {pointsEarned != null && !unifiedReceiptData?.rewards && (
         <div className="receipt-points-badge">
           +{fmtInt(pointsEarned)} puntos POS
           {newPointsBalance != null && <span> · Saldo: {fmtInt(newPointsBalance)} pts</span>}

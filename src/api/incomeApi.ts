@@ -43,6 +43,9 @@ export interface IncomePayload {
     userId: number;
     clientId: number;
     companyId: number;
+    /** Idempotency key: one UUID per checkout attempt, reused on retries. A
+     *  repeat with the same key returns the existing sale (no second insert). */
+    clientRequestId?: string;
     /** Coupon code (posRewardCatalogItems coupon_b2g1). Applied server-side
      *  after the insert by sp_income_applyDiscounts, which sets the final total. */
     promotionCode?: string | null;

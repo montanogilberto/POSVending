@@ -492,6 +492,15 @@ export function generateMobileReceiptHTML(data: UnifiedReceiptData): string {
 
     ${buildPaymentSection(data)}
 
+    ${
+      data.rewards?.lines?.length
+        ? `<section class="section">
+      <h2 class="section-title">Recompensas</h2>
+      ${data.rewards.lines.map(line => `<div class="kv-row"><span>${escapeHtml(line)}</span></div>`).join('')}
+    </section>`
+        : ''
+    }
+
     <section class="section">
       <h2 class="section-title">Metadatos</h2>
       <div class="meta-small">incomeId: ${incomeId}</div>

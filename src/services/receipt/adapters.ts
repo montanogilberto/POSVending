@@ -145,7 +145,8 @@ export function adaptTicketToUnifiedReceipt(ticket: Ticket): UnifiedReceiptData 
       method: normalizePaymentMethod(ticket.paymentMethod),
       amountReceived: ticket.totals.amountReceived,
       change: ticket.totals.change
-    }
+    },
+    rewards: ticket.rewards?.lines?.length ? ticket.rewards : undefined,
   };
 }
 

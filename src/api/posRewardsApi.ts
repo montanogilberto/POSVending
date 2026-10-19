@@ -270,11 +270,15 @@ export const posRewardsApi = {
     );
     return data?.result?.[0]?.posRewardCatalogItems ?? [];
   },
-  listCoupons: async (companyId: number): Promise<PosRewardCatalogItem[]> => {
+  /** Live coupons. With clientId the backend leaves out first-purchase coupons
+   *  once that client has a sale; without a client they're left out here (a
+   *  first-purchase coupon needs a registered client). */
+  listCoupons: async (companyId: number, clientId?: number | null): Promise<PosRewardCatalogItem[]> => {
     const data = await crud<{ result?: Array<{ posRewardCatalogItems?: PosRewardCatalogItem[] }> }>(
-      'posRewardCatalogItems', 0, { companyId, activeOnly: true, includeCoupons: true }
+      'posRewardCatalogItems', 0, { companyId, activeOnly: true, includeCoupons: true, clientId: clientId ?? undefined }
     );
-    return (data?.result?.[0]?.posRewardCatalogItems ?? []).filter(i => isCouponLive(i));
+    return (data?.result?.[0]?.posRewardCatalogItems ?? [])
+      .filter(i => isCouponLive(i) && (clientId != null || !i.firstPurchaseOnly));
   },
   upsertCatalogItem: (item: PosRewardCatalogItem) =>
     crud('posRewardCatalogItems', item.catalogItemId ? 2 : 1, item),
