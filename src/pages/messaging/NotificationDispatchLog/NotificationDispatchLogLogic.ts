@@ -7,7 +7,7 @@ import {
   fetchNotificationUsage, getAllNotificationDispatches, NotificationSourceType, NotificationUsage,
 } from '../../../api/notificationDispatchApi';
 import { getAllClients } from '../../../api/clientsApi';
-import { computeKpis, hermosilloMonthKey, inDateRange, inMonth, matchesSearch, toRow, whatsappQuota } from './NotificationStats';
+import { channelUsage, computeKpis, hermosilloMonthKey, inDateRange, inMonth, matchesSearch, toRow, whatsappQuota } from './NotificationStats';
 import type { ChannelFilter, DateFilter, DeliveryFilter, DispatchRow } from './NotificationDispatchLogTypes';
 
 export const useNotificationDispatchLog = () => {
@@ -57,7 +57,11 @@ export const useNotificationDispatchLog = () => {
   const monthKey = hermosilloMonthKey(new Date().toISOString());
   const monthRows = useMemo(() => inMonth(rows, monthKey), [rows, monthKey]);
   const kpis = useMemo(() => computeKpis(monthRows), [monthRows]);
-  const ourWhatsapp = useMemo(() => whatsappQuota(monthRows), [monthRows]);
+  const channels = useMemo(() => channelUsage(monthRows), [monthRows]);
+  // Meta bills what went out: delivered + still without receipt, never the failed ones.
+  const quota = useMemo(
+    () => whatsappQuota(channels.metaWhatsapp.delivered + channels.metaWhatsapp.noReceipt, usage?.whatsappLimit ?? null),
+    [channels, usage]);
 
   const filtered = useMemo(() => rows.filter(r =>
     (sourceFilter === 'all' || r.sourceType === sourceFilter)
@@ -67,7 +71,7 @@ export const useNotificationDispatchLog = () => {
     && matchesSearch(r, search)), [rows, sourceFilter, channelFilter, deliveryFilter, dateFilter, search]);
 
   return {
-    loading, lastUpdated, filtered, kpis, usage, ourWhatsapp, total: rows.length, refresh: load, toastProps,
+    loading, lastUpdated, filtered, kpis, usage, channels, quota, total: rows.length, refresh: load, toastProps,
     selected, openDetail: setSelected, closeDetail: () => setSelected(null),
     search, setSearch,
     sourceFilter, setSourceFilter, channelFilter, setChannelFilter,

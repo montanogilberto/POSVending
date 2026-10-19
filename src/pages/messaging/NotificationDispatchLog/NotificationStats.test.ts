@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { NotificationDispatch } from '../../../api/notificationDispatchApi';
-import { attentionCount, computeKpis, deliveryState, hermosilloMonthKey, inDateRange, inMonth, matchesSearch, parseAttempts, percent, toRow, whatsappQuota } from './NotificationStats';
+import { attentionCount, channelUsage, computeKpis, deliveryState, hermosilloMonthKey, inDateRange, inMonth, matchesSearch, parseAttempts, percent, toRow, whatsappQuota } from './NotificationStats';
 
 const row = (over: Partial<NotificationDispatch> = {}): NotificationDispatch => ({
   notificationDispatchId: 1, companyId: 1, sourceType: 'income', sourceId: 4863, recipientType: 'client', recipientId: 2330,
@@ -20,6 +20,10 @@ describe('deliveryState', () => {
   it('trusts the timestamps when status lags behind', () => {
     expect(deliveryState(row({ status: 'sent', failedAt: '2026-10-02T23:08:00' }))).toBe('failed');
     expect(deliveryState(row({ status: 'sent', confirmedAt: '2026-10-02T23:08:00' }))).toBe('confirmed');
+  });
+  it('a delivery receipt after a failure wins (Meta 131026 then delivered)', () => {
+    expect(deliveryState(row({ status: 'confirmed', failedAt: '2026-10-18T20:21:05.537', confirmedAt: '2026-10-18T20:21:34.000' }))).toBe('confirmed');
+    expect(deliveryState(row({ status: 'failed', confirmedAt: '2026-10-18T20:21:05.000', failedAt: '2026-10-18T20:21:34.000' }))).toBe('failed');
   });
 });
 
@@ -64,16 +68,44 @@ describe('computeKpis', () => {
   });
 });
 
-describe('whatsappQuota', () => {
-  it('counts sent WhatsApp only: failed, pending and other channels use no allowance', () => {
+describe('channelUsage', () => {
+  it('splits Meta WhatsApp by receipt and leaves Twilio-era WhatsApp out', () => {
     const rows = [
-      row(), row({ status: 'confirmed' }), row({ status: 'failed' }), row({ status: 'pending' }), row({ selectedChannel: 'sms' }),
+      row({ providerName: 'meta_whatsapp', status: 'confirmed' }),
+      row({ providerName: 'meta_whatsapp', status: 'failed' }),
+      row({ providerName: 'meta_whatsapp' }),
+      row({ providerName: 'twilio_whatsapp' }),
     ].map(x => toRow(x));
-    expect(whatsappQuota(rows, 10)).toEqual({ limit: 10, used: 2, remaining: 8, ratio: 0.2, exceeded: false });
+    expect(channelUsage(rows).metaWhatsapp).toEqual({ delivered: 1, failed: 1, noReceipt: 1, total: 3 });
   });
-  it('flags going over the allowance', () => {
-    const rows = [row(), row(), row()].map(x => toRow(x));
-    expect(whatsappQuota(rows, 2)).toMatchObject({ used: 3, remaining: 0, ratio: 1, exceeded: true });
+  it('a delivery receipt after a Meta failure counts as delivered', () => {
+    const rows = [row({ providerName: 'meta_whatsapp', status: 'confirmed', failedAt: '2026-10-18T20:21:05', confirmedAt: '2026-10-18T20:21:34' })].map(x => toRow(x));
+    expect(channelUsage(rows).metaWhatsapp).toMatchObject({ delivered: 1, failed: 0 });
+  });
+  it('counts SMS and Push on their own', () => {
+    const rows = [
+      row({ selectedChannel: 'sms', providerName: 'twilio_sms' }),
+      row({ selectedChannel: 'sms', providerName: 'twilio_sms', status: 'failed' }),
+      row({ selectedChannel: 'push', providerName: 'azure_notification_hub' }),
+    ].map(x => toRow(x));
+    const usage = channelUsage(rows);
+    expect(usage.sms).toEqual({ delivered: 0, failed: 1, noReceipt: 1, total: 2 });
+    expect(usage.push).toEqual({ delivered: 0, failed: 0, noReceipt: 1, total: 1 });
+    expect(usage.metaWhatsapp.total).toBe(0);
+  });
+});
+
+describe('whatsappQuota', () => {
+  it('is null when no allowance is configured', () => {
+    expect(whatsappQuota(5, null)).toBeNull();
+    expect(whatsappQuota(5, 0)).toBeNull();
+  });
+  it('measures used against the allowance', () => {
+    expect(whatsappQuota(2, 10, 0.2)).toEqual({ limit: 10, used: 2, remaining: 8, ratio: 0.2, exceeded: false, low: false });
+  });
+  it('flags low and going over the allowance', () => {
+    expect(whatsappQuota(9, 10, 0.2)).toMatchObject({ remaining: 1, low: true, exceeded: false });
+    expect(whatsappQuota(3, 2)).toMatchObject({ used: 3, remaining: 0, ratio: 1, exceeded: true, low: true });
   });
 });
 

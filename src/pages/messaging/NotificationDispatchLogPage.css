@@ -73,8 +73,27 @@
 }
 
 .ndl-quota-head ion-icon {
-  color: #25d366;
+  color: var(--ion-color-primary);
   font-size: 1.3rem;
+}
+
+.ndl-usage-channel {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.ndl-usage-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ion-color-medium-shade);
+}
+
+.ndl-usage-title--whatsapp ion-icon {
+  color: #25d366;
 }
 
 .ndl-quota-numbers {

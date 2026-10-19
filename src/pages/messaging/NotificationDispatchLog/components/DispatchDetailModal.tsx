@@ -43,6 +43,11 @@ const DispatchDetailModal: React.FC<DispatchDetailModalProps> = ({ row, onClose 
               {describeProviderError(row.providerErrorCode, row.providerErrorMessage)}
             </Field>
           )}
+          {row.delivery === 'confirmed' && row.failedAt && (
+            <Field label="Aviso del proveedor">
+              {describeProviderError(row.providerErrorCode, row.providerErrorMessage)} — después confirmó la entrega.
+            </Field>
+          )}
           <Field label="Mensaje">{row.messagePreview || '—'}</Field>
           <Field label="Creado">{toHermosillo(row.created_At) || '—'}</Field>
           <Field label="Enviado">{toHermosillo(row.sentAt) || '—'}</Field>
