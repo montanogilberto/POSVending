@@ -1,3 +1,4 @@
+import { API_BASE_URL } from './appEnv';
 // Shared API utility functions to eliminate duplicate code
 
 export interface ApiError {
@@ -192,7 +193,7 @@ export const fetchProductsByCompany = async (
     console.log(`Fetching products for company ${companyId}${categoryId ? ` and category ${categoryId}` : ''}...`);
     
     const data = await makeApiRequest(
-      'https://smartloansbackend.azurewebsites.net/by_company_products',
+      `${API_BASE_URL}/by_company_products`,
       requestBody
     );
 
@@ -290,7 +291,7 @@ export const fetchCategoriesByCompany = async (companyId: string | number): Prom
 
   try {
     const data = await makeApiRequest(
-      'https://smartloansbackend.azurewebsites.net/all_products_categories',
+      `${API_BASE_URL}/all_products_categories`,
       requestBody
     );
 

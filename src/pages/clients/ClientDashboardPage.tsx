@@ -99,8 +99,8 @@ import { onDataChanged } from '../../utils/refreshBus';
 import { PLAY_STORE_URL, APP_STORE_URL } from '../../utils/appLinks';
 import { usePopovers } from '../../hooks/usePopovers';
 
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 import './ClientDashboardPage.css';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 // ── Stripe helpers ────────────────────────────────────────────────────────────
 // getStripeAccountStatus/createOrRefreshStripeAccount now live in

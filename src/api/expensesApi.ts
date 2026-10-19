@@ -1,6 +1,6 @@
 import type { MonthPeriod } from '../utils/monthPeriod';
+import { API_BASE_URL } from '../utils/appEnv';
 
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 export type ExpenseType = 'inventory' | 'general' | 'payroll';
 

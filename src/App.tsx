@@ -208,6 +208,7 @@ import { myLoansRoute, notificationDetailRoute, p2pLendingRoute } from './utils/
 import { PRODUCT_LABELS, productLandingRoute, discoverProducts, DiscoverProduct } from './utils/productContext';
 import DiscoverProductModal from './components/layout/DiscoverProductModal';
 import './components/layout/DiscoverProductModal.css';
+import { API_BASE_URL } from './utils/appEnv';
 
 setupIonicReact();
 
@@ -445,7 +446,7 @@ const AppShell: React.FC = () => {
       registrationHandle = await PushNotifications.addListener('registration', async (token) => {
         const platform = Capacitor.getPlatform();
         try {
-          await fetch(`${import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net'}/registerDevice`, {
+          await fetch(`${API_BASE_URL}/registerDevice`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

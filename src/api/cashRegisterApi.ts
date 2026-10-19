@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
 
 type CashRegisterAction = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 

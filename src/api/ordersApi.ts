@@ -1,6 +1,7 @@
+import { API_BASE_URL } from '../utils/appEnv';
 export const fetchOrders = async () => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/list_orders');
+    const response = await fetch(`${API_BASE_URL}/list_orders`);
     const data = await response.json();
     return data.orders || [];
   } catch (error) {
@@ -10,7 +11,7 @@ export const fetchOrders = async () => {
 
 export const fetchCommands = async () => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_commands');
+    const response = await fetch(`${API_BASE_URL}/all_commands`);
     if (!response.ok) {
       throw new Error('Failed to fetch commands');
     }
@@ -23,7 +24,7 @@ export const fetchCommands = async () => {
 
 export const fetchOrderProductDetails = async (orderId: number) => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/one_products_orders', {
+    const response = await fetch(`${API_BASE_URL}/one_products_orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orders: [{ orderId }] }),
@@ -50,7 +51,7 @@ export const updateOrderStatus = async (orderId: number, currentStatusName: stri
   const nextStatusId = statusProgression[currentStatusName.toLowerCase()] || 1;
 
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/tracking_status_orders', {
+    const response = await fetch(`${API_BASE_URL}/tracking_status_orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

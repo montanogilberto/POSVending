@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 export interface Ticket {
   incomeId: number;
   companyId: number;
@@ -169,7 +170,7 @@ export const fetchTicket = async (incomeId: string, signal?: AbortSignal): Promi
       const requestBody = { tickets: [{ income: incomeId }] };
       console.log('fetchTicket - Request body:', JSON.stringify(requestBody));
       
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/one_tickets', {
+      const response = await fetch(`${API_BASE_URL}/one_tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
@@ -241,7 +242,7 @@ export const sendTicketSms = async (
 
     try {
       const encodedTicketId = encodeURIComponent(ticketId);
-      const smsUrl = `https://smartloansbackend.azurewebsites.net/api/tickets/${encodedTicketId}/send-sms`;
+      const smsUrl = `${API_BASE_URL}/api/tickets/${encodedTicketId}/send-sms`;
       console.log('[TicketAPI][SMS] Request', {
         url: smsUrl,
         ticketId,
@@ -326,7 +327,7 @@ export const saveTicketHtml = async (
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const saveHtmlUrl = 'https://smartloansbackend.azurewebsites.net/api/tickets/receipt-html';
+      const saveHtmlUrl = `${API_BASE_URL}/api/tickets/receipt-html`;
       console.log('[TicketAPI][UPLOAD_AZURE] Request', {
         url: saveHtmlUrl,
         incomeId: payload.incomeId,
@@ -400,7 +401,7 @@ export const sendTicketWhatsapp = async (
 
     try {
       const encodedPathParam = encodeURIComponent(phoneOrTicketId);
-      const whatsappUrl = `https://smartloansbackend.azurewebsites.net/api/tickets/${encodedPathParam}/send-whatsapp`;
+      const whatsappUrl = `${API_BASE_URL}/api/tickets/${encodedPathParam}/send-whatsapp`;
       console.log('[TicketAPI][WHATSAPP] Request', {
         url: whatsappUrl,
         pathParam: phoneOrTicketId,
@@ -475,7 +476,7 @@ export const postOneTicketTracking = async (
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const trackingUrl = 'https://smartloansbackend.azurewebsites.net/one_ticket_tracking';
+      const trackingUrl = `${API_BASE_URL}/one_ticket_tracking`;
       console.log('[TicketAPI][TRACKING] Calling /one_ticket_tracking', {
         url: trackingUrl
       });

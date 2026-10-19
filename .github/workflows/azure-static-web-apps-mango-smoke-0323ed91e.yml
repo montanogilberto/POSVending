@@ -1,24 +1,34 @@
-name: Azure Static Web Apps CI/CD
+# PRODUCTION — main → https://mango-smoke-0323ed91e.3.azurestaticapps.net
+# Release flow: feature/* → development (DEV) → qa (QA) → main (PROD), via PRs.
+name: Deploy PROD (main)
 
 on:
   push:
     branches:
       - main
-      - development
-      - qa
-      - production
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
       - main
 
 jobs:
-  build_and_deploy_job:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+  deploy_production:
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_deploy-swa.yml
+    with:
+      environment: production
+      app_env: prod
+      token_secret: AZURE_STATIC_WEB_APPS_API_TOKEN_MANGO_SMOKE_0323ED91E
+    secrets: inherit
+
+  # PR qa → main: Azure creates a staging preview of the release candidate
+  # (mango-smoke-0323ed91e-<PR#>.westus2.3.azurestaticapps.net) and comments the link.
+  preview_pull_request:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
+    name: PR preview
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
           lfs: false
@@ -27,6 +37,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
@@ -34,26 +45,22 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Deploy to Azure Static Web Apps
-        id: builddeploy
+      - name: Deploy PR preview
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_MANGO_SMOKE_0323ED91E }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for GitHub integrations (PR comments, etc.)
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "/" # App source code path
-          api_location: ""  # API path (if any)
-          output_location: "dist" # Ionic/React build output
+          app_location: "/"
+          api_location: ""
+          output_location: "dist"
 
-  close_pull_request_job:
+  close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
-    name: Close Pull Request Job
+    name: Close PR preview
     steps:
-      - name: Close Pull Request
-        id: closepullrequest
-        uses: Azure/static-web-apps-deploy@v1
+      - uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_MANGO_SMOKE_0323ED91E }}
           action: "close"
-

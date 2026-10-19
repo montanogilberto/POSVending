@@ -20,6 +20,7 @@ import {
 import { waterOutline, receiptOutline, documentsOutline, helpCircleOutline, notificationsOutline, mailOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import './POS.css';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 interface Transaction {
   date: string;
@@ -41,7 +42,7 @@ const POS: React.FC = () => {
   // 🔄 POST al backend para guardar un ingreso
   const sendToBackend = async (amount: number): Promise<boolean> => {
     try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/vending', {
+      const response = await fetch(`${API_BASE_URL}/vending`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,7 +73,7 @@ const POS: React.FC = () => {
   };
 const fetchAllVending = async () => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_vending');
+    const response = await fetch(`${API_BASE_URL}/all_vending`);
     if (!response.ok) {
       throw new Error(`Error al obtener datos del backend: ${response.status}`);
     }

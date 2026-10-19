@@ -1,0 +1,18 @@
+# DEV — every push to `development` deploys to the DEV Static Web App.
+# Needs repo secret AZURE_SWA_TOKEN_DEV (deploy is skipped with a warning until it exists).
+name: Deploy DEV (development)
+
+on:
+  push:
+    branches:
+      - development
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-swa.yml
+    with:
+      environment: dev
+      app_env: dev
+      token_secret: AZURE_SWA_TOKEN_DEV
+    secrets: inherit

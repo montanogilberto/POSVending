@@ -1,4 +1,5 @@
-const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
+const BASE = API_BASE_URL;
 
 async function sp(payload: Record<string, unknown>) {
   const r = await fetch(`${BASE}/rewards`, {
