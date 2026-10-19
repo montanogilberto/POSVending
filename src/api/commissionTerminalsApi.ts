@@ -1,8 +1,8 @@
+import { API_BASE_URL } from '../utils/appEnv';
 // Commission terminal catalog (dbo.commission_terminals) — the payment
 // terminal / provider commission rate that income.commissionTerminalId
 // points to. Global catalog, not company-scoped.
 
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 export interface CommissionTerminal {
   commissionTerminalId: number;

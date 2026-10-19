@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
 export type NormalBalance = 'D' | 'C';

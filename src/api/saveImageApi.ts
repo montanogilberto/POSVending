@@ -1,6 +1,7 @@
+import { API_BASE_URL } from '../utils/appEnv';
 export const saveImage = async (filename: string, base64: string): Promise<string> => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/save_image', { // Replace with actual backend endpoint
+    const response = await fetch(`${API_BASE_URL}/save_image`, { // Replace with actual backend endpoint
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

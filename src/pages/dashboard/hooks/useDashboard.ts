@@ -15,6 +15,7 @@ import {
 } from '../../../utils/incomeMoney';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
 import { Transaction, CartItem } from '../types';
+import { API_BASE_URL } from '../../../utils/appEnv';
 
 type PaymentMethod = PaymentMethodLabel;
 
@@ -341,7 +342,7 @@ export const useDashboard = () => {
       console.log('[Dashboard] handleConfirmSale → /pos_laundry', { itemCount: cart.length, total });
 
       const response = await fetch(
-        'https://smartloansbackend.azurewebsites.net/pos_laundry',
+        `${API_BASE_URL}/pos_laundry`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

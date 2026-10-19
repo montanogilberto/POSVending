@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 /**
  * arcadeStoreApi — compra de fichas con dinero real.
  *
@@ -17,7 +18,7 @@
  *
  * El riel se elige en chipRail.ts.
  */
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const BASE_URL = API_BASE_URL;
 
 export interface ChipPack {
   packKey: string;

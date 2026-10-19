@@ -50,6 +50,7 @@ const normalizeError = (error: unknown) => {
 // (GET /all_income is NOT filtered by company — its wrapper was removed
 // 2026-09-29; don't reintroduce it.)
 import type { MonthPeriod } from '../utils/monthPeriod';
+import { API_BASE_URL } from '../utils/appEnv';
 export type IncomePeriod = MonthPeriod;
 
 export const fetchMonthlyLaundry = async (
@@ -59,7 +60,7 @@ export const fetchMonthlyLaundry = async (
 ): Promise<Income[]> => {
   try {
     const response = await fetch(
-      'https://smartloansbackend.azurewebsites.net/monthly_income',
+      `${API_BASE_URL}/monthly_income`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -108,7 +109,7 @@ export const createLaundrySale = async (
 ): Promise<any> => {
   try {
     const response = await fetch(
-      'https://smartloansbackend.azurewebsites.net/pos_laundry',
+      `${API_BASE_URL}/pos_laundry`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,8 +1,9 @@
 import {
   fingerPrintOutline, documentTextOutline, shieldCheckmarkOutline,
 } from 'ionicons/icons';
+import { API_BASE_URL } from '../../../utils/appEnv';
 
-export const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+export { API_BASE_URL };
 
 export const STEPS = [
   { icon: fingerPrintOutline,     label: 'Biometría' },

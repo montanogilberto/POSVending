@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 
 
   export interface Categories {
@@ -18,7 +19,7 @@
         ]
       });
       console.log('Request body:', body);
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/all_products_categories', {
+      const response = await fetch(`${API_BASE_URL}/all_products_categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

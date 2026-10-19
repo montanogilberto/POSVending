@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 /**
  * posRewardsApi — puntos de lealtad ganados por compra en el POS/vending.
  *
@@ -14,7 +15,6 @@
  * del lado del servidor) — este archivo nunca debe sumar puntos localmente, solo pedir
  * el resultado ya calculado.
  */
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 async function parseBody(response: Response): Promise<any> {
   const raw = await response.text().catch(() => '');
