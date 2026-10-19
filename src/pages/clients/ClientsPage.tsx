@@ -105,6 +105,7 @@ import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { PLAY_STORE_URL, APP_STORE_URL } from '../../utils/appLinks';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   nombre: '',
@@ -174,7 +175,7 @@ const productsFromClientType = (t?: ClientType): ClientCapability[] => {
   }
 };
 
-const API_BASE = 'https://smartloansbackend.azurewebsites.net';
+const API_BASE = API_BASE_URL;
 
 async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
   const res = await fetch(`${API_BASE}/stripe/connected-accounts`, {

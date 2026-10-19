@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 /**
  * arcadeApi — mini-juegos de apuesta con FICHAS VIRTUALES.
  *
@@ -8,7 +9,7 @@
  * pide la ronda, `playAction` declara la intencion ("pido carta", "estos son
  * mis golpes") y el backend responde con el resultado ya liquidado.
  */
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const BASE_URL = API_BASE_URL;
 
 export type GameKey =
   | 'blackjack' | 'mole' | 'bowling' | 'dice' | 'coinflip'

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 /**
  * rewardBenefitsApi — los puntos valen en el préstamo.
  *
@@ -9,7 +10,7 @@
  * NO existe —ni debe agregarse— ninguna función que convierta fichas en
  * puntos. Ese puente volvería una ganancia de azar en valor económico.
  */
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const BASE_URL = API_BASE_URL;
 
 export type BenefitType = 'fee_discount_pct' | 'rate_discount_bps';
 

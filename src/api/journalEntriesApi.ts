@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
 
 export type JournalEntryStatus = 'POSTED' | 'VOID';
 export type ReferenceType = 'income' | 'income_commission' | 'expense' | 'manual' | 'adjustment' | 'opening_balance';

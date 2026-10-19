@@ -1,0 +1,42 @@
+# Enforces the promotion path and type-checks/builds every PR before it can merge.
+#   PR into qa   must come from development
+#   PR into main must come from qa   (hotfix/* allowed for emergencies)
+# Make "Release guard / promotion-path" and "Release guard / build" required checks
+# in the branch protection rules for qa and main.
+name: Release guard
+
+on:
+  pull_request:
+    branches:
+      - development
+      - qa
+      - main
+
+jobs:
+  promotion-path:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check source branch
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          echo "PR: $HEAD → $BASE"
+          if [ "$BASE" = "qa" ] && [ "$HEAD" != "development" ]; then
+            echo "::error::Only development can be merged into qa (got $HEAD)."; exit 1
+          fi
+          if [ "$BASE" = "main" ] && [ "$HEAD" != "qa" ] && [[ "$HEAD" != hotfix/* ]]; then
+            echo "::error::Only qa (or hotfix/*) can be merged into main (got $HEAD)."; exit 1
+          fi
+          echo "OK"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build

@@ -1,4 +1,5 @@
-const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
+const BASE = API_BASE_URL;
 
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 

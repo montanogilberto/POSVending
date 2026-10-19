@@ -1,9 +1,10 @@
+import { API_BASE_URL } from '../utils/appEnv';
 // Banking-first Phase 1 client (docs/payment-banking-first-redesign.md):
 // verified CLABEs + immutable ledger + SPEI dispersión orchestrator.
 // STP runs in MOCK mode server-side until credentials exist, so every call
 // here is exercisable end-to-end without moving real money.
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "https://smartloansbackend.azurewebsites.net";
+const BASE_URL = API_BASE_URL;
 
 async function post(path: string, body: unknown): Promise<any> {
   const res = await fetch(`${BASE_URL}${path}`, {

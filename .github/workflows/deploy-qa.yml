@@ -1,0 +1,18 @@
+# QA — every push to `qa` (i.e. a merged development → qa release PR) deploys to the QA Static Web App.
+# Needs repo secret AZURE_SWA_TOKEN_QA (deploy is skipped with a warning until it exists).
+name: Deploy QA (qa)
+
+on:
+  push:
+    branches:
+      - qa
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-swa.yml
+    with:
+      environment: qa
+      app_env: qa
+      token_secret: AZURE_SWA_TOKEN_QA
+    secrets: inherit

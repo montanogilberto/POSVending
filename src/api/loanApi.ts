@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 export interface Loan {
   loanId: number;
   companyId: number;
@@ -21,7 +22,7 @@ export interface LoanApiResponse {
   loans: Loan[];
 }
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const BASE_URL = API_BASE_URL;
 
 export async function getAllLoans(companyId: number, searchTerm: string = ''): Promise<Loan[]> {
   const body = { loans: [{ companyId, ...(searchTerm && { loanNumber: searchTerm }) }] };

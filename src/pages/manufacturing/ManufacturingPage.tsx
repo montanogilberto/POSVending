@@ -26,8 +26,9 @@ import { useHistory } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { fmtMXN as fmt } from '../../utils/format';
 import './ManufacturingPage.css';
+import { API_BASE_URL } from '../../utils/appEnv';
 
-const API = 'https://smartloansbackend.azurewebsites.net';
+const API = API_BASE_URL;
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
 
