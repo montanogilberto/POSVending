@@ -204,6 +204,30 @@ export interface PosRewardDashboardSummary {
   activity: Array<{ date: string; earned: number; redeemed: number }>;
 }
 
+/** POST /posRewards/dashboard (sp_posRewardsDashboard): everything about rewards
+ *  for one company and period, read-only. Days are Hermosillo days. */
+export interface PosRewardsDashboard {
+  period: { startDate: string; endDate: string };
+  kpis: {
+    pointsEarned: number; pointsRedeemed: number; pointsAdjusted: number;
+    outstandingPoints: number; outstandingValueMxn: number | null; earnPct: number | null;
+    clientsWithBalance: number; activeClients: number; redemptions: number;
+    couponUses: number; discountGiven: number; sales: number;
+  };
+  daily: Array<{ date: string; earned: number; redeemed: number }>;
+  topCustomers: Array<{ clientId: number; name: string; balance: number; lifetimeEarned: number;
+                        lifetimeRedeemed: number; lastActivity: string | null }>;
+  coupons: Array<{ catalogItemId: number; code: string; name: string; isActive: boolean;
+                   firstPurchaseOnly: boolean; uses: number; discountTotal: number }>;
+  rewards: Array<{ catalogItemId: number; name: string; rewardType: PosRewardType; requiredPoints: number;
+                   isActive: boolean; redemptions: number; cancelled: number; pointsSpent: number }>;
+  stampCards: Array<{ catalogItemId: number; name: string; freeProductId: number; requiredUnits: number;
+                      ready: number; oneAway: number; inProgress: number;
+                      closest: Array<{ clientId: number; name: string; unitsAvailable: number; requiredUnits: number }> }>;
+  /** The separate SmartLoans rewards (/rewards): points earned on sales in the period. */
+  smartLoans: { purchaseRuleActive: boolean; pointsEarned: number; transactions: number; clients: number } | null;
+}
+
 // ── API ──────────────────────────────────────────────────────────────────
 
 export const posRewardsApi = {
@@ -248,6 +272,12 @@ export const posRewardsApi = {
       'posRewardBalances', 0, { companyId }
     );
     return data?.result?.[0]?.posRewardBalances ?? [];
+  },
+  getDashboard: async (companyId: number, startDate?: string, endDate?: string): Promise<PosRewardsDashboard | null> => {
+    const data = await post<{ result?: PosRewardsDashboard[] }>('/posRewards/dashboard', {
+      posRewardsDashboard: [{ companyId, startDate, endDate }],
+    });
+    return data?.result?.[0] ?? null;
   },
   getDashboardSummary: (companyId: number, startDate?: string, endDate?: string) =>
     post<PosRewardDashboardSummary>('/posRewardBalances/dashboard-summary', {

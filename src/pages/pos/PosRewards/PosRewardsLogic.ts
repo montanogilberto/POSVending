@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useIonViewWillEnter } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
 import { canAccess } from '../../../config/rolePermissions';
@@ -10,8 +10,24 @@ import {
   PosRewardTransaction,
   PosRewardCatalogItem,
   PosRewardDashboardSummary,
+  PosRewardsDashboard,
 } from '../../../api/posRewardsApi';
 import { PosRewardsTab } from './PosRewardsTypes';
+import { hermosilloDayKey, monthToDate, type CustomRange, type PeriodFilter } from '../../../utils/period';
+
+/** Inclusive Hermosillo days for a period of the shared PeriodSegment. */
+function periodRange(period: PeriodFilter, custom: CustomRange): { start: string; end: string } {
+  const today = hermosilloDayKey(new Date().toISOString());
+  if (period === 'custom') {
+    const [start, end] = custom.from <= custom.to ? [custom.from, custom.to] : [custom.to, custom.from];
+    return { start, end };
+  }
+  if (period === 'today') return { start: today, end: today };
+  if (period === 'month') return { start: `${today.slice(0, 8)}01`, end: today };
+  const d = new Date(`${today}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 6);
+  return { start: d.toISOString().slice(0, 10), end: today };
+}
 import { EMPTY_CATALOG_ITEM } from './PosRewardsConstants';
 
 export function usePosRewards() {
@@ -26,6 +42,11 @@ export function usePosRewards() {
   const [balances, setBalances] = useState<PosRewardBalance[]>([]);
   const [catalog, setCatalog] = useState<PosRewardCatalogItem[]>([]);
   const [ledger, setLedger] = useState<PosRewardTransaction[]>([]);
+  // Resumen tab: the full rewards dashboard for the chosen period (same
+  // PeriodSegment as the notification screens: Hoy / 7 días / Este mes / Personalizado).
+  const [period, setPeriod] = useState<PeriodFilter>('month');
+  const [customRange, setCustomRange] = useState<CustomRange>(monthToDate());
+  const [dashboard, setDashboard] = useState<PosRewardsDashboard | null>(null);
 
   const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [editCatalogItem, setEditCatalogItem] = useState<Partial<PosRewardCatalogItem>>(EMPTY_CATALOG_ITEM);
@@ -34,12 +55,15 @@ export function usePosRewards() {
     if (!companyId) return;
     setLoading(true);
     try {
-      const [summaryRes, balancesRes, catalogRes, ledgerRes] = await Promise.all([
+      const range = periodRange(period, customRange);
+      const [summaryRes, balancesRes, catalogRes, ledgerRes, dashboardRes] = await Promise.all([
         posRewardsApi.getDashboardSummary(companyId).catch(() => null),
         posRewardsApi.listBalances(companyId).catch(() => []),
         posRewardsApi.listCatalog(companyId, false, true).catch(() => []),
         posRewardsApi.listLedger(companyId).catch(() => []),
+        posRewardsApi.getDashboard(companyId, range.start, range.end).catch(() => null),
       ]);
+      setDashboard(dashboardRes);
       setSummary(summaryRes);
       setBalances(Array.isArray(balancesRes) ? balancesRes : []);
       setCatalog(Array.isArray(catalogRes) ? catalogRes : []);
@@ -52,6 +76,14 @@ export function usePosRewards() {
   };
 
   useIonViewWillEnter(() => { load(); });
+
+  // A new period reloads; the first render is covered by useIonViewWillEnter.
+  const periodLoaded = useRef(false);
+  useEffect(() => {
+    if (!periodLoaded.current) { periodLoaded.current = true; return; }
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, customRange]);
 
   useEffect(() => {
     return onDataChanged((reason) => {
@@ -143,6 +175,7 @@ export function usePosRewards() {
     summary,
     balances,
     catalog,
+    dashboard, period, setPeriod, customRange, setCustomRange,
     ledger,
     showCatalogModal, setShowCatalogModal,
     editCatalogItem, setEditCatalogItem,

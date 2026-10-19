@@ -55,12 +55,12 @@ export const PROPOSAL_STATUS: Record<string, { label: string }> = {
 
 /** Cascada de notificaciones (notificationDispatches.status). */
 export const NOTIFICATION_DISPATCH_STATUS: Record<string, StatusMeta> = {
-  pending:   { label: 'Pendiente',  color: 'medium'  },
-  sent:      { label: 'Enviada',    color: 'success' },
-  confirmed: { label: 'Confirmada', color: 'primary' },
-  failed:    { label: 'Fallida',    color: 'danger'  },
-  // Derived on the client (notificationStats.deliveryState): accepted by the provider, delivery never confirmed.
-  unconfirmed: { label: 'Sin confirmar', color: 'warning' },
+  // Only 'confirmed' means delivered to the person; pending + unconfirmed both await a final status.
+  confirmed: { label: 'Entrega confirmada',        color: 'success' },
+  unconfirmed: { label: 'Pendiente de confirmación', color: 'warning' },
+  pending:   { label: 'Pendiente de confirmación', color: 'warning' },
+  failed:    { label: 'Fallido',                   color: 'danger'  },
+  sent:      { label: 'Aceptado por el proveedor', color: 'medium'  },
 };
 
 /** Canal de envío (notificationDispatches.selectedChannel) — verde=gratis, ambar=medio, rojo=caro. */
@@ -127,6 +127,12 @@ export const NOTIFICATION_TYPE: Record<string, StatusMeta> = {
   warning: { label: 'Aviso',       color: 'warning' },
   error:   { label: 'Error',       color: 'danger'  },
   system:  { label: 'Sistema',     color: 'medium'  },
+};
+
+/** Lectura de una notificación push (pushNotifications.isRead): la marca la app del destinatario. */
+export const PUSH_READ_STATUS: Record<string, StatusMeta> = {
+  read:   { label: 'Leída',    color: 'success' },
+  unread: { label: 'Sin leer', color: 'warning' },
 };
 
 /** Prioridad de notificación push (pushNotifications.priority). */

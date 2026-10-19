@@ -649,15 +649,6 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'clientFaceRecognitions') && (
-              <IonItem button routerLink="/clientFaceRecognitions" title="Cliente Reconocimiento Facial">
-                <IonIcon icon={personCircle} slot="start" />
-                {!menuCollapsed && <IonLabel>Cliente Reconocimiento Facial</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'products') && (
               <IonItem button routerLink="/products-management" title="Productos">
                 <IonIcon icon={cube} slot="start" />

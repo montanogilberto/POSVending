@@ -4,11 +4,10 @@ import {
   IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonList, IonItem, IonLabel, IonNote, IonBadge,
   IonToast, IonLoading, IonFab, IonFabButton, IonSegment, IonSegmentButton,
-  IonGrid, IonRow, IonCol,
 } from '@ionic/react';
 import { useExitConfirm } from '../../../contexts/ExitConfirmContext';
 import {
-  addOutline, arrowBack, trophyOutline, starOutline, giftOutline, cashOutline,
+  addOutline, arrowBack, giftOutline,
   createOutline, trashOutline, refreshOutline, checkmarkCircleOutline, removeCircleOutline,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
@@ -19,6 +18,7 @@ import { fmtInt as fmt, mxDate as toDate } from '../../../utils/format';
 import { stampUnits } from '../../../api/posRewardsApi';
 import { PosRewardsVM } from './PosRewardsLogic';
 import CatalogItemModal from './components/CatalogItemModal';
+import RewardsOverview from './components/RewardsOverview';
 import '../PosRewardsPage.css';
 
 interface Props {
@@ -30,65 +30,12 @@ const PosRewardsView: React.FC<Props> = ({ vm }) => {
   const { confirmBack } = useExitConfirm();
   const {
     isAdmin, tab, setTab, loading, toastProps,
-    summary, balances, catalog, ledger,
+    catalog, ledger,
     openNewCatalogItem, openEditCatalogItem, deleteCatalogItem,
     reload,
   } = vm;
 
-  const renderOverview = () => (
-    <>
-      <IonGrid className="pr-kpi-grid">
-        <IonRow>
-          {[
-            { icon: starOutline,   label: 'Puntos otorgados', value: fmt(summary?.pointsIssued ?? 0),   color: '#2563eb' },
-            { icon: giftOutline,   label: 'Puntos canjeados', value: fmt(summary?.pointsRedeemed ?? 0), color: '#059669' },
-            { icon: trophyOutline, label: 'Recompensas canjeadas', value: fmt(summary?.redemptionsCount ?? 0), color: '#d97706' },
-            { icon: cashOutline,   label: 'Clientes con saldo', value: fmt(balances.filter(b => b.balance > 0).length), color: '#7c3aed' },
-          ].map(k => (
-            <IonCol size="6" key={k.label}>
-              <IonCard className="pr-kpi-card">
-                <IonCardContent>
-                  <IonIcon icon={k.icon} style={{ color: k.color, fontSize: '1.6rem' }} />
-                  <p className="pr-kpi-label">{k.label}</p>
-                  <h2 className="pr-kpi-value" style={{ color: k.color }}>{k.value}</h2>
-                </IonCardContent>
-              </IonCard>
-            </IonCol>
-          ))}
-        </IonRow>
-      </IonGrid>
-
-      <IonCard className="pr-card">
-        <IonCardHeader>
-          <div className="pr-card-header-row">
-            <IonCardTitle>Top Clientes</IonCardTitle>
-            <IonButton fill="clear" size="small" onClick={reload}>
-              <IonIcon icon={refreshOutline} slot="icon-only" />
-            </IonButton>
-          </div>
-        </IonCardHeader>
-        <IonCardContent>
-          {balances.length === 0 ? (
-            <EmptyState icon={trophyOutline} text="Sin puntos POS registrados aún." />
-          ) : (
-            <IonList lines="none">
-              {balances.slice(0, 20).map((b, i) => (
-                <IonItem key={b.clientId} className="pr-leaderboard-item">
-                  <span className="pr-rank" slot="start">{i + 1}</span>
-                  <IonLabel>
-                    <h3>Cliente #{b.clientId}</h3>
-                    <p>Ganados: {fmt(b.lifetimeEarned)} · Canjeados: {fmt(b.lifetimeRedeemed)}</p>
-                    <IonNote>{b.lastActivity ? `Última actividad: ${toDate(b.lastActivity)}` : 'Sin actividad'}</IonNote>
-                  </IonLabel>
-                  <IonBadge slot="end" className="pr-balance-badge">{fmt(b.balance)} pts</IonBadge>
-                </IonItem>
-              ))}
-            </IonList>
-          )}
-        </IonCardContent>
-      </IonCard>
-    </>
-  );
+  const renderOverview = () => <RewardsOverview vm={vm} />;
 
   const renderCatalog = () => (
     <IonCard className="pr-card">

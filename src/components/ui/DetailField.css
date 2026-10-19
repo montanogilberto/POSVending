@@ -1,0 +1,15 @@
+.detail-field {
+  display: grid;
+  grid-template-columns: 45% 55%;
+  padding: 4px 0;
+  font-size: 0.8rem;
+}
+
+.detail-field span {
+  color: var(--ion-color-medium);
+}
+
+.detail-field strong {
+  font-weight: 500;
+  word-break: break-word;
+}
