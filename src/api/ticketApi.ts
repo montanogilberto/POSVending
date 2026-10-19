@@ -48,6 +48,8 @@ export interface Ticket {
     change: number;
   };
   ticketMeta: object;
+  /** POS points for this sale (backend /one_tickets), null for walk-in sales. */
+  rewards?: { pointsEarned: number; balance: number; lines: string[] } | null;
 }
 
 export interface SendTicketSmsRequest {

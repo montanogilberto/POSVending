@@ -1,0 +1,31 @@
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  font-size: 0.78rem;
+  color: var(--ion-color-medium);
+}
+
+.pager-pages {
+  display: flex;
+  align-items: center;
+}
+
+.pager-pages ion-button {
+  min-width: 32px;
+  margin: 0 2px;
+}
+
+.pager-gap {
+  padding: 0 4px;
+}
+
+@media (max-width: 767px) {
+  .pager {
+    justify-content: center;
+    padding: 10px 8px 0;
+  }
+}

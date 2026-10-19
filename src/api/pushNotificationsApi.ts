@@ -21,6 +21,21 @@ export interface PushNotification {
   updated_at?: string;
 }
 
+/**
+ * What POST /pushNotifications (action 1) answers after it tried to send. The backend
+ * resolves recipients and calls Notification Hub once per user (modules/pushNotifications.py).
+ * pushSentCount = users the hub accepted for; it is NOT a delivery receipt.
+ */
+export interface PushSendResult {
+  status?: string;
+  pushNotificationId?: number | string;
+  pushSendSkipped?: boolean;
+  pushSendReason?: string;
+  pushRecipientCount?: number;
+  pushSentCount?: number;
+  error?: string;
+}
+
 export interface PushNotificationListResponse {
   pushNotifications: PushNotification[];
 }
@@ -41,7 +56,7 @@ export async function getAllPushNotifications(companyId: number): Promise<PushNo
 
 // CREATE -- POST /pushNotifications
 // Body: { "pushNotifications": [{ "action": 1, "companyId": ..., ...fields }] }
-export async function createPushNotification(payload: Omit<PushNotification, "pushNotificationId" | "created_At" | "updated_at" | "isRead" | "isSent" | "sentAt">): Promise<PushNotification> {
+export async function createPushNotification(payload: Omit<PushNotification, "pushNotificationId" | "created_At" | "updated_at" | "isRead" | "isSent" | "sentAt">): Promise<PushSendResult> {
   const res = await fetch(BASE_URL + "/pushNotifications", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

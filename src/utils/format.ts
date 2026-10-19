@@ -57,3 +57,10 @@ export const toHermosilloDate = (utc: string): Date => {
   const d = new Date(utc.includes('Z') ? utc : utc + 'Z');
   return new Date(d.getTime() - 7 * 60 * 60 * 1000);
 };
+
+/** Share of `part` in `total` as a percent with one decimal; 0 when there is nothing to divide by. */
+export const percent = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : 0);
+
+/** "5:00 a. m." — hora de Hermosillo (UTC-7) de un timestamp UTC, para listas agrupadas por día. */
+export const hermosilloTime = (utc: string): string =>
+  toHermosilloDate(utc).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });

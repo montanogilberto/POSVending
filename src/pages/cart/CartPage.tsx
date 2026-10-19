@@ -19,7 +19,7 @@ import { addCircle, card, wallet, business, receipt, cart, person, pricetag, qrC
 import { useCart } from '../../contexts/CartContext';
 import { useProduct } from '../../contexts/ProductContext';
 import { useUser } from '../../contexts/UserContext';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import { submitOrder } from '../../api/cartApi';
 import useInactivityTimer from '../../hooks/useInactivityTimer';
@@ -49,12 +49,25 @@ import ReceiptDisplay from '../receipt/ReceiptDisplay';
  */
 const payQty2x1 = (qty: number): number => Math.max(0, qty - Math.floor(qty / 2));
 
+// crypto.randomUUID needs a secure context; fall back to getRandomValues (v4 layout).
+const newClientRequestId = (): string =>
+  typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+        (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16));
+
 const CartPage: React.FC = () => {
   const { cart: cartItems, removeFromCart, clearCart } = useCart();
   const { clearAllProducts } = useProduct();
   const { companyId, userId } = useUser();
   const { loadIncomes } = useIncome();
   const history = useHistory();
+
+  // Idempotency key for POST /income: one per checkout attempt, the same on
+  // every retry (timeout, double tap) so the backend returns the sale it
+  // already made instead of inserting a second one. A new cart gets a new key.
+  const clientRequestIdRef = useRef<string | null>(null);
+  useEffect(() => { clientRequestIdRef.current = null; }, [cartItems]);
 
   const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta' | 'Transferir' | ''>('');
   const [cashPaid, setCashPaid] = useState<string>('');
@@ -89,7 +102,6 @@ const CartPage: React.FC = () => {
       .then((terminals) => setCardTerminal(activeCardTerminal(terminals)))
       .catch((e) => console.warn('[Cart] Could not load commission terminals', e));
   });
-  const [clientBalanceLoading, setClientBalanceLoading] = useState(false);
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
   const [newPointsBalance, setNewPointsBalance] = useState<number | null>(null);
 
@@ -105,23 +117,22 @@ const CartPage: React.FC = () => {
   const [coupons, setCoupons] = useState<PosRewardCatalogItem[]>([]);
   const [selectedCouponId, setSelectedCouponId] = useState<number | null>(null);
 
-  // Coupons from the catalog (coupon_b2g1). firstPurchaseOnly ones (the 2x1
-  // welcome coupon) need a client who never earned POS points -- the same
-  // rule the backend enforces when it applies the code.
+  // Coupons from the catalog (coupon_b2g1), per client: the backend leaves out
+  // first-purchase coupons (the 2x1 welcome coupon) once the client has a sale
+  // at this company -- the rule it enforces when it applies the code.
+  // Reloaded after each sale (couponsVersion) so a client who just bought
+  // stops seeing the welcome coupon.
+  const [couponsVersion, setCouponsVersion] = useState(0);
+  const selectedClientId = selectedClient?.clientId && selectedClient.clientId !== 1 ? selectedClient.clientId : null;
   useEffect(() => {
     let cancelled = false;
-    posRewardsApi.listCoupons(companyId)
+    posRewardsApi.listCoupons(companyId, selectedClientId)
       .then(list => { if (!cancelled) setCoupons(list); })
       .catch(err => console.error('[CartPage] Failed to load coupons', err));
     return () => { cancelled = true; };
-  }, [companyId]);
+  }, [companyId, selectedClientId, couponsVersion]);
 
-  const clientIsNew =
-    !!selectedClient && !clientBalanceLoading && (clientBalance === null || clientBalance.lifetimeEarned === 0);
-  const availableCoupons = useMemo(
-    () => coupons.filter(c => !c.firstPurchaseOnly || clientIsNew),
-    [coupons, clientIsNew]
-  );
+  const availableCoupons = coupons;
   const selectedCoupon = availableCoupons.find(c => c.catalogItemId === selectedCouponId) ?? null;
   const promoActive = !!selectedCoupon;
   const couponCovers = useCallback(
@@ -232,15 +243,12 @@ const CartPage: React.FC = () => {
   useEffect(() => {
     if (!selectedClient?.clientId) {
       setClientBalance(null);
-      setClientBalanceLoading(false);
       return;
     }
     let cancelled = false;
-    setClientBalanceLoading(true);
     posRewardsApi.getBalance(companyId, selectedClient.clientId)
       .then(balance => { if (!cancelled) setClientBalance(balance); })
-      .catch(err => console.error('[CartPage] Failed to load points balance', err))
-      .finally(() => { if (!cancelled) setClientBalanceLoading(false); });
+      .catch(err => console.error('[CartPage] Failed to load points balance', err));
     return () => { cancelled = true; };
   }, [selectedClient?.clientId]);
 
@@ -455,10 +463,12 @@ const CartPage: React.FC = () => {
             }
           }
 
+          clientRequestIdRef.current ??= newClientRequestId();
           const payload = {
             income: [
               {
                 action: 1,
+                clientRequestId: clientRequestIdRef.current,
                 total: total,
                 paymentMethod: effectivePaymentMethod.toLowerCase(),
                 cashPaid: splitPaymentEnabled
@@ -499,6 +509,7 @@ const CartPage: React.FC = () => {
 
           if (rec && rec.msg === 'Inserted Successfully' && rec.value != null) {
             const newId = String(rec.value);
+            clientRequestIdRef.current = null;
             setLastIncomeId(newId);
             await loadIncomes(1);
 
@@ -542,6 +553,7 @@ const CartPage: React.FC = () => {
         clearAllProducts();
         setSelectedCouponId(null);
         setSelectedRewardId(null);
+        setCouponsVersion(v => v + 1);
         setSplitPaymentEnabled(false);
         setSplitAmounts({ Efectivo: '', Tarjeta: '', Transferir: '' });
         setShowSuccessToast(true);
