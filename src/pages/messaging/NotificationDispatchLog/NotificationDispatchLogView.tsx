@@ -9,7 +9,7 @@ import { usePopovers } from '../../../hooks/usePopovers';
 import { mxChatTime } from '../../../utils/format';
 import { useNotificationDispatchLog } from './NotificationDispatchLogLogic';
 import KpiGrid from './components/KpiGrid';
-import WhatsappQuotaCard from './components/WhatsappQuotaCard';
+import ChannelUsageCard from './components/ChannelUsageCard';
 import DispatchList from './components/DispatchList';
 import DispatchDetailModal from './components/DispatchDetailModal';
 
@@ -36,7 +36,7 @@ const NotificationDispatchLogView: React.FC = () => {
         </div>
 
         <KpiGrid vm={vm} />
-        <WhatsappQuotaCard vm={vm} />
+        <ChannelUsageCard vm={vm} />
 
         <IonSearchbar className="ndl-search" placeholder="Cliente, mensaje o ID" value={vm.search}
           debounce={200} onIonInput={(e) => vm.setSearch(e.detail.value ?? '')} />

@@ -1,9 +1,19 @@
 import type { NotificationDispatch } from '../../../api/notificationDispatchApi';
 import { toHermosilloDate } from '../../../utils/format';
-import { WHATSAPP_FREE_MONTHLY } from './NotificationDispatchLogConstants';
-import type { DateFilter, DeliveryState, DispatchAttempt, DispatchRow, NotificationKpis, WhatsappQuota } from './NotificationDispatchLogTypes';
+import { WHATSAPP_LOW_QUOTA_RATIO } from './NotificationDispatchLogConstants';
+import type {
+  ChannelCounts, ChannelUsage, DateFilter, DeliveryState, DispatchAttempt, DispatchRow, NotificationKpis, WhatsappQuota,
+} from './NotificationDispatchLogTypes';
+
+// Meta can report "failed" and then "delivered/read" for the same wamid (seen
+// with 131026, 2026-10-18): the later receipt wins, so a delivered message is
+// never shown as Fallida.
+const deliveredAfterFailure = (row: NotificationDispatch): boolean =>
+  !!row.confirmedAt && !!row.failedAt &&
+  new Date(row.confirmedAt + 'Z').getTime() >= new Date(row.failedAt + 'Z').getTime();
 
 export const deliveryState = (row: NotificationDispatch): DeliveryState => {
+  if (deliveredAfterFailure(row)) return 'confirmed';
   if (row.status === 'failed' || row.failedAt) return 'failed';
   if (row.status === 'confirmed' || row.confirmedAt) return 'confirmed';
   if (row.status === 'sent') return 'unconfirmed';
@@ -53,15 +63,35 @@ export const computeKpis = (rows: DispatchRow[]): NotificationKpis => ({
   failed: rows.filter(r => r.delivery === 'failed').length,
 });
 
-/** WhatsApp messages sent in `monthRows` against the monthly free allowance. */
-export const whatsappQuota = (monthRows: DispatchRow[], limit = WHATSAPP_FREE_MONTHLY): WhatsappQuota => {
-  const used = monthRows.filter(r => r.selectedChannel === 'whatsapp' && r.delivery !== 'failed' && r.delivery !== 'pending').length;
+const countDelivery = (rows: DispatchRow[]): ChannelCounts => ({
+  delivered: rows.filter(r => r.delivery === 'confirmed').length,
+  failed: rows.filter(r => r.delivery === 'failed').length,
+  noReceipt: rows.filter(r => r.delivery === 'unconfirmed' || r.delivery === 'pending').length,
+  total: rows.length,
+});
+
+/**
+ * Per-channel usage of `monthRows` from our own rows, which Meta's status webhooks
+ * (and Twilio's callbacks) move to confirmed/failed. Twilio-era WhatsApp rows are left
+ * out: Twilio's own count for them comes from /notifications/usage.
+ */
+export const channelUsage = (monthRows: DispatchRow[]): ChannelUsage => ({
+  metaWhatsapp: countDelivery(monthRows.filter(r => r.selectedChannel === 'whatsapp' && r.providerName === 'meta_whatsapp')),
+  sms: countDelivery(monthRows.filter(r => r.selectedChannel === 'sms')),
+  push: countDelivery(monthRows.filter(r => r.selectedChannel === 'push')),
+});
+
+/** `used` messages against the free allowance; null when no allowance is configured. */
+export const whatsappQuota = (used: number, limit: number | null, lowRatio = WHATSAPP_LOW_QUOTA_RATIO): WhatsappQuota | null => {
+  if (!limit || limit <= 0) return null;
+  const remaining = Math.max(limit - used, 0);
   return {
     limit,
     used,
-    remaining: Math.max(limit - used, 0),
-    ratio: limit > 0 ? Math.min(used / limit, 1) : 1,
+    remaining,
+    ratio: Math.min(used / limit, 1),
     exceeded: used > limit,
+    low: remaining / limit <= lowRatio,
   };
 };
 

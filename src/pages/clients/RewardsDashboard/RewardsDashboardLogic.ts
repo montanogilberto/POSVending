@@ -86,7 +86,8 @@ export const useRewardsDashboard = () => {
   const nextReward = useMemo(() => {
     const currentBalance = balance?.balance ?? 0;
     const affordable = catalog
-      .filter((item) => item.requiredPoints > currentBalance)
+      // Stamp cards are earned by purchases of their product, not points.
+      .filter((item) => item.rewardType !== 'free_product' && item.requiredPoints > currentBalance)
       .sort((a, b) => a.requiredPoints - b.requiredPoints);
     return affordable[0] ?? null;
   }, [catalog, balance]);

@@ -27,14 +27,34 @@ export interface NotificationKpis {
   failed: number;
 }
 
+/** One channel's messages this month as far as OUR rows + provider receipts can tell. */
+export interface ChannelCounts {
+  /** Delivery receipt from the provider (Meta webhook / Twilio callback). */
+  delivered: number;
+  failed: number;
+  /** Accepted by the provider, no receipt (yet). For push this is the only state that exists. */
+  noReceipt: number;
+  total: number;
+}
+
+export interface ChannelUsage {
+  /** WhatsApp through Meta Cloud API (providerName meta_whatsapp). */
+  metaWhatsapp: ChannelCounts;
+  sms: ChannelCounts;
+  /** Accepted by Notification Hub: there is no per-device receipt. */
+  push: ChannelCounts;
+}
+
 export interface WhatsappQuota {
   limit: number;
-  /** WhatsApp messages sent this month (failed ones don't count). */
+  /** WhatsApp messages that went out (failed ones don't count). */
   used: number;
   remaining: number;
   /** used / limit, capped at 1. */
   ratio: number;
   exceeded: boolean;
+  /** Less than `lowRatio` of the allowance left. */
+  low: boolean;
 }
 
 export type ChannelFilter = NotificationChannel | 'all';

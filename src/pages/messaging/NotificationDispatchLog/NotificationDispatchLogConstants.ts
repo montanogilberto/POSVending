@@ -1,11 +1,3 @@
-/**
- * Monthly allowance of free WhatsApp (Meta Cloud API) messages shown in the quota card.
- * ASSUMPTION: Meta's historical free tier is 1,000 conversations/month; Meta has changed
- * its pricing model more than once, so confirm the real number in Business Manager and
- * edit it here — the page only counts what WE sent, it cannot read Meta's billing.
- */
-export const WHATSAPP_FREE_MONTHLY = 1000;
-
 /** Below this share of the free allowance left, the quota card turns amber. */
 export const WHATSAPP_LOW_QUOTA_RATIO = 0.2;
 
@@ -27,7 +19,7 @@ export const CHANNEL_LABELS: Record<string, string> = {
 export const PROVIDER_ERROR_LABELS: Record<string, string> = {
   // Meta WhatsApp Cloud
   '131047': 'Fuera de la ventana de 24 h: se requiere una plantilla aprobada',
-  '131026': 'El número no tiene WhatsApp o no puede recibir el mensaje',
+  '131026': 'WhatsApp no pudo entregarlo a este número (bloqueó al negocio, app desactualizada o términos sin aceptar)',
   '131042': 'Problema de pago en la cuenta de WhatsApp Business',
   '131049': 'Meta no entregó el mensaje para cuidar la experiencia del usuario',
   '132001': 'La plantilla no existe o no está aprobada',

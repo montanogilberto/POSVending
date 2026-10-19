@@ -111,34 +111,40 @@ export async function getOneNotificationDispatch(
   return data.notificationDispatches?.[0] ?? null;
 }
 
-/** What the PROVIDER (Twilio) reports for this month — see backend modules/notificationUsage.py. */
-export interface NotificationUsage {
-  ok: true;
-  source: 'twilio';
-  period: 'this_month';
-  whatsapp: {
-    outboundMessages: number;
-    inboundMessages: number;
-    conversations: number;
-    freeConversations: number;
-    billableConversations: number;
-    price: number;
-    priceUnit: string;
-    /** null when the owner has not configured the free allowance on the backend. */
-    limit: number | null;
-    remaining: number | null;
-  };
-  sms: { outboundMessages: number };
+/** Twilio's own count of outbound messages this month, by final status (Messages API). */
+export interface ProviderCounts {
+  delivered: number;
+  failed: number;
+  /** Accepted/queued/sent with no final receipt yet. */
+  inFlight: number;
+  total: number;
 }
 
-// GET /notifications/usage. null when the provider can't be reached: the screen then
-// falls back to its own counts and says so, it never invents provider numbers.
+/**
+ * What only the providers know — see backend modules/notificationUsage.py.
+ * Meta WhatsApp and Push are not here: the screen counts them from its own dispatch rows.
+ */
+export interface NotificationUsage {
+  ok: true;
+  period: 'this_month';
+  /** UTC instant the Hermosillo month started. */
+  since: string;
+  /** 'meta' when WA_SENDER_PHONE_NUMBER_ID is set on the backend. */
+  whatsappProvider: 'meta' | 'none';
+  /** WHATSAPP_FREE_MONTHLY_LIMIT; null when the owner has not configured it. */
+  whatsappLimit: number | null;
+  /** The whole Twilio account (every company), not just this one. */
+  twilio: { ok: true; whatsapp: ProviderCounts; sms: ProviderCounts } | { ok: false; error: string };
+}
+
+// GET /notifications/usage. null when the backend can't be reached: the screen then
+// shows only its own counts and says so, it never invents provider numbers.
 export async function fetchNotificationUsage(): Promise<NotificationUsage | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/notifications/usage`);
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.ok ? (data as NotificationUsage) : null;
+    return data?.ok && data.twilio ? (data as NotificationUsage) : null;
   } catch (err) {
     console.log('[NotificationDispatch] usage unavailable', String(err));
     return null;

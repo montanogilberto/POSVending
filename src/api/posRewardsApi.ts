@@ -92,7 +92,12 @@ export interface PosRewardBalance {
   lastActivity?: string;
 }
 
-export type PosRewardType = 'discount_fixed' | 'discount_pct' | 'free_product';
+/** posRewardCatalogItems is the single table for every discount:
+ *  - coupon_b2g1: a 2x1 coupon typed at checkout (code, dates, firstPurchaseOnly);
+ *    freeProductId = the only product it discounts (null = every product)
+ *  - discount_fixed / discount_pct: points rewards, paid with the balance
+ *  - free_product: stamp card, earned by buying freeProductId requiredUnits times */
+export type PosRewardType = 'discount_fixed' | 'discount_pct' | 'free_product' | 'coupon_b2g1';
 
 export interface PosRewardCatalogItem {
   catalogItemId?: number;
@@ -104,6 +109,39 @@ export interface PosRewardCatalogItem {
   freeProductId?: number | null;
   isActive: boolean;
   description?: string;
+  /** coupon_b2g1 only */
+  code?: string | null;
+  startAtUtc?: string | null;
+  endAtUtc?: string | null;
+  firstPurchaseOnly?: boolean;
+  /** free_product: purchases of freeProductId per free unit */
+  requiredUnits?: number | null;
+}
+
+/** Purchases a stamp card needs. Rows saved before requiredUnits existed kept
+ *  the unit count in requiredPoints. */
+export const stampUnits = (item: PosRewardCatalogItem): number =>
+  Number(item.requiredUnits ?? item.requiredPoints) || 0;
+
+/** A coupon is usable right now (active and inside its date window). */
+export const isCouponLive = (item: PosRewardCatalogItem, now = new Date()): boolean => {
+  if (item.rewardType !== 'coupon_b2g1' || !item.isActive || !item.code) return false;
+  const utc = (v?: string | null) => (v ? new Date(v.endsWith('Z') ? v : `${v}Z`) : null);
+  const start = utc(item.startAtUtc);
+  const end = utc(item.endAtUtc);
+  return (!start || start <= now) && (!end || end >= now);
+};
+
+/** What sp_income_applyDiscounts did with the sale's coupon and reward
+ *  (returned on the POST /income result as result[0].discounts). */
+export interface IncomeDiscountsResult {
+  incomeId: number;
+  subtotal: number;
+  total: number;
+  discountAmount: number;
+  promotionCode: string | null;
+  applied: Array<{ catalogItemId: number; rewardType: PosRewardType; discount: number }>;
+  rejected: Array<{ catalogItemId?: number; code?: string; reason: string }>;
 }
 
 export type PosRewardRedemptionStatus = 'applied' | 'cancelled';
@@ -225,11 +263,18 @@ export const posRewardsApi = {
   },
 
   // Catalog (see PRD prd_posRewardCatalogItem.json)
-  listCatalog: async (companyId: number, activeOnly = false): Promise<PosRewardCatalogItem[]> => {
+  /** Coupons are left out unless includeCoupons: they're typed at checkout, not redeemed. */
+  listCatalog: async (companyId: number, activeOnly = false, includeCoupons = false): Promise<PosRewardCatalogItem[]> => {
     const data = await crud<{ result?: Array<{ posRewardCatalogItems?: PosRewardCatalogItem[] }> }>(
-      'posRewardCatalogItems', 0, { companyId, activeOnly }
+      'posRewardCatalogItems', 0, { companyId, activeOnly, includeCoupons }
     );
     return data?.result?.[0]?.posRewardCatalogItems ?? [];
+  },
+  listCoupons: async (companyId: number): Promise<PosRewardCatalogItem[]> => {
+    const data = await crud<{ result?: Array<{ posRewardCatalogItems?: PosRewardCatalogItem[] }> }>(
+      'posRewardCatalogItems', 0, { companyId, activeOnly: true, includeCoupons: true }
+    );
+    return (data?.result?.[0]?.posRewardCatalogItems ?? []).filter(i => isCouponLive(i));
   },
   upsertCatalogItem: (item: PosRewardCatalogItem) =>
     crud('posRewardCatalogItems', item.catalogItemId ? 2 : 1, item),
@@ -243,7 +288,9 @@ export const posRewardsApi = {
     );
     return data?.result?.[0]?.posRewardRedemptions ?? [];
   },
-  /** Verifies balance, records the redemption + a matching REDEEM ledger row, decrements the balance — all server-side. */
+  /** Redeem OUTSIDE a sale (Rewards Dashboard). In the cart, send the reward with
+   *  the sale instead (income rewardCatalogItemIds) so a failed sale can't use it up.
+   *  Verifies balance, records the redemption + a matching REDEEM ledger row, decrements the balance — all server-side. */
   redeem: (
     companyId: number, clientId: number, catalogItemId: number, redeemedByUserId: number, incomeId?: number
   ) =>

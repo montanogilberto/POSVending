@@ -37,7 +37,7 @@ export function usePosRewards() {
       const [summaryRes, balancesRes, catalogRes, ledgerRes] = await Promise.all([
         posRewardsApi.getDashboardSummary(companyId).catch(() => null),
         posRewardsApi.listBalances(companyId).catch(() => []),
-        posRewardsApi.listCatalog(companyId).catch(() => []),
+        posRewardsApi.listCatalog(companyId, false, true).catch(() => []),
         posRewardsApi.listLedger(companyId).catch(() => []),
       ]);
       setSummary(summaryRes);
@@ -75,13 +75,42 @@ export function usePosRewards() {
       showToast('Nombre de la recompensa requerido', 'danger');
       return;
     }
-    if (!editCatalogItem.requiredPoints || editCatalogItem.requiredPoints <= 0) {
-      showToast('Puntos requeridos inválidos', 'danger');
-      return;
+    const item = { ...editCatalogItem, companyId } as PosRewardCatalogItem;
+    // One table, three kinds of discount: keep only the fields each one uses.
+    if (item.rewardType === 'coupon_b2g1') {
+      item.code = (item.code ?? '').trim().toUpperCase();
+      if (!item.code) {
+        showToast('Código del cupón requerido', 'danger');
+        return;
+      }
+      Object.assign(item, { requiredPoints: 0, discountValue: null, requiredUnits: null });
+    } else if (item.rewardType === 'free_product') {
+      if (!item.freeProductId) {
+        showToast('Producto de la tarjeta de sellos requerido', 'danger');
+        return;
+      }
+      if (!item.requiredUnits || item.requiredUnits <= 0) {
+        showToast('Compras requeridas inválidas', 'danger');
+        return;
+      }
+      // requiredPoints mirrors the units for screens that still read it (menuLaundy).
+      Object.assign(item, { requiredPoints: item.requiredUnits, discountValue: null, code: null,
+                            startAtUtc: null, endAtUtc: null, firstPurchaseOnly: false });
+    } else {
+      if (!item.requiredPoints || item.requiredPoints <= 0) {
+        showToast('Puntos requeridos inválidos', 'danger');
+        return;
+      }
+      if (!item.discountValue || item.discountValue <= 0) {
+        showToast('Valor del descuento inválido', 'danger');
+        return;
+      }
+      Object.assign(item, { freeProductId: null, requiredUnits: null, code: null,
+                            startAtUtc: null, endAtUtc: null, firstPurchaseOnly: false });
     }
     setLoading(true);
     try {
-      await posRewardsApi.upsertCatalogItem({ ...editCatalogItem, companyId } as PosRewardCatalogItem);
+      await posRewardsApi.upsertCatalogItem(item);
       showToast('Recompensa guardada');
       setShowCatalogModal(false);
       notifyDataChanged('pos_reward_catalog_changed');

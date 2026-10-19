@@ -43,7 +43,12 @@ export interface IncomePayload {
     userId: number;
     clientId: number;
     companyId: number;
+    /** Coupon code (posRewardCatalogItems coupon_b2g1). Applied server-side
+     *  after the insert by sp_income_applyDiscounts, which sets the final total. */
     promotionCode?: string | null;
+    /** Loyalty reward redeemed WITH this sale (one per sale): a stamp card or a
+     *  points reward. Redeemed server-side only if the sale is saved. */
+    rewardCatalogItemIds?: number[];
     // Card terminal (dbo.commissionTerminals) that charged this sale — tarjeta only.
     commissionTerminalId?: number | null;
     products: Array<{

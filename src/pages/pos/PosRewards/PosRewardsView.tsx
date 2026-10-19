@@ -16,6 +16,7 @@ import EmptyState from '../../../components/ui/EmptyState';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { POS_REWARD_TX_TYPE } from '../../../components/ui/statusMaps';
 import { fmtInt as fmt, mxDate as toDate } from '../../../utils/format';
+import { stampUnits } from '../../../api/posRewardsApi';
 import { PosRewardsVM } from './PosRewardsLogic';
 import CatalogItemModal from './components/CatalogItemModal';
 import '../PosRewardsPage.css';
@@ -111,7 +112,16 @@ const PosRewardsView: React.FC<Props> = ({ vm }) => {
               <IonItem key={item.catalogItemId} className="pr-catalog-item">
                 <IonLabel>
                   <h3>{item.name}</h3>
-                  <p><strong>{fmt(item.requiredPoints)} pts</strong>{item.description ? ` · ${item.description}` : ''}</p>
+                  <p>
+                    <strong>
+                      {item.rewardType === 'coupon_b2g1'
+                        ? `Cupón ${item.code}${item.firstPurchaseOnly ? ' · solo primera compra' : ''}`
+                        : item.rewardType === 'free_product'
+                          ? `Tarjeta de sellos · ${fmt(stampUnits(item))} compras`
+                          : `${fmt(item.requiredPoints)} pts`}
+                    </strong>
+                    {item.description ? ` · ${item.description}` : ''}
+                  </p>
                 </IonLabel>
                 <IonBadge slot="end" color={item.isActive ? 'success' : 'medium'}>
                   {item.isActive ? 'Activa' : 'Inactiva'}
