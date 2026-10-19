@@ -81,7 +81,7 @@ const EmailsPage: React.FC = () => {
         screenTitle={`Correos ${unreadCount > 0 ? `(${unreadCount})` : ''}`}
         showBackButton={true}
         backButtonText="Menú"
-        backButtonHref="/Laundry"
+        backButtonHref="/dashboard"
       />
 
       <IonContent>

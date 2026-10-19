@@ -6,6 +6,7 @@ import {
 import { personCircleOutline, timeOutline, walletOutline } from 'ionicons/icons';
 import { statusColor, statusIcon, statusLabel, toDate } from '../LenderDashboardConstants';
 import { LenderDashboardVM } from '../LenderDashboardLogic';
+import { myLoansRoute, p2pLendingRoute } from '../../../../utils/routes';
 
 /** Préstamos otorgados — lista del portafolio con estado por préstamo. */
 const LoansList: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
@@ -13,8 +14,10 @@ const LoansList: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
     <IonCardHeader>
       <div className="ldx-card-title-row">
         <IonCardTitle>Préstamos otorgados{vm.loans.length > 0 ? ` (${vm.loans.length})` : ''}</IonCardTitle>
+        {/* /loans es la pantalla CRUD de back-office; el prestamista va a su
+            propia cartera. */}
         {vm.loans.length > 0 && (
-          <IonButton fill="clear" size="small" onClick={() => vm.history.push('/loans')}>Ver todos</IonButton>
+          <IonButton fill="clear" size="small" onClick={() => vm.history.push(myLoansRoute(vm.lenderClientId))}>Ver todos</IonButton>
         )}
       </div>
     </IonCardHeader>
@@ -24,7 +27,7 @@ const LoansList: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
           <IonIcon icon={walletOutline} />
           <p><strong>Aún no tienes préstamos activos</strong></p>
           <p className="ldx-empty-sub">Publica tu capital y comienza a generar rendimientos.</p>
-          <IonButton onClick={() => vm.history.push('/p2p-lending')}>Publicar capital</IonButton>
+          <IonButton onClick={() => vm.history.push(p2pLendingRoute(vm.lenderClientId))}>Publicar capital</IonButton>
         </div>
       )}
       <IonList lines="none">

@@ -65,6 +65,48 @@
   white-space: nowrap;
 }
 
+.product-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.original-price {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #9ca3af;
+  text-decoration: line-through;
+  white-space: nowrap;
+}
+
+.total-price.discounted {
+  color: #059669;
+}
+
+.card-discount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ecfdf5;
+  border-radius: 8px;
+  padding: 5px 10px;
+  margin-bottom: 6px;
+}
+
+.discount-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #065f46;
+}
+
+.discount-amount {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #059669;
+  white-space: nowrap;
+}
+
 .remove-button {
   --color: #9ca3af;
   --color-hover: #ef4444;
@@ -84,41 +126,26 @@
   background: #fef2f2;
 }
 
-/* Second row: Option chips */
-.card-options-row {
+/* Option labels row (e.g. "Ciclo: Basico") */
+.card-option-labels-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 6px;
 }
 
-.option-chip {
+.option-label-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   background: #f3f4f6;
-  color: #4b5563;
+  color: #374151;
   font-size: 0.8rem;
   font-weight: 500;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid #e5e7eb;
 }
 
-.option-name {
-  color: #4b5563;
-}
-
-.option-quantity {
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 2px 5px;
-  border-radius: 999px;
-}
-
-/* Third row: Unit price (secondary metadata) */
+/* Unit price (secondary metadata) */
 .card-unit-price {
   font-size: 0.8rem;
   color: #9ca3af;
@@ -145,7 +172,7 @@
     font-size: 1.2rem;
   }
 
-  .option-chip {
+  .option-label-chip {
     font-size: 0.85rem;
     padding: 5px 12px;
   }
@@ -168,7 +195,7 @@
     font-size: 1.3rem;
   }
 
-  .option-chip {
+  .option-label-chip {
     font-size: 0.9rem;
   }
 }
@@ -185,7 +212,7 @@
     height: 40px;
   }
 
-  .option-chip {
+  .option-label-chip {
     padding: 6px 12px;
     min-height: 32px;
   }

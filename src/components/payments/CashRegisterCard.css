@@ -1,0 +1,39 @@
+.cash-agent-review {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #F9FAFB;
+  border: 1px solid #E2E8F0;
+}
+
+.cash-agent-status {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #1A202C;
+}
+
+.cash-agent-explanation {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: #4A5568;
+}
+
+.cash-agent-actions {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: #4A5568;
+}
+
+.cash-agent-none .cash-agent-status,
+.cash-agent-minor .cash-agent-status {
+  color: #15803d;
+}
+
+.cash-agent-moderate .cash-agent-status {
+  color: #b45309;
+}
+
+.cash-agent-severe .cash-agent-status {
+  color: #dc2626;
+}

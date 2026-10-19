@@ -1,13 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBackButton, IonBadge, IonMenuButton } from '@ionic/react';
+import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBadge, IonMenuButton } from '@ionic/react';
+import ConfirmBackButton from '../ui/ConfirmBackButton';
+import TokenBalanceChip from './TokenBalanceChip';
 import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline } from 'ionicons/icons';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
+import { canAccess } from '../../config/rolePermissions';
 import { useUser } from '../../contexts/UserContext';
 import { fetchMyNotifications } from '../../api/myNotificationsApi';
 import { getChatConfig } from '../../api/loanChatApi';
+import { PosSupportTopic } from '../../api/posSupportChatApi';
 import { APP_ENV, IS_DEV_BUILD } from '../../utils/appEnv';
 import './Header.css';
 
@@ -18,21 +22,31 @@ interface HeaderProps {
   showBackButton?: boolean;
   backButtonText?: string;
   backButtonHref?: string;
+  // Opt-in per page: shows the same "ask the assistant" sparkles button the
+  // SmartLoans role gets, pointed at /pos-support/{topic} instead of
+  // /loan-chat. Only rendered for POS roles (mirrors the SmartLoans button's
+  // own role gating) — pass this from Incomes/Expenses/Accounting pages only.
+  posSupportTopic?: PosSupportTopic;
 }
 
 const Header: React.FC<HeaderProps> = ({
   presentAlertPopover,
   presentMailPopover,
-  screenTitle = 'POS GMO',
+  screenTitle = 'GMO',
   showBackButton = false,
   backButtonText = 'Atrás',
-  backButtonHref = '/'
+  backButtonHref = '/',
+  posSupportTopic,
 }) => {
   const history = useHistory();
   const { cart } = useCart();
-  const { roleCode, userId } = useUser();
+  const { roleCode, userId, activeProduct } = useUser();
   // No shopping cart concept in the SmartLoans (borrower/lender) experience.
-  const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
+  // Follows the active product for self-service sessions (a POS customer who
+  // is also a borrower gets SmartLoans icons while in SmartLoans).
+  const isSmartLoansRole = activeProduct
+    ? activeProduct === 'borrower' || activeProduct === 'lender'
+    : roleCode === 'borrower' || roleCode === 'lender';
   const [unreadCount, setUnreadCount] = useState(0);
   const listenerRef = useRef<any>(null);
   // LLM support agent (cuenta · contratos · legal GUÍA) — id from backend
@@ -78,16 +92,15 @@ const Header: React.FC<HeaderProps> = ({
     <IonHeader className="dashboard-header">
       <IonToolbar color="light">
         <IonButtons slot="start">
-          {showBackButton ? (
-            <IonBackButton text={backButtonText} defaultHref={backButtonHref} />
-          ) : (
-            <IonMenuButton
-              menu="main-menu"
-              autoHide={false}
-              className="only-mobile header-menu-button"
-              aria-label="Abrir menú"
-            />
-          )}
+          {/* The menu button stays reachable on phone widths even on pages that
+              show a back button (the split-pane menu is only permanent on wide
+              screens), otherwise those pages have no way to open the side menu. */}
+          <IonMenuButton
+            menu="main-menu"
+            autoHide={false}
+            className="only-mobile header-menu-button"
+            aria-label="Abrir menú"
+          />
         </IonButtons>
         <IonTitle className="screen-title" style={{ textAlign: 'center', flex: 1 }}>
           {screenTitle}
@@ -96,7 +109,10 @@ const Header: React.FC<HeaderProps> = ({
           {IS_DEV_BUILD && <IonBadge color="warning" className="header-env-badge">{APP_ENV.toUpperCase()}</IonBadge>}
         </IonTitle>
         <IonButtons slot="end">
-          {!isSmartLoansRole && (
+          {/* Company AI-token balance — POS experience only (hidden until the balance is known). */}
+          {!isSmartLoansRole && <TokenBalanceChip />}
+          {/* Cart is the cashier's checkout — only roles with POS access. */}
+          {!isSmartLoansRole && canAccess(roleCode, 'pos') && (
             <IonButton onClick={handleCartClick} title="Cart" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
               <span className="icon-with-badge">
                 <IonIcon icon={cartOutline} style={{ fontSize: '28px' }} />
@@ -128,6 +144,16 @@ const Header: React.FC<HeaderProps> = ({
               <IonIcon icon={chatbubblesOutline} style={{ fontSize: '28px' }} />
             </IonButton>
           )}
+          {!isSmartLoansRole && posSupportTopic && (
+            <IonButton
+              onClick={() => { console.log(`[Header] agent icon → /pos-support/${posSupportTopic}`); history.push(`/pos-support/${posSupportTopic}`); }}
+              title="Asistente POS"
+              className="header-action-button"
+              style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}
+            >
+              <IonIcon icon={sparklesOutline} style={{ fontSize: '28px' }} />
+            </IonButton>
+          )}
           <IonButton onClick={handleNotificationsClick} title="Notifications" className="header-action-button" style={{ '--padding-start': '12px', '--padding-end': '12px', minHeight: '48px', minWidth: '48px' }}>
             <span className="icon-with-badge">
               <IonIcon icon={notificationsOutline} style={{ fontSize: '28px' }} />
@@ -147,6 +173,15 @@ const Header: React.FC<HeaderProps> = ({
 
         </IonButtons>
       </IonToolbar>
+      {/* Back navigation gets its own row under the action bar — in the top
+          toolbar it competed with the menu/action icons for width. */}
+      {showBackButton && (
+        <IonToolbar color="light" className="header-back-bar">
+          <IonButtons slot="start">
+            <ConfirmBackButton text={backButtonText} defaultHref={backButtonHref} />
+          </IonButtons>
+        </IonToolbar>
+      )}
     </IonHeader>
   );
 };

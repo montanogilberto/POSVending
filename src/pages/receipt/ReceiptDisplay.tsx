@@ -4,22 +4,14 @@ import {
   IonIcon,
   IonLoading,
   IonToast,
-  IonModal,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonButtons,
-  IonContent,
-  IonList,
-  IonItem,
-  IonLabel,
-  IonText
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { printOutline, closeOutline } from 'ionicons/icons';
+import { printOutline, closeOutline, copyOutline } from 'ionicons/icons';
 import UnifiedReceipt from '../../components/pos/UnifiedReceipt';
 import { ReceiptService } from '../../services/ReceiptService';
-import { useReceiptPrint, ReceiptPrintSummary } from './useReceiptPrint';
+import { useReceiptPrint } from './useReceiptPrint';
+import { fmtInt } from '../../utils/format';
+import './ReceiptDisplay.css';
 
 interface ReceiptDisplayProps {
   ticketData: any;
@@ -30,6 +22,10 @@ interface ReceiptDisplayProps {
   setTicketData: (data: any) => void;
   promotionCode?: string;
   discountAmount?: number;
+  /** Puntos POS ganados con este ticket (posRewardsApi.earnFromTicket), si el cálculo tuvo éxito. */
+  pointsEarned?: number | null;
+  /** Nuevo saldo de puntos del cliente tras este ticket. */
+  newPointsBalance?: number | null;
 }
 
 /**
@@ -93,6 +89,11 @@ const repairTicketTotals = (ticketData: any): any => {
         subtotal: Number(calculatedSubtotal.toFixed(2)),
         iva: receivedIva > 0 ? Number(calculatedIva.toFixed(2)) : 0,
         total: Number(calculatedTotal.toFixed(2)),
+        // discount/promotionCode aren't recomputed here — they come straight
+        // from the income row (sp_tickets_one), not from summing product
+        // lines, so a subtotal/total repair doesn't change them.
+        discount: ticketData.totals?.discount,
+        promotionCode: ticketData.totals?.promotionCode,
         amountReceived: receivedAmountReceived,
         change: receivedChange,
       },
@@ -108,6 +109,8 @@ const repairTicketTotals = (ticketData: any): any => {
       subtotal: receivedSubtotal,
       iva: receivedIva,
       total: receivedTotal,
+      discount: ticketData.totals?.discount,
+      promotionCode: ticketData.totals?.promotionCode,
       amountReceived: receivedAmountReceived,
       change: receivedChange,
     },
@@ -123,14 +126,13 @@ const ReceiptDisplay: React.FC<ReceiptDisplayProps> = ({
   setTicketData,
   promotionCode,
   discountAmount,
+  pointsEarned,
+  newPointsBalance,
 }) => {
   const history = useHistory();
   const [closing, setClosing] = React.useState(false);
   const [showToast, setShowToast] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState('');
-  const [showSummaryModal, setShowSummaryModal] = React.useState(false);
-  const [printSummary, setPrintSummary] = React.useState<ReceiptPrintSummary | null>(null);
-  const [savedReceiptUrl, setSavedReceiptUrl] = React.useState('');
 
   // ✅ Guard: if parent already cleared ticketData, don't render (prevents crashes)
   if (!ticketData) return null;
@@ -178,13 +180,21 @@ const unifiedReceiptData = React.useMemo(() => {
     
     // Only override if props have valid values (cash payment with valid cashPaid)
     const shouldOverridePayment = isCashPayment && cashPaidNumber > 0;
-    
+
+    // Props are only populated right after checkout, in the same render that
+    // completed the sale (CartPage knows promoActive there). A reprint / the
+    // standalone /receipt/:incomeId page has no such props — fall back to
+    // what sp_tickets_one persisted on the income row itself, so the benefit
+    // still shows up there too.
+    const effectivePromotionCode = promotionCode ?? td.totals?.promotionCode ?? undefined;
+    const effectiveDiscountAmount = discountAmount ?? td.totals?.discount ?? 0;
+
     const result = {
       ...adaptedData,
       // Include promotion info if available
-      promotion: promotionCode ? {
-        code: promotionCode,
-        discount: discountAmount || 0,
+      promotion: effectivePromotionCode ? {
+        code: effectivePromotionCode,
+        discount: effectiveDiscountAmount || 0,
         type: 'B2G1', // 2x1 promotion
       } : undefined,
       payment: {
@@ -200,8 +210,8 @@ const unifiedReceiptData = React.useMemo(() => {
         amountReceived: shouldOverridePayment ? cashPaidNumber : adaptedData.totals.amountReceived,
         change: shouldOverridePayment ? Math.max(0, calculatedChange) : adaptedData.totals.change,
         // Include discount in totals if promo applied
-        discount: discountAmount || 0,
-        originalTotal: discountAmount ? (adaptedData.totals.total + discountAmount) : undefined,
+        discount: effectiveDiscountAmount || 0,
+        originalTotal: effectiveDiscountAmount ? (adaptedData.totals.total + effectiveDiscountAmount) : undefined,
       },
     };
     
@@ -218,31 +228,48 @@ const unifiedReceiptData = React.useMemo(() => {
       cashPaid: result.payment.cashPaid,
       cashReturn: result.payment.cashReturn
     });
-    if (promotionCode) {
+    if (effectivePromotionCode) {
       console.log('🧾 [ReceiptDisplay] Promotion applied:', {
-        code: promotionCode,
-        discount: discountAmount
+        code: effectivePromotionCode,
+        discount: effectiveDiscountAmount
       });
     }
     
     return result;
   }, [repairedTicketData, paymentMethod, cashPaid, changeAmount, promotionCode, discountAmount]);
 
-  const { handlePrint } = useReceiptPrint({
+  // After the first print on this screen, further presses print a COPIA
+  // (same rule as /receipt) and keep the original printedDate.
+  const [printedOnce, setPrintedOnce] = React.useState(false);
+
+  const { handlePrint, saveReceipt } = useReceiptPrint({
     receiptData: unifiedReceiptData,
     ticketData: repairedTicketData,
-    onSavedUrl: (url) => setSavedReceiptUrl(url),
+    isReprint: printedOnce,
+    onSavedUrl: (url) => console.log('[ReceiptDisplay] receipt HTML saved at:', url),
     onToast: (message) => {
       setToastMessage(message);
       setShowToast(true);
     },
+    // Cashier-facing screen -- no need to interrupt every sale with a
+    // technical per-channel status modal (HTML upload / push / WhatsApp /
+    // SMS / physical print). Keep it in the console for real debugging.
     onSummary: (summary) => {
-      setPrintSummary(summary);
-      setShowSummaryModal(true);
+      console.log('[ReceiptDisplay] print summary:', summary);
+      if (summary.print.ok) setPrintedOnce(true);
     }
   });
 
-  const statusColor = (ok: boolean) => (ok ? 'success' : 'danger');
+  // Upload the ticket as soon as the sale is shown, not only on print: the
+  // WhatsApp sent at sale time links to it (/recibo), and without the upload
+  // the customer only sees a summary page.
+  const savedIncomeRef = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    const incomeId = Number(repairedTicketData?.incomeId ?? repairedTicketData?.id ?? 0);
+    if (!unifiedReceiptData || incomeId <= 0 || savedIncomeRef.current === incomeId) return;
+    savedIncomeRef.current = incomeId;
+    saveReceipt();
+  }, [unifiedReceiptData, repairedTicketData, saveReceipt]);
 
   const handleClose = async () => {
     if (closing) return; // ✅ prevent double click
@@ -257,7 +284,7 @@ const unifiedReceiptData = React.useMemo(() => {
       setTicketData(null);
       
       // Navigate away
-      history.replace('/Laundry');
+      history.replace('/dashboard');
       
       // Dismiss loader after navigation
       setClosing(false);
@@ -280,6 +307,15 @@ const unifiedReceiptData = React.useMemo(() => {
         options={{ width: '46mm', thermal: true }}
       />
 
+      {/* Fallback when the ticket came without its rewards block (the receipt
+          itself shows it otherwise). */}
+      {pointsEarned != null && !unifiedReceiptData?.rewards && (
+        <div className="receipt-points-badge">
+          +{fmtInt(pointsEarned)} puntos POS
+          {newPointsBalance != null && <span> · Saldo: {fmtInt(newPointsBalance)} pts</span>}
+        </div>
+      )}
+
       <div
         style={{
           display: 'flex',
@@ -295,8 +331,8 @@ const unifiedReceiptData = React.useMemo(() => {
           onClick={handlePrint}
           style={{ flex: '1 1 180px', minWidth: '160px' }}
         >
-          <IonIcon icon={printOutline} slot="start" />
-          Imprimir
+          <IonIcon icon={printedOnce ? copyOutline : printOutline} slot="start" />
+          {printedOnce ? 'Reimprimir' : 'Imprimir'}
         </IonButton>
 
         <IonButton
@@ -321,87 +357,6 @@ const unifiedReceiptData = React.useMemo(() => {
         duration={3000}
         color="success"
       />
-
-      <IonModal isOpen={showSummaryModal} onDidDismiss={() => setShowSummaryModal(false)}>
-        <IonHeader>
-          <IonToolbar>
-            <IonTitle>Resultado de envío de ticket</IonTitle>
-            <IonButtons slot="end">
-              <IonButton onClick={() => setShowSummaryModal(false)}>
-                <IonIcon icon={closeOutline} />
-              </IonButton>
-            </IonButtons>
-          </IonToolbar>
-        </IonHeader>
-
-        <IonContent className="ion-padding">
-          {printSummary ? (
-            <>
-              <IonList inset>
-                <IonItem>
-                  <IonLabel>
-                    <h2>HTML en Azure</h2>
-                    <p>{printSummary.azureHtml.message}</p>
-                    {!!printSummary.azureHtml.error && <IonText color="medium"><p>{printSummary.azureHtml.error}</p></IonText>}
-                  </IonLabel>
-                  <IonText color={statusColor(printSummary.azureHtml.ok)}>
-                    <strong>{printSummary.azureHtml.ok ? 'OK' : 'FALLÓ'}</strong>
-                  </IonText>
-                </IonItem>
-
-                <IonItem>
-                  <IonLabel>
-                    <h2>WhatsApp</h2>
-                    <p>{printSummary.whatsapp.message}</p>
-                    {!!printSummary.whatsapp.error && <IonText color="medium"><p>{printSummary.whatsapp.error}</p></IonText>}
-                  </IonLabel>
-                  <IonText color={statusColor(printSummary.whatsapp.ok)}>
-                    <strong>{printSummary.whatsapp.ok ? 'OK' : 'FALLÓ'}</strong>
-                  </IonText>
-                </IonItem>
-
-                <IonItem>
-                  <IonLabel>
-                    <h2>SMS</h2>
-                    <p>{printSummary.sms.message}</p>
-                    {!!printSummary.sms.error && <IonText color="medium"><p>{printSummary.sms.error}</p></IonText>}
-                  </IonLabel>
-                  <IonText color={statusColor(printSummary.sms.ok)}>
-                    <strong>{printSummary.sms.ok ? 'OK' : 'FALLÓ'}</strong>
-                  </IonText>
-                </IonItem>
-
-                <IonItem>
-                  <IonLabel>
-                    <h2>Impresión</h2>
-                    <p>{printSummary.print.message}</p>
-                    {!!printSummary.print.error && <IonText color="medium"><p>{printSummary.print.error}</p></IonText>}
-                  </IonLabel>
-                  <IonText color={statusColor(printSummary.print.ok)}>
-                    <strong>{printSummary.print.ok ? 'OK' : 'FALLÓ'}</strong>
-                  </IonText>
-                </IonItem>
-              </IonList>
-
-              {!!printSummary.receiptUrl && (
-                <p><strong>URL del recibo:</strong> {printSummary.receiptUrl}</p>
-              )}
-              {!!printSummary.phone && (
-                <p><strong>Teléfono:</strong> {printSummary.phone}</p>
-              )}
-              {!!savedReceiptUrl && !printSummary.receiptUrl && (
-                <p><strong>URL guardada:</strong> {savedReceiptUrl}</p>
-              )}
-
-              <IonButton expand="block" onClick={() => setShowSummaryModal(false)}>
-                Cerrar
-              </IonButton>
-            </>
-          ) : (
-            <p>No hay resumen disponible.</p>
-          )}
-        </IonContent>
-      </IonModal>
     </div>
   );
 };

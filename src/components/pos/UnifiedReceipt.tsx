@@ -336,6 +336,16 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
           </IonLabel>
         </IonItem>
 
+        {/* POS POINTS — same lines as the sale message */}
+        {data.rewards?.lines?.length ? (
+          <IonItem className="receipt-section">
+            <IonLabel>
+              <IonText className="section-title">Recompensas</IonText>
+              {data.rewards.lines.map((line, i) => <p key={i}>{line}</p>)}
+            </IonLabel>
+          </IonItem>
+        ) : null}
+
         {/* FOOTER */}
         <IonItem className="receipt-section footer-section">
           <IonLabel>

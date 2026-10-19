@@ -1,0 +1,124 @@
+.eie-list {
+  padding: 0;
+  background: transparent;
+}
+
+.eie-line {
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  padding: 10px 12px 12px;
+  margin-bottom: 10px;
+  background: #ffffff;
+}
+
+.eie-line-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eie-line-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1A202C;
+  line-height: 1.3;
+  padding-top: 6px;
+}
+
+.eie-supply-chip {
+  --color: #0056D2;
+  height: 20px;
+  margin: 0 0 0 6px;
+  font-size: 0.7rem;
+  vertical-align: middle;
+}
+
+.eie-line-fields {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.eie-qty,
+.eie-cost {
+  --border-radius: 10px;
+  min-height: 48px;
+}
+
+.eie-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.eie-amount-label {
+  font-size: 0.7rem;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.eie-amount-value {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1A202C;
+  font-variant-numeric: tabular-nums;
+}
+
+.eie-summary {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #F3F4F6;
+}
+
+.eie-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  color: #4A5568;
+}
+
+.eie-summary-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #D1D5DB;
+  font-size: 1rem;
+  color: #1A202C;
+}
+
+.eie-summary-total strong {
+  font-size: 1.2rem;
+  color: #DC2626;
+  font-variant-numeric: tabular-nums;
+}
+
+.eie-picker-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: #718096;
+}
+
+.eie-picker-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px;
+}
+
+.eie-picker-footer ion-button:last-child {
+  flex: 1;
+}

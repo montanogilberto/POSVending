@@ -1,0 +1,24 @@
+/* Dados — número del tiro y controles de apuesta. */
+.dice-roll {
+  font-size: 3.4rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ion-color-medium);
+}
+
+.dice-roll--done {
+  color: var(--arc-violet, #6d4aff);
+}
+
+.dice-controls {
+  padding: 4px 16px 0;
+}
+
+.dice-target {
+  text-align: center;
+  font-size: 1.9rem;
+  font-weight: 800;
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
+}

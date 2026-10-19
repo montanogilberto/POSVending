@@ -20,4 +20,28 @@ export const AVATARS: Avatar[] = [
     image: '🦕',
     thumbnail: '🦕',
   },
+  // Rigged (Idle/Walk/Run/Jump) via the local Blender pipeline — see world3d/GameAvatar.ts and
+  // README §17. Added here so it's actually selectable/playable for on-device validation, no
+  // longer just a static 3D preview card.
+  {
+    id: 'gilbertito',
+    name: 'Gilbertito',
+    description: '¡A limpiar el cuarto!',
+    image: '🧒',
+    thumbnail: '🧒',
+  },
+  {
+    id: 'gael',
+    name: 'Gael',
+    description: '¡Vamos a ordenar!',
+    image: '🧑',
+    thumbnail: '🧑',
+  },
+  {
+    id: 'tutu',
+    name: 'Tutu',
+    description: '¡Grr, a limpiar!',
+    image: '🧸',
+    thumbnail: '🧸',
+  },
 ];

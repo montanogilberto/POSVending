@@ -1,0 +1,67 @@
+.jd-body {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 12px 32px;
+}
+
+.jd-hero {
+  margin: 0 0 16px;
+  border-radius: 16px;
+  box-shadow: none;
+  background: linear-gradient(135deg, #7c4a03, #b45309);
+  color: #fff;
+}
+
+.jd-hero ion-card-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.jd-hero-icon {
+  font-size: 44px;
+  flex-shrink: 0;
+}
+
+.jd-hero-kicker {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+  margin: 0;
+}
+
+.jd-hero-name {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 2px 0;
+  color: #fff;
+}
+
+.jd-hero-stat {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.jd-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.jd-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 16px 4px 8px;
+}
+
+.jd-templates {
+  border-radius: 12px;
+}
+
+.jd-template-text {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}

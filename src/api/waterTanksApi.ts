@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 export interface TankWaterDetail {
   tankWatersDetailId: number;
   quantityLiters?: number;
@@ -26,7 +27,7 @@ export interface WaterTanksResponse {
 }
 
 export const fetchWaterTanks = async (): Promise<WaterTanksResponse> => {
-  const response = await fetch('https://smartloansbackend.azurewebsites.net/all_tankWaters');
+  const response = await fetch(`${API_BASE_URL}/all_tankWaters`);
   if (!response.ok) {
     throw new Error(`Failed to fetch water tanks: ${response.status}`);
   }

@@ -123,28 +123,28 @@ http://ionicframework.com/docs/theming/ */
   }
 
   /* ── Collapsed rail mode ─────────────────────────────────── */
+  /* Below the split-pane breakpoint the menu is a plain overlay drawer,
+     so it ignores ion-split-pane's --side-width and falls back to this
+     --width — set it here too or the "rail" stays full-width. */
+  .menu-rail {
+    --width: 64px;
+  }
   .menu-rail ion-item {
     --padding-start: 0;
     --padding-end: 0;
     --inner-padding-start: 0;
     --inner-padding-end: 0;
+    position: relative;
   }
-  /* Center the entire native row */
-  .menu-rail ion-item::part(native) {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0;
-  }
-  /* The start slot becomes the only content — push it to center */
-  .menu-rail ion-item::part(start) {
-    margin-inline-end: 0;
-    margin-inline-start: 0;
-  }
+  /* The empty label slot still flex-grows inside item-inner, which pins
+     the icon left; absolute-center it against the item instead. */
   .menu-rail ion-item ion-icon {
     font-size: 22px;
-    margin: 0 auto !important;
-    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
   }
 
   /* Collapsed profile — avatar only, centred, no gradient text */

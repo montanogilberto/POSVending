@@ -543,6 +543,13 @@
 .cd-loan-preview p { margin: 3px 0; }
 .cd-loan-preview strong { display: block; margin-bottom: 6px; font-size: 14px; }
 
+/* ── Cuenta bancaria (SPEI) ─────────────────────────────────── */
+/* Nota del riel directo: ancho completo de la tarjeta (a diferencia de
+   .cd-stripe-sub, que va centrada y angosta dentro del empty state). */
+.cd-bank-note {
+  font-size: 0.85rem; line-height: 1.45; color: #74839f; margin: 0 0 8px;
+}
+
 /* ── Stripe payment section ─────────────────────────────────── */
 .cd-stripe-header { display: flex; align-items: center; justify-content: space-between; }
 .cd-stripe-loading { color: #74839f; text-align: center; font-size: 0.9rem; }

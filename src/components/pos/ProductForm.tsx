@@ -15,11 +15,13 @@ import {
   IonSelectOption,
   IonDatetime,
   IonLoading,
+  IonCheckbox,
 } from '@ionic/react';
 import { close } from 'ionicons/icons';
 import { useProduct } from '../../contexts/ProductContext';
 import { Product } from '../../data/type_products';
 import { useUser } from '../../contexts/UserContext';
+import { posRewardsApi } from '../../api/posRewardsApi';
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -41,6 +43,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
     categoryId: 0,
     companyId: 0,
   });
+  const [pointsPerUnit, setPointsPerUnit] = useState(0);
+  const [pointsActive, setPointsActive] = useState(true);
+  const [savingRate, setSavingRate] = useState(false);
 
   useEffect(() => {
     if (product) {
@@ -67,8 +72,23 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
         categoryId: 0,
         companyId: sessionCompanyId,
       });
+      setPointsPerUnit(0);
+      setPointsActive(true);
     }
   }, [product, sessionCompanyId]);
+
+  useEffect(() => {
+    if (!product?.productId) return;
+    let cancelled = false;
+    posRewardsApi.getProductRate(product.productId, sessionCompanyId)
+      .then(rate => {
+        if (cancelled || !rate) return;
+        setPointsPerUnit(rate.pointsPerUnit);
+        setPointsActive(rate.isActive);
+      })
+      .catch(err => console.error('[ProductForm] Failed to load reward rate', err));
+    return () => { cancelled = true; };
+  }, [product?.productId, sessionCompanyId]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
@@ -84,11 +104,30 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
         companyId: sessionCompanyId,
       };
 
+      let productId: number | null;
       if (product) {
         await updateProduct(product.productId, payload);
+        productId = product.productId;
       } else {
-        await createProduct(payload);
+        productId = await createProduct(payload);
       }
+
+      if (productId) {
+        setSavingRate(true);
+        try {
+          await posRewardsApi.upsertProductRate({
+            productId,
+            companyId: sessionCompanyId,
+            pointsPerUnit,
+            isActive: pointsActive,
+          });
+        } catch (rateError) {
+          console.error('[ProductForm] Failed to save reward rate', rateError);
+        } finally {
+          setSavingRate(false);
+        }
+      }
+
       onClose();
     } catch (error) {
       console.error('Error saving product:', error);
@@ -108,7 +147,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
         </IonToolbar>
       </IonHeader>
       <IonContent>
-        <IonLoading isOpen={loading} message="Guardando producto..." />
+        <IonLoading isOpen={loading || savingRate} message="Guardando producto..." />
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
           <div className="product-form-fields">
             <IonInput fill="outline" label="Nombre *" labelPlacement="floating"
@@ -116,6 +155,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ isOpen, onClose, product }) =
 
             <IonInput fill="outline" label="Código *" labelPlacement="floating"
               value={formData.code} onIonChange={(e) => handleInputChange('code', e.detail.value!)} required />
+
+            <IonInput fill="outline" label="Puntos por unidad vendida" labelPlacement="floating"
+              type="number" value={pointsPerUnit}
+              onIonChange={(e) => setPointsPerUnit(parseFloat(e.detail.value!) || 0)} />
+
+            <IonCheckbox labelPlacement="end" checked={pointsActive}
+              onIonChange={(e) => setPointsActive(e.detail.checked)}>
+              Producto activo para puntos de lealtad
+            </IonCheckbox>
 
             <div className="product-field-group">
               <p className="product-field-label">Fecha de Expiración</p>

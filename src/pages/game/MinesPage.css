@@ -1,0 +1,205 @@
+/* Minas — tablero 5×5, escalera de multiplicador y presets de dificultad. */
+
+/* ── Escalera ─────────────────────────────────────────────────
+   Lo que llevas vs lo que ganarías al seguir. Es la decisión del juego, así
+   que va arriba del tablero y no escondida en una barra. */
+
+.mn-ladder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 8px 12px 14px;
+  padding: 14px 12px;
+  border-radius: 16px;
+  background: var(--arc-card, #fff);
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.07);
+}
+
+.mn-ladder__now,
+.mn-ladder__next {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 96px;
+}
+
+.mn-ladder__label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ion-color-medium);
+}
+
+.mn-ladder__now strong,
+.mn-ladder__next strong {
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.mn-ladder__now strong small,
+.mn-ladder__next strong small {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-left: 1px;
+}
+
+.mn-ladder__now strong { color: var(--arc-green, #16a34a); }
+.mn-ladder__next strong { color: var(--ion-color-medium); }
+
+.mn-ladder__coins {
+  font-size: 0.7rem;
+  color: var(--ion-color-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.mn-ladder__arrow {
+  font-size: 20px;
+  color: var(--arc-violet, #6d4aff);
+  flex-shrink: 0;
+}
+
+/* ── Tablero ──────────────────────────────────────────────── */
+
+.mn-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+  width: 100%;
+  max-width: 320px;
+}
+
+/* Sin ronda el tablero se atenúa: deja claro que hay que apostar primero. */
+.mn-grid--idle {
+  opacity: 0.5;
+}
+
+.mn-tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: none;
+  border-radius: 12px;
+  background: var(--ion-color-step-150, #e3e6ef);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 90ms ease-out, background 140ms ease-out;
+}
+
+.mn-grid:not(.mn-grid--idle) .mn-tile:not(:disabled):active {
+  transform: scale(0.93);
+}
+
+.mn-tile:disabled {
+  cursor: default;
+}
+
+.mn-tile--safe {
+  background: var(--arc-green-soft, #dcfce7);
+  color: var(--arc-green, #16a34a);
+  /* Un rebote corto al destapar: confirma el acierto sin frenar el ritmo. */
+  animation: mn-pop 220ms ease-out;
+}
+
+.mn-tile--mine {
+  background: var(--arc-red-soft, #ffe4e6);
+  color: var(--ion-color-danger, #e11d48);
+  animation: mn-shake 320ms ease-out;
+}
+
+@keyframes mn-pop {
+  0%   { transform: scale(0.7); }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes mn-shake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mn-tile,
+  .mn-tile--safe,
+  .mn-tile--mine {
+    animation: none;
+    transition: none;
+  }
+}
+
+.mn-progress {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+}
+
+/* ── Presets de dificultad ────────────────────────────────── */
+
+.mn-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+
+.mn-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 6px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: var(--arc-card, #fff);
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.07);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mn-preset--on {
+  border-color: var(--arc-violet, #6d4aff);
+}
+
+.mn-preset__mines {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--arc-violet, #6d4aff);
+}
+
+.mn-preset__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ion-text-color, #1f2333);
+}
+
+.mn-preset__hint {
+  font-size: 0.66rem;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--ion-color-medium);
+}
+
+@media (prefers-color-scheme: dark) {
+  .mn-ladder,
+  .mn-preset {
+    background: #1c1d24;
+    box-shadow: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .mn-preset--on {
+    border-color: var(--arc-violet, #6d4aff);
+  }
+
+  .mn-tile {
+    background: #2a2c36;
+  }
+}

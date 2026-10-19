@@ -1,0 +1,262 @@
+.movements-content {
+  --background: #F9FAFB;
+}
+
+.movements-container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ── Filtrar por Fecha banner ─────────────────────────────────────────── */
+.movements-filter-banner {
+  --background: #EFF6FF;
+  --border-radius: 20px;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --inner-padding-end: 0;
+  margin: 0 0 16px 0;
+}
+
+.movements-filter-icon-circle {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 50%;
+  background: #DBEAFE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline-end: 14px;
+}
+
+.movements-filter-icon-circle ion-icon {
+  font-size: 22px;
+  color: #0056D2;
+}
+
+.movements-filter-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #111827;
+}
+
+.movements-filter-subtitle {
+  font-size: 13px;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+.movements-filter-chevron {
+  font-size: 18px;
+  color: #9CA3AF;
+  transition: transform 0.2s ease;
+}
+
+.movements-filter-chevron.open {
+  transform: rotate(90deg);
+}
+
+/* ── Calendar card ────────────────────────────────────────────────────── */
+.movements-calendar-card {
+  border-radius: 24px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+  margin: 0 0 16px 0;
+}
+
+.movements-calendar {
+  width: 100%;
+  --background: transparent;
+}
+
+.movements-calendar::part(calendar-day) {
+  border-radius: 50%;
+}
+
+.movements-calendar::part(calendar-day active) {
+  background: #0056D2;
+  color: #ffffff;
+}
+
+.movements-calendar::part(calendar-day today) {
+  border-color: #0056D2;
+  color: #0056D2;
+}
+
+/* ── Selected date chip ───────────────────────────────────────────────── */
+.movements-selected-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #EFF6FF;
+  border-radius: 16px;
+  padding: 10px 8px 10px 14px;
+  margin: 0 0 16px 0;
+}
+
+.movements-selected-chip ion-icon.calendar-icon {
+  font-size: 18px;
+  color: #0056D2;
+}
+
+.movements-selected-chip-text {
+  flex: 1;
+}
+
+.movements-selected-chip-label {
+  font-size: 12px;
+  color: #0056D2;
+  font-weight: 600;
+}
+
+.movements-selected-chip-value {
+  font-size: 14px;
+  color: #111827;
+}
+
+.movements-selected-chip-clear {
+  --padding-start: 6px;
+  --padding-end: 6px;
+  margin: 0;
+}
+
+/* ── Type filter chips ────────────────────────────────────────────────── */
+.movements-type-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px 0;
+}
+
+.movements-type-chip {
+  margin: 0;
+}
+
+/* ── Summary card ─────────────────────────────────────────────────────── */
+.movements-summary-card {
+  border-radius: 24px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+  margin: 0 0 16px 0;
+}
+
+.movements-summary-content {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.movements-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.movements-summary-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.movements-summary-icon ion-icon {
+  font-size: 16px;
+}
+
+.movements-summary-icon.total {
+  background: #DBEAFE;
+}
+.movements-summary-icon.total ion-icon {
+  color: #0056D2;
+}
+
+.movements-summary-icon.count {
+  background: #E6F4EA;
+}
+.movements-summary-icon.count ion-icon {
+  color: #16A34A;
+}
+
+.movements-summary-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.movements-summary-label {
+  font-size: 11px;
+  color: #6B7280;
+}
+
+/* ── Movements list card ──────────────────────────────────────────────── */
+.movements-list-card {
+  border-radius: 24px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+.movements-list-card ion-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.movements-day-group {
+  --background: #F3F4F6;
+  --border-radius: 12px;
+  margin: 12px 0 6px 0;
+}
+
+.movements-day-group h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.movements-day-group p {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.movements-row-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  background: #E6F4EA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline-end: 12px;
+}
+
+.movements-row-icon ion-icon {
+  font-size: 18px;
+  color: #16A34A;
+}
+
+.movements-row-amount {
+  font-weight: 700;
+  color: #111827;
+}
+
+.movements-row-meta {
+  font-size: 12px;
+  color: #6B7280;
+  text-transform: capitalize;
+}
+
+.movements-empty {
+  color: #9CA3AF;
+}
+
+.movements-empty ion-icon {
+  font-size: 56px;
+  color: #C7D2FE;
+}

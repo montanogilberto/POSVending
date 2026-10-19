@@ -1,0 +1,9 @@
+/* Matches the look of the ion-back-button it replaces. */
+.confirm-back-button {
+  --color: currentColor;
+  min-height: 48px;
+}
+
+.confirm-back-button ion-icon {
+  font-size: 24px;
+}

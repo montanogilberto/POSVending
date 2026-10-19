@@ -1,0 +1,47 @@
+.pr-page { --background: #f8fafc; }
+
+.pr-kpi-grid { padding: 0; margin-bottom: 4px; }
+
+.pr-kpi-card {
+  margin: 4px;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+}
+.pr-kpi-card ion-card-content {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px;
+}
+.pr-kpi-label { font-size: 0.75rem; color: #6b7280; margin: 0; }
+.pr-kpi-value { font-size: 1.4rem; font-weight: 700; margin: 0; }
+
+.pr-card {
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+  margin: 8px 0;
+}
+.pr-card-header-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* Leaderboard */
+.pr-leaderboard-item { --border-radius: 12px; margin-bottom: 4px; }
+.pr-rank {
+  font-size: 1.1rem; font-weight: 800; color: #d97706;
+  min-width: 28px; text-align: center;
+}
+.pr-balance-badge {
+  --background: #fef3c7; --color: #92400e;
+  font-size: 0.78rem; padding: 4px 10px; border-radius: 99px;
+}
+
+/* Catalog */
+.pr-catalog-item { --border-radius: 12px; margin-bottom: 4px; }
+.pr-catalog-actions { display: flex; }
+
+/* History */
+.pr-tx-item { --border-radius: 12px; margin-bottom: 4px; }
+.pr-pts-earn   { color: #059669; font-weight: 700; margin-left: 6px; }
+.pr-pts-redeem { color: #dc2626; font-weight: 700; margin-left: 6px; }
+
+/* Form */
+.pr-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 0 80px; }
+.pr-save-btn { --background: #2563eb; --color: #fff; margin-top: 4px; }

@@ -1,0 +1,58 @@
+/* Per-choice quantity: − [n] + (typed or stepped, 1..999) */
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+}
+
+.qty-stepper ion-button {
+  margin: 0;
+  --padding-start: 6px;
+  --padding-end: 6px;
+  min-height: 40px;
+}
+
+.qty-input {
+  width: 52px;
+  min-height: 40px;
+  text-align: center;
+  --padding-start: 4px;
+  --padding-end: 4px;
+  border: 1px solid var(--ion-color-light-shade, #d1d5db);
+  border-radius: 8px;
+}
+
+/* ---- iOS only (plt-ios is set by Ionic on real iPhone/iPad, never on
+   Android or web): on iPhone 11 the stepper squeezed the option name to
+   one word per line. Price goes to its own line, stepper gets compact. ---- */
+.plt-ios .choice-label {
+  min-width: 0;
+  white-space: normal;
+}
+
+.plt-ios .choice-price {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.875em;
+  color: var(--ion-color-medium, #6b7280);
+}
+
+.plt-ios .qty-stepper {
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.plt-ios .qty-stepper ion-button {
+  width: 32px;
+  min-height: 36px;
+  --padding-start: 0;
+  --padding-end: 0;
+}
+
+.plt-ios .qty-input {
+  width: 44px;
+  min-height: 36px;
+  --padding-start: 2px;
+  --padding-end: 2px;
+}

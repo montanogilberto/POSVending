@@ -21,6 +21,7 @@ import {
 import { waterOutline, receiptOutline, documentsOutline, helpCircleOutline, notificationsOutline, mailOutline } from 'ionicons/icons';
 import { useEffect, useState } from 'react';
 import './Vending.css';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 interface Transaction {
   date: string;
@@ -43,7 +44,7 @@ const Vending: React.FC = () => {
   // 🔄 POST al backend para guardar un ingreso
   const sendToBackend = async (amount: number): Promise<boolean> => {
     try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/vending', {
+      const response = await fetch(`${API_BASE_URL}/vending`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,7 +76,7 @@ const Vending: React.FC = () => {
 const fetchAllVending = async () => {
   setLoading(true);
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_vending');
+    const response = await fetch(`${API_BASE_URL}/all_vending`);
     if (!response.ok) {
       throw new Error(`Error al obtener datos del backend: ${response.status}`);
     }
@@ -152,7 +153,7 @@ const fetchAllVending = async () => {
         <div className="header-content">
           <div className="header-brand">
             <div className="brand-logo">P</div>
-            <h1 className="brand-text">POS GMO</h1>
+            <h1 className="brand-text">GMO</h1>
           </div>
           <div className="header-actions">
             <IonButton className="action-button" fill="clear">

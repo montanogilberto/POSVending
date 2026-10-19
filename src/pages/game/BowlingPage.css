@@ -1,0 +1,36 @@
+/* Boliche — pista, pinos y bola. */
+.bw-lane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f0e2c8, #dcc9a6);
+  width: 100%;
+  max-width: 220px;
+}
+
+.bw-pins {
+  display: grid;
+  grid-template-columns: repeat(4, 14px);
+  gap: 5px;
+  justify-content: center;
+}
+
+.bw-pin {
+  width: 14px;
+  height: 20px;
+  border-radius: 7px 7px 4px 4px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.bw-pin--down {
+  opacity: 0.25;
+  transform: rotate(28deg);
+}
+
+.bw-ball {
+  font-size: 2rem;
+}

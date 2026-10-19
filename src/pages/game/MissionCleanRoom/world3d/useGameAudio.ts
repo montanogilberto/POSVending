@@ -1,12 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { playSynthTone } from './synthSounds';
 
 export type SoundKey = 'jump' | 'land' | 'pickup' | 'drop' | 'collect' | 'success' | 'celebrate';
 
 /**
- * public/assets/audio/{key}.mp3 — none of these exist yet. play() fails silently until
- * they're dropped in (same pattern as the character-art and character-model pipelines):
- * build the architecture and every call site now, swap in real files later with zero
- * gameplay changes.
+ * public/assets/audio/{key}.mp3 — none of these exist yet, so every key falls back to a
+ * synthesized tone (synthSounds.ts) until real files are dropped in. Same pattern as the
+ * character-art/model pipelines: build the architecture and every call site now, swap in
+ * real files later with zero gameplay changes — the fallback just stops triggering once a
+ * given file loads successfully.
  */
 const SOUND_PATHS: Record<SoundKey, string> = {
   jump: '/assets/audio/jump.mp3',
@@ -57,12 +59,21 @@ export const useGameAudio = (): GameAudioApi => {
   const play = useCallback((key: SoundKey) => {
     if (mutedRef.current) return;
     const entry = entries[key];
-    if (entry.unavailable) return;
+    if (entry.unavailable) {
+      playSynthTone(key, volumeRef.current);
+      return;
+    }
     entry.element.volume = volumeRef.current;
     entry.element.currentTime = 0;
     // Every call site is a direct response to a user action (tap/key press), so browser
     // autoplay policy isn't the concern here — this just guards a missing/undecodable file.
-    entry.element.play().catch(() => { /* non-fatal: e.g. rapid re-trigger interrupted a prior play() */ });
+    entry.element.play().catch(() => {
+      // 404/undecodable file (expected today — see SOUND_PATHS comment) or a rapid
+      // re-trigger interrupting a prior play(). Either way, fall back to the synth tone
+      // and remember it so the next play() for this key skips straight to the fallback.
+      entry.unavailable = true;
+      playSynthTone(key, volumeRef.current);
+    });
   }, [entries]);
 
   const toggleMute = useCallback(() => setMuted((prev) => !prev), []);

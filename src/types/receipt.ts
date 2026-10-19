@@ -46,6 +46,15 @@ export interface UnifiedReceiptData {
     cashPaid?: number;
     cashReturn?: number;
   };
+  /** POS points block (backend ticket "rewards"): the same lines as the sale
+   *  message — points earned, balance and the next goals. */
+  rewards?: ReceiptRewards;
+}
+
+export interface ReceiptRewards {
+  pointsEarned: number;
+  balance: number;
+  lines: string[];
 }
 
 export interface UnifiedProduct {
@@ -139,5 +148,7 @@ export interface PrintOptions {
   thermal?: boolean;
   showPreview?: boolean;
   autoPrint?: boolean;
+  /** Re-print of an already-printed ticket: adds a REIMPRESIÓN/COPIA banner. */
+  reprint?: boolean;
 }
 

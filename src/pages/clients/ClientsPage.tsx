@@ -64,6 +64,10 @@ import {
   copyOutline,
   closeOutline,
   close,
+  giftOutline,
+  banOutline,
+  chevronDown,
+  chevronUp,
 } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
@@ -72,7 +76,9 @@ import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
 import { useUser } from '../../contexts/UserContext';
-import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr } from '../../api/clientsApi';
+import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRequest, uploadClientQr, deleteClient, setClientActive } from '../../api/clientsApi';
+import { posRewardsApi } from '../../api/posRewardsApi';
+import { ClientCapability, grantClientCapability, revokeClientCapability, listClientCapabilities } from '../../api/clientCapabilitiesApi';
 import QRCode from 'qrcode';
 import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
 import {
@@ -98,6 +104,8 @@ import SignaturePad from '../../components/kyc/SignaturePad';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
+import { PLAY_STORE_URL, APP_STORE_URL } from '../../utils/appLinks';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   nombre: '',
@@ -123,7 +131,51 @@ type CaptureSubStep =
 
 const WIZARD_STEPS = ['Cliente', 'Código QR', 'Documento', 'Captura', 'Verificación', 'Contrato', 'Cuenta'];
 
-const API_BASE = 'https://smartloansbackend.azurewebsites.net';
+// Products a client can belong to (dbo.clientCapabilities). Multi-select: a
+// client accumulates memberships, "Ambos" is BORROWER + LENDER.
+const PRODUCT_GROUPS: { title: string; items: { id: ClientCapability; label: string; desc: string }[] }[] = [
+  { title: 'POS GMO', items: [
+    { id: 'POS',     label: 'Cliente POS', desc: 'Compras en tienda' },
+    { id: 'REWARDS', label: 'Rewards',     desc: 'Puntos y recompensas' },
+    { id: 'ARCADE',  label: 'Arcade',      desc: 'Juegos con fichas' },
+  ] },
+  { title: 'SmartLoans', items: [
+    { id: 'SMARTLOANS_BORROWER',  label: 'Acreditado',  desc: 'Solicita préstamos' },
+    { id: 'SMARTLOANS_LENDER',    label: 'Prestamista', desc: 'Financia préstamos' },
+    { id: 'SMARTLOANS_JURIDICAL', label: 'Jurídico',    desc: 'Asesoría legal' },
+  ] },
+  { title: 'Factory AI', items: [
+    { id: 'FACTORY_AI', label: 'Factory AI Software', desc: 'Software a la medida con IA' },
+  ] },
+];
+const DEFAULT_PRODUCTS: ClientCapability[] = ['POS', 'REWARDS'];
+
+/** Legacy dbo.clients.clientType, derived from the selected products while the
+ * column still exists (it is read-only legacy data — see client-capabilities.md). */
+const clientTypeFromProducts = (products: ClientCapability[]): ClientType => {
+  const b = products.includes('SMARTLOANS_BORROWER');
+  const l = products.includes('SMARTLOANS_LENDER');
+  if (b && l) return 'both';
+  if (l) return 'lender';
+  if (b) return 'borrower';
+  if (products.includes('SMARTLOANS_JURIDICAL')) return 'lawyer';
+  return 'pos';
+};
+
+/** Capabilities implied by a legacy clientType — only used to pre-fill the
+ * edit form for a client that has no clientCapabilities rows yet. */
+const productsFromClientType = (t?: ClientType): ClientCapability[] => {
+  switch (t) {
+    case 'borrower': return ['SMARTLOANS_BORROWER'];
+    case 'lender':   return ['SMARTLOANS_LENDER'];
+    case 'both':     return ['SMARTLOANS_BORROWER', 'SMARTLOANS_LENDER'];
+    case 'lawyer':   return ['SMARTLOANS_JURIDICAL'];
+    case 'pos':      return ['POS'];
+    default:         return [];
+  }
+};
+
+const API_BASE = API_BASE_URL;
 
 async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
   const res = await fetch(`${API_BASE}/stripe/connected-accounts`, {
@@ -149,7 +201,7 @@ const emptyErrors = {
 };
 
 const ClientsPage: React.FC = () => {
-  const { companyId } = useUser();
+  const { companyId, userId } = useUser();
   const history = useHistory();
 
   // ── List state ─────────────────────────────────────────────────────────────
@@ -162,6 +214,10 @@ const ClientsPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<Client | null>(null);
+  const [deletingClientId, setDeletingClientId] = useState<number | null>(null);
+  const [togglingActiveId, setTogglingActiveId] = useState<number | null>(null);
+  // Only one card shows its secondary actions at a time — keeps the list scannable.
+  const [expandedActionsId, setExpandedActionsId] = useState<number | null>(null);
   const pops = usePopovers();
 
   // ── Wizard state ───────────────────────────────────────────────────────────
@@ -173,9 +229,14 @@ const ClientsPage: React.FC = () => {
   const [wizardError, setWizardError] = useState('');
 
   // Step 0 — client info
-  const [newClient, setNewClient] = useState<Partial<Client>>({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'borrower' });
+  const [newClient, setNewClient] = useState<Partial<Client>>({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'pos' });
   const [createErrors, setCreateErrors] = useState(emptyErrors);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
+  const [products, setProducts] = useState<ClientCapability[]>(DEFAULT_PRODUCTS);
+  // Rows the client already had when the edit form opened — diffed on save.
+  const [initialProducts, setInitialProducts] = useState<ClientCapability[]>([]);
+  // KYC, contract and payout steps only apply to SmartLoans memberships.
+  const needsSmartLoansSteps = products.some(p => p.startsWith('SMARTLOANS_'));
 
   // Step 1 — QR
   const [qrBlobUrl, setQrBlobUrl] = useState('');
@@ -324,6 +385,16 @@ const ClientsPage: React.FC = () => {
     return new Date(ds).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const clientTypeLabel = (t?: ClientType) => {
+    switch (t) {
+      case 'lender': return 'Prestamista';
+      case 'both': return 'Ambos';
+      case 'lawyer': return 'Licenciado en derecho';
+      case 'pos': return 'Cliente POS';
+      default: return 'Acreditado';
+    }
+  };
+
   // ── Load clients ───────────────────────────────────────────────────────────
   useEffect(() => { loadClients(); }, []);
 
@@ -371,19 +442,18 @@ const ClientsPage: React.FC = () => {
   }, [clients, searchTerm]);
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  // ── App store links (update with real URLs once published) ───────────────
-  const PLAY_STORE_URL  = 'https://play.google.com/store/apps/details?id=com.lavanderia.gmo';
-  const APP_STORE_URL   = 'https://apps.apple.com/app/pos-gmo/id000000000';
-
   const buildShareMessage = (client: Client): string => {
     const name  = `${client.first_name} ${client.last_name}`;
     const type  = client.clientType ?? 'borrower';
     const store = `📱 Android: ${PLAY_STORE_URL}\n🍎 iOS: ${APP_STORE_URL}`;
 
     if (type === 'lender') {
-      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para gestionar tu cartera de préstamos, ver el estado de tus acreditados y más.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta de prestamista y accede a tu dashboard de portfolio.`;
+      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *GMO* para gestionar tu cartera de préstamos, ver el estado de tus acreditados y más.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta de prestamista y accede a tu dashboard de portfolio.`;
     }
-    return `Hola ${name} 👋\n\nTe invitamos a descargar la app *POS GMO* para consultar tu préstamo, ver tu estado de cuenta y realizar pagos fácilmente.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard.`;
+    if (type === 'pos') {
+      return `Hola ${name} 👋\n\nTe invitamos a descargar la app *GMO* para ver tu historial de compras y tus puntos de recompensas.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard de recompensas.`;
+    }
+    return `Hola ${name} 👋\n\nTe invitamos a descargar la app *GMO* para consultar tu préstamo, ver tu estado de cuenta y realizar pagos fácilmente.\n\n${store}\n\nUna vez instalada, inicia sesión con tu cuenta para ver tu dashboard.`;
   };
 
   const openWhatsApp = (client: Client) => {
@@ -404,22 +474,77 @@ const ClientsPage: React.FC = () => {
     setTimeout(() => setShareCopied(false), 2000);
   };
 
-  const handleDelete = (client: Client) => { setSelectedForDelete(client); setShowDeleteAlert(true); };
+  const handleDelete = (client: Client) => {
+    console.log('[ClientsPage] handleDelete: requested for clientId =', client.clientId, client.first_name, client.last_name);
+    setSelectedForDelete(client);
+    setShowDeleteAlert(true);
+  };
   const confirmDelete = async () => {
-    if (selectedForDelete) {
-      setClients(clients.filter(c => c.clientId !== selectedForDelete.clientId));
-      toast('Cliente eliminado exitosamente');
-    }
+    console.log('[ClientsPage] confirmDelete: confirmed for clientId =', selectedForDelete?.clientId);
+    if (!selectedForDelete) { setShowDeleteAlert(false); return; }
+    const clientId = selectedForDelete.clientId;
+    setDeletingClientId(clientId);
     setShowDeleteAlert(false);
-    setSelectedForDelete(null);
+    try {
+      const res = await deleteClient(clientId);
+      const result = typeof res === 'string' ? undefined : res.result?.[0];
+      if (result?.error === '1') {
+        console.log('[ClientsPage] confirmDelete: backend returned an error, clientId =', clientId, result.msg);
+        toast(result.msg || 'Error al eliminar el cliente');
+      } else {
+        setClients(prev => prev.filter(c => c.clientId !== clientId));
+        toast('Cliente eliminado exitosamente');
+        console.log('[ClientsPage] confirmDelete: SUCCESS, removed clientId =', clientId);
+      }
+    } catch (err) {
+      console.log('[ClientsPage] confirmDelete: FAILED', err);
+      toast('Error al eliminar el cliente');
+    } finally {
+      setDeletingClientId(null);
+      setSelectedForDelete(null);
+    }
+  };
+
+  const handleToggleActive = async (client: Client) => {
+    const nextActive = client.isActive === false;
+    console.log('[ClientsPage] handleToggleActive: clientId =', client.clientId, nextActive ? 'reactivating' : 'deactivating');
+    setTogglingActiveId(client.clientId);
+    try {
+      const res = await setClientActive(client.clientId, nextActive);
+      const result = typeof res === 'string' ? undefined : res.result?.[0];
+      if (result?.error === '1') {
+        console.log('[ClientsPage] handleToggleActive: backend returned an error, clientId =', client.clientId, result.msg);
+        toast(result.msg || 'Error al actualizar el cliente');
+      } else {
+        setClients(prev => prev.map(c => c.clientId === client.clientId ? { ...c, isActive: nextActive } : c));
+        toast(nextActive ? 'Cliente reactivado' : 'Cliente desactivado');
+        console.log('[ClientsPage] handleToggleActive: SUCCESS, clientId =', client.clientId, 'isActive =', nextActive);
+      }
+    } catch (err) {
+      console.log('[ClientsPage] handleToggleActive: FAILED', err);
+      toast('Error al actualizar el cliente');
+    } finally {
+      setTogglingActiveId(null);
+    }
   };
 
   // ── Edit modal ─────────────────────────────────────────────────────────────
   const handleEdit = (client: Client) => {
     resetWizard();
     setWizardMode('edit');
-    setNewClient({ first_name: client.first_name, last_name: client.last_name, email: client.email, cellphone: client.cellphone, clientType: client.clientType ?? 'borrower' });
+    setNewClient({ first_name: client.first_name, last_name: client.last_name, email: client.email, cellphone: client.cellphone, clientType: client.clientType ?? 'pos' });
     setCreatedClientId(client.clientId);
+    const legacy = productsFromClientType(client.clientType);
+    setProducts(legacy);
+    setInitialProducts([]);
+    listClientCapabilities(Number(companyId), client.clientId)
+      .then(rows => {
+        const active = rows.filter(r => r.isActive).map(r => r.capability);
+        console.log('[ClientsPage] handleEdit capabilities for clientId=%d: %o', client.clientId, active);
+        setInitialProducts(active);
+        if (active.length > 0) setProducts(active);
+      })
+      .catch(err => console.warn('[ClientsPage] listClientCapabilities failed:', err));
     // Preload the client's existing QR (if any) so the auto-upload effect sees
     // it's already done and doesn't generate + upload a brand new blob every
     // time this client is reopened for editing.
@@ -432,9 +557,11 @@ const ClientsPage: React.FC = () => {
     setWizardStep(0);
     setCaptureSubStep('doc-intro');
     setWizardError('');
-    setNewClient({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'borrower' });
+    setNewClient({ first_name: '', last_name: '', email: '', cellphone: '', clientType: 'pos' });
     setCreateErrors(emptyErrors);
     setCreatedClientId(null);
+    setProducts(DEFAULT_PRODUCTS);
+    setInitialProducts([]);
     setDocumentType('');
     setIdFrontImageBase64('');
     setIdBackImageBase64('');
@@ -558,8 +685,50 @@ const ClientsPage: React.FC = () => {
 
   const createIsValid = useMemo(() => {
     const e = validateEmail(newClient.email || '');
-    return !!(newClient.first_name && newClient.last_name && e.isValid && !validateCellphone(newClient.cellphone || ''));
-  }, [newClient]);
+    return !!(newClient.first_name && newClient.last_name && e.isValid && !validateCellphone(newClient.cellphone || '')) && products.length > 0;
+  }, [newClient, products]);
+
+  const toggleProduct = (id: ClientCapability, on: boolean) => {
+    setProducts(prev => {
+      const next = on ? [...new Set([...prev, id])] : prev.filter(p => p !== id);
+      setNewClient(c => ({ ...c, clientType: clientTypeFromProducts(next) }));
+      return next;
+    });
+  };
+
+  /** Grants every selected product and revokes the ones unticked in edit
+   * mode. Best-effort per row: the client already exists, so a failed grant
+   * is logged for the backfill rather than blocking the wizard. */
+  const syncCapabilities = async (clientId: number, cellphone: string) => {
+    // sp_clients may not keep the clientId sent on create — resolve the
+    // stored row by phone (same pattern as ClientSelector) before granting.
+    let targetId = clientId;
+    try {
+      const digits = (v: string) => v.replace(/\D/g, '');
+      const match = (await getAllClients()).find(c => digits(c.cellphone || '').endsWith(digits(cellphone).slice(-10)));
+      if (match) targetId = match.clientId;
+    } catch (err) {
+      console.warn('[ClientsPage] syncCapabilities: client lookup failed, using clientId', clientId, err);
+    }
+    for (const capability of products.filter(p => !initialProducts.includes(p))) {
+      try { await grantClientCapability(Number(companyId), targetId, capability); }
+      catch (err) { console.warn('[ClientsPage] grant', capability, 'failed for clientId=', targetId, err); }
+    }
+    for (const capability of initialProducts.filter(p => !products.includes(p))) {
+      try { await revokeClientCapability(Number(companyId), targetId, capability); }
+      catch (err) { console.warn('[ClientsPage] revoke', capability, 'failed for clientId=', targetId, err); }
+    }
+    setInitialProducts(products);
+  };
+
+  // POS / Rewards / Arcade / Factory AI need no KYC or contract — the wizard
+  // ends after the QR step for them.
+  const handleFinishWithoutKyc = () => {
+    toast('Cliente registrado');
+    setShowWizard(false);
+    resetWizard();
+    loadClients();
+  };
 
   useEffect(() => {
     setCreateErrors({
@@ -580,6 +749,7 @@ const ClientsPage: React.FC = () => {
           clients: [{ clientId: createdClientId, first_name: newClient.first_name!, last_name: newClient.last_name!, cellphone: newClient.cellphone!, email: newClient.email!, companyId, clientType: newClient.clientType, action: '2' }],
         };
         await createOrUpdateClient(req);
+        await syncCapabilities(createdClientId, newClient.cellphone!);
         await loadClients();
       } else if (!createdClientId) {
         const clientId = Date.now();
@@ -588,6 +758,13 @@ const ClientsPage: React.FC = () => {
         };
         await createOrUpdateClient(req);
         setCreatedClientId(clientId);
+        await syncCapabilities(clientId, newClient.cellphone!);
+        // Sign-up bonus: registering unlocks any one of the 3x1 free-product
+        // rewards immediately. Best-effort — a PosRewards hiccup shouldn't
+        // block client creation.
+        posRewardsApi
+          .adjustPoints(companyId, clientId, 3, 'Bono de bienvenida: cliente registrado', userId)
+          .catch((err) => console.log('[ClientsPage] welcome bonus failed', err));
         await loadClients();
       }
       setWizardStep(1);
@@ -887,32 +1064,28 @@ const ClientsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Client type selector */}
-      <div className="wizard-client-type-section">
-        <p className="wizard-client-type-label">Tipo de cliente:</p>
-        <div className="wizard-client-type-grid">
-          {([
-            { id: 'borrower', label: '📋 Acreditado', desc: 'Solicita préstamo', color: '#2563eb' },
-            { id: 'lender',   label: '💼 Prestamista', desc: 'Financia préstamos', color: '#15803d' },
-            { id: 'both',     label: '🔄 Ambos', desc: 'Acreditado y prestamista', color: '#7c3aed' },
-            { id: 'lawyer',   label: '⚖️ Licenciado en derecho', desc: 'Asesoría legal', color: '#b45309' },
-          ] as { id: ClientType; label: string; desc: string; color: string }[]).map(t => (
-            <button
-              key={t.id}
-              type="button"
-              className={`wizard-client-type-btn${newClient.clientType === t.id ? ' selected' : ''}`}
-              style={newClient.clientType === t.id
-                ? { borderColor: t.color, background: `${t.color}14` }
-                : undefined}
-              onClick={() => setNewClient(p => ({ ...p, clientType: t.id }))}
-            >
-              <span className="wizard-client-type-btn-name" style={newClient.clientType === t.id ? { color: t.color } : undefined}>
-                {t.label}
-              </span>
-              <span className="wizard-client-type-btn-desc">{t.desc}</span>
-            </button>
-          ))}
-        </div>
+      {/* Products the client belongs to (clientCapabilities) — multi-select */}
+      <div className="wizard-products-section">
+        <p className="wizard-client-type-label">Productos del cliente:</p>
+        {PRODUCT_GROUPS.map(group => (
+          <div key={group.title} className="wizard-products-group">
+            <p className="wizard-products-group-title">{group.title}</p>
+            {group.items.map(item => (
+              <IonCheckbox
+                key={item.id}
+                className="wizard-product-checkbox"
+                labelPlacement="end"
+                justify="start"
+                checked={products.includes(item.id)}
+                onIonChange={e => toggleProduct(item.id, e.detail.checked)}
+              >
+                <span className="wizard-product-name">{item.label}</span>
+                <span className="wizard-product-desc">{item.desc}</span>
+              </IonCheckbox>
+            ))}
+          </div>
+        ))}
+        {products.length === 0 && <p className="wizard-products-error">Elige al menos un producto.</p>}
       </div>
     </div>
   );
@@ -1615,8 +1788,11 @@ const ClientsPage: React.FC = () => {
       return (
         <ClientWizardFooterBar
           onBack={goBackWizard}
-          onPrimary={() => setWizardStep(2)}
-          primary={<>Siguiente <IonIcon icon={chevronForward} /></>}
+          onPrimary={needsSmartLoansSteps ? () => setWizardStep(2) : handleFinishWithoutKyc}
+          variant={needsSmartLoansSteps ? undefined : 'submit'}
+          primary={needsSmartLoansSteps
+            ? <>Siguiente <IonIcon icon={chevronForward} /></>
+            : <>Finalizar <IonIcon icon={checkmark} /></>}
         />
       );
     }
@@ -1692,6 +1868,7 @@ const ClientsPage: React.FC = () => {
       <Header
         {...pops.headerProps}
         screenTitle="Clientes"
+        posSupportTopic="clients"
         showBackButton={true}
         backButtonText="Menú"
         backButtonHref="/dashboard"
@@ -1709,7 +1886,7 @@ const ClientsPage: React.FC = () => {
 
         <div className="clients-list">
           {filteredClients.map((client) => (
-            <IonCard key={client.clientId} className="client-card">
+            <IonCard key={client.clientId} className={`client-card${client.isActive === false ? ' client-card-inactive' : ''}`}>
               <IonCardContent className="client-card-content">
                 <div className="client-card-row">
                   <div className="client-left" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -1742,12 +1919,38 @@ const ClientsPage: React.FC = () => {
                         <span className="meta-label">Creado</span>
                         <span className="meta-value">{formatDate(client.created_At)}</span>
                       </span>
+                      <span className="client-meta-badge">
+                        <span className="meta-label">Tipo</span>
+                        <span className="meta-value">{clientTypeLabel(client.clientType)}</span>
+                      </span>
+                      {client.isActive === false && (
+                        <span className="client-meta-badge client-meta-badge-inactive">
+                          <span className="meta-value">Inactivo</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="client-actions">
                     <IonButton fill="outline" size="small" color="success" onClick={() => { setQrModalClient(client); setShowQrModal(true); }} className="action-button">
                       <IonIcon icon={qrCodeOutline} slot="start" /> QR
                     </IonButton>
+                    <IonButton fill="outline" size="small" color="primary" onClick={() => handleEdit(client)} className="action-button edit-button">
+                      <IonIcon icon={pencil} slot="start" /> Editar
+                    </IonButton>
+                    <IonButton
+                      fill="clear"
+                      size="small"
+                      color="medium"
+                      onClick={() => setExpandedActionsId(expandedActionsId === client.clientId ? null : client.clientId)}
+                      className="action-button more-button"
+                    >
+                      {expandedActionsId === client.clientId ? 'Menos' : 'Más'}
+                      <IonIcon icon={expandedActionsId === client.clientId ? chevronUp : chevronDown} slot="end" />
+                    </IonButton>
+                  </div>
+                </div>
+                {expandedActionsId === client.clientId && (
+                  <div className="client-actions-more">
                     <IonButton fill="outline" size="small" color="medium" onClick={() => { setShareClient(client); setShowShareModal(true); }} className="action-button">
                       <IonIcon icon={shareOutline} slot="start" /> Invitar
                     </IonButton>
@@ -1758,24 +1961,35 @@ const ClientsPage: React.FC = () => {
                       </IonButton>
                     )}
                     {(client.clientType === 'lender' || client.clientType === 'both') && (
-                      <IonButton fill="outline" size="small" style={{ '--color': '#15803d', '--border-color': '#15803d' }} onClick={() => history.push(`/lender-dashboard/${client.clientId}`)} className="action-button">
+                      <IonButton fill="outline" size="small" onClick={() => history.push(`/lender-dashboard/${client.clientId}`)} className="action-button portfolio-button">
                         <IonIcon icon={walletOutline} slot="start" /> Portfolio
                       </IonButton>
                     )}
+                    <IonButton fill="outline" size="small" color="secondary" onClick={() => history.push(`/rewards-dashboard/${client.clientId}`)} className="action-button">
+                      {client.clientType === 'pos'
+                        ? <><IonIcon icon={barChartOutline} slot="start" /> Dashboard</>
+                        : <><IonIcon icon={giftOutline} slot="start" /> Recompensas</>}
+                    </IonButton>
                     <IonButton fill="outline" size="small" color="warning" onClick={() => history.push(`/client-followup/${client.clientId}`)} className="action-button">
                       <IonIcon icon={calendarOutline} slot="start" /> Seguimiento
                     </IonButton>
-                    <IonButton fill="outline" size="small" style={{ '--color': '#b45309', '--border-color': '#b45309' }} onClick={() => history.push(`/client-expediente/${client.clientId}`)} className="action-button">
+                    <IonButton fill="outline" size="small" onClick={() => history.push(`/client-expediente/${client.clientId}`)} className="action-button expediente-button">
                       <IonIcon icon={documentTextOutline} slot="start" /> Expediente
                     </IonButton>
-                    <IonButton fill="outline" size="small" color="primary" onClick={() => handleEdit(client)} className="action-button edit-button">
-                      <IonIcon icon={pencil} slot="start" /> Editar
+                    <IonButton fill="outline" size="small" color={client.isActive === false ? 'success' : 'medium'} disabled={togglingActiveId === client.clientId} onClick={() => handleToggleActive(client)} className="action-button">
+                      {togglingActiveId === client.clientId
+                        ? <IonSpinner name="dots" />
+                        : client.isActive === false
+                          ? <><IonIcon icon={checkmarkCircle} slot="start" /> Activar</>
+                          : <><IonIcon icon={banOutline} slot="start" /> Desactivar</>}
                     </IonButton>
-                    <IonButton fill="outline" size="small" color="danger" onClick={() => handleDelete(client)} className="action-button delete-button">
-                      <IonIcon icon={trash} slot="start" /> Eliminar
+                    <IonButton fill="outline" size="small" color="danger" disabled={deletingClientId === client.clientId} onClick={() => handleDelete(client)} className="action-button delete-button">
+                      {deletingClientId === client.clientId
+                        ? <IonSpinner name="dots" />
+                        : <><IonIcon icon={trash} slot="start" /> Eliminar</>}
                     </IonButton>
                   </div>
-                </div>
+                )}
               </IonCardContent>
             </IonCard>
           ))}
@@ -1889,13 +2103,14 @@ const ClientsPage: React.FC = () => {
                   <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>{shareClient.cellphone}</p>
                   <span style={{
                     fontSize: 11,
-                    background: shareClient.clientType === 'lender' ? '#dcfce7' : shareClient.clientType === 'lawyer' ? '#fef3c7' : '#eff6ff',
-                    color: shareClient.clientType === 'lender' ? '#15803d' : shareClient.clientType === 'lawyer' ? '#b45309' : '#2563eb',
+                    background: shareClient.clientType === 'lender' ? '#dcfce7' : shareClient.clientType === 'lawyer' ? '#fef3c7' : shareClient.clientType === 'pos' ? '#ffedd5' : '#eff6ff',
+                    color: shareClient.clientType === 'lender' ? '#15803d' : shareClient.clientType === 'lawyer' ? '#b45309' : shareClient.clientType === 'pos' ? '#c2410c' : '#2563eb',
                     padding: '2px 8px', borderRadius: 99, fontWeight: 700,
                   }}>
                     {shareClient.clientType === 'lender' ? '💼 Prestamista'
                       : shareClient.clientType === 'both' ? '🔄 Ambos'
                       : shareClient.clientType === 'lawyer' ? '⚖️ Licenciado en derecho'
+                      : shareClient.clientType === 'pos' ? '🛒 Cliente POS'
                       : '📋 Acreditado'}
                   </span>
                 </div>

@@ -1,0 +1,64 @@
+/* Employees — builds on SupplierPage.css + shared-card-list.css (imported by
+   EmployeesPage). Only employee-specific rules live here. */
+
+.emp-segment {
+  margin-top: 8px;
+  --background: #f4f6f9;
+}
+
+.emp-avatar {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0056d2 0%, #007bff 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.emp-status {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.emp-capitalize {
+  text-transform: capitalize;
+}
+
+.emp-loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.emp-section {
+  margin: 8px 0 -4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+}
+
+.emp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.supplier-form-fields ion-select {
+  --border-radius: 12px;
+}
+
+.emp-form-error {
+  font-size: 13px;
+}
+
+@media (max-width: 576px) {
+  .emp-grid {
+    grid-template-columns: 1fr;
+  }
+}

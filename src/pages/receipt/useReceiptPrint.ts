@@ -1,10 +1,5 @@
 import { useCallback } from 'react';
-import {
-  postOneTicketTracking,
-  saveTicketHtml,
-  sendTicketSms,
-  sendTicketWhatsapp
-} from '../../api/ticketApi';
+import { postOneTicketTracking, saveTicketHtml } from '../../api/ticketApi';
 import { ReceiptService } from '../../services/ReceiptService';
 
 export interface ReceiptActionStatus {
@@ -15,6 +10,7 @@ export interface ReceiptActionStatus {
 
 export interface ReceiptPrintSummary {
   azureHtml: ReceiptActionStatus;
+  push: ReceiptActionStatus;
   whatsapp: ReceiptActionStatus;
   sms: ReceiptActionStatus;
   print: ReceiptActionStatus;
@@ -28,6 +24,13 @@ interface UseReceiptPrintParams {
   onSavedUrl: (url: string) => void;
   onToast: (message: string) => void;
   onSummary?: (summary: ReceiptPrintSummary) => void;
+  /** Ticket already printed once: print a marked copy and keep the original printedDate. */
+  isReprint?: boolean;
+}
+
+export interface TicketPrintStatus {
+  printed: boolean;
+  printedDate: string | null;
 }
 
 const normalizeReceiptUrl = (url: string): string => {
@@ -47,38 +50,43 @@ export function useReceiptPrint({
   ticketData,
   onSavedUrl,
   onToast,
-  onSummary
+  onSummary,
+  isReprint = false
 }: UseReceiptPrintParams) {
-  const handlePrint = useCallback(async () => {
-    const summary: ReceiptPrintSummary = {
-      azureHtml: { ok: false, message: 'No ejecutado' },
-      whatsapp: { ok: false, message: 'No ejecutado' },
-      sms: { ok: false, message: 'No ejecutado' },
-      print: { ok: false, message: 'No ejecutado' },
-      receiptUrl: '',
-      phone: ''
-    };
-
-    if (!receiptData) {
-      console.log('[ReceiptPrint] No receiptData, print aborted');
-      summary.azureHtml = { ok: false, message: 'Sin datos de recibo', error: 'No receiptData' };
-      summary.whatsapp = { ok: false, message: 'No ejecutado por falta de recibo' };
-      summary.sms = { ok: false, message: 'No ejecutado por falta de recibo' };
-      summary.print = { ok: false, message: 'No ejecutado por falta de recibo' };
-      onSummary?.(summary);
-      return;
-    }
-
-    console.log('[ReceiptPrint] Print flow started');
-    console.log('[ReceiptPrint][TRACK] Goal checklist', {
-        uploadHtmlToAzure: true,
-        generateHtmlLink: true,
-        sendWhatsapp: true,
-        sendSms: true,
-        updateDatabaseTables: true,
-        physicalPrint: true
+  // Reads tickets.printed/printedDate (returned by the existing 'validate'
+  // action) so the page can offer REIMPRIMIR instead of a second original.
+  const fetchPrintStatus = useCallback(async (): Promise<TicketPrintStatus> => {
+    const directIncomeId = Number(ticketData?.incomeId ?? 0);
+    const incomeId = directIncomeId > 0
+      ? directIncomeId
+      : Number(ticketData?.id ?? ticketData?.income?.incomeId ?? 0);
+    if (incomeId <= 0) return { printed: false, printedDate: null };
+    try {
+      const response = await postOneTicketTracking({
+        ticket: [{
+          action: 'validate' as const,
+          incomeId,
+          companyId: Number(ticketData?.companyId ?? 0),
+          fileName: `receipt_${incomeId}.html`,
+          containerName: 'ticketspos',
+          receiptUrl: '',
+          phone: ''
+        }]
       });
+      const t = response?.tickets?.[0];
+      const status = { printed: Boolean(t?.printed), printedDate: t?.printedDate ?? null };
+      console.log('[ReceiptPrint][STATUS] print status', { incomeId, ...status });
+      return status;
+    } catch (statusError) {
+      console.warn('[ReceiptPrint][STATUS] could not read print status', statusError);
+      return { printed: false, printedDate: null };
+    }
+  }, [ticketData]);
 
+  // Generates the receipt HTML, uploads it to Azure and tracks it. Idempotent:
+  // 'validate' reuses the stored URL, so it runs right after the sale (the
+  // customer's /recibo link shows the full ticket) and again on print.
+  const uploadReceipt = useCallback(async (summary: ReceiptPrintSummary) => {
     try {
       const directIncomeId = Number(ticketData?.incomeId ?? 0);
       const fallbackIncomeId = Number(ticketData?.id ?? ticketData?.income?.incomeId ?? 0);
@@ -93,9 +101,7 @@ export function useReceiptPrint({
         ''
       ).trim();
       const normalizedPhoneDigits = rawClientPhone.replace(/\D/g, '');
-      const clientPhoneWithPlus = normalizedPhoneDigits ? `+${normalizedPhoneDigits}` : '';
-      const clientPhoneDigits = normalizedPhoneDigits;
-      const clientPhone = clientPhoneWithPlus;
+      const clientPhone = normalizedPhoneDigits ? `+${normalizedPhoneDigits}` : '';
       summary.phone = clientPhone;
       const safeIncomeForFile = incomeId > 0 ? incomeId : Date.now();
       const fileName = `receipt_${safeIncomeForFile}.html`;
@@ -227,121 +233,13 @@ export function useReceiptPrint({
           }
         }
 
-        if (receiptUrl && clientPhone) {
-          const message = 'Aquí está su recibo:';
-
-          console.log('[ReceiptPrint] Sending WhatsApp...', {
-            endpointTicketId: String(incomeId),
-            endpointPhoneFallback: clientPhone,
-            endpointPhoneFallbackDigits: clientPhoneDigits,
-            phone: clientPhone,
-            message,
-            receiptUrl
-          });
-
-          let whatsappResponse = await sendTicketWhatsapp(String(incomeId), {
-            phone: clientPhone,
-            message,
-            receiptUrl
-          });
-
-          if (!whatsappResponse) {
-            console.warn('[ReceiptPrint] WhatsApp by incomeId failed, retrying with phone path param');
-            whatsappResponse = await sendTicketWhatsapp(clientPhone, {
-              phone: clientPhone,
-              message,
-              receiptUrl
-            });
-          }
-
-          if (!whatsappResponse && clientPhoneDigits) {
-            console.warn('[ReceiptPrint] WhatsApp by +phone path param failed, retrying with digits-only path param');
-            whatsappResponse = await sendTicketWhatsapp(clientPhoneDigits, {
-              phone: clientPhone,
-              message,
-              receiptUrl
-            });
-          }
-
-          if (whatsappResponse) {
-            summary.whatsapp = { ok: true, message: 'WhatsApp enviado correctamente' };
-            onToast('WhatsApp enviado correctamente');
-            const whatsappTrackingPayload = {
-              ticket: [{
-                action: 'whatsapp' as const,
-                incomeId,
-                companyId,
-                fileName,
-                containerName,
-                receiptUrl,
-                phone: clientPhone,
-                channelResponse: whatsappResponse
-              }]
-            };
-            console.log('[ReceiptPrint][DB_TRACKING] Sending whatsapp payload', whatsappTrackingPayload);
-            const whatsappTrackingResponse = await postOneTicketTracking(whatsappTrackingPayload);
-            console.log('[ReceiptPrint][DB_TRACKING] WhatsApp tracking response', whatsappTrackingResponse);
-          } else {
-            summary.whatsapp = {
-              ok: false,
-              message: 'No se pudo enviar WhatsApp',
-              error: 'All endpoint variants failed'
-            };
-            onToast('No se pudo enviar WhatsApp');
-          }
-
-          console.log('[ReceiptPrint] Sending SMS...', {
-            endpointIncomeId: String(incomeId),
-            phone: clientPhone,
-            message,
-            receiptUrl
-          });
-
-          const smsResponse = await sendTicketSms(String(incomeId), {
-            phone: clientPhone,
-            message,
-            receiptUrl
-          });
-
-          if (smsResponse) {
-            summary.sms = { ok: true, message: 'SMS enviado correctamente' };
-            onToast('SMS enviado correctamente');
-            const smsTrackingPayload = {
-              ticket: [{
-                action: 'sms' as const,
-                incomeId,
-                companyId,
-                fileName,
-                containerName,
-                receiptUrl,
-                phone: clientPhone,
-                channelResponse: smsResponse
-              }]
-            };
-            console.log('[ReceiptPrint][DB_TRACKING] Sending sms payload', smsTrackingPayload);
-            const smsTrackingResponse = await postOneTicketTracking(smsTrackingPayload);
-            console.log('[ReceiptPrint][DB_TRACKING] SMS tracking response', smsTrackingResponse);
-          } else {
-            summary.sms = {
-              ok: false,
-              message: 'No se pudo enviar SMS',
-              error: 'sendTicketSms returned null'
-            };
-            onToast('No se pudo enviar SMS');
-          }
-        } else if (receiptUrl && !clientPhone) {
-          console.warn('[ReceiptPrint] No client phone available, skipping WhatsApp/SMS send');
-          summary.whatsapp = { ok: false, message: 'No enviado: cliente sin teléfono' };
-          summary.sms = { ok: false, message: 'No enviado: cliente sin teléfono' };
-          onToast('Recibo guardado. Cliente sin teléfono para envío');
-        } else {
-          console.warn('[ReceiptPrint] No receiptUrl available; skipping WhatsApp/SMS tracking.');
-          if (!summary.azureHtml.message || summary.azureHtml.message === 'No ejecutado') {
-            summary.azureHtml = { ok: false, message: 'No se obtuvo URL del recibo' };
-          }
-          summary.whatsapp = { ok: false, message: 'No enviado: sin URL de recibo' };
-          summary.sms = { ok: false, message: 'No enviado: sin URL de recibo' };
-        }
+        // The customer is notified once, by the backend, when the sale is
+        // saved (income_created in modules/income.py). Printing only prints:
+        // dispatching here as well sent the same customer a second message.
+        const notifiedAtSale = { ok: false, message: 'Se envía al registrar la venta, no al imprimir' };
+        summary.push = notifiedAtSale;
+        summary.whatsapp = notifiedAtSale;
+        summary.sms = notifiedAtSale;
       } else {
         console.warn('[ReceiptPrint] Skipping save/track: invalid incomeId in ticketData', {
           incomeId,
@@ -353,6 +251,7 @@ export function useReceiptPrint({
           }
         });
         summary.azureHtml = { ok: false, message: 'incomeId inválido para guardar ticket' };
+        summary.push = { ok: false, message: 'No enviado por incomeId inválido' };
         summary.whatsapp = { ok: false, message: 'No enviado por incomeId inválido' };
         summary.sms = { ok: false, message: 'No enviado por incomeId inválido' };
       }
@@ -364,15 +263,64 @@ export function useReceiptPrint({
         error: uploadError?.message || String(uploadError)
       };
       onToast('Error al guardar el HTML del recibo');
+    }
+  }, [receiptData, ticketData, onSavedUrl, onToast]);
+
+  const saveReceipt = useCallback(async () => {
+    if (!receiptData) return;
+    await uploadReceipt({
+      azureHtml: { ok: false, message: 'No ejecutado' },
+      push: { ok: false, message: 'No ejecutado' },
+      whatsapp: { ok: false, message: 'No ejecutado' },
+      sms: { ok: false, message: 'No ejecutado' },
+      print: { ok: false, message: 'No ejecutado' },
+      receiptUrl: '',
+      phone: ''
+    });
+  }, [receiptData, uploadReceipt]);
+
+  const handlePrint = useCallback(async () => {
+    const summary: ReceiptPrintSummary = {
+      azureHtml: { ok: false, message: 'No ejecutado' },
+      push: { ok: false, message: 'No ejecutado' },
+      whatsapp: { ok: false, message: 'No ejecutado' },
+      sms: { ok: false, message: 'No ejecutado' },
+      print: { ok: false, message: 'No ejecutado' },
+      receiptUrl: '',
+      phone: ''
+    };
+
+    if (!receiptData) {
+      console.log('[ReceiptPrint] No receiptData, print aborted');
+      summary.azureHtml = { ok: false, message: 'Sin datos de recibo', error: 'No receiptData' };
+      summary.push = { ok: false, message: 'No ejecutado por falta de recibo' };
+      summary.whatsapp = { ok: false, message: 'No ejecutado por falta de recibo' };
+      summary.sms = { ok: false, message: 'No ejecutado por falta de recibo' };
+      summary.print = { ok: false, message: 'No ejecutado por falta de recibo' };
+      onSummary?.(summary);
+      return;
+    }
+
+    console.log('[ReceiptPrint] Print flow started');
+    console.log('[ReceiptPrint][TRACK] Goal checklist', {
+        uploadHtmlToAzure: true,
+        generateHtmlLink: true,
+        updateDatabaseTables: true,
+        physicalPrint: true
+      });
+
+    try {
+      await uploadReceipt(summary);
     } finally {
       console.log('[ReceiptPrint][PHYSICAL_PRINT] Triggering physical print');
       try {
         ReceiptService.printReceipt(receiptData, {
           width: '46mm',
           thermal: true,
-          autoPrint: true
+          autoPrint: true,
+          reprint: isReprint
         });
-        summary.print = { ok: true, message: 'Impresión física ejecutada' };
+        summary.print = { ok: true, message: isReprint ? 'Reimpresión (copia) ejecutada' : 'Impresión física ejecutada' };
       } catch (printError: any) {
         summary.print = {
           ok: false,
@@ -398,7 +346,11 @@ export function useReceiptPrint({
         const safeIncomeForFile = incomeId > 0 ? incomeId : Date.now();
         const fileName = `receipt_${safeIncomeForFile}.html`;
 
-        if (incomeId > 0) {
+        // A reprint must not overwrite the original printedDate ('print'
+        // stamps GETDATE()), so only the first print is tracked.
+        if (isReprint) {
+          console.log('[ReceiptPrint][DB_TRACKING] Reprint — original print tracking kept', { incomeId, incomeIdSource });
+        } else if (incomeId > 0) {
           const printTrackingPayload = {
             ticket: [{
               action: 'print' as const,
@@ -424,7 +376,7 @@ export function useReceiptPrint({
       onSummary?.(summary);
       console.log('[ReceiptPrint] Print flow finished', summary);
     }
-  }, [receiptData, ticketData, onSavedUrl, onToast, onSummary]);
+  }, [receiptData, ticketData, uploadReceipt, onSummary, isReprint]);
 
-  return { handlePrint };
+  return { handlePrint, saveReceipt, fetchPrintStatus };
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
   IonPage,
   IonHeader,
@@ -16,6 +16,7 @@ import {
   IonCardTitle,
   IonCardContent,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   arrowBack,
   idCardOutline,
@@ -76,7 +77,7 @@ const DocSlot: React.FC<DocSlotProps> = ({ title, url, kind, meta }) => (
 const ExpedienteDigitalPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const clientId = Number(clientIdParam);
-  const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const { companyId } = useUser();
 
   const [client, setClient] = useState<Client | null>(null);
@@ -109,7 +110,7 @@ const ExpedienteDigitalPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBack} slot="icon-only" />
             </IonButton>
           </IonButtons>

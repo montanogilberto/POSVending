@@ -1,7 +1,8 @@
+import { API_BASE_URL } from '../utils/appEnv';
  // Per-user notification inbox (bell icon) — the persistent, trackable history
 // of pushes. Backed by NotificationDeliveries + PushNotifications.
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "https://smartloansbackend.azurewebsites.net";
+const BASE_URL = API_BASE_URL;
 
 export interface InboxNotification {
   notificationDeliveryId: number;

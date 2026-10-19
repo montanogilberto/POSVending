@@ -10,14 +10,14 @@ interface CartItemCardProps {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  selectedChoices?: {
-    [key: number]: {
-      id: number;
-      name: string;
-      price: number;
-      quantity: number;
-    }[];
-  };
+  /** Pre-discount line total, only passed when discountAmount > 0 -- lets
+   * the card show "was/now" pricing instead of just the already-discounted
+   * number with no explanation of why it's lower. */
+  originalPrice?: number;
+  discountAmount?: number;
+  /** Why this line is discounted -- a specific applied reward's name (e.g.
+   * "Servicio de lavado gratis (3x1)") or the welcome coupon label. */
+  discountLabel?: string;
   selectedOptionLabels?: { [key: string]: string | string[] };
   pieces?: Piezas;
   onRemove: (id: string) => void;
@@ -29,7 +29,9 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
   quantity,
   unitPrice,
   totalPrice,
-  selectedChoices,
+  originalPrice,
+  discountAmount,
+  discountLabel,
   selectedOptionLabels,
   pieces,
   onRemove,
@@ -40,28 +42,6 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       style: 'currency',
       currency: 'MXN',
     }).format(price);
-  };
-
-  // Build option chips from selectedChoices
-  const buildOptionChips = (): React.ReactNode[] => {
-    const chips: React.ReactNode[] = [];
-
-    if (selectedChoices) {
-      Object.entries(selectedChoices).forEach(([optionId, choices]) => {
-        choices.forEach((choice) => {
-          chips.push(
-            <span key={`${optionId}-${choice.id}`} className="option-chip">
-              <span className="option-name">{choice.name}</span>
-              {choice.quantity > 1 && (
-                <span className="option-quantity">x{choice.quantity}</span>
-              )}
-            </span>
-          );
-        });
-      });
-    }
-
-    return chips;
   };
 
   // Format option labels (for "Servicio Completo" and other products)
@@ -117,7 +97,14 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
           <span className="quantity-badge">x{quantity}</span>
         </div>
         <div className="product-total">
-          <span className="total-price">{formatPrice(totalPrice)}</span>
+          {discountAmount && discountAmount > 0 && originalPrice != null ? (
+            <>
+              <span className="original-price">{formatPrice(originalPrice)}</span>
+              <span className="total-price discounted">{formatPrice(totalPrice)}</span>
+            </>
+          ) : (
+            <span className="total-price">{formatPrice(totalPrice)}</span>
+          )}
         </div>
         <IonButton
           fill="clear"
@@ -128,12 +115,16 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
         </IonButton>
       </div>
 
-      {/* Second row: Option chips */}
-      <div className="card-options-row">
-        {buildOptionChips()}
-      </div>
+      {/* Why this line's price dropped -- which reward/coupon was applied */}
+      {/* `discountAmount &&` rendered a literal "0" when the discount was 0. */}
+      {discountAmount != null && discountAmount > 0 && discountLabel && (
+        <div className="card-discount-row">
+          <span className="discount-badge">🎁 {discountLabel}</span>
+          <span className="discount-amount">-{formatPrice(discountAmount)}</span>
+        </div>
+      )}
 
-      {/* Third row: Option labels (for "Servicio Completo" and other products) */}
+      {/* Option labels (e.g. "Ciclo: Basico", or "Servicio Completo" and other products) */}
       {formatOptionLabels() && (
         <div className="card-option-labels-row">
           {formatOptionLabels()}
@@ -147,10 +138,12 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
         </div>
       )}
 
-      {/* Unit price (secondary metadata) */}
-      <div className="card-unit-price">
-        {formatPrice(unitPrice)} c/u
-      </div>
+      {/* Unit price (secondary metadata) -- only informative when qty > 1 */}
+      {quantity > 1 && (
+        <div className="card-unit-price">
+          {formatPrice(unitPrice)} c/u
+        </div>
+      )}
     </div>
   );
 };

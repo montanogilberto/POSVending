@@ -1,0 +1,18 @@
+/* Volado — moneda y selección de lado. */
+.cf-coin {
+  font-size: 5rem;
+  line-height: 1;
+}
+
+.cf-picks {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 16px;
+}
+
+.cf-picks ion-chip {
+  margin: 0;
+  height: 40px;
+  font-weight: 600;
+}

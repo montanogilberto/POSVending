@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 export interface Category {
   categoryId: number;
   name: string;
@@ -13,10 +14,11 @@ export const fetchCategories = async (companyId: string): Promise<Category[]> =>
   return await fetchCategoriesByCompany(companyId);
 };
 
-export const createCategory = async (name: string, image: string, companyId: number): Promise<void> => {
+/** parentCategoryId: create it as a subcategory of that top-level category. */
+export const createCategory = async (name: string, image: string, companyId: number, parentCategoryId?: number | null): Promise<void> => {
   console.log('name:' + name + 'path' + image)
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/product_categories', {
+    const response = await fetch(`${API_BASE_URL}/product_categories`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -28,6 +30,7 @@ export const createCategory = async (name: string, image: string, companyId: num
             name,
             image,
             companyId,
+            ...(parentCategoryId ? { parentCategoryId } : {}),
           },
         ],
       }),
@@ -49,7 +52,7 @@ export const createCategory = async (name: string, image: string, companyId: num
 
 export const updateCategory = async (productCategoryId: number, name: string, image: string, companyId: number): Promise<void> => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/product_categories', {
+    const response = await fetch(`${API_BASE_URL}/product_categories`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -83,7 +86,7 @@ export const updateCategory = async (productCategoryId: number, name: string, im
 
 export const deleteCategory = async (productCategoryId: number): Promise<void> => {
   try {
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/product_categories', {
+    const response = await fetch(`${API_BASE_URL}/product_categories`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

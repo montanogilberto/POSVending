@@ -1,0 +1,143 @@
+/* Atrapa al Topo — cuadricula de hoyos, HUD y selector de apuesta. */
+
+.mole-content {
+  --padding-bottom: 24px;
+}
+
+.mole-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.mole-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px 0;
+}
+
+.mole-topbar ion-chip {
+  margin: 0;
+}
+
+/* ── HUD ──────────────────────────────────────────────────── */
+
+.mole-hud {
+  margin: 10px 16px 14px;
+}
+
+.mole-hud__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.mole-hud__score {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.mole-hud__clock {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ion-color-warning-shade);
+  /* Ancho fijo para que el conteo no empuje el marcador cada segundo. */
+  font-variant-numeric: tabular-nums;
+}
+
+.mole-hud--idle p {
+  margin: 0;
+  text-align: center;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--ion-color-medium);
+}
+
+/* ── Cuadricula ───────────────────────────────────────────── */
+
+.mole-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 0 16px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.mole-hole {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--ion-color-step-150, #e8e0d5);
+  overflow: hidden;
+  cursor: pointer;
+  /* Sin resaltado azul al tocar: en un juego de toques rapidos parpadea feo. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.mole-hole:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+/* El monticulo va DELANTE del topo (z-index mayor) para que el topo se vea
+   asomar por detras y no flotando encima del hoyo. */
+.mole-hole__dirt {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 0;
+  height: 42%;
+  border-radius: 50% 50% 0 0;
+  background: var(--ion-color-step-300, #c9b79c);
+  z-index: 2;
+}
+
+.mole-hole__mole {
+  position: absolute;
+  left: 50%;
+  /* 32% deja al topo asomando por encima del monticulo (que llega al 42%)
+     en vez de quedar tragado por el. */
+  bottom: 32%;
+  /* En px, no en %: un font-size porcentual se resuelve contra el tipo
+     heredado del boton (~6px), no contra el ancho del hoyo. */
+  font-size: clamp(34px, 11vw, 54px);
+  color: var(--ion-color-dark);
+  z-index: 1;
+  /* Escondido bajo el hoyo; sale con la clase --up. */
+  transform: translate(-50%, 130%);
+  opacity: 0;
+  transition: transform 90ms ease-out, opacity 90ms ease-out;
+}
+
+.mole-hole--up .mole-hole__mole {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.mole-hole--up {
+  background: var(--ion-color-warning-tint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mole-hole__mole {
+    transition: none;
+  }
+}
+
+/* ── Liquidacion ──────────────────────────────────────────── */
+
+.mole-settling {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px 16px;
+  font-size: 0.88rem;
+  color: var(--ion-color-medium);
+}

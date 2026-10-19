@@ -1,0 +1,82 @@
+.enroll-body {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.enroll-intro {
+  font-size: 15px;
+  color: var(--ion-color-medium-shade);
+  margin: 4px 4px 12px;
+  line-height: 1.5;
+}
+
+.enroll-option {
+  margin: 0 0 12px;
+  box-shadow: none;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 14px;
+}
+
+.enroll-option-held {
+  background: rgba(var(--ion-color-success-rgb), 0.06);
+}
+
+.enroll-checkbox {
+  display: flex;
+  width: 100%;
+}
+
+.enroll-checkbox::part(label) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-inline-start: 12px;
+  white-space: normal;
+}
+
+.enroll-option-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ion-color-dark);
+  margin: 0;
+}
+
+.enroll-option-desc {
+  font-size: 14px;
+  color: var(--ion-color-medium-shade);
+  margin: 0;
+}
+
+.enroll-option-next {
+  font-size: 13px;
+  color: var(--ion-color-medium);
+  margin-top: 4px;
+}
+
+.enroll-held-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.enroll-terms {
+  margin: 20px 4px 16px;
+}
+
+.enroll-term {
+  font-size: 13px;
+  color: var(--ion-color-medium-shade);
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+
+.enroll-accept {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.enroll-submit {
+  margin-top: 8px;
+}

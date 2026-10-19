@@ -2,6 +2,7 @@ import React from 'react';
 import { IonBadge, IonButton, IonIcon, IonSpinner } from '@ionic/react';
 import { addOutline, arrowUpOutline, informationCircleOutline, notificationsOutline } from 'ionicons/icons';
 import { LenderDashboardVM } from '../LenderDashboardLogic';
+import { p2pLendingRoute } from '../../../../utils/routes';
 
 /** Banner de solicitudes pendientes + hero del portafolio con donut. */
 const PortfolioHero: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
@@ -10,7 +11,7 @@ const PortfolioHero: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
     {vm.pendingProposals > 0 && (
       <div
         className="pending-proposals-banner"
-        onClick={() => { console.log('[LenderDashboard] proposals banner → /p2p-lending'); vm.history.push('/p2p-lending'); }}>
+        onClick={() => { console.log('[LenderDashboard] proposals banner →', p2pLendingRoute(vm.lenderClientId, 'proposals')); vm.history.push(p2pLendingRoute(vm.lenderClientId, 'proposals')); }}>
         <IonIcon icon={notificationsOutline} />
         <span>
           Tienes <strong>{vm.pendingProposals}</strong> {vm.pendingProposals === 1 ? 'solicitud pendiente' : 'solicitudes pendientes'} de respuesta
@@ -28,7 +29,7 @@ const PortfolioHero: React.FC<{ vm: LenderDashboardVM }> = ({ vm }) => (
           <IonIcon icon={arrowUpOutline} /> +${vm.earningsMonth.toLocaleString('es-MX', { minimumFractionDigits: 2 })} este mes
         </span>
         <IonButton fill="outline" className="ldx-hero-btn"
-          onClick={() => { console.log('[LenderDashboard] hero → /p2p-lending'); vm.history.push('/p2p-lending'); }}>
+          onClick={() => { console.log('[LenderDashboard] hero →', p2pLendingRoute(vm.lenderClientId)); vm.history.push(p2pLendingRoute(vm.lenderClientId)); }}>
           <IonIcon icon={addOutline} slot="start" /> Publicar más capital
         </IonButton>
       </div>

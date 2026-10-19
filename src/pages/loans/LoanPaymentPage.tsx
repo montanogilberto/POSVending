@@ -22,6 +22,7 @@ import {
   IonIcon, IonToast, IonLoading, IonBadge, IonProgressBar, IonInput, IonChip,
   IonSpinner, IonText, IonCheckbox,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   arrowBackOutline, checkmarkCircle, cardOutline, lockClosedOutline,
   walletOutline, refreshOutline, alertCircleOutline, receiptOutline,
@@ -30,9 +31,10 @@ import {
 import { useHistory, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
 import { useUser } from '../../contexts/UserContext';
+import { p2pLendingRoute } from '../../utils/routes';
 // ── Stripe / Payment types & fetchers (single-use, kept inline) ──────────────
 
-const _api = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const _api = API_BASE_URL;
 
 interface ConnectedAccount {
   connectedAccountId: string;
@@ -106,6 +108,7 @@ import { notifyDataChanged } from '../../utils/refreshBus';
 import { fmtMXN as fmt } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
 import './LoanPaymentPage.css';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
@@ -128,6 +131,7 @@ type Step = 'kyc' | 'amount' | 'card' | 'processing' | 'success' | 'error';
 // ── component ─────────────────────────────────────────────────────────────────
 const LoanPaymentPage: React.FC = () => {
   const history  = useHistory();
+  const { confirmBack } = useExitConfirm();
   const location = useLocation();
   const { clientId, companyId, username, roleCode } = useUser();
 
@@ -367,7 +371,7 @@ const LoanPaymentPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()} disabled={step === 'processing'}>
+            <IonButton onClick={() => confirmBack()} disabled={step === 'processing'}>
               <IonIcon icon={arrowBackOutline} slot="icon-only" />
             </IonButton>
           </IonButtons>
@@ -619,7 +623,7 @@ const LoanPaymentPage: React.FC = () => {
                 </div>
               </div>
             )}
-            <IonButton expand="block" onClick={() => history.replace(isTopUp ? '/p2p-lending' : '/loans')}>
+            <IonButton expand="block" onClick={() => history.replace(isTopUp ? p2pLendingRoute(clientId) : '/loans')}>
               {isTopUp ? 'Ir a plataforma SmartLoans' : 'Ver mis préstamos'}
             </IonButton>
             <IonButton expand="block" fill="outline" onClick={() => history.replace('/dashboard')}>
@@ -640,7 +644,7 @@ const LoanPaymentPage: React.FC = () => {
               <IonIcon icon={refreshOutline} slot="start" />
               Intentar de nuevo
             </IonButton>
-            <IonButton expand="block" fill="outline" onClick={() => history.goBack()}>
+            <IonButton expand="block" fill="outline" onClick={() => confirmBack()}>
               Cancelar
             </IonButton>
           </div>

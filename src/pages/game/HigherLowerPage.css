@@ -1,0 +1,132 @@
+/* Mayor o Menor — carta actual, racha y decisión mayor/menor. */
+
+/* ── Racha ────────────────────────────────────────────────── */
+
+.hl-streak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 12px 4px;
+}
+
+.hl-streak__pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--arc-green, #16a34a);
+}
+
+.hl-streak__value {
+  margin-left: 6px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--arc-green, #16a34a);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Mesa ─────────────────────────────────────────────────── */
+
+.hl-table {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.hl-card {
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #1c1c1e;
+}
+
+.hl-card--current {
+  width: 92px;
+  height: 130px;
+  font-size: 2.8rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+}
+
+/* La carta anterior queda pequeña y apagada: da contexto sin competir con la
+   que importa para decidir. */
+.hl-card--past {
+  width: 54px;
+  height: 76px;
+  font-size: 1.5rem;
+  opacity: 0.45;
+}
+
+/* ── Decisión ─────────────────────────────────────────────── */
+
+.hl-choices {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 8px 16px 0;
+}
+
+.hl-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 8px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  background: var(--arc-card, #fff);
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.07);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 104px;
+  justify-content: center;
+}
+
+.hl-choice ion-icon {
+  font-size: 22px;
+}
+
+.hl-choice--up    { color: var(--arc-green, #16a34a); }
+.hl-choice--down  { color: var(--ion-color-danger, #e11d48); }
+.hl-choice--up    { border-color: var(--arc-green-soft, #dcfce7); }
+.hl-choice--down  { border-color: var(--arc-red-soft, #ffe4e6); }
+
+.hl-choice:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hl-choice__name {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ion-text-color, #1f2333);
+}
+
+/* La probabilidad va grande: es el dato con el que se decide. */
+.hl-choice__chance {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.hl-choice__pays {
+  font-size: 0.74rem;
+  color: var(--ion-color-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hl-choice {
+    background: #1c1d24;
+    box-shadow: none;
+  }
+
+  .hl-card {
+    background: #f4f5fa;
+  }
+}

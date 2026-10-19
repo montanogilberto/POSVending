@@ -1,4 +1,5 @@
-export const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
+export { API_BASE_URL };
 
 /** Azure blob container for user profile photos (filename in `image`, full URL in `imageUrl`). */
 export const PROFILE_IMAGE_BASE_URL =

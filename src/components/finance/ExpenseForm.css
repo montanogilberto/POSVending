@@ -1,0 +1,264 @@
+.expense-form-content {
+  --background: #F9FAFB;
+}
+
+/* Routed page (/egresos/nuevo), not a modal -- sized like the rest of the
+   app's full pages (see theme/variables.css's .page-padding breakpoints),
+   not the cramped single-column width a modal needed. */
+.expense-form-body {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .expense-form-body {
+    padding: 24px;
+    gap: 20px;
+  }
+}
+
+@media (min-width: 992px) {
+  .expense-form-body {
+    max-width: 840px;
+    padding: 28px 32px;
+  }
+
+  .expense-form-card-title {
+    font-size: 1.15rem !important;
+  }
+}
+
+/* ==========================================================================
+   CARDS
+   ========================================================================== */
+.expense-form-card {
+  margin: 0 !important;
+  border-radius: 20px !important;
+  --background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.02) !important;
+}
+
+.expense-form-card-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  color: #1A202C;
+}
+
+.expense-form-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 0;
+  color: #A0AEC0;
+}
+
+.expense-form-empty ion-icon {
+  font-size: 28px;
+}
+
+.expense-form-empty p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   PRODUCT LIST
+   ========================================================================== */
+.expense-form-product-list {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.expense-form-product-item {
+  --background: #F9FAFB;
+  --border-radius: 14px;
+  --padding-start: 12px;
+  --inner-padding-end: 4px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+}
+
+.expense-form-product-item h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1A202C;
+}
+
+.expense-form-product-item p {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0056D2;
+}
+
+.expense-form-product-icon {
+  font-size: 20px;
+  color: #718096;
+}
+
+/* ==========================================================================
+   FORM FIELDS
+   ========================================================================== */
+.expense-form-item {
+  display: block;
+  width: 100%;
+  margin-bottom: 14px;
+  --border-radius: 12px;
+  --border-color: #E2E8F0;
+  --highlight-color-focused: #0056D2;
+}
+
+.expense-form-item:last-child {
+  margin-bottom: 0;
+}
+
+/* "+ Nuevo proveedor" sits right under the Proveedor select. */
+.expense-form-new-supplier {
+  display: block;
+  margin: -8px 0 10px auto;
+  width: fit-content;
+  --color: #0056D2;
+  font-weight: 700;
+  text-transform: none;
+}
+
+/* ==========================================================================
+   AGENT REVIEW
+   ========================================================================== */
+.expense-agent-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   RECEIPT PREVIEW
+   ========================================================================== */
+.expense-receipt-preview {
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  margin: 12px 0 0 0;
+}
+
+/* ==========================================================================
+   STICKY FOOTER
+   ========================================================================== */
+.expense-form-footer {
+  background: #ffffff;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.expense-form-total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 14px 20px 0 20px;
+}
+
+@media (min-width: 992px) {
+  .expense-form-total-row {
+    max-width: 840px;
+    padding: 14px 32px 0 32px;
+  }
+}
+
+.expense-form-total-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #718096;
+}
+
+.expense-form-total-amount {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #DC2626;
+  letter-spacing: -0.02em;
+}
+
+.expense-form-missing-hint {
+  max-width: 720px;
+  margin: 6px auto 0;
+  padding: 0 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #B45309;
+}
+
+@media (min-width: 992px) {
+  .expense-form-missing-hint {
+    max-width: 840px;
+    padding: 0 32px;
+  }
+}
+
+.expense-form-card--invalid {
+  box-shadow: 0 0 0 2px #DC2626;
+}
+
+.expense-form-submit {
+  --border-radius: 14px !important;
+  --background: #0056D2 !important;
+  max-width: 720px;
+  margin: 12px auto !important;
+  width: calc(100% - 40px);
+  font-weight: 700;
+  height: 50px;
+}
+
+@media (min-width: 992px) {
+  .expense-form-submit {
+    max-width: 840px;
+    width: calc(100% - 64px);
+  }
+}
+
+.expense-form-submit ion-spinner {
+  color: #ffffff;
+}
+
+.expense-required {
+  color: #DC2626;
+  font-weight: 700;
+}
+
+.expense-agent-card {
+  border: 1px solid #BFDBFE;
+  background: #EFF6FF;
+}
+
+.expense-agent-copy {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  font-family: 'Inter', sans-serif;
+  color: #1A202C;
+}
+
+.expense-agent-copy ion-icon {
+  flex: none;
+  font-size: 1.6rem;
+  color: #0056D2;
+}
+
+.expense-agent-copy strong { font-size: 1rem; }
+
+.expense-agent-copy p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: #4A5568;
+  line-height: 1.4;
+}

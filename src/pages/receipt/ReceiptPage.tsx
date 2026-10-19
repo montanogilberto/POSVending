@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { useHistory, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { IonPage, IonContent, IonLoading, IonToast, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonList, IonItem, IonLabel, IonText } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import { closeOutline } from 'ionicons/icons';
 import { ReceiptService } from '../../services/ReceiptService';
 import ReceiptHeader from './components/ReceiptHeader';
 import ReceiptBody from './components/ReceiptBody';
 import ReceiptActions from './components/ReceiptActions';
-import { ReceiptPrintSummary, useReceiptPrint } from './useReceiptPrint';
+import { ReceiptPrintSummary, TicketPrintStatus, useReceiptPrint } from './useReceiptPrint';
+import { toHermosillo } from '../../utils/format';
 import './ReceiptPage.css';
 
 interface LocationState {
@@ -14,7 +16,7 @@ interface LocationState {
 }
 
 const ReceiptPage: React.FC = () => {
-  const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const location = useLocation<LocationState>();
   const [receiptData, setReceiptData] = useState<any>(null);
   const [loading, setLoading] = useState(() => !location.state?.ticketData);
@@ -24,6 +26,8 @@ const ReceiptPage: React.FC = () => {
   const [savedReceiptUrl, setSavedReceiptUrl] = useState<string>('');
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [printSummary, setPrintSummary] = useState<ReceiptPrintSummary | null>(null);
+  const [printStatus, setPrintStatus] = useState<TicketPrintStatus>({ printed: false, printedDate: null });
+  const [printing, setPrinting] = useState(false);
 
   const ticketData = location.state?.ticketData;
 
@@ -67,9 +71,12 @@ const ReceiptPage: React.FC = () => {
     loadReceipt();
   }, [ticketData]);
 
-  const { handlePrint } = useReceiptPrint({
+  const isReprint = printStatus.printed;
+
+  const { handlePrint, fetchPrintStatus } = useReceiptPrint({
     receiptData,
     ticketData,
+    isReprint,
     onSavedUrl: (url) => setSavedReceiptUrl(url),
     onToast: (message) => {
       setToastMessage(message);
@@ -78,12 +85,30 @@ const ReceiptPage: React.FC = () => {
     onSummary: (summary) => {
       setPrintSummary(summary);
       setShowSummaryModal(true);
+      // First print done: any further press on this screen is a reprint.
+      if (summary.print.ok && !isReprint) {
+        setPrintStatus({ printed: true, printedDate: new Date().toISOString() });
+      }
     }
   });
 
-  const handleClose = () => {
-    history.goBack();
+  // Already printed (e.g. reopened from Ingresos/Movimientos) → REIMPRIMIR.
+  useEffect(() => {
+    if (!ticketData) return;
+    fetchPrintStatus().then(setPrintStatus);
+  }, [ticketData, fetchPrintStatus]);
+
+  const onPrint = async () => {
+    if (printing) return;
+    setPrinting(true);
+    try {
+      await handlePrint();
+    } finally {
+      setPrinting(false);
+    }
   };
+
+  const handleClose = () => confirmBack('/dashboard');
 
   const statusColor = (ok: boolean) => (ok ? 'success' : 'danger');
 
@@ -91,14 +116,17 @@ const ReceiptPage: React.FC = () => {
     <IonPage>
       <IonLoading isOpen={loading} message="Cargando recibo..." backdropDismiss={false} />
 
-      <ReceiptHeader onClose={handleClose} onPrint={handlePrint} />
+      <ReceiptHeader onClose={handleClose} onPrint={onPrint} printing={printing} />
 
       <IonContent className="receipt-page-content">
         <ReceiptBody receiptData={receiptData} savedReceiptUrl={savedReceiptUrl} error={error} />
         <ReceiptActions
           loading={loading}
           hasReceiptData={!!receiptData}
-          onPrint={handlePrint}
+          onPrint={onPrint}
+          printing={printing}
+          isReprint={isReprint}
+          printedAtLabel={printStatus.printedDate ? toHermosillo(printStatus.printedDate) : ''}
           onClose={handleClose}
         />
 
@@ -144,7 +172,7 @@ const ReceiptPage: React.FC = () => {
                       {!!printSummary.whatsapp.error && <IonText color="medium"><p>{printSummary.whatsapp.error}</p></IonText>}
                     </IonLabel>
                     <IonText color={statusColor(printSummary.whatsapp.ok)}>
-                      <strong>{printSummary.whatsapp.ok ? 'OK' : 'FALLÓ'}</strong>
+                      <strong>{printSummary.whatsapp.ok ? 'OK' : 'N/A'}</strong>
                     </IonText>
                   </IonItem>
 
@@ -155,7 +183,7 @@ const ReceiptPage: React.FC = () => {
                       {!!printSummary.sms.error && <IonText color="medium"><p>{printSummary.sms.error}</p></IonText>}
                     </IonLabel>
                     <IonText color={statusColor(printSummary.sms.ok)}>
-                      <strong>{printSummary.sms.ok ? 'OK' : 'FALLÓ'}</strong>
+                      <strong>{printSummary.sms.ok ? 'OK' : 'N/A'}</strong>
                     </IonText>
                   </IonItem>
 

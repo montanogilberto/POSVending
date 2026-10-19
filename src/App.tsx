@@ -26,10 +26,12 @@ import {
   IonPage,
   IonButton,
   IonButtons,
+  IonBadge,
   useIonAlert,
   setupIonicReact,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
+import { ExitConfirmProvider } from './contexts/ExitConfirmContext';
 import {
   cash,
   settings,
@@ -39,6 +41,7 @@ import {
   bulb,
   logOutOutline,
   people,
+  locationOutline,
   cube,
   notifications,
   mail,
@@ -46,6 +49,8 @@ import {
   person,
   water,
   storefrontOutline,
+  receiptOutline,
+  idCardOutline,
   cashOutline,
   peopleOutline,
   shieldCheckmarkOutline,
@@ -54,14 +59,26 @@ import {
   walletOutline,
   constructOutline,
   starOutline,
+  giftOutline,
   chatbubblesOutline,
+  chatbubbleEllipsesOutline,
   chevronBackOutline,
   chevronForwardOutline,
   homeOutline,
   cardOutline,
+  documentTextOutline,
   pulseOutline,
   personCircleOutline,
   gameControllerOutline,
+  diamondOutline,
+  trendingUpOutline,
+  trendingDownOutline,
+  statsChartOutline,
+  paperPlaneOutline,
+  checkmarkCircle,
+  compassOutline,
+  briefcaseOutline,
+  sparklesOutline,
 }
   from 'ionicons/icons';
   
@@ -70,6 +87,7 @@ import {
 import Setting from './pages/system/Setting';
 //mport Sells from './pages/dashboard/Sells';
 import Dashboard from './pages/dashboard/Dashboard';
+import MonthlySummaryPage from './pages/dashboard/MonthlySummaryPage';
 //import ScannerQR from './pages/dashboard/ScannerQR';
 import Category from './pages/category/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
@@ -77,7 +95,10 @@ import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/cart/CartPage';
 import MovementsPage from './pages/finance/MovementsPage';
 import LedStatusPage from './pages/iot/LedStatusPage';
-import ClientsPage from './pages/clients/ClientsPage';
+import EnrollmentPage from './pages/enrollment/EnrollmentPage';
+import JuridicalDashboardPage from './pages/juridical/JuridicalDashboardPage';
+import FactoryDashboardPage from './pages/factory/FactoryDashboardPage';
+import ClientsMapPage from './pages/clients/ClientsMapPage';
 import ProductsManagementPage from './pages/products/ProductsManagementPage';
 import AlertsPage from './pages/messaging/AlertsPage';
 import EmailsPage from './pages/messaging/EmailsPage';
@@ -85,13 +106,20 @@ import CategoriesPage from './pages/category/CategoriesPage';
 import UsersPage from './pages/admin/UsersPage';
 import IncomesPage from './pages/finance/IncomesPage';
 import ExpensesPage from './pages/finance/ExpensesPage';
+import NewExpensePage from './pages/finance/NewExpensePage';
+import ExpensesDetailPage from './pages/finance/ExpensesDetailPage';
+import OperationReviewPage from './pages/finance/OperationReviewPage';
+import AccountingPage from './pages/finance/AccountingPage';
 import WaterTanksPage from './pages/iot/WaterTanksPage';
 import WaterTanksHistoryPage from './pages/iot/WaterTanksHistoryPage';
 import ReceiptPage from './pages/receipt/ReceiptPage';
 import Login from './pages/authentication/Login';
 import ForgotPassword from './pages/authentication/ForgotPassword';
 import CreateAccount from './pages/authentication/CreateAccount';
+import ClientLogin from './pages/authentication/ClientLogin';
 import SupplierPage from './pages/admin/SupplierPage';
+import ServicePage from './pages/admin/ServicePage';
+import EmployeesPage from './pages/admin/EmployeesPage';
 import LoanPage from './pages/loans/LoanPage';
 import ProfilePage from './pages/profile/ProfilePage';
 // Lazy-loaded: pulls in the gated @azure/ai-vision-face-ui SDK, which isn't
@@ -99,21 +127,56 @@ import ProfilePage from './pages/profile/ProfilePage';
 // bundle means environments without those credentials can still run the rest
 // of the app; only this route fails to load.
 const ClientFaceRecognitionPage = React.lazy(() => import('./pages/clients/ClientFaceRecognitionPage'));
+// Heavy pages load on first visit, not at startup: ClientsPage pulls in
+// face-api/TensorFlow and the game pulls in three.js. Bundled eagerly they
+// pushed the iOS WebView past its memory limit (WebContent crash → app
+// reload → Face ID again on every module open). Suspense lives inside the
+// component so the routes stay plain children of IonRouterOutlet.
+const lazyPage = <P extends object>(load: () => Promise<{ default: React.ComponentType<P> }>) => {
+  const Page = React.lazy(load);
+  const LazyPage: React.FC<P> = (props) => (
+    <React.Suspense fallback={null}>
+      <Page {...props} />
+    </React.Suspense>
+  );
+  return LazyPage;
+};
+const ClientsPage = lazyPage(() => import('./pages/clients/ClientsPage'));
+const MissionCleanRoomPage = lazyPage(() => import('./pages/game/MissionCleanRoomPage'));
 import ClientDashboardPage from './pages/clients/ClientDashboardPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
+import RewardsDashboardPage from './pages/clients/RewardsDashboardPage';
+import MyQrPage from './pages/clients/MyQrPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
+import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
+import NotificationDetailPage from './pages/messaging/NotificationDetailPage';
+import type { NotificationTapState } from './pages/messaging/NotificationDetail/NotificationDetailTypes';
 import P2PLendingPage from './pages/loans/P2PLendingPage';
+import MyLoansPage from './pages/loans/MyLoansPage';
 import BorrowerOnboardingPage from './pages/loans/BorrowerOnboardingPage';
 import LoanPaymentPage from './pages/loans/LoanPaymentPage';
 import ManufacturingPage from './pages/manufacturing/ManufacturingPage';
 import RewardsPage from './pages/finance/RewardsPage';
+import PosRewardsPage from './pages/pos/PosRewardsPage';
 import LoanChatPage from './pages/loans/LoanChatPage';
 import LoanChatListPage from './pages/loans/LoanChatListPage';
 import LoanDetailPage from './pages/loans/LoanDetailPage';
-import MissionCleanRoomPage from './pages/game/MissionCleanRoomPage';
+import PosSupportChatPage from './pages/support/PosSupportChatPage';
+import ArcadePage from './pages/game/ArcadePage';
+import BlackjackPage from './pages/game/BlackjackPage';
+import MolePage from './pages/game/MolePage';
+import ChipStorePage from './pages/game/ChipStorePage';
+import CoinflipPage from './pages/game/CoinflipPage';
+import DicePage from './pages/game/DicePage';
+import WheelPage from './pages/game/WheelPage';
+import ScratchPage from './pages/game/ScratchPage';
+import HigherLowerPage from './pages/game/HigherLowerPage';
+import MinesPage from './pages/game/MinesPage';
+import PenaltyPage from './pages/game/PenaltyPage';
+import BowlingPage from './pages/game/BowlingPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -133,13 +196,19 @@ import { IncomeProvider } from './contexts/IncomeContext';
 import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
-import { canAccess } from './config/rolePermissions';
+import { canAccess, UiFeature } from './config/rolePermissions';
+import { useNotificationAttention } from './hooks/useNotificationAttention';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
 import BiometricLockScreen from './components/BiometricLockScreen';
 import ZoomableImage from './components/ui/ZoomableImage';
 import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
 import { getPostLoginRoute } from './utils/postLoginRoute';
+import { myLoansRoute, notificationDetailRoute, p2pLendingRoute } from './utils/routes';
+import { PRODUCT_LABELS, productLandingRoute, discoverProducts, DiscoverProduct } from './utils/productContext';
+import DiscoverProductModal from './components/layout/DiscoverProductModal';
+import './components/layout/DiscoverProductModal.css';
+import { API_BASE_URL } from './utils/appEnv';
 
 setupIonicReact();
 
@@ -147,30 +216,98 @@ interface PrivateRouteProps {
   component: React.ComponentType<any>;
   path: string;
   exact?: boolean;
+  /** Staff-only screen: also requires canAccess(roleCode, feature). The side
+   * menu already hides these items, but without this a lower role could still
+   * open them by typing the URL. Denied → the role's own landing page. */
+  feature?: UiFeature;
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({
   component: Component,
+  feature,
   ...rest
 }) => {
-  const { isAuthenticated } = useUser();
+  const { isAuthenticated, roleCode, clientId } = useUser();
 
   return (
     <Route
       {...rest}
-      render={(props) =>
-        isAuthenticated ? <Component {...props} /> : <Redirect to="/login" />
-      }
+      render={(props) => {
+        if (!isAuthenticated) return <Redirect to="/login" />;
+        if (feature && !canAccess(roleCode, feature)) {
+          console.warn('[PrivateRoute] role', roleCode, 'lacks feature', feature, '→ redirecting from', props.location.pathname);
+          return <Redirect to={getPostLoginRoute(roleCode, clientId)} />;
+        }
+        return <Component {...props} />;
+      }}
     />
   );
 };
 
+// POS operational routes where the global SmartLoans "Chat" tab is hidden --
+// tapping it here reads as an app glitch (e.g. right after registering a
+// client) since POS admins have no reason to expect a loan-chat shortcut in
+// the middle of Clientes/Productos/etc. Left visible on lending-related admin
+// routes (loans, p2p-lending, client-followup, borrower-onboarding...) where
+// quick chat access still makes sense.
+const POS_ONLY_ROUTE_PREFIXES = [
+  '/dashboard', '/category', '/products', '/product', '/cart',
+  '/expense-categories', '/expense-products', '/expense-cart',
+  '/movements', '/led-status', '/clients', '/products-management',
+  '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
+  '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees',
+  '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
+  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log',
+  '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
+];
+
+const isPosOnlyRoute = (pathname: string): boolean =>
+  POS_ONLY_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
 const AppShell: React.FC = () => {
-  const { logout, username, companyName, branchName, avatarUrl, userId, clientId, roleCode, roleName, setAvatarUrl } =
-    useUser();
-  const isSmartLoansRole = roleCode === 'borrower' || roleCode === 'lender';
+  const {
+    logout, username, companyName, branchName, avatarUrl, userId, clientId, companyId, roleCode, roleName, setAvatarUrl,
+    activeProduct, availableProducts, setActiveProduct, clientCapabilities,
+  } = useUser();
+  // Self-service sessions follow the ACTIVE PRODUCT (from clientCapabilities),
+  // so one login can be a POS customer and a SmartLoans borrower. Staff have
+  // no product context and keep the role-based shell.
+  const isSmartLoansRole = activeProduct
+    ? activeProduct === 'borrower' || activeProduct === 'lender'
+    : roleCode === 'borrower' || roleCode === 'lender';
+  const isClientRole = activeProduct ? activeProduct === 'pos' : roleCode === 'pos';
+  // Juridical / Factory AI products: their own dashboard + a small tab bar.
+  const isOwnDashboardProduct = activeProduct === 'juridical' || activeProduct === 'factory';
+  const shellTitle = activeProduct === 'factory' ? 'Factory AI'
+    : isSmartLoansRole || activeProduct === 'juridical' ? 'SmartLoans' : 'GMO';
+  const PRODUCT_ICONS = {
+    pos: storefrontOutline, borrower: walletOutline, lender: walletOutline,
+    juridical: briefcaseOutline, factory: sparklesOutline,
+  } as const;
+  const notificationAttention = useNotificationAttention(companyId, canAccess(roleCode, 'notificationDispatchLog'));
+  const discover = discoverProducts(roleCode, clientCapabilities);
+  const [discoverOpen, setDiscoverOpen] = useState<DiscoverProduct | null>(null);
+  const switchProduct = (product: typeof availableProducts[number]) => {
+    console.log('[AppShell] switching product context →', product);
+    setActiveProduct(product);
+    history.push(productLandingRoute(product, clientId));
+  };
   const history = useHistory();
   const location = useLocation();
+  // A product dashboard opened directly (deep link, push, back button) makes
+  // that product the active one, so the shell never shows another product's
+  // tabs/header over it. Only products the session actually holds.
+  useEffect(() => {
+    const byRoute: [string, typeof availableProducts[number]][] = [
+      ['/rewards-dashboard', 'pos'], ['/client-dashboard', 'borrower'], ['/lender-dashboard', 'lender'],
+      ['/juridical-dashboard', 'juridical'], ['/factory-dashboard', 'factory'],
+    ];
+    const match = byRoute.find(([prefix]) => location.pathname.startsWith(prefix));
+    if (match && match[1] !== activeProduct && availableProducts.includes(match[1])) {
+      console.log('[AppShell] route', location.pathname, '→ active product', match[1]);
+      setActiveProduct(match[1]);
+    }
+  }, [location.pathname, activeProduct, availableProducts, setActiveProduct]);
   // ClientDashboardPage's 5 sections are ?tab=... on one route, not separate
   // routes — IonTabs matches tabs by path only (ignores query string), so a
   // plain href would treat all 5 buttons as "already on this tab" and never
@@ -182,15 +319,17 @@ const AppShell: React.FC = () => {
   // borrower ?tab= tabs above are sections of the borrower dashboard and would
   // send a lender to the wrong page. Pagos scrolls to a section on the lender
   // dashboard; Invertir/Invitar are real routes.
-  const isLender = roleCode === 'lender';
+  const isLender = activeProduct ? activeProduct === 'lender' : roleCode === 'lender';
   const lenderSection = new URLSearchParams(location.search).get('section');
   const activeLenderTab =
     location.pathname.startsWith('/p2p-lending') ? 'invertir'
       : location.pathname.startsWith('/rewards') ? 'invitar'
+      : location.pathname.startsWith('/my-loans') ? 'prestamos'
       : lenderSection === 'pagos' ? 'pagos'
       : 'inicio';
   const goLenderTab = (tab: string) => {
-    if (tab === 'invertir') return history.push('/p2p-lending');
+    if (tab === 'invertir') return history.push(p2pLendingRoute(clientId));
+    if (tab === 'prestamos') return history.push(myLoansRoute(clientId));
     if (tab === 'invitar') return history.push('/rewards');
     if (tab === 'pagos') return history.push(`/lender-dashboard/${clientId}?section=pagos`);
     return history.push(`/lender-dashboard/${clientId}`); // inicio
@@ -258,14 +397,24 @@ const AppShell: React.FC = () => {
     let localTapHandle: PluginListenerHandle | undefined;
     let cancelled = false;
 
-    // Tapping a notification must DO something: deep-link to the payload's
-    // navigationRoute (e.g. /loan-chat/12) or fall back to the inbox.
-    const openFromNotification = (data: Record<string, any> | undefined, source: string) => {
-      const route = typeof data?.navigationRoute === 'string' && data.navigationRoute.startsWith('/')
-        ? data.navigationRoute
-        : '/notifications';
+    // Tapping a notification opens its info screen (title, body, date, data
+    // and a button to the related record via navigationRoute) instead of
+    // jumping straight to the route or just opening the app.
+    const openFromNotification = (
+      notification: { title?: string; body?: string } | undefined,
+      data: Record<string, any> | undefined,
+      source: 'push' | 'local',
+    ) => {
+      const route = notificationDetailRoute(data?.pushNotificationId);
+      const state: NotificationTapState = {
+        title: notification?.title,
+        body: notification?.body,
+        data: Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])),
+        tappedAt: new Date().toISOString(),
+        source,
+      };
       console.log('[Push] tap →', JSON.stringify({ source, route, data }));
-      history.push(route);
+      history.push(route, state);
     };
 
     const registerPush = async () => {
@@ -297,7 +446,7 @@ const AppShell: React.FC = () => {
       registrationHandle = await PushNotifications.addListener('registration', async (token) => {
         const platform = Capacitor.getPlatform();
         try {
-          await fetch(`${import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net'}/registerDevice`, {
+          await fetch(`${API_BASE_URL}/registerDevice`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -343,12 +492,12 @@ const AppShell: React.FC = () => {
 
       // App in background/closed: user taps the system (FCM) notification.
       tapHandle = await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-        openFromNotification(action.notification?.data, 'push');
+        openFromNotification(action.notification, action.notification?.data, 'push');
       });
 
       // App was foreground: user taps the LocalNotifications banner we scheduled.
       localTapHandle = await LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
-        openFromNotification(action.notification?.extra, 'local');
+        openFromNotification(action.notification, action.notification?.extra, 'local');
       });
 
       await PushNotifications.register();
@@ -418,7 +567,7 @@ const AppShell: React.FC = () => {
       <IonMenu menuId="main-menu" contentId="main" side="start" className={menuCollapsed ? 'menu-rail' : ''}>
         <IonHeader className="menu-header">
           <IonToolbar>
-            {!menuCollapsed && <IonTitle>{isSmartLoansRole ? 'SmartLoans' : 'POS GMO'}</IonTitle>}
+            {!menuCollapsed && <IonTitle>{shellTitle}</IonTitle>}
             <IonButtons slot="end">
               <IonButton fill="clear" size="small" onClick={() => setMenuCollapsed(c => !c)} className="menu-collapse-btn">
                 <IonIcon icon={menuCollapsed ? chevronForwardOutline : chevronBackOutline} />
@@ -451,6 +600,26 @@ const AppShell: React.FC = () => {
           </div>
 
           <IonList>
+            {availableProducts.length > 1 && (
+              <>
+                {!menuCollapsed && <IonItemDivider>Mis productos</IonItemDivider>}
+                {availableProducts.map(product => (
+                  <IonMenuToggle autoHide={false} key={product}>
+                    <IonItem
+                      button
+                      onClick={() => switchProduct(product)}
+                      title={PRODUCT_LABELS[product]}
+                      className={product === activeProduct ? 'menu-product-active' : undefined}
+                    >
+                      <IonIcon icon={PRODUCT_ICONS[product]} slot="start" />
+                      {!menuCollapsed && <IonLabel>{PRODUCT_LABELS[product]}</IonLabel>}
+                      {product === activeProduct && <IonIcon icon={checkmarkCircle} slot="end" color="primary" />}
+                    </IonItem>
+                  </IonMenuToggle>
+                ))}
+              </>
+            )}
+
             {!menuCollapsed && <IonItemDivider>Cuenta</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
@@ -472,10 +641,10 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'clientFaceRecognitions') && (
-              <IonItem button routerLink="/clientFaceRecognitions" title="Cliente Reconocimiento Facial">
-                <IonIcon icon={personCircle} slot="start" />
-                {!menuCollapsed && <IonLabel>Cliente Reconocimiento Facial</IonLabel>}
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/clients-map" title="Mapa de clientes">
+                <IonIcon icon={locationOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mapa de clientes</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -499,6 +668,18 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'notificationDispatchLog') && (
+              <IonItem button routerLink="/notification-dispatch-log" title="Notificaciones">
+                <IonIcon icon={paperPlaneOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Notificaciones</IonLabel>}
+                {notificationAttention > 0 && (
+                  <IonBadge slot="end" color="danger" title="Mensajes fallidos o pendientes (últimos 7 días)">{notificationAttention}</IonBadge>
+                )}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'categories') && (
               <IonItem button routerLink="/categories" title="Categorías">
                 <IonIcon icon={grid} slot="start" />
@@ -512,6 +693,24 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/suppliers" title="Proveedores">
                 <IonIcon icon={storefrontOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Proveedores</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'services') && (
+              <IonItem button routerLink="/services" title="Servicios">
+                <IonIcon icon={receiptOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Servicios</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'employees') && (
+              <IonItem button routerLink="/employees" title="Empleados">
+                <IonIcon icon={idCardOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Empleados</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -550,7 +749,7 @@ const AppShell: React.FC = () => {
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'ingresos') && (
               <IonItem button routerLink="/ingresos" title="Ingresos">
-                <IonIcon icon={barChart} slot="start" />
+                <IonIcon icon={trendingUpOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Ingresos</IonLabel>}
               </IonItem>
               )}
@@ -559,8 +758,26 @@ const AppShell: React.FC = () => {
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'egresos') && (
               <IonItem button routerLink="/egresos" title="Egresos">
-                <IonIcon icon={barChart} slot="start" />
+                <IonIcon icon={trendingDownOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>Egresos</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'accounting') && (
+              <IonItem button routerLink="/accounting" title="Contabilidad">
+                <IonIcon icon={documentTextOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Contabilidad</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'ingresos') && (
+              <IonItem button routerLink="/monthly-summary" title="Resumen mensual">
+                <IonIcon icon={statsChartOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Resumen mensual</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -590,6 +807,18 @@ const AppShell: React.FC = () => {
                 {!menuCollapsed && <IonLabel>Recompensas</IonLabel>}
               </IonItem>
               )}
+              {canAccess(roleCode, 'posRewards') && (
+              <IonItem button routerLink="/pos-rewards" title="Puntos POS">
+                <IonIcon icon={giftOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Puntos POS</IonLabel>}
+              </IonItem>
+              )}
+              {canAccess(roleCode, 'myRewards') && clientId && (
+              <IonItem button routerLink={`/rewards-dashboard/${clientId}`} title="Mis Recompensas">
+                <IonIcon icon={giftOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mis Recompensas</IonLabel>}
+              </IonItem>
+              )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
@@ -599,13 +828,19 @@ const AppShell: React.FC = () => {
                 {!menuCollapsed && <IonLabel>Misión: Limpiar el Cuarto</IonLabel>}
               </IonItem>
               )}
+              {canAccess(roleCode, 'arcade') && (
+              <IonItem button routerLink="/arcade" title="Arcade">
+                <IonIcon icon={diamondOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Arcade</IonLabel>}
+              </IonItem>
+              )}
             </IonMenuToggle>
 
             {!menuCollapsed && <IonItemDivider>Finanzas P2P</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
               {(canAccess(roleCode, 'clients') || canAccess(roleCode, 'p2pLending')) && (
-              <IonItem button routerLink="/p2p-lending" title="SmartLoans">
+              <IonItem button routerLink={p2pLendingRoute(clientId)} title="SmartLoans">
                 <IonIcon icon={walletOutline} slot="start" />
                 {!menuCollapsed && <IonLabel>SmartLoans</IonLabel>}
               </IonItem>
@@ -670,6 +905,25 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            {discover.length > 0 && clientId > 0 && (
+              <>
+                {!menuCollapsed && <IonItemDivider>Descubrir</IonItemDivider>}
+                {discover.map(product => (
+                  <IonMenuToggle autoHide={false} key={product}>
+                    <IonItem
+                      button
+                      onClick={() => setDiscoverOpen(product)}
+                      title={product === 'smartloans' ? 'Descubre SmartLoans' : 'Descubre Factory AI'}
+                      className="menu-discover-item"
+                    >
+                      <IonIcon icon={compassOutline} slot="start" />
+                      {!menuCollapsed && <IonLabel>{product === 'smartloans' ? 'SmartLoans' : 'Factory AI Software'}</IonLabel>}
+                    </IonItem>
+                  </IonMenuToggle>
+                ))}
+              </>
+            )}
+
             <IonMenuToggle autoHide={false}>
               <IonItem button onClick={handleLogout} title="Cerrar sesión">
                 <IonIcon icon={logOutOutline} slot="start" color="danger" />
@@ -680,17 +934,28 @@ const AppShell: React.FC = () => {
         </IonContent>
       </IonMenu>
 
+      <DiscoverProductModal
+        product={discoverOpen}
+        companyId={companyId}
+        clientId={clientId}
+        userId={userId}
+        onClose={() => setDiscoverOpen(null)}
+      />
+
       {/* Main content */}
       <IonPage id="main">
         <IonTabs>
           <IonRouterOutlet>
             
-            <PrivateRoute exact path="/setting" component={Setting} />
+            <PrivateRoute exact path="/setting" feature="settings" component={Setting} />
             
             <PrivateRoute exact path="/dashboard" component={Dashboard} />
-            
+            <PrivateRoute exact path="/monthly-summary" component={MonthlySummaryPage} />
 
-            <PrivateRoute exact path="/category" component={Category} />
+
+            {/* The sale goes straight to the product list (categories are chips there). */}
+            <Route exact path="/category" render={() => <Redirect to="/product" />} />
+            <PrivateRoute exact path="/product" component={ProductListPage} />
             <PrivateRoute exact path="/products/:productId" component={ProductDetailPage} />
             <PrivateRoute exact path="/product/:categoryId" component={ProductListPage} />
             <PrivateRoute exact path="/cart" component={CartPage} />
@@ -700,25 +965,32 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/expense-cart" component={CartPage} />
 
             <PrivateRoute exact path="/movements" component={MovementsPage} />
-            <PrivateRoute exact path="/led-status" component={LedStatusPage} />
-            <PrivateRoute exact path="/clients" component={ClientsPage} />
-            <PrivateRoute exact path="/products-management" component={ProductsManagementPage} />
-            <PrivateRoute exact path="/categories" component={CategoriesPage} />
-            <PrivateRoute exact path="/alerts" component={AlertsPage} />
-            <PrivateRoute exact path="/emails" component={EmailsPage} />
-            <PrivateRoute exact path="/users" component={UsersPage} />
-            <PrivateRoute exact path="/ingresos" component={IncomesPage} />
-            <PrivateRoute exact path="/egresos" component={ExpensesPage} />
-            <PrivateRoute exact path="/water-tanks" component={WaterTanksPage} />
-            <PrivateRoute exact path="/water-tanks-history/:tankId" component={WaterTanksHistoryPage} />
+            <PrivateRoute exact path="/led-status" feature="iot" component={LedStatusPage} />
+            <PrivateRoute exact path="/clients" feature="clients" component={ClientsPage} />
+            <PrivateRoute exact path="/clients-map" feature="clients" component={ClientsMapPage} />
+            <PrivateRoute exact path="/products-management" feature="products" component={ProductsManagementPage} />
+            <PrivateRoute exact path="/categories" feature="categories" component={CategoriesPage} />
+            <PrivateRoute exact path="/alerts" feature="alerts" component={AlertsPage} />
+            <PrivateRoute exact path="/emails" feature="emails" component={EmailsPage} />
+            <PrivateRoute exact path="/users" feature="users" component={UsersPage} />
+            <PrivateRoute exact path="/ingresos" feature="ingresos" component={IncomesPage} />
+            <PrivateRoute exact path="/egresos" feature="egresos" component={ExpensesPage} />
+            <PrivateRoute exact path="/egresos/nuevo" feature="egresos" component={NewExpensePage} />
+            <PrivateRoute exact path="/egresos/resumen" feature="egresos" component={OperationReviewPage} />
+            <PrivateRoute exact path="/egresos/detalle" feature="egresos" component={ExpensesDetailPage} />
+            <PrivateRoute exact path="/accounting" feature="accounting" component={AccountingPage} />
+            <PrivateRoute exact path="/water-tanks" feature="iot" component={WaterTanksPage} />
+            <PrivateRoute exact path="/water-tanks-history/:tankId" feature="iot" component={WaterTanksHistoryPage} />
             <PrivateRoute exact path="/receipt" component={ReceiptPage} />
             <PrivateRoute exact path="/receipt/:incomeId" component={ReceiptPage} />
 
             <Route exact path="/">
               <Redirect to="/login" />
             </Route>
-            <PrivateRoute exact path="/suppliers" component={SupplierPage} />
-            <PrivateRoute exact path="/loans" component={LoanPage} />
+            <PrivateRoute exact path="/suppliers" feature="suppliers" component={SupplierPage} />
+            <PrivateRoute exact path="/services" feature="services" component={ServicePage} />
+            <PrivateRoute exact path="/employees" feature="employees" component={EmployeesPage} />
+            <PrivateRoute exact path="/loans" feature="loans" component={LoanPage} />
             <PrivateRoute exact path="/profile" component={ProfilePage} />
             <React.Suspense fallback={null}>
               <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
@@ -726,18 +998,48 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/client-dashboard/:clientId" component={ClientDashboardPage} />
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
+            <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
+            <PrivateRoute exact path="/my-qr" component={MyQrPage} />
+            <PrivateRoute exact path="/enroll/:product" component={EnrollmentPage} />
+            <PrivateRoute exact path="/juridical-dashboard/:clientId" component={JuridicalDashboardPage} />
+            <PrivateRoute exact path="/factory-dashboard/:clientId" component={FactoryDashboardPage} />
             <PrivateRoute exact path="/client-followup/:clientId" component={ClientFollowUpPage} />
+            {/* Mismo patrón que /client-dashboard/:clientId — el id va en la URL
+                para que la ruta sea compartible y sobreviva un refresh. La
+                variante sin id se conserva (deep links de push viejos y menús
+                sin clientId) y resuelve la identidad desde UserContext. */}
+            <PrivateRoute exact path="/p2p-lending/:clientId" component={P2PLendingPage} />
             <PrivateRoute exact path="/p2p-lending" component={P2PLendingPage} />
+            <PrivateRoute exact path="/my-loans/:clientId" component={MyLoansPage} />
+            <PrivateRoute exact path="/my-loans" component={MyLoansPage} />
             <PrivateRoute exact path="/borrower-onboarding" component={BorrowerOnboardingPage} />
             <PrivateRoute exact path="/payment" component={LoanPaymentPage} />
-            <PrivateRoute exact path="/manufacturing" component={ManufacturingPage} />
+            <PrivateRoute exact path="/manufacturing" feature="manufacturing" component={ManufacturingPage} />
             <PrivateRoute exact path="/rewards" component={RewardsPage} />
+            <PrivateRoute exact path="/pos-rewards" feature="posRewards" component={PosRewardsPage} />
             <PrivateRoute exact path="/game/mission-clean-room" component={MissionCleanRoomPage} />
+            {/* Arcade de fichas virtuales. Los 8 juegos que faltan salen como
+                tiles bloqueados en /arcade, asi que no necesitan ruta todavia. */}
+            <PrivateRoute exact path="/arcade" component={ArcadePage} />
+            <PrivateRoute exact path="/arcade/blackjack" component={BlackjackPage} />
+            <PrivateRoute exact path="/arcade/mole" component={MolePage} />
+            <PrivateRoute exact path="/arcade/tienda" component={ChipStorePage} />
+            <PrivateRoute exact path="/arcade/volado" component={CoinflipPage} />
+            <PrivateRoute exact path="/arcade/dados" component={DicePage} />
+            <PrivateRoute exact path="/arcade/ruleta" component={WheelPage} />
+            <PrivateRoute exact path="/arcade/raspadito" component={ScratchPage} />
+            <PrivateRoute exact path="/arcade/mayor-menor" component={HigherLowerPage} />
+            <PrivateRoute exact path="/arcade/minas" component={MinesPage} />
+            <PrivateRoute exact path="/arcade/penales" component={PenaltyPage} />
+            <PrivateRoute exact path="/arcade/boliche" component={BowlingPage} />
             <PrivateRoute exact path="/loan-chat/:conversationId" component={LoanChatPage} />
             <PrivateRoute exact path="/loan-chats" component={LoanChatListPage} />
+            <PrivateRoute exact path="/pos-support/:topic?" component={PosSupportChatPage} />
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
-            <PrivateRoute exact path="/pushNotifications" component={PushNotificationPage} />
+            <PrivateRoute exact path="/pushNotifications" feature="pushNotifications" component={PushNotificationPage} />
+            <PrivateRoute exact path="/notification-dispatch-log" feature="notificationDispatchLog" component={NotificationDispatchLogPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
+            <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />
           </IonRouterOutlet>
 
           {/* Custom bottom nav (was IonTabBar/IonTabButton). The SmartLoans
@@ -753,6 +1055,10 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={homeOutline} />
                   <span>Inicio</span>
                 </button>
+                <button type="button" className={`cd-tab${activeLenderTab === 'prestamos' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('prestamos')}>
+                  <IonIcon aria-hidden="true" icon={documentTextOutline} />
+                  <span>Préstamos</span>
+                </button>
                 <button type="button" className={`cd-tab${activeLenderTab === 'pagos' ? ' cd-tab--active' : ''}`} onClick={() => goLenderTab('pagos')}>
                   <IonIcon aria-hidden="true" icon={cardOutline} />
                   <span>Pagos</span>
@@ -765,6 +1071,12 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={peopleOutline} />
                   <span>Invitar</span>
                 </button>
+                {(canAccess(roleCode, 'loanChat') || isSmartLoansRole) && (
+                  <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
+                    <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
+                    <span>Chat</span>
+                  </button>
+                )}
               </>
             ) : isSmartLoansRole ? (
               <>
@@ -788,12 +1100,78 @@ const AppShell: React.FC = () => {
                   <IonIcon aria-hidden="true" icon={personCircleOutline} />
                   <span>Perfil</span>
                 </button>
+                {(canAccess(roleCode, 'loanChat') || isSmartLoansRole) && (
+                  <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
+                    <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
+                    <span>Chat</span>
+                  </button>
+                )}
+              </>
+            ) : isOwnDashboardProduct && activeProduct ? (
+              <>
+                <button
+                  type="button"
+                  className={`cd-tab${location.pathname === productLandingRoute(activeProduct, clientId) ? ' cd-tab--active' : ''}`}
+                  onClick={() => history.push(productLandingRoute(activeProduct, clientId))}
+                >
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Inicio</span>
+                </button>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/profile') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/profile')}>
+                  <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                  <span>Perfil</span>
+                </button>
+              </>
+            ) : isClientRole ? (
+              <>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/rewards-dashboard') ? ' cd-tab--active' : ''}`} onClick={() => history.push(`/rewards-dashboard/${clientId}`)}>
+                  <IonIcon aria-hidden="true" icon={homeOutline} />
+                  <span>Inicio</span>
+                </button>
+                <button
+                  type="button"
+                  className={`cd-tab${location.pathname === '/my-qr' ? ' cd-tab--active' : ''}`}
+                  onClick={() => history.push('/my-qr')}
+                >
+                  <IonIcon aria-hidden="true" icon={qrCode} />
+                  <span>Mi QR</span>
+                </button>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/arcade') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/arcade')}>
+                  <IonIcon aria-hidden="true" icon={gameControllerOutline} />
+                  <span>Arcade</span>
+                </button>
+                <button type="button" className={`cd-tab${location.pathname.startsWith('/profile') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/profile')}>
+                  <IonIcon aria-hidden="true" icon={personCircleOutline} />
+                  <span>Perfil</span>
+                </button>
               </>
             ) : (
-              <button type="button" className="cd-tab" onClick={() => history.push('/dashboard')}>
-                <IonIcon aria-hidden="true" icon={home} />
-                <span>Dashboard</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className={`cd-tab${location.pathname === '/dashboard' ? ' cd-tab--active' : ''}`}
+                  onClick={() => history.push('/dashboard')}
+                >
+                  <IonIcon aria-hidden="true" icon={home} />
+                  <span>Dashboard</span>
+                </button>
+                {canAccess(roleCode, 'loanChat') && !isPosOnlyRoute(location.pathname) && (
+                  <button type="button" className={`cd-tab${location.pathname.startsWith('/loan-chat') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/loan-chats')}>
+                    <IonIcon aria-hidden="true" icon={chatbubblesOutline} />
+                    <span>Chat</span>
+                  </button>
+                )}
+                {isPosOnlyRoute(location.pathname) && (
+                  <button
+                    type="button"
+                    className={`cd-tab${location.pathname.startsWith('/pos-support') ? ' cd-tab--active' : ''}`}
+                    onClick={() => history.push('/pos-support')}
+                  >
+                    <IonIcon aria-hidden="true" icon={chatbubbleEllipsesOutline} />
+                    <span>Soporte</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </IonTabs>
@@ -839,6 +1217,13 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
     let cancelled = false;
     let stateChangeHandle: PluginListenerHandle | undefined;
+    // Decide on the way OUT, not on the way back in. The prompt's own
+    // inactive event always fires while the sheet is open (guard reliably
+    // true), but its trailing active event can arrive after the guard's
+    // reset timer on iOS Face ID — re-locking on every success, forever
+    // (confirmed via device logs). So only a pause the prompt didn't cause
+    // arms the re-lock.
+    let leftApp = false;
 
     (async () => {
       const enabled = await isBiometricLockEnabled();
@@ -851,10 +1236,16 @@ const BiometricLockGate: React.FC<{ children: React.ReactNode }> = ({ children }
 
       stateChangeHandle = await CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
         console.log('[BiometricLockGate] appStateChange fired. isActive =', isActive, 'isBiometricPromptInProgress =', isBiometricPromptInProgress());
-        if (!isActive || isBiometricPromptInProgress()) {
-          console.log('[BiometricLockGate] appStateChange: ignoring (inactive or mid-authenticate)');
+        if (!isActive) {
+          if (!isBiometricPromptInProgress()) leftApp = true;
+          console.log('[BiometricLockGate] appStateChange: inactive, leftApp =', leftApp);
           return;
         }
+        if (!leftApp) {
+          console.log('[BiometricLockGate] appStateChange: ignoring (resume caused by a biometric prompt)');
+          return;
+        }
+        leftApp = false;
         const stillEnabled = await isBiometricLockEnabled();
         console.log('[BiometricLockGate] appStateChange: stillEnabled =', stillEnabled);
         if (stillEnabled) {
@@ -938,19 +1329,22 @@ const App: React.FC = () => {
       <ProductProvider>
         <IonApp>
           <IonReactRouter>
-            <BiometricLockGate>
-              <IonRouterOutlet id="root-outlet">
-                <Route exact path="/login" component={Login} />
-                <Route exact path="/forgot-password" component={ForgotPassword} />
-                <Route exact path="/create-account" component={CreateAccount} />
+            <ExitConfirmProvider>
+              <BiometricLockGate>
+                <IonRouterOutlet id="root-outlet">
+                  <Route exact path="/login" component={Login} />
+                  <Route exact path="/forgot-password" component={ForgotPassword} />
+                  <Route exact path="/create-account" component={CreateAccount} />
+                  <Route exact path="/client-login" component={ClientLogin} />
 
-                <Route exact path="/">
-                  <Redirect to="/login" />
-                </Route>
+                  <Route exact path="/">
+                    <Redirect to="/login" />
+                  </Route>
 
-                <Route component={AppShell} />
-              </IonRouterOutlet>
-            </BiometricLockGate>
+                  <Route component={AppShell} />
+                </IonRouterOutlet>
+              </BiometricLockGate>
+            </ExitConfirmProvider>
           </IonReactRouter>
         </IonApp>
       </ProductProvider>

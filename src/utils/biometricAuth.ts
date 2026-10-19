@@ -3,6 +3,12 @@ import { Preferences } from '@capacitor/preferences';
 import { Capacitor } from '@capacitor/core';
 
 const BIOMETRIC_LOCK_ENABLED_KEY = 'biometricLockEnabled';
+// Device-local only, never sent anywhere — lets ClientLogin.tsx offer a
+// "Continuar como +52 XXX...XXXX" biometric shortcut instead of retyping
+// the phone on every visit. Only ever written once biometric lock is
+// actually enabled (see ClientLogin.tsx's handleEnableBiometric) — storing
+// it unprotected would be pointless PII retention.
+const CLIENT_LOGIN_PHONE_KEY = 'clientLoginLastPhone';
 
 // Shared across every caller of authenticateBiometric() (not just
 // BiometricLockGate's own unlock flow) — the native biometric sheet runs in
@@ -78,4 +84,27 @@ export async function isBiometricLockEnabled(): Promise<boolean> {
 export async function setBiometricLockEnabled(enabled: boolean): Promise<void> {
   console.log('[BiometricAuth] setBiometricLockEnabled: setting to', enabled);
   await Preferences.set({ key: BIOMETRIC_LOCK_ENABLED_KEY, value: enabled ? 'true' : 'false' });
+}
+
+export async function getSavedClientPhone(): Promise<string | null> {
+  const { value } = await Preferences.get({ key: CLIENT_LOGIN_PHONE_KEY });
+  return value || null;
+}
+
+export async function saveClientPhone(phone: string): Promise<void> {
+  await Preferences.set({ key: CLIENT_LOGIN_PHONE_KEY, value: phone });
+}
+
+export async function clearSavedClientPhone(): Promise<void> {
+  await Preferences.remove({ key: CLIENT_LOGIN_PHONE_KEY });
+}
+
+/** "+526621234567" -> "+52 662...4567" — enough for the client to recognize
+ * their own number without fully exposing it on a shared/public device. */
+export function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 8) return phone;
+  const country = digits.length > 10 ? digits.slice(0, digits.length - 10) : '';
+  const local = digits.slice(-10);
+  return `${country ? '+' + country + ' ' : ''}${local.slice(0, 3)}...${local.slice(-4)}`;
 }

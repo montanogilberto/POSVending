@@ -1,0 +1,99 @@
+.incomes-summary-card {
+  margin: 0 !important;
+  border-radius: 24px !important;
+  --background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02), 0 2px 8px rgba(0, 0, 0, 0.01) !important;
+}
+
+.incomes-summary-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #718096;
+  text-transform: capitalize;
+  margin-bottom: 16px;
+}
+
+.incomes-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.incomes-summary-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #F9FAFB;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.incomes-summary-tile-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 12px;
+  background: #EFF6FF;
+  color: #0056D2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.incomes-summary-tile-icon ion-icon {
+  font-size: 20px;
+}
+
+.incomes-summary-tile-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #718096;
+}
+
+.incomes-summary-tile-value {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #1A202C;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .incomes-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Income list card — same design as /movements' list card ─────────── */
+.incomes-list-card {
+  border-radius: 24px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+.incomes-list-card ion-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.incomes-list-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+/* Month picker in the summary card: ‹ Septiembre de 2026 › */
+.incomes-period {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.incomes-period .incomes-summary-title {
+  flex: 1;
+  text-align: center;
+  margin: 0;
+}

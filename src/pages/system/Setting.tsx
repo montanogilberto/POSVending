@@ -118,6 +118,7 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   lender:   'Prestamista',
   business: 'Negocio',
   viewer:   'Lector',
+  pos:      'Cliente',
 };
 
 const ROLE_COLORS: Record<RoleCode, string> = {
@@ -128,6 +129,7 @@ const ROLE_COLORS: Record<RoleCode, string> = {
   lender:   'tertiary',
   business: 'secondary',
   viewer:   'medium',
+  pos:      'secondary',
 };
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -143,6 +145,7 @@ function buildInitialPermissions(): PermissionMap {
     lender:   new Set(ROLE_UI.lender   as UiFeature[]),
     business: new Set(ROLE_UI.business as UiFeature[]),
     viewer:   new Set(ROLE_UI.viewer   as UiFeature[]),
+    pos:      new Set(ROLE_UI.pos      as UiFeature[]),
   };
 }
 

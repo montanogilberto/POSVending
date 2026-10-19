@@ -1,8 +1,9 @@
+import { API_BASE_URL } from '../utils/appEnv';
 // Cuotas (loanInstallments) — schedule reads + SPEI repayment.
 // Rail primario STP/SPEI (decisión de producto): la cuota se paga debitando la
 // billetera del borrower y abonando la del lender en el ledger. Sin tarjeta.
 
-const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const BASE = API_BASE_URL;
 
 export interface Installment {
   installmentId: number;

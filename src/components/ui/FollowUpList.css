@@ -1,0 +1,23 @@
+.ui-followup-list {
+  background: transparent;
+  padding: 0;
+}
+
+.ui-followup-label h3 {
+  font-weight: 600;
+  white-space: normal;
+}
+
+.ui-followup-label p {
+  white-space: normal;
+}
+
+.ui-followup-date {
+  font-size: 12px;
+  color: var(--ion-color-medium);
+}
+
+.ui-followup-badge {
+  align-self: flex-start;
+  margin-top: 12px;
+}

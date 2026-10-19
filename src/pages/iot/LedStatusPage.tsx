@@ -7,7 +7,6 @@ import {
   IonToolbar,
   IonButton,
   IonButtons,
-  IonBackButton,
   IonCard,
   IonCardContent,
   IonCardHeader,
@@ -16,13 +15,15 @@ import {
   IonRow,
   IonCol,
 } from '@ionic/react';
+import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 const LedStatusPage: React.FC = () => {
   const [ledStatus, setLedStatus] = useState<'on' | 'off'>('off');
 
   const toggleLed = async (status: 'on' | 'off') => {
     try {
-      const response = await fetch('https://smartloansbackend.azurewebsites.net/led_status', {
+      const response = await fetch(`${API_BASE_URL}/led_status`, {
         method: 'POST',
         headers: {
           'accept': 'application/json',
@@ -44,7 +45,7 @@ const LedStatusPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonBackButton defaultHref="/" />
+            <ConfirmBackButton defaultHref="/" />
           </IonButtons>
           <IonTitle>LED Status</IonTitle>
         </IonToolbar>

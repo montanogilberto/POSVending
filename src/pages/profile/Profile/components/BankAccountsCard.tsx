@@ -2,6 +2,7 @@ import React from 'react';
 import { IonBadge, IonButton, IonCard, IonCardContent, IonIcon, IonSpinner } from '@ionic/react';
 import { cardOutline, chevronForwardOutline, walletOutline } from 'ionicons/icons';
 import { ProfileVM } from '../ProfileLogic';
+import { p2pLendingRoute } from '../../../../utils/routes';
 
 /**
  * Cuentas de pago — resumen de los DOS rieles (CLABE/SPEI vía bankAccounts +
@@ -10,7 +11,13 @@ import { ProfileVM } from '../ProfileLogic';
  * flujo NativeConnectOnboarding — no se duplica esa UI aquí.
  */
 const BankAccountsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
-  const defaultClabe = vm.bankAccounts.find(a => a.isDefault) ?? vm.bankAccounts[0];
+  // Misma regla que P2PLendingPage: sólo la Principal cuenta como cuenta
+  // activa. Sin PRIMARY se cae a la más reciente pero se marca "Pendiente" —
+  // una cuenta ARCHIVED llega con isVerified=1 y no debe presentarse como
+  // verificada (D18).
+  const primaryClabe = vm.bankAccounts.find(a => a.isVerified && a.isDefault);
+  const defaultClabe = primaryClabe ?? vm.bankAccounts[0];
+  const clabeIsActive = !!primaryClabe;
 
   return (
     <IonCard className="profile-card">
@@ -40,8 +47,8 @@ const BankAccountsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
                 </strong>
               </div>
               {defaultClabe && (
-                <IonBadge color={defaultClabe.isVerified ? 'success' : 'medium'}>
-                  {defaultClabe.isVerified ? 'Verificada' : 'Pendiente'}
+                <IonBadge color={clabeIsActive ? 'success' : 'medium'}>
+                  {clabeIsActive ? 'Verificada' : 'Pendiente'}
                 </IonBadge>
               )}
             </div>
@@ -76,7 +83,7 @@ const BankAccountsCard: React.FC<{ vm: ProfileVM }> = ({ vm }) => {
             </div>
 
             <IonButton fill="outline" expand="block" className="profile-link-btn"
-              onClick={() => vm.history.push('/p2p-lending')}>
+              onClick={() => vm.history.push(p2pLendingRoute(vm.clientId))}>
               Administrar cuentas de pago
               <IonIcon icon={chevronForwardOutline} slot="end" />
             </IonButton>

@@ -5,12 +5,17 @@ import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonToggle,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { eye, eyeOff, fingerPrintOutline } from 'ionicons/icons';
+import {
+  eye, eyeOff, fingerPrintOutline, personOutline, lockClosedOutline,
+  logInOutline, callOutline, personAddOutline, headsetOutline, chevronForward,
+} from 'ionicons/icons';
 import { useUser } from '../../contexts/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
 import { canAccess, normalizeRoleCode } from '../../config/rolePermissions';
-import { getPostLoginRoute } from '../../utils/postLoginRoute';
+import { appDestination, LOGIN_APPS, LoginApp, readLastLoginApp, saveLastLoginApp } from '../../utils/loginApps';
+import LoginAppPicker from './LoginAppPicker';
+import PhoneAppLogin from './clientphone/PhoneAppLogin';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
 import CompanySelector from '../../components/pos/companySelector/CompanySelector';
 import {
@@ -32,6 +37,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const usernameRef = useRef<string>('');
   const passwordRef = useRef<string>('');
 
+  const [app, setApp]                               = useState<LoginApp>(readLastLoginApp);
   const [loading, setLoading]                       = useState(false);
   const [message, setMessage]                       = useState<string | null>(null);
   const [showPassword, setShowPassword]             = useState(false);
@@ -57,6 +63,14 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     roleCode: ReturnType<typeof normalizeRoleCode>;
     roleName: string;
   } | null>(null);
+
+  const selectApp = (next: LoginApp) => {
+    setApp(next);
+    saveLastLoginApp(next);
+  };
+  const appInfo = LOGIN_APPS.find(a => a.id === app) ?? LOGIN_APPS[0];
+  // Arcade and Rewards are customer apps: phone number only, no username/password.
+  const phoneApp = app === 'arcade' || app === 'rewards';
 
   useEffect(() => {
     (async () => {
@@ -85,7 +99,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     // instead of asking them to type credentials again.
     if (nextValue && isAuthenticated) {
       console.log('[Login] handleBiometricToggle: already authenticated, redirecting by role =', roleCode);
-      history.push(getPostLoginRoute(roleCode, clientId));
+      history.push(appDestination(app, roleCode, clientId).route);
     } else {
       console.log('[Login] handleBiometricToggle: not redirecting (nextValue/isAuthenticated false)');
     }
@@ -247,7 +261,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     if ((pending?.roleCode === 'borrower' || pending?.roleCode === 'lender') && !pending?.clientId) {
       console.warn('[Login] borrower/lender with no clientId — falling back to /dashboard', pending);
     }
-    history.push(getPostLoginRoute(pending?.roleCode, pending?.clientId));
+    const destination = appDestination(app, pending?.roleCode, pending?.clientId);
+    if (!destination.granted) {
+      console.log('[Login] account has no access to', app, '→ landing on', destination.route);
+    }
+    history.push(destination.route);
   };
 
   const handleSkipOpenCash = () => {
@@ -298,17 +316,18 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <IonPage>
-      <IonContent className="ion-padding login-page-content">
+      <IonContent className={`ion-padding login-page-content login-app--${app}`}>
         <IonGrid>
           <IonRow className="ion-justify-content-center">
             <IonCol size="12" sizeSm="8" sizeMd="6" sizeLg="4">
 
               {/* Logo / Brand */}
               <div className="login-brand">
-                <div className="login-logo">POS</div>
-                <h1 className="login-title">POS GMO</h1>
-                <p className="login-subtitle">Sistema de punto de venta</p>
+                <h1 className="login-title">{appInfo.label}</h1>
+                <p className="login-subtitle">{appInfo.subtitle}</p>
               </div>
+
+              <LoginAppPicker value={app} onChange={selectApp} disabled={loading} />
 
               <IonToast
                 isOpen={!!message}
@@ -316,15 +335,21 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 duration={3500}
                 onDidDismiss={() => setMessage(null)}
                 color="danger"
-                position="top"
+                position="bottom"
               />
 
+              {phoneApp ? (
+                <PhoneAppLogin app={app} onUseStaffLogin={() => selectApp('pos')} />
+              ) : (
               <div className="login-card">
                 <h2 className="login-card-title">Iniciar sesión</h2>
+                <p className="login-card-subtitle">Ingresa a tu cuenta para continuar</p>
 
                 <form onSubmit={handleLogin} className="login-form">
                   <div className="login-field">
-                    <IonLabel className="login-label">Usuario</IonLabel>
+                    <IonLabel className="login-label login-label--icon">
+                      <IonIcon icon={personOutline} aria-hidden="true" /> Usuario
+                    </IonLabel>
                     <IonInput
                       type="text"
                       placeholder="Ingresa tu usuario"
@@ -335,7 +360,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   </div>
 
                   <div className="login-field">
-                    <IonLabel className="login-label">Contraseña</IonLabel>
+                    <IonLabel className="login-label login-label--icon">
+                      <IonIcon icon={lockClosedOutline} aria-hidden="true" /> Contraseña
+                    </IonLabel>
                     <div className="login-password-wrapper">
                       <IonInput
                         type={showPassword ? 'text' : 'password'}
@@ -344,14 +371,14 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         className="login-input"
                         autocomplete="current-password"
                       />
-                      <button
-                        type="button"
-                        className="login-eye-btn"
+                      <IonButton
+                        fill="clear"
+                        className="client-login-eye-btn"
                         onClick={() => setShowPassword(v => !v)}
                         tabIndex={-1}
                       >
-                        <IonIcon icon={showPassword ? eye : eyeOff} />
-                      </button>
+                        <IonIcon slot="icon-only" icon={showPassword ? eye : eyeOff} />
+                      </IonButton>
                     </div>
                   </div>
 
@@ -373,15 +400,43 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     disabled={loading}
                     className="login-submit-btn"
                   >
+                    <IonIcon icon={logInOutline} slot="start" aria-hidden="true" />
                     {loading ? 'Verificando...' : 'Iniciar sesión'}
                   </IonButton>
                 </form>
 
-                <div className="login-links">
-                  <IonRouterLink href="/forgot-password">¿Olvidaste tu contraseña?</IonRouterLink>
-                  <IonRouterLink href="/create-account">Crear cuenta</IonRouterLink>
+                <div className="login-help-divider">
+                  <span>¿Necesitas ayuda?</span>
                 </div>
+
+                <div className="login-help-tiles">
+                  <IonRouterLink routerLink="/forgot-password" className="login-help-tile">
+                    <div className="login-help-tile-inner">
+                      <IonIcon icon={callOutline} aria-hidden="true" />
+                      <span>¿Olvidaste tu contraseña?</span>
+                    </div>
+                  </IonRouterLink>
+                  <IonRouterLink routerLink="/create-account" className="login-help-tile">
+                    <div className="login-help-tile-inner">
+                      <IonIcon icon={personAddOutline} aria-hidden="true" />
+                      <span>Crear cuenta</span>
+                    </div>
+                  </IonRouterLink>
+                  <IonRouterLink routerLink="/client-login" className="login-help-tile">
+                    <div className="login-help-tile-inner">
+                      <IonIcon icon={headsetOutline} aria-hidden="true" />
+                      <span>Soy cliente, quiero ver mis recompensas</span>
+                    </div>
+                  </IonRouterLink>
+                </div>
+
+                <IonRouterLink routerLink="/client-login" className="login-client-banner">
+                  <IonIcon icon={callOutline} aria-hidden="true" />
+                  <span>¿Eres cliente? Inicia sesión con tu teléfono</span>
+                  <IonIcon icon={chevronForward} aria-hidden="true" className="login-client-banner-chevron" />
+                </IonRouterLink>
               </div>
+              )}
 
             </IonCol>
           </IonRow>

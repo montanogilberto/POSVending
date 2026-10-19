@@ -4,6 +4,9 @@ interface Income {
   total: number;
   discountAmount: number;
   paymentMethod: string;
+  commissionTerminalId?: number | null;
+  commissionRatePct?: number | null;
+  commissionAmount?: number | null;
   paymentDate: string;
   userId: number;
   clientId: number;
@@ -40,17 +43,35 @@ const normalizeError = (error: unknown) => {
   return { raw: String(error) };
 };
 
-// ✅ FIXED: Proper options object instead of raw signal
-export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> => {
+// One company's income for one month (Hermosillo time). No period = the
+// current month (Dashboard, /movements); { year, month } = that month
+// (/ingresos) — needs sql/migrations/2026-09-29_income_monthly_any_month.sql,
+// before which the SP ignores the period and returns the current month.
+// (GET /all_income is NOT filtered by company — its wrapper was removed
+// 2026-09-29; don't reintroduce it.)
+import type { MonthPeriod } from '../utils/monthPeriod';
+import { API_BASE_URL } from '../utils/appEnv';
+export type IncomePeriod = MonthPeriod;
+
+export const fetchMonthlyLaundry = async (
+  companyId: number,
+  signal?: AbortSignal,
+  period?: IncomePeriod
+): Promise<Income[]> => {
   try {
     const response = await fetch(
-      'https://smartloansbackend.azurewebsites.net/all_income',
-      signal ? { signal } : {}
+      `${API_BASE_URL}/monthly_income`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ income: [{ companyId, ...(period ?? {}) }] }),
+        ...(signal ? { signal } : {}),
+      }
     );
 
     if (!response.ok) {
       const responseText = await response.text().catch(() => '');
-      console.error('all_income non-OK response', {
+      console.error('monthly_income non-OK response', {
         status: response.status,
         statusText: response.statusText,
         body: responseText,
@@ -60,7 +81,7 @@ export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> =
 
     const data = await response.json();
 
-    console.log('Fetched all_income:', data);
+    console.log('Fetched monthly_income:', data);
 
     const incomeArray = Array.isArray(data.income) ? data.income : [];
 
@@ -76,7 +97,7 @@ export const fetchAllLaundry = async (signal?: AbortSignal): Promise<Income[]> =
       return [];
     }
 
-    console.error('Error loading incomes (api detailed):', normalizeError(error));
+    console.error('Error loading monthly incomes (api detailed):', normalizeError(error));
     return [];
   }
 };
@@ -88,7 +109,7 @@ export const createLaundrySale = async (
 ): Promise<any> => {
   try {
     const response = await fetch(
-      'https://smartloansbackend.azurewebsites.net/pos_laundry',
+      `${API_BASE_URL}/pos_laundry`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,4 +1,4 @@
-import { IonPage, IonContent, IonGrid, IonRow, IonCol, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonButtons, IonButton, IonIcon, IonImg, IonCardTitle } from '@ionic/react';
+import { IonPage, IonContent, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonButtons, IonButton, IonIcon, IonImg, IonCardTitle } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { fetchCategories, Categories } from '../../data/categories';
@@ -9,6 +9,7 @@ import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
 import '../../styles/dashboard.css';
+import './CategoryPage.css';
 
 const CategoryPage: React.FC = () => {
   const history = useHistory();
@@ -66,23 +67,28 @@ const CategoryPage: React.FC = () => {
               <IonCardSubtitle>{isExpenseMode ? 'Categorías de Egresos Disponibles' : 'Categorías Disponibles'}</IonCardSubtitle>
             </IonCardHeader>
             <IonCardContent>
-              <IonGrid style={{ padding: '16px' }}>
-                <IonRow className="ion-justify-content-center">
-                  {categories.map((category, index) => (
-                    <IonCol size="6" sizeLg="4" key={category.categoryId || index} style={{ display: 'flex', justifyContent: 'center' }}>
-                      <IonCard onClick={() => {
-                        const route = isExpenseMode 
-                          ? `/expense-products/${category.categoryId}` 
-                          : `/product/${category.categoryId}`;
-                        history.push(route);
-                      }} style={{ background: '#ffffff', borderRadius: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', padding: '16px', margin: '8px', width: '100%', maxWidth: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-                        <IonImg src={category.image} style={{ width: '128px', height: '128px', objectFit: 'contain', marginBottom: '12px' }} />
-                        <IonCardTitle style={{ color: '#444', fontSize: '18px', fontWeight: '500', textAlign: 'center', margin: 0 }}>{category.name}</IonCardTitle>
-                      </IonCard>
-                    </IonCol>
-                  ))}
-                </IonRow>
-              </IonGrid>
+              <div className="category-pick-list">
+                {categories.map((category, index) => (
+                  <IonCard
+                    button
+                    key={category.categoryId || index}
+                    className="category-pick-card"
+                    onClick={() => {
+                      const route = isExpenseMode
+                        ? `/expense-products/${category.categoryId}`
+                        : `/product/${category.categoryId}`;
+                      history.push(route);
+                    }}
+                  >
+                    <div className="category-pick-row">
+                      <div className="category-pick-thumb">
+                        <IonImg src={category.image} />
+                      </div>
+                      <IonCardTitle className="category-pick-title">{category.name}</IonCardTitle>
+                    </div>
+                  </IonCard>
+                ))}
+              </div>
             </IonCardContent>
           </div>
         </div>

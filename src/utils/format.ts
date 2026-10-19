@@ -15,6 +15,18 @@ export const fmtNum = (n: number) =>
 /** 1,234 — número sin decimales forzados (puntos, conteos). */
 export const fmtInt = (n: number) => n.toLocaleString('es-MX');
 
+/** 842 · 48.2K · 1.24M — tokens en forma compacta para espacios chicos (header). */
+export const fmtTokens = (n: number): string => {
+  const sign = n < 0 ? '-' : '';
+  const v = Math.abs(Math.round(n));
+  if (v < 1_000) return `${sign}${v}`;
+  if (v < 1_000_000) {
+    const k = v / 1_000;
+    return `${sign}${k >= 100 ? Math.round(k) : (Math.round(k * 10) / 10).toString()}K`;
+  }
+  return `${sign}${(Math.round((v / 1_000_000) * 100) / 100).toString()}M`;
+};
+
 /** Los timestamps del backend llegan sin zona: interpretarlos como UTC. */
 const asUtc = (s: string) =>
   new Date(s.includes('Z') || s.includes('+') ? s : `${s}Z`);
@@ -37,5 +49,18 @@ export const mxChatTime = (s: string) =>
 export const toHermosillo = (utc: string | undefined): string => {
   if (!utc) return '';
   const d = new Date(utc.includes('Z') ? utc : utc + 'Z');
-  return new Date(d.getTime() - 7 * 60 * 60 * 1000).toLocaleString();
+  return new Date(d.getTime() - 7 * 60 * 60 * 1000).toLocaleString('es-MX', { timeZone: 'UTC' });
 };
+
+/** Date desplazado a Hermosillo (UTC-7, sin DST) — para agrupar/comparar por día o mes. */
+export const toHermosilloDate = (utc: string): Date => {
+  const d = new Date(utc.includes('Z') ? utc : utc + 'Z');
+  return new Date(d.getTime() - 7 * 60 * 60 * 1000);
+};
+
+/** Share of `part` in `total` as a percent with one decimal; 0 when there is nothing to divide by. */
+export const percent = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : 0);
+
+/** "5:00 a. m." — hora de Hermosillo (UTC-7) de un timestamp UTC, para listas agrupadas por día. */
+export const hermosilloTime = (utc: string): string =>
+  toHermosilloDate(utc).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });

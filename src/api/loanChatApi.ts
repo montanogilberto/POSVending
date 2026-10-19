@@ -1,4 +1,5 @@
-const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
+const BASE = API_BASE_URL;
 
 // Every chat action funnels through here, so this one pair of logs tracks the
 // whole negotiation flow (start/send/accept/reject → push server-side). Bodies
@@ -131,4 +132,7 @@ export const loanChatApi = {
 
   getConversation: (conversationId: number) =>
     sp({ action: 'get_conversation', conversationId }),
+
+  closeConversation: (conversationId: number) =>
+    sp({ action: 'close_conversation', conversationId }),
 };

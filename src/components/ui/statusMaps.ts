@@ -8,6 +8,21 @@ export interface StatusMeta {
   color: string; // color Ionic (primary/success/danger/warning/medium)
 }
 
+/** Asientos contables (journalEntries.status). */
+export const JOURNAL_ENTRY_STATUS: Record<string, StatusMeta> = {
+  posted: { label: 'Contabilizado', color: 'success' },
+  void:   { label: 'Anulado',       color: 'medium'  },
+};
+
+/** Tipo de cuenta contable (chartOfAccounts.accountType). */
+export const ACCOUNT_TYPE: Record<string, StatusMeta> = {
+  asset:     { label: 'Activo',   color: 'primary' },
+  liability: { label: 'Pasivo',   color: 'warning' },
+  equity:    { label: 'Capital',  color: 'tertiary' },
+  income:    { label: 'Ingreso',  color: 'success' },
+  expense:   { label: 'Gasto',    color: 'danger'  },
+};
+
 /** Conversaciones de negociación (loanConversations.status). */
 export const CONVERSATION_STATUS: Record<string, StatusMeta> = {
   open:     { label: 'Abierta',   color: 'primary' },
@@ -18,10 +33,15 @@ export const CONVERSATION_STATUS: Record<string, StatusMeta> = {
 
 /** Préstamos (loans.loanStatus, comparar en minúsculas). */
 export const LOAN_STATUS: Record<string, StatusMeta> = {
-  active:  { label: 'Activo',    color: 'success' },
-  pending: { label: 'Pendiente', color: 'warning' },
-  paidoff: { label: 'Pagado',    color: 'primary' },
-  closed:  { label: 'Cerrado',   color: 'medium'  },
+  active:          { label: 'Activo',            color: 'success' },
+  pending:         { label: 'Pendiente',         color: 'warning' },
+  // RFC-002 no-custodio: aprobado pero esperando el SPEI del prestamista.
+  pending_funding: { label: 'Por fondear',       color: 'warning' },
+  overdue:         { label: 'Vencido',           color: 'danger'  },
+  defaulted:       { label: 'En mora',           color: 'danger'  },
+  paidoff:         { label: 'Pagado',            color: 'primary' },
+  closed:          { label: 'Cerrado',           color: 'medium'  },
+  cancelled:       { label: 'Cancelado',         color: 'medium'  },
 };
 
 /** Propuestas P2P (labels; los colores viven en P2PLendingPage.css .p2p-status-*). */
@@ -31,4 +51,94 @@ export const PROPOSAL_STATUS: Record<string, { label: string }> = {
   rejected:  { label: 'Rechazada' },
   expired:   { label: 'Vencida'   },
   cancelled: { label: 'Cancelada' },
+};
+
+/** Cascada de notificaciones (notificationDispatches.status). */
+export const NOTIFICATION_DISPATCH_STATUS: Record<string, StatusMeta> = {
+  // Only 'confirmed' means delivered to the person; pending + unconfirmed both await a final status.
+  confirmed: { label: 'Entrega confirmada',        color: 'success' },
+  unconfirmed: { label: 'Pendiente de confirmación', color: 'warning' },
+  pending:   { label: 'Pendiente de confirmación', color: 'warning' },
+  failed:    { label: 'Fallido',                   color: 'danger'  },
+  sent:      { label: 'Aceptado por el proveedor', color: 'medium'  },
+};
+
+/** Canal de envío (notificationDispatches.selectedChannel) — verde=gratis, ambar=medio, rojo=caro. */
+export const NOTIFICATION_CHANNEL: Record<string, StatusMeta> = {
+  push:     { label: 'Push',     color: 'success' },
+  whatsapp: { label: 'WhatsApp', color: 'warning' },
+  sms:      { label: 'SMS',      color: 'danger'  },
+};
+
+/** Resultado de una ronda del arcade (arcadeRounds.outcome). */
+export const ARCADE_OUTCOME: Record<string, StatusMeta> = {
+  win:       { label: 'Ganada',    color: 'success' },
+  blackjack: { label: 'Blackjack', color: 'success' },
+  push:      { label: 'Empate',    color: 'warning' },
+  lose:      { label: 'Perdida',   color: 'medium'  },
+};
+
+/** Método de pago (income.paymentMethod / expenses.paymentMethod). */
+export const PAYMENT_METHOD: Record<string, StatusMeta> = {
+  efectivo:      { label: 'Efectivo',      color: 'success'  },
+  tarjeta:       { label: 'Tarjeta',       color: 'primary'  },
+  transferencia: { label: 'Transferencia', color: 'tertiary' },
+};
+
+/** Tipo de egreso (expenses.expenseType). */
+export const EXPENSE_TYPE: Record<string, StatusMeta> = {
+  inventory: { label: 'Inventario', color: 'primary' },
+  general:   { label: 'General',    color: 'medium'  },
+  payroll:   { label: 'Nómina',     color: 'tertiary' },
+};
+
+/** Tipo de movimiento del ledger de puntos POS (posRewardTransactions.txType, comparar en minúsculas). */
+export const POS_REWARD_TX_TYPE: Record<string, StatusMeta> = {
+  earn:       { label: 'Ganados',   color: 'success' },
+  redeem:     { label: 'Canjeados', color: 'primary' },
+  adjustment: { label: 'Ajuste',    color: 'warning' },
+  expire:     { label: 'Expirado',  color: 'medium'  },
+};
+
+/** Estado de una redención de puntos POS (posRewardRedemptions.status). */
+export const POS_REWARD_REDEMPTION_STATUS: Record<string, StatusMeta> = {
+  applied:   { label: 'Aplicada',  color: 'success' },
+  cancelled: { label: 'Cancelada', color: 'medium'  },
+};
+
+/** dbo.clientFollowUps.status — staff follow-ups, Factory AI requests,
+ * juridical assignments. */
+export const FOLLOW_UP_STATUS: Record<string, StatusMeta> = {
+  pending:   { label: 'Pendiente',  color: 'warning' },
+  completed: { label: 'Completado', color: 'success' },
+  cancelled: { label: 'Cancelado',  color: 'medium' },
+};
+
+/** Empleados (dbo.status vía employees.statusId). */
+export const EMPLOYEE_STATUS: Record<string, StatusMeta> = {
+  active:   { label: 'Activo',   color: 'success' },
+  inactive: { label: 'Inactivo', color: 'medium' },
+};
+
+/** Tipo de notificación push (pushNotifications.notificationType). */
+export const NOTIFICATION_TYPE: Record<string, StatusMeta> = {
+  info:    { label: 'Información', color: 'primary' },
+  success: { label: 'Éxito',       color: 'success' },
+  warning: { label: 'Aviso',       color: 'warning' },
+  error:   { label: 'Error',       color: 'danger'  },
+  system:  { label: 'Sistema',     color: 'medium'  },
+};
+
+/** Lectura de una notificación push (pushNotifications.isRead): la marca la app del destinatario. */
+export const PUSH_READ_STATUS: Record<string, StatusMeta> = {
+  read:   { label: 'Leída',    color: 'success' },
+  unread: { label: 'Sin leer', color: 'warning' },
+};
+
+/** Prioridad de notificación push (pushNotifications.priority). */
+export const NOTIFICATION_PRIORITY: Record<string, StatusMeta> = {
+  low:      { label: 'Baja',    color: 'medium'  },
+  normal:   { label: 'Normal',  color: 'primary' },
+  high:     { label: 'Alta',    color: 'warning' },
+  critical: { label: 'Crítica', color: 'danger'  },
 };

@@ -26,6 +26,9 @@ import {
 } from '@ionic/react';
 import { person, close, checkmarkCircle, business, add, save, informationCircle } from 'ionicons/icons';
 import { Client, getAllClients, createOrUpdateClient } from '../../api/clientsApi';
+import { posRewardsApi } from '../../api/posRewardsApi';
+import { grantClientCapability } from '../../api/clientCapabilitiesApi';
+import { useUser } from '../../contexts/UserContext';
 
 interface ClientSelectorProps {
   isOpen: boolean;
@@ -40,6 +43,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
   onChange,
   selectedClient,
 }) => {
+  const { companyId, userId } = useUser();
   const [searchText, setSearchText] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
@@ -296,10 +300,17 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
       const requestData = {
         clients: [{
           clientId: 0,
+          // The store registering the client owns it. Without this the row was
+          // saved with companyId NULL, so it never showed up in the store's
+          // client list, rewards or reports (found 2026-10-06, clientId 2260).
+          companyId,
           first_name: newClient.first_name!,
           last_name: newClient.last_name!,
           cellphone: formattedCellphone,
           email: newClient.email || '',
+          // Created from the POS checkout — always a retail customer. Omitting
+          // it let the backend default to 'borrower'.
+          clientType: 'pos' as const,
           action: '1'
         }]
       };
@@ -338,11 +349,30 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
           throw new Error('No se pudo verificar el cliente creado en la base de datos.');
         }
 
+        // Product membership lives in clientCapabilities (company-scoped),
+        // not clientType. Best-effort — the client row already exists, so a
+        // failed grant is logged for the backfill rather than failing the sale.
+        // REWARDS too: every checkout client gets the welcome points below.
+        for (const capability of ['POS', 'REWARDS'] as const) {
+          try {
+            await grantClientCapability(companyId, persistedClient.clientId, capability);
+          } catch (capErr) {
+            console.warn('[ClientSelector] grantClientCapability', capability, 'failed for clientId=', persistedClient.clientId, capErr);
+          }
+        }
+
         onChange(persistedClient);
         onClose();
         setToastMessage('Cliente creado exitosamente');
         setToastColor('success');
         setShowToast(true);
+
+        // Sign-up bonus: registering unlocks any one of the 3x1 free-product
+        // rewards immediately. Best-effort — a PosRewards hiccup shouldn't
+        // block client creation.
+        posRewardsApi
+          .adjustPoints(companyId, persistedClient.clientId, 3, 'Bono de bienvenida: cliente registrado', userId)
+          .catch((err) => console.log('[ClientSelector] welcome bonus failed', err));
       }
 
       setShowCreateForm(false);

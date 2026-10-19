@@ -4,23 +4,34 @@ import { useIncome } from '../../../contexts/IncomeContext';
 import { useUser } from '../../../contexts/UserContext';
 import { isCashRegisterOpen, closeCashRegister } from '../../../api/cashRegisterApi';
 import { fetchTicket } from '../../../api/ticketApi';
+import { fetchMonthlyExpenses, Expense } from '../../../api/expensesApi';
+import { toHermosilloDate } from '../../../utils/format';
+import { getAllCommissionTerminals, CommissionTerminal } from '../../../api/commissionTerminalsApi';
+import {
+  PaymentMethodLabel,
+  normalizePaymentMethod,
+  activeCardTerminal,
+  incomeCommission,
+} from '../../../utils/incomeMoney';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
 import { Transaction, CartItem } from '../types';
+import { API_BASE_URL } from '../../../utils/appEnv';
 
-type PaymentMethod = 'Efectivo' | 'Transferencia' | 'Tarjeta';
+type PaymentMethod = PaymentMethodLabel;
 
 const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
+
+// PAGOS (expenses) uses the expense red of the Egresos trends chart.
+const EXPENSE_PAYMENT_COLORS: Record<PaymentMethod, string> = {
+  Efectivo: '#DC2626',
+  Transferencia: '#F87171',
+  Tarjeta: '#FCA5A5',
+};
 
 const PAYMENT_COLORS: Record<PaymentMethod, string> = {
   Efectivo: '#16A34A',
   Transferencia: '#22C55E',
   Tarjeta: '#86EFAC',
-};
-
-// 🔥 helper to normalize Hermosillo date (reused everywhere)
-const toHermosilloDate = (dateStr: string) => {
-  const utcDate = new Date(dateStr + (dateStr.includes('Z') ? '' : 'Z'));
-  return new Date(utcDate.getTime() - 7 * 60 * 60 * 1000);
 };
 
 export const useDashboard = () => {
@@ -40,21 +51,46 @@ export const useDashboard = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const [loadingReceiptId, setLoadingReceiptId] = useState<number | null>(null);
+  // Only used to price a card sale the backend has not stamped yet.
+  const [cardTerminal, setCardTerminal] = useState<CommissionTerminal | null>(null);
   //const [pieData, setPieData] = useState<any>(null);
 
   const refreshDashboardData = () => {
     console.log('[Dashboard] refreshDashboardData: loading incomes, companyId =', companyId);
     const controller = new AbortController();
-    loadIncomes(controller.signal).catch(() => {});
+    loadIncomes(companyId, controller.signal).catch(() => {});
+
+    // Egresos KPIs (hoy / mes): this company's current Hermosillo month only —
+    // /all_expense summed every company's history.
+    if (companyId) {
+      fetchMonthlyExpenses(companyId, undefined, controller.signal)
+        .then(({ expenses }) => {
+          if (!controller.signal.aborted) setAllExpenses(expenses);
+        })
+        .catch((err) => {
+          if (!controller.signal.aborted) console.warn('[Dashboard] fetchMonthlyExpenses failed:', err);
+        });
+    }
+
+    getAllCommissionTerminals()
+      .then((terminals) => {
+        if (!controller.signal.aborted) setCardTerminal(activeCardTerminal(terminals));
+      })
+      .catch((err) => console.warn('[Dashboard] getAllCommissionTerminals failed:', err));
+
     return () => controller.abort();
   };
 
-  useEffect(() => {
-    console.log('[Dashboard] initial-load effect: mounting, companyId =', companyId, 'userId =', userId);
-    return refreshDashboardData();
-  // loadIncomes is stable (useCallback with no deps) — omitting it avoids double-fetch
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // No mount-only fetch here on purpose: Dashboard.tsx's useIonViewWillEnter
+  // already calls refreshDashboardData() on both the first entry AND every
+  // revisit (Ionic keeps this page mounted, so a mount effect only ever
+  // covers the first entry — see CLAUDE.md rule #6). A mount effect here
+  // used to run IN ADDITION to that, firing two overlapping fetches (each
+  // with its own AbortController, so both ran to completion) on every
+  // single Dashboard view — confirmed in a production logcat capture,
+  // not just a dev double-invoke.
 
   // ✅ Refresh on inactivity
   useInactivityTimer(300000, () => {
@@ -71,8 +107,8 @@ export const useDashboard = () => {
     //console.log("🔵 useLaundryDashboard - Computing pie chart, allIncome length:", allIncome?.length);
 
   // ✅ PIE CHART (🔥 FIXED — single source of truth)
-  const pieData = useMemo(() => {
-    if (!allIncome?.length) return null;
+  const paymentBreakdown = useMemo(() => {
+    if (!allIncome?.length) return [];
 
     const now = new Date();
     const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
@@ -86,43 +122,50 @@ export const useDashboard = () => {
       );
     });
 
-    if (!monthly.length) return null;
+    if (!monthly.length) return [];
 
-    const methodMap: Record<string, PaymentMethod> = {
-      efectivo: 'Efectivo',
-      tarjeta: 'Tarjeta',
-      transferencia: 'Transferencia',
-    };
+    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
+    const commissions: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
+    monthly.forEach((income) => {
+      const method = normalizePaymentMethod(income.paymentMethod);
+      if (!method) return;
+      totals[method] += Number(income.total) || 0;
+      commissions[method] += incomeCommission(income, cardTerminal);
+    });
 
-    const totals = monthly.reduce(
-      (acc: Record<PaymentMethod, number>, income: any) => {
-        const method = methodMap[(income.paymentMethod || '').toLowerCase()];
-        if (!method) return acc;
-        acc[method] += Number(income.total) || 0;
-        return acc;
-      },
-      { Efectivo: 0, Transferencia: 0, Tarjeta: 0 }
-    );
+    const total = PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
+    if (total === 0) return [];
 
-    const values = PAYMENT_METHODS.map((m) => totals[m] || 0);
-    if (values.every((v) => v === 0)) return null;
+    return PAYMENT_METHODS.map((method) => ({
+      method,
+      amount: totals[method],
+      commission: commissions[method],
+      percent: (totals[method] / total) * 100,
+      color: PAYMENT_COLORS[method],
+    }));
+  }, [allIncome, cardTerminal]);
 
-    return {
-      labels: PAYMENT_METHODS,
-      datasets: [
-        {
-          data: values,
-          backgroundColor: PAYMENT_METHODS.map((m) => PAYMENT_COLORS[m]),
-          borderWidth: 0,
-        },
-      ],
-    };
-  }, [allIncome]);
+  // PAGOS: expenses of the current month by payment method — same shape as
+  // COBROS (no terminal commission on money going out). allExpenses is
+  // already this company's current month (fetchMonthlyExpenses).
+  const expenseBreakdown = useMemo(() => {
+    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
+    allExpenses.forEach((expense) => {
+      const method = normalizePaymentMethod(expense.paymentMethod);
+      if (method) totals[method] += Number(expense.total) || 0;
+    });
 
-  // sync state (optional, keeps compatibility with your component)
-  //useEffect(() => {
-    //setPieData(pieChartData);
-  //}, [pieChartData]);
+    const total = PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
+    if (total === 0) return [];
+
+    return PAYMENT_METHODS.map((method) => ({
+      method,
+      amount: totals[method],
+      commission: 0,
+      percent: (totals[method] / total) * 100,
+      color: EXPENSE_PAYMENT_COLORS[method],
+    }));
+  }, [allExpenses]);
 
   // ✅ METRICS
   const calculateTotal = () =>
@@ -139,9 +182,43 @@ export const useDashboard = () => {
         const d = toHermosilloDate(i.paymentDate);
         return d.toISOString().split('T')[0] === today;
       })
-      .reduce((sum, i) => {
-        return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
-      }, 0);
+      // income.total is already the charged (post-discount) amount — the cart
+      // sends the promo total and sp_income stores it — so no second subtraction.
+      .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+  };
+
+  // Card-terminal commissions on today's sales — a cost, not a sale: Neto deducts it.
+  const calculateDailyCommissions = () => {
+    const today = toHermosilloDate(new Date().toISOString())
+      .toISOString()
+      .split('T')[0];
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => toHermosilloDate(i.paymentDate).toISOString().split('T')[0] === today)
+      .reduce((sum, i) => sum + incomeCommission(i, cardTerminal), 0);
+  };
+
+  const calculateDailySalesCount = () => {
+    const today = toHermosilloDate(new Date().toISOString())
+      .toISOString()
+      .split('T')[0];
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => toHermosilloDate(i.paymentDate).toISOString().split('T')[0] === today)
+      .length;
+  };
+
+  const calculateExpensesDailyTotal = () => {
+    const today = toHermosilloDate(new Date().toISOString())
+      .toISOString()
+      .split('T')[0];
+
+    return allExpenses
+      .filter((e) => e?.paymentDate)
+      .filter((e) => toHermosilloDate(e.paymentDate).toISOString().split('T')[0] === today)
+      .reduce((sum, e) => sum + (Number(e.total) || 0), 0);
   };
 
   const calculateMonthlyTotal = () => {
@@ -157,9 +234,58 @@ export const useDashboard = () => {
           d.getFullYear() === hermosilloNow.getFullYear()
         );
       })
-      .reduce((sum, i) => {
-        return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
-      }, 0);
+      // income.total is already the charged (post-discount) amount — the cart
+      // sends the promo total and sp_income stores it — so no second subtraction.
+      .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+  };
+
+  // Card-terminal commissions on this month's sales — mirrors calculateDailyCommissions.
+  const calculateMonthlyCommissions = () => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => {
+        const d = toHermosilloDate(i.paymentDate);
+        return (
+          d.getMonth() === hermosilloNow.getMonth() &&
+          d.getFullYear() === hermosilloNow.getFullYear()
+        );
+      })
+      .reduce((sum, i) => sum + incomeCommission(i, cardTerminal), 0);
+  };
+
+  const calculateMonthlySalesCount = () => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    return allIncome
+      .filter((i) => i?.paymentDate)
+      .filter((i) => {
+        const d = toHermosilloDate(i.paymentDate);
+        return (
+          d.getMonth() === hermosilloNow.getMonth() &&
+          d.getFullYear() === hermosilloNow.getFullYear()
+        );
+      })
+      .length;
+  };
+
+  const calculateExpensesMonthlyTotal = () => {
+    const now = new Date();
+    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
+
+    return allExpenses
+      .filter((e) => e?.paymentDate)
+      .filter((e) => {
+        const d = toHermosilloDate(e.paymentDate);
+        return (
+          d.getMonth() === hermosilloNow.getMonth() &&
+          d.getFullYear() === hermosilloNow.getFullYear()
+        );
+      })
+      .reduce((sum, e) => sum + (Number(e.total) || 0), 0);
   };
 
   const currentMonthYear = new Date().toLocaleDateString('es-ES', {
@@ -184,9 +310,7 @@ export const useDashboard = () => {
           const d = toHermosilloDate(i.paymentDate);
           return d.toISOString().split('T')[0] === dateKey;
         })
-        .reduce((sum, i) => {
-          return sum + (Number(i.total) || 0) - (Number(i.discountAmount) || 0);
-        }, 0);
+        .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
 
     const todayTotal = getNet(todayKey);
     const yesterdayTotal = getNet(yesterdayKey);
@@ -204,7 +328,7 @@ export const useDashboard = () => {
   }, [allIncome]);
 
   // ✅ ACTIONS
-  const handleStartSeller = () => history.push('/category');
+  const handleStartSeller = () => history.push('/product');
 
   const handleConfirmSale = async () => {
     if (!cart.length) {
@@ -218,7 +342,7 @@ export const useDashboard = () => {
       console.log('[Dashboard] handleConfirmSale → /pos_laundry', { itemCount: cart.length, total });
 
       const response = await fetch(
-        'https://smartloansbackend.azurewebsites.net/pos_laundry',
+        `${API_BASE_URL}/pos_laundry`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -243,7 +367,7 @@ export const useDashboard = () => {
       setShowToast(true);
       setCart([]);
       setShowCart(false);
-      loadIncomes();
+      loadIncomes(companyId);
     } catch (err) {
       console.log('[Dashboard] handleConfirmSale ❌', err);
       setToastMessage('Error al confirmar la venta.');
@@ -253,6 +377,7 @@ export const useDashboard = () => {
 
   const handleShowReceipt = async (incomeId: number) => {
     console.log('[Dashboard] handleShowReceipt: fetching ticket, incomeId =', incomeId);
+    setLoadingReceiptId(incomeId);
     try {
       const ticket = await fetchTicket(incomeId.toString());
       if (!ticket) throw new Error();
@@ -263,6 +388,8 @@ export const useDashboard = () => {
       console.log('[Dashboard] handleShowReceipt ❌', err);
       setToastMessage('Error al obtener el recibo.');
       setShowToast(true);
+    } finally {
+      setLoadingReceiptId(null);
     }
   };
 
@@ -286,16 +413,24 @@ export const useDashboard = () => {
     setShowLogoutAlert,
     receiptData,
     setReceiptData,
-    pieData,
+    paymentBreakdown,
+    expenseBreakdown,
 
     calculateTotal,
     calculateDailySales,
+    calculateDailySalesCount,
+    calculateDailyCommissions,
+    calculateExpensesDailyTotal,
     calculateMonthlyTotal,
+    calculateMonthlyCommissions,
+    calculateMonthlySalesCount,
+    calculateExpensesMonthlyTotal,
     currentMonthYear,
 
     handleStartSeller,
     handleConfirmSale,
     handleShowReceipt,
+    loadingReceiptId,
 
     handleLogoutConfirm: async () => {
       try {

@@ -60,6 +60,9 @@ function generateCompactProducts(data: UnifiedReceiptData): string {
 }
 
 function generateCompactTotals(data: UnifiedReceiptData): string {
+  const discount = Number(data.totals.discount ?? 0);
+  const originalTotal = Number(data.totals.originalTotal ?? data.totals.subtotal + data.totals.iva);
+
   return `
     <div class="totals-row">
       <span class="total-label">Subtotal:</span>
@@ -69,6 +72,15 @@ function generateCompactTotals(data: UnifiedReceiptData): string {
       <span class="total-label">IVA:</span>
       <span class="total-value">$${data.totals.iva.toFixed(2)}</span>
     </div>
+    ${discount > 0 ? `
+    <div class="totals-row">
+      <span class="total-label">Descuento${data.promotion?.code ? ` (${data.promotion.code})` : ''}:</span>
+      <span class="total-value">-$${discount.toFixed(2)}</span>
+    </div>
+    <div class="totals-row">
+      <span class="total-label">Total original:</span>
+      <span class="total-value">$${originalTotal.toFixed(2)}</span>
+    </div>` : ''}
     <div class="divider"></div>
     <div class="totals-row grand-total">
       <span class="total-label">TOTAL:</span>
@@ -85,6 +97,17 @@ function generateCompactPayment(data: UnifiedReceiptData): string {
     ${data.payment.method === 'efectivo' ? `
     <div class="receipt-field"><strong>Efectivo</strong><span>$${Number(data.payment.cashPaid ?? data.payment.amountReceived ?? 0).toFixed(2)}</span></div>
     <div class="receipt-field"><strong>Cambio</strong><span>$${Number(data.payment.change ?? 0).toFixed(2)}</span></div>` : ''}
+    <div class="divider"></div>`;
+}
+
+// POS points: the same lines the client gets in the sale message.
+function generateCompactRewards(data: UnifiedReceiptData): string {
+  const lines = data.rewards?.lines ?? [];
+  if (lines.length === 0) return '';
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `
+    <div class="section-title">Recompensas</div>
+    ${lines.map(line => `<div class="receipt-field"><span>${esc(line)}</span></div>`).join('')}
     <div class="divider"></div>`;
 }
 
@@ -106,6 +129,18 @@ function generateCompactFooter(data: UnifiedReceiptData): string {
     </div>`;
 }
 
+// A copy handed to the customer later must never pass for the original ticket.
+function generateReprintBanner(): string {
+  const now = new Date().toLocaleString('es-MX', {
+    timeZone: 'America/Hermosillo',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  return `
+    <div class="reprint-banner">*** REIMPRESIÓN / COPIA ***</div>
+    <div class="reprint-date">Reimpreso: ${now}</div>
+    <div class="divider"></div>`;
+}
+
 export function generatePrintHTML(data: UnifiedReceiptData, options: PrintOptions = {}): string {
   const width = options.width || '58mm';
   const isUltraCompact = width === '46mm';
@@ -120,10 +155,12 @@ export function generatePrintHTML(data: UnifiedReceiptData, options: PrintOption
 <body>
   <div class="receipt-container">
     ${generateCompactHeader(data, isUltraCompact)}
+    ${options.reprint ? generateReprintBanner() : ''}
     ${generateCompactClientInfo(data)}
     ${generateCompactProducts(data)}
     ${generateCompactTotals(data)}
     ${generateCompactPayment(data)}
+    ${generateCompactRewards(data)}
     ${generateCompactFooter(data)}
   </div>
 </body>

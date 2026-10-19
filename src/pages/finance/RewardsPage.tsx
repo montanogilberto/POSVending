@@ -7,12 +7,12 @@ import {
   IonToast, IonLoading, IonFab, IonFabButton, IonSegment, IonSegmentButton,
   IonGrid, IonRow, IonCol,
 } from '@ionic/react';
+import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import {
   addOutline, closeOutline, starOutline, giftOutline, trophyOutline,
   cashOutline, arrowBack, createOutline, trashOutline, refreshOutline,
   checkmarkCircleOutline, removeCircleOutline,
 } from 'ionicons/icons';
-import { useHistory } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { canAccess } from '../../config/rolePermissions';
 import { rewardsApi, RewardRule, RewardTransaction, RewardBalance } from '../../api/rewardsApi';
@@ -27,7 +27,7 @@ const EMPTY_RULE: Partial<RewardRule> = {
 };
 
 const RewardsPage: React.FC = () => {
-  const history = useHistory();
+  const { confirmBack } = useExitConfirm();
   const { companyId, userId, roleCode } = useUser();
   const isAdmin = canAccess(roleCode, 'users');
 
@@ -411,7 +411,7 @@ const RewardsPage: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           <IonButtons slot="start">
-            <IonButton onClick={() => history.goBack()}>
+            <IonButton onClick={() => confirmBack()}>
               <IonIcon icon={arrowBack} slot="icon-only" />
             </IonButton>
           </IonButtons>

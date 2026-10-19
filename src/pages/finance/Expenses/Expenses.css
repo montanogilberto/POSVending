@@ -1,0 +1,390 @@
+.expenses-content {
+  --background: #F9FAFB;
+}
+
+.expenses-container {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ==========================================================================
+   SUMMARY CARD
+   ========================================================================== */
+.expenses-summary-card {
+  margin: 0 !important;
+  border-radius: 24px !important;
+  --background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02), 0 2px 8px rgba(0, 0, 0, 0.01) !important;
+}
+
+.expenses-summary-content {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  --padding-start: 32px !important;
+  --padding-end: 32px !important;
+  --padding-top: 28px !important;
+  --padding-bottom: 28px !important;
+}
+
+.expenses-summary-title h1 {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1A202C;
+  margin: 0;
+}
+
+.expenses-summary-subtitle span {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  color: #718096;
+  font-weight: 600;
+}
+
+/* Month picker: ‹ Septiembre de 2026 › */
+.expenses-period {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expenses-period ion-button {
+  --padding-start: 4px;
+  --padding-end: 4px;
+  margin: 0;
+}
+
+.expenses-summary-amount-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.expenses-summary-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #FEE2E2;
+  color: #DC2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expenses-summary-icon ion-icon {
+  font-size: 20px;
+}
+
+.expenses-summary-amount h2 {
+  font-family: 'Inter', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #0056D2;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.expenses-summary-count-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: #718096;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.expenses-summary-count-row ion-icon {
+  font-size: 15px;
+}
+
+.expenses-trends-button {
+  --border-radius: 12px !important;
+  font-weight: 700;
+  text-transform: none;
+}
+
+/* ==========================================================================
+   LIST CARD (toolbar + filters + table + pagination)
+   ========================================================================== */
+.expenses-list-card {
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02), 0 2px 8px rgba(0, 0, 0, 0.01);
+  padding: 24px;
+  overflow: hidden;
+}
+
+.expenses-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.expenses-toolbar-search {
+  flex: 1 1 260px;
+  --border-radius: 12px;
+  --box-shadow: none;
+  --background: #F3F4F6;
+  padding: 0;
+}
+
+.expenses-filters-toggle {
+  --border-radius: 12px !important;
+  font-weight: 600;
+  text-transform: none;
+  position: relative;
+}
+
+.expenses-filters-badge {
+  margin-left: 6px;
+}
+
+.expenses-add-button {
+  --border-radius: 12px !important;
+  --background: #0056D2 !important;
+  font-weight: 700;
+  text-transform: none;
+  min-height: 50px;
+  margin: 0 0 20px;
+}
+
+/* "Agente de egresos": secondary action under Nuevo Egreso (the container's gap spaces it) */
+.expenses-agent-button {
+  --border-radius: 12px !important;
+  --border-color: #0056D2;
+  --color: #0056D2;
+  font-weight: 700;
+  text-transform: none;
+  min-height: 50px;
+  margin: -4px 0 20px;
+}
+
+/* ==========================================================================
+   OVERVIEW — Actividad Reciente (same card as /dashboard)
+   ========================================================================== */
+.expenses-activity-card {
+  margin: 0;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02), 0 2px 8px rgba(0, 0, 0, 0.01);
+}
+
+.expenses-activity-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #1A202C;
+}
+
+.expenses-see-all {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.expenses-see-all ion-button {
+  font-weight: 700;
+  text-transform: none;
+}
+
+.expenses-loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0;
+}
+
+/* ==========================================================================
+   DETAIL — month + total header
+   ========================================================================== */
+.expenses-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.expenses-detail-total {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1A202C;
+}
+
+/* ==========================================================================
+   FILTERS PANEL
+   ========================================================================== */
+.expenses-filters-panel {
+  margin: 0 0 16px 0 !important;
+  border-radius: 16px !important;
+  --background: #F9FAFB;
+  box-shadow: none !important;
+  border: 1px solid #EDF2F7;
+}
+
+.expenses-filters-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.expenses-filter-item {
+  --background: transparent;
+  --min-height: 44px;
+  flex: 1 1 200px;
+}
+
+.expenses-filters-clear {
+  --color: #DC2626;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.expenses-empty {
+  padding: 48px 0;
+}
+
+/* ==========================================================================
+   PAGINATION
+   ========================================================================== */
+.expenses-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #F3F4F6;
+}
+
+.expenses-pagination-summary {
+  font-size: 0.9rem;
+  color: #718096;
+  font-weight: 600;
+}
+
+.expenses-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expenses-pagination-page {
+  --border-radius: 10px !important;
+  min-width: 36px;
+  font-weight: 600;
+}
+
+.expenses-pagination-ellipsis {
+  padding: 0 6px;
+  color: #A0AEC0;
+}
+
+.expenses-pagination-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #718096;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .expenses-container {
+    padding: 16px;
+  }
+
+  .expenses-list-card {
+    padding: 16px;
+  }
+
+  .expenses-summary-content {
+    --padding-start: 20px !important;
+    --padding-end: 20px !important;
+    --padding-top: 20px !important;
+    --padding-bottom: 20px !important;
+  }
+
+}
+
+@media (max-width: 640px) {
+  .expenses-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .expenses-pagination-controls {
+    justify-content: center;
+  }
+
+  .expenses-pagination-size {
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   EXPENSE DETAIL MODAL
+   ========================================================================== */
+.expense-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.expense-detail-row-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.expense-detail-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.expense-detail-value {
+  font-size: 0.95rem;
+  color: #1A202C;
+  text-align: right;
+}
+
+.expense-detail-total {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.expense-detail-notes {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #1A202C;
+  white-space: pre-wrap;
+}
+
+.expense-detail-receipt {
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+}

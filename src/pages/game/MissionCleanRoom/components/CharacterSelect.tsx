@@ -69,6 +69,11 @@ const CharacterSelect: React.FC<CharacterSelectProps> = ({ avatars, selectedAvat
     >
       Empezar
     </IonButton>
+
+    {/* Gilbertito, Gael, and Tutu all graduated to real selectable cards above (rigged + 4
+        animations each, see world3d/GameAvatar.ts) — no static preview cards left. Worth noting:
+        Gael's shirt literally reads "LITTLE DINO", so he may end up being the real dino_boy asset
+        rather than a standalone roster addition — not yet decided. */}
   </div>
 );
 

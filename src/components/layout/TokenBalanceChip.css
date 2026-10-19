@@ -1,0 +1,25 @@
+.token-chip {
+  --background: #EFF6FF;
+  --color: #0056D2;
+  margin: 0 4px;
+  height: 32px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.token-chip ion-icon { font-size: 1rem; margin-inline-end: 2px; }
+
+.token-chip--low {
+  --background: #FFFBEB;
+  --color: #B45309;
+}
+
+.token-chip--empty {
+  --background: #FEF2F2;
+  --color: #DC2626;
+}
+
+/* The detail alert lists several short lines — keep their line breaks. */
+.token-alert .alert-message { white-space: pre-line; }

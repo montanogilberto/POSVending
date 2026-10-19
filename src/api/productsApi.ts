@@ -1,6 +1,6 @@
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 import { Product, ProductCategory, ProductPackingType } from '../data/type_products';
+import { API_BASE_URL } from '../utils/appEnv';
 
 const inFlightProductsByCompanyRequests = new Map<number, Promise<Product[]>>();
 
@@ -60,7 +60,8 @@ export interface ProductFormPayload {
 export interface ProductDetailsPayload {
   action?: number;
   productDetailId: number | null;
-  stockQuantity: number;
+  /** Target stock count; omit unless the user changed it (backend posts the difference). */
+  stockQuantity?: number;
   unitPrice: number;
   salePrice: number;
 }
@@ -81,6 +82,10 @@ export interface ProductOptionChoicePayload {
   name: string;
   price: number;
   description: string;
+  /** Size of this choice (19 L, 600 ml); null for services. */
+  quantity?: number | null;
+  /** Unit code matching measurements.prefix: g, kg, ml, L, pz. */
+  unit?: string | null;
 }
 
 export interface ProductOptionPayload {
@@ -89,6 +94,7 @@ export interface ProductOptionPayload {
   optionKey: string;
   name: string;
   type: string;
+  isRequired?: boolean;
   optionChoices: ProductOptionChoicePayload[];
 }
 
@@ -102,6 +108,15 @@ export interface CreateProductRequest {
     barCode: string;
     code: string;
     dateOfExpire: string | null;
+    /** true = explicitly no expiration (clears dateOfExpire on update). */
+    noExpire?: boolean;
+    /** Net content per unit sold, e.g. 500 + 'g'. */
+    netContent?: number | null;
+    unitOfMeasure?: string | null;
+    /** Competitor/market shelf price, reference only. */
+    referencePrice?: number | null;
+    /** Product photo blob URL (uploadProductImage). Absent/null keeps the current one. */
+    imageUrl?: string | null;
     manufactureId: number | null;
     description: string;
     productForm?: ProductFormPayload | null;
@@ -110,6 +125,7 @@ export interface CreateProductRequest {
     productOptions?: ProductOptionPayload[];
     // Backward-compatible fields for existing API behavior
     productFormId?: number;
+    isSupply?: boolean;
   }>;
 }
 
@@ -423,4 +439,71 @@ export const deleteProduct = async (data: DeleteProductRequest): Promise<DeleteP
   }
 
   throw lastError ?? new Error('Failed to delete product');
+};
+
+/**
+ * Every product of the company, supplies included. getProductsByCompany
+ * (the POS list) only returns sellable products — those with options — so a
+ * purchase needs this one instead.
+ */
+export const getCompanyProducts = async (companyId: number): Promise<Product[]> => {
+  const all = await getAllProducts();
+  return all.filter((p) => Number(p?.companyId) === Number(companyId));
+};
+
+/**
+ * Creates a supply product (isSupply=true) straight from the expense form.
+ * Created WITHOUT options/price on purpose: sp_products_by_company only lists
+ * products that have options, so it never shows up in the POS sales menu.
+ * sp_products_save returns the new productId in result[0].value.
+ */
+export const createSupplyProduct = async (params: {
+  companyId: number;
+  categoryId: number;
+  name: string;
+  code?: string;
+}): Promise<number> => {
+  const res = await createOrUpdateProduct({
+    products: [{
+      action: 1,
+      productId: null,
+      companyId: params.companyId,
+      categoryId: params.categoryId,
+      name: params.name,
+      barCode: '',
+      code: params.code ?? '',
+      dateOfExpire: null,
+      manufactureId: null,
+      description: '',
+      isSupply: true,
+    }],
+  });
+  const productId = Number(res.result?.[0]?.value);
+  if (!Number.isFinite(productId) || productId <= 0) {
+    throw new Error('El producto se creó pero no se recibió su id; recarga la lista.');
+  }
+  return productId;
+};
+
+/**
+ * POST /products/upload-image — uploads a product photo (data URL or bare
+ * base64) to blob storage and returns its URL. The URL is saved separately
+ * as products[].imageUrl through createOrUpdateProduct.
+ */
+export const uploadProductImage = async (payload: {
+  companyId: number;
+  imageBase64: string;
+}): Promise<string> => {
+  console.log('[productsApi] uploadProductImage: START', { companyId: payload.companyId });
+  const response = await fetch(`${API_BASE_URL}/products/upload-image`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body?.blobUrl) {
+    console.error('[productsApi] uploadProductImage: FAILED', { status: response.status, error: body?.error });
+    throw new Error('No se pudo subir la imagen del producto.');
+  }
+  return body.blobUrl as string;
 };

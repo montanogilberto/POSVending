@@ -201,7 +201,7 @@ const CategoriesPage: React.FC = () => {
         screenTitle="Categorías"
         showBackButton={true}
         backButtonText="Menú"
-        backButtonHref="/laundry"
+        backButtonHref="/dashboard"
       />
 
       <IonContent className="categories-content">

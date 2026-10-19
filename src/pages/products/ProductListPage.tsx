@@ -17,59 +17,91 @@ import {
   IonToolbar,
   IonTitle,
   IonButtons,
+  useIonViewWillEnter,
 } from '@ionic/react';
-import { barcodeOutline, closeOutline } from 'ionicons/icons';
+import { barcodeOutline, closeOutline, swapVerticalOutline } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { getProducts } from '../../data/products';
+import CategoryChips from '../../components/pos/CategoryChips';
+import { useProductCategories, categoryIdsFor } from '../../hooks/useProductCategories';
 import { Product } from '../../data/type_products';
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
+import { onDataChanged } from '../../utils/refreshBus';
 import '../../styles/dashboard.css';
+import './ProductListPage.css';
+
+type SortOrder = 'az' | 'za';
 
 interface RouteParams {
-  categoryId: string;
+  categoryId?: string;
 }
 
 const ProductListPage: React.FC = () => {
   const { categoryId } = useParams<RouteParams>();
   const history = useHistory();
   const [products, setProducts] = useState<Product[]>([]);
+  const { categories } = useProductCategories();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
   const [showScanner, setShowScanner] = useState(false);
-  const hasFetched = useRef(false);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('az');
   const pops = usePopovers();
 
-  const categoryIdNumber = +categoryId;
+  // The sale starts here directly (no separate category screen): every product
+  // is listed and categories are filter chips. /product/:categoryId preselects one.
+  const routeCategoryId = categoryId ? Number(categoryId) : NaN;
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
+    Number.isFinite(routeCategoryId) && routeCategoryId > 0 ? routeCategoryId : null,
+  );
 
   useEffect(() => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
-    const fetchData = async () => {
-      try {
-        const data = await getProducts(categoryIdNumber);
-        setProducts(data);
-      } catch {
-        setError('No se pudieron cargar los productos.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [categoryIdNumber]);
+    setSelectedCategoryId(Number.isFinite(routeCategoryId) && routeCategoryId > 0 ? routeCategoryId : null);
+  }, [routeCategoryId]);
+
+  // Reload on every visit (CLAUDE.md §6): a fetch-once guard kept serving
+  // stale products — a price edited in Gestión de productos never reached
+  // the detail page or the cart.
+  const load = useCallback(async () => {
+    try {
+      const data = await getProducts();
+      console.log('[ProductList] load', JSON.stringify({
+        count: data.length,
+        basePrices: data.map(p => ({ id: p.productId, name: p.name, salePrice: p.details?.[0]?.salePrice ?? 0 })),
+      }));
+      setProducts(data);
+      setError(null);
+    } catch {
+      setError('No se pudieron cargar los productos.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useIonViewWillEnter(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => onDataChanged(load), [load]);
 
   const handleScan = (result: string) => {
     setShowScanner(false);
     setSearchText(result);
   };
 
+  // A category includes its subcategories (same rule as Gestión de productos).
+  const categoryIds = categoryIdsFor(selectedCategoryId, categories);
+  const categoryProducts = categoryIds
+    ? products.filter((p) => categoryIds.has(Number(p.categoryId)))
+    : products;
+
   const filteredProducts = searchText.trim()
-    ? products.filter((p) => {
+    ? categoryProducts.filter((p) => {
         const q = searchText.toLowerCase();
         return (
           p.name?.toLowerCase().includes(q) ||
@@ -78,7 +110,13 @@ const ProductListPage: React.FC = () => {
           p.description?.toLowerCase().includes(q)
         );
       })
-    : products;
+    : categoryProducts;
+
+  // Accent/case-insensitive so "Árbol" sorts with the A's.
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    const cmp = (a.name ?? '').localeCompare(b.name ?? '', 'es', { sensitivity: 'base' });
+    return sortOrder === 'az' ? cmp : -cmp;
+  });
 
   if (loading) {
     return (
@@ -87,8 +125,8 @@ const ProductListPage: React.FC = () => {
           {...pops.headerProps}
           screenTitle=""
           showBackButton={true}
-          backButtonText="Categorías"
-          backButtonHref="/Category"
+          backButtonText="Inicio"
+          backButtonHref="/dashboard"
         />
         <IonContent className="ion-padding">
           <p>Cargando productos...</p>
@@ -103,12 +141,15 @@ const ProductListPage: React.FC = () => {
         {...pops.headerProps}
         screenTitle="Productos"
         showBackButton={true}
-        backButtonText="Categoria Productos"
-        backButtonHref="/Category"
+        backButtonText="Inicio"
+        backButtonHref="/dashboard"
       />
 
       <IonContent fullscreen className="dashboard-content">
         <div className="dashboard-container">
+
+          {/* Category filter (replaces the old /category step) — shared with Gestión de productos */}
+          <CategoryChips categories={categories} selectedId={selectedCategoryId} onSelect={setSelectedCategoryId} />
 
           {/* Search + Scan bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0' }}>
@@ -127,6 +168,18 @@ const ProductListPage: React.FC = () => {
             >
               <IonIcon icon={barcodeOutline} style={{ fontSize: '24px' }} />
             </IonButton>
+            {/* One-tap toggle instead of a segment row — vertical space is
+                scarce on small phones. */}
+            <IonButton
+              fill="outline"
+              shape="round"
+              className="product-sort-toggle"
+              aria-label={sortOrder === 'az' ? 'Orden A-Z, cambiar a Z-A' : 'Orden Z-A, cambiar a A-Z'}
+              onClick={() => setSortOrder(sortOrder === 'az' ? 'za' : 'az')}
+            >
+              <IonIcon slot="start" icon={swapVerticalOutline} />
+              {sortOrder === 'az' ? 'A-Z' : 'Z-A'}
+            </IonButton>
           </div>
 
           {/* Products List */}
@@ -139,9 +192,9 @@ const ProductListPage: React.FC = () => {
             <IonCardContent style={{ padding: '16px 24px' }}>
               {error && <p style={{ padding: '16px 0' }}>{error}</p>}
 
-              {filteredProducts.length > 0 ? (
+              {sortedProducts.length > 0 ? (
                 <IonGrid style={{ padding: 0 }}>
-                  {filteredProducts.map((product) => (
+                  {sortedProducts.map((product) => (
                     <IonRow key={product.productId}>
                       <IonCol>
                         <IonCard button={true} onClick={() => history.push(`/products/${product.productId}`, { product })}>
@@ -181,7 +234,9 @@ const ProductListPage: React.FC = () => {
                 </IonGrid>
               ) : (
                 <p style={{ padding: '16px 0' }}>
-                  {searchText ? 'No se encontraron productos con ese código o nombre.' : 'No hay productos en esta categoría.'}
+                  {searchText
+                    ? 'No se encontraron productos con ese código o nombre.'
+                    : selectedCategoryId === null ? 'No hay productos.' : 'No hay productos en esta categoría.'}
                 </p>
               )}
             </IonCardContent>

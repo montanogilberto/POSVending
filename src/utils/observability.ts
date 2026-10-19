@@ -8,10 +8,11 @@
 
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
+import { API_BASE_URL } from './appEnv';
 
 const AUTH_STORAGE_KEY = 'pos_gmo_auth';        // written by UserContext
 const WORKFLOW_STORAGE_KEY = 'pos_gmo_workflow'; // current business workflow
-const BACKEND_HOST = 'smartloansbackend.azurewebsites.net';
+const BACKEND_HOST = new URL(API_BASE_URL).host; // prod: smartloansbackend.azurewebsites.net, dev: localhost:8000
 
 // Cached device/version — resolved once (async) at install; header falls back to
 // platform until resolved.

@@ -1,0 +1,154 @@
+/* Marco comun de los juegos del arcade (GameShell + barra de retiro). */
+
+.ag-content {
+  --padding-bottom: 28px;
+  --background: var(--ion-color-step-50, #f7f7fb);
+}
+
+.ag-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.ag-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 0;
+}
+
+.ag-topbar ion-chip {
+  margin: 0;
+}
+
+/* Tablero: caja donde vive cada juego. */
+.ag-board {
+  margin: 12px;
+  padding: 20px 16px;
+  border-radius: 18px;
+  background: var(--ion-background-color, #fff);
+  box-shadow: 0 1px 3px rgba(20, 20, 60, 0.07);
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.ag-hint {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--ion-color-medium);
+}
+
+.ag-big {
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 4px 16px 8px;
+}
+
+.ag-actions ion-button {
+  --border-radius: 12px;
+  height: 46px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.ag-actions--single {
+  grid-template-columns: 1fr;
+}
+
+/* ── Barra de retiro (juegos de racha) ────────────────────── */
+
+.ag-cashout {
+  margin: 0 16px 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--arc-green-soft, #dcfce7);
+  text-align: center;
+}
+
+.ag-cashout__now {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ag-cashout__label {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--arc-green, #16a34a);
+}
+
+.ag-cashout__now strong {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--arc-green, #16a34a);
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-cashout__mult {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--arc-green, #16a34a);
+  opacity: 0.75;
+}
+
+.ag-cashout__next {
+  margin: 4px 0 10px;
+  font-size: 0.8rem;
+  color: var(--ion-color-medium-shade, #6b7280);
+}
+
+.ag-cashout ion-button {
+  --border-radius: 12px;
+  height: 42px;
+  margin: 0;
+  font-weight: 700;
+}
+
+/* ── Racha ────────────────────────────────────────────────── */
+
+.ag-streak {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ag-streak__pip {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--arc-green, #16a34a);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ag-content {
+    --background: #131419;
+  }
+
+  .ag-board {
+    background: #1c1d24;
+    box-shadow: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .ag-cashout {
+    background: rgba(22, 163, 74, 0.16);
+  }
+}

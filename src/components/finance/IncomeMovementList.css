@@ -1,0 +1,90 @@
+/* Same design as /dashboard "Actividad Reciente" (.activity-*) and /movements. */
+
+.imv-day {
+  --background: #F3F4F6;
+  --border-radius: 12px;
+  margin: 12px 0 6px 0;
+}
+
+.imv-day h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.imv-day p {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.imv-list {
+  background: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.imv-row {
+  --background: #F9FAFB;
+  --background-hover: #F3F4F6;
+  --border-radius: 16px;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --inner-padding-end: 0;
+  margin: 0;
+}
+
+.imv-badge {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  background: #E6F4EA;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #16A34A;
+  margin-right: 16px;
+}
+
+.imv-badge ion-icon {
+  font-size: 22px;
+}
+
+.imv-amount {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1A202C;
+}
+
+.imv-meta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #718096;
+  margin-top: 2px;
+  text-transform: capitalize;
+}
+
+.imv-ticket {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: #EFF6FF;
+  color: #0056D2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 12px;
+}
+
+.imv-ticket ion-icon {
+  font-size: 15px;
+}
+
+.imv-delete {
+  margin: 0;
+  --padding-start: 8px;
+  --padding-end: 8px;
+}

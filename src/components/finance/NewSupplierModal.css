@@ -1,0 +1,20 @@
+.new-supplier-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.new-supplier-fields ion-input {
+  --border-radius: 12px;
+}
+
+.new-supplier-save {
+  --border-radius: 12px;
+  --background: #0056D2;
+  min-height: 48px;
+  margin-top: 6px;
+  font-weight: 700;
+  text-transform: none;
+}

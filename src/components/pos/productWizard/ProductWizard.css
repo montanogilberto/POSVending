@@ -447,9 +447,16 @@
 
 .wizard-choice-row {
   display: grid;
-  grid-template-columns: 1fr 100px 30px;
+  grid-template-columns: 1fr 130px 36px;
   gap: 8px;
   align-items: center;
+}
+
+/* 100px left ~20px for the number once the $ prefix and padding were taken */
+.wizard-choice-row .wizard-input.with-prefix {
+  padding-left: 12px;
+  padding-right: 8px;
+  text-align: right;
 }
 
 .wizard-add-choice-btn {
@@ -871,4 +878,384 @@
   .wizard-category-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
+}
+
+/* ── Net content (amount + unit) ── */
+.wizard-content-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+/* doubled class: Ionic injects ion-input styles after this file */
+.wizard-ion-input.wizard-ion-input {
+  flex: 0 0 140px;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --color: #111827;
+  --placeholder-color: #9CA3AF;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  background: #ffffff;
+  font-size: 15px;
+  min-height: 46px;
+}
+
+.wizard-ion-input.has-focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.wizard-ion-input.error {
+  border-color: #EF4444;
+}
+
+.wizard-unit-segment {
+  flex: 1;
+  --background: #F3F4F6;
+  border-radius: 12px;
+}
+
+.wizard-unit-segment ion-segment-button {
+  --indicator-color: #2563EB;
+  --color: #4B5563;
+  --color-checked: #2563EB;
+  min-width: 0;
+  font-weight: 600;
+}
+
+/* ── No-expiry checkbox ── */
+.wizard-checkbox {
+  --size: 20px;
+  --checkbox-background-checked: #2563EB;
+  --border-color-checked: #2563EB;
+  margin-top: 10px;
+  font-size: 14px;
+  color: #374151;
+}
+
+/* ── 30% margin suggestion ── */
+.wizard-suggested-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.wizard-suggested-price strong {
+  color: #059669;
+}
+
+.wizard-price-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* doubled class: Ionic injects ion-chip styles after this file */
+.wizard-price-chip.wizard-price-chip {
+  --background: #ffffff;
+  --color: #374151;
+  margin: 0;
+  border: 1.5px solid #E5E7EB;
+  font-size: 13px;
+}
+
+.wizard-price-chip.wizard-price-chip.selected {
+  --background: #ECFDF5;
+  --color: #047857;
+  border-color: #059669;
+}
+
+.price-red { color: #DC2626; font-size: 16px; }
+
+@media (max-width: 480px) {
+  .wizard-content-row { flex-direction: column; }
+  .wizard-ion-input { flex-basis: auto; }
+}
+
+/* ── Market reference price ── */
+.wizard-market-hint {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  font-size: 13px;
+  color: #065F46;
+}
+
+.wizard-market-hint.warn {
+  background: #FFFBEB;
+  border-color: #FCD34D;
+  color: #92400E;
+}
+
+.wizard-market-hint p {
+  margin: 0;
+}
+
+.wizard-market-hint p + p {
+  margin-top: 4px;
+}
+
+/* ── Auto-assigned product code (read-only) ── */
+.wizard-auto-code {
+  padding: 12px 14px;
+  border: 1.5px dashed #E5E7EB;
+  border-radius: 12px;
+  background: #F9FAFB;
+  font-size: 15px;
+  color: #6B7280;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+
+/* ── Product image ── */
+.wizard-image-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.wizard-image-preview,
+.wizard-image-empty {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  border: 1.5px solid #E5E7EB;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.wizard-image-preview::part(image) {
+  object-fit: cover;
+}
+
+.wizard-image-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+.wizard-image-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.wizard-image-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wizard-image-chip.wizard-image-chip {
+  --background: #ffffff;
+  --color: #374151;
+  margin: 0;
+  border: 1.5px solid #E5E7EB;
+  font-size: 13px;
+}
+
+.wizard-image-chip.wizard-image-chip.selected {
+  --background: #EFF6FF;
+  --color: #1D4ED8;
+  border-color: #2563EB;
+}
+
+.wizard-image-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.wizard-footer-submit ion-spinner {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+/* ── Category create / rename (step 1) ── */
+.wizard-category-cell {
+  position: relative;
+}
+
+.wizard-category-cell .wizard-category-card {
+  width: 100%;
+  height: 100%;
+}
+
+.wizard-cat-edit {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  margin: 0;
+  height: auto;
+  min-height: 0;
+  --padding-start: 6px;
+  --padding-end: 6px;
+  --color: #6B7280;
+}
+
+.wizard-cat-add {
+  margin: 16px 0 0;
+}
+
+.wizard-cat-form {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wizard-cat-form-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.wizard-cat-input.wizard-cat-input {
+  flex: none;
+  width: 100%;
+}
+
+.wizard-cat-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Category as chips inside "Producto" (replaces the old first step) */
+.wizard-cat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wizard-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #E5E7EB;
+  background: #ffffff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s ease;
+}
+.wizard-cat-chip ion-icon {
+  font-size: 18px;
+}
+.wizard-cat-chip.selected {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #ffffff;
+}
+.wizard-cat-chip.add {
+  border-style: dashed;
+  color: #2563EB;
+}
+.wizard-cat-chip:disabled {
+  cursor: default;
+}
+.wizard-cat-rename-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: #6B7280;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Category actions under the chips (new category / subcategory / rename) */
+.wizard-cat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.wizard-cat-actions .wizard-cat-rename-link {
+  margin-top: 0;
+}
+
+/* "Obligatoria" toggle on an option */
+.wizard-required-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0 12px;
+  cursor: pointer;
+}
+.wizard-required-toggle input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: #2563EB;
+  flex-shrink: 0;
+}
+.wizard-required-toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  color: #111827;
+}
+.wizard-required-toggle small {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+/* Choice row with size: name | quantity + unit | price | remove */
+.wizard-choice-row.with-size {
+  grid-template-columns: 1fr 150px 120px 36px;
+}
+.wizard-choice-size {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 4px;
+}
+.wizard-choice-size .wizard-input,
+.wizard-choice-size .wizard-select {
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 4px;
+}
+@media (max-width: 480px) {
+  .wizard-choice-row.with-size {
+    grid-template-columns: 1fr 1fr 36px;
+  }
+  .wizard-choice-row.with-size > .wizard-input:first-child {
+    grid-column: 1 / -1;
+  }
+}
+.wizard-required-hint {
+  margin: 4px 0 12px;
+  font-size: 12px;
+  color: #6B7280;
 }

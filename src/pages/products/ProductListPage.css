@@ -1,0 +1,10 @@
+/* Sort toggle in the search row (A-Z <-> Z-A) */
+.product-sort-toggle {
+  min-height: 48px;
+  margin: 0;
+  flex-shrink: 0;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
