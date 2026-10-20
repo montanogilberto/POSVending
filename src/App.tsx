@@ -61,6 +61,7 @@ import {
   starOutline,
   giftOutline,
   chatbubblesOutline,
+  logoWhatsapp,
   chatbubbleEllipsesOutline,
   chevronBackOutline,
   chevronForwardOutline,
@@ -151,6 +152,7 @@ import MyQrPage from './pages/clients/MyQrPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
+import WhatsAppAgentPage from './pages/messaging/WhatsAppAgentPage';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import NotificationDetailPage from './pages/messaging/NotificationDetailPage';
 import type { NotificationTapState } from './pages/messaging/NotificationDetail/NotificationDetailTypes';
@@ -257,7 +259,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
   '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
-  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log',
+  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
 ];
 
@@ -680,6 +682,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'notificationDispatchLog') && (
+              <IonItem button routerLink="/whatsapp-agent" title="Agente WhatsApp">
+                <IonIcon icon={logoWhatsapp} slot="start" />
+                {!menuCollapsed && <IonLabel>Agente WhatsApp</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'categories') && (
               <IonItem button routerLink="/categories" title="Categorías">
                 <IonIcon icon={grid} slot="start" />
@@ -1038,6 +1049,8 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
             <PrivateRoute exact path="/pushNotifications" feature="pushNotifications" component={PushNotificationPage} />
             <PrivateRoute exact path="/notification-dispatch-log" feature="notificationDispatchLog" component={NotificationDispatchLogPage} />
+            {/* Same permission as Notificaciones: role features come from GET /roles, a new one would need a DB change first. */}
+            <PrivateRoute exact path="/whatsapp-agent" feature="notificationDispatchLog" component={WhatsAppAgentPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
             <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />
           </IonRouterOutlet>
