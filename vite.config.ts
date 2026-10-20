@@ -1,11 +1,21 @@
 /// <reference types="vitest" />
 
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
+
+// `npm run dev` calls the local backend over http (API_BASE_URL → http://localhost:8000),
+// but index.html's CSP only allows https: connections. Widen it for the dev server only;
+// production builds keep the strict policy.
+const devLocalApiCsp = (): Plugin => ({
+  name: 'dev-local-api-csp',
+  apply: 'serve',
+  transformIndexHtml: (html) =>
+    html.replace("data: blob: https:;", "data: blob: https: http://localhost:8000;"),
+});
 
 // vite.config.ts
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), devLocalApiCsp()],
   base: './',
   build: {
     target: 'esnext',
