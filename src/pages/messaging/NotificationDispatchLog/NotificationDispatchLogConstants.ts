@@ -115,8 +115,8 @@ export const SORT_LABELS: Record<string, string> = {
 /** Rows per page in the messages table. */
 export const PAGE_SIZE = 10;
 
-/** Route of the client profile opened from the detail panel. */
-export const clientProfileRoute = (clientId: number) => `/client-dashboard/${clientId}`;
+/** Route opened from the detail panel: the Clients list filtered to this client. */
+export const clientProfileRoute = (clientId: number) => `/clients?clientId=${clientId}`;
 
 /** Error code and plain-language meaning as separate fields (detail drawer). */
 export const explainProviderError = (code?: string, message?: string): { code: string; meaning: string; providerText: string } => {

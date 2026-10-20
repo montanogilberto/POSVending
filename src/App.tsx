@@ -144,6 +144,7 @@ const lazyPage = <P extends object>(load: () => Promise<{ default: React.Compone
 const ClientsPage = lazyPage(() => import('./pages/clients/ClientsPage'));
 const MissionCleanRoomPage = lazyPage(() => import('./pages/game/MissionCleanRoomPage'));
 import ClientDashboardPage from './pages/clients/ClientDashboardPage';
+import ClientDashboardPOSPage from './pages/clients/ClientDashboardPOSPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
 import RewardsDashboardPage from './pages/clients/RewardsDashboardPage';
@@ -253,7 +254,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 const POS_ONLY_ROUTE_PREFIXES = [
   '/dashboard', '/category', '/products', '/product', '/cart',
   '/expense-categories', '/expense-products', '/expense-cart',
-  '/movements', '/led-status', '/clients', '/products-management',
+  '/movements', '/led-status', '/clients', '/client-pos', '/products-management',
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
   '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
@@ -996,6 +997,7 @@ const AppShell: React.FC = () => {
               <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
             </React.Suspense>
             <PrivateRoute exact path="/client-dashboard/:clientId" component={ClientDashboardPage} />
+            <PrivateRoute exact path="/client-pos/:clientId" feature="clients" component={ClientDashboardPOSPage} />
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
