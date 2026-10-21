@@ -130,16 +130,16 @@ const Dashboard: React.FC<{ d: WhatsAppAgentDashboard }> = ({ d }) => {
       : null;
 
   const kpis = [
-    { icon: peopleOutline, label: 'Clientes que escribieron', value: fmt(k.customers) },
-    { icon: chatbubblesOutline, label: 'Mensajes respondidos', value: fmt(k.messagesAnswered),
+    { icon: peopleOutline, tone: 'teal', label: 'Clientes que escribieron', value: fmt(k.customers) },
+    { icon: chatbubblesOutline, tone: 'blue', label: 'Mensajes respondidos', value: fmt(k.messagesAnswered),
       note: k.failedCalls > 0 ? `${fmt(k.failedCalls)} sin responder (${k.failureRatePct ?? 0}%)` : 'Sin fallas' },
-    { icon: timerOutline, label: 'Tiempo de respuesta', value: seconds(k.avgLatencyMs),
+    { icon: timerOutline, tone: 'violet', label: 'Tiempo de respuesta', value: seconds(k.avgLatencyMs),
       note: k.p95LatencyMs != null ? `95% en menos de ${seconds(k.p95LatencyMs)}` : undefined },
-    { icon: personOutline, label: 'Pasados a una persona', value: fmt(k.handoffs),
+    { icon: personOutline, tone: 'rose', label: 'Pasados a una persona', value: fmt(k.handoffs),
       note: k.customers > 0 ? `${percent(k.handoffs, k.customers)}% de los clientes` : undefined },
-    { icon: calendarOutline, label: 'Reservaciones por WhatsApp', value: fmt(k.bookings),
+    { icon: calendarOutline, tone: 'amber', label: 'Reservaciones por WhatsApp', value: fmt(k.bookings),
       note: k.bookingsCancelled > 0 ? `${fmt(k.bookingsCancelled)} canceladas` : `${fmt(k.proposals)} propuestas` },
-    { icon: cashOutline, label: 'Compraron después', value: fmt(k.customersWhoBought),
+    { icon: cashOutline, tone: 'green', label: 'Compraron después', value: fmt(k.customersWhoBought),
       note: `${fmtMXN(k.salesAfterChat)} en ventas · ${k.attributionDays} días tras su primer mensaje` },
   ];
 
@@ -186,7 +186,7 @@ const Dashboard: React.FC<{ d: WhatsAppAgentDashboard }> = ({ d }) => {
             <IonCol size="6" sizeMd="4" key={t.label}>
               <IonCard className="wa-agent-kpi-card">
                 <IonCardContent>
-                  <IonIcon icon={t.icon} className="wa-agent-kpi-icon" aria-hidden="true" />
+                  <IonIcon icon={t.icon} className={`wa-agent-kpi-icon wa-agent-tone-${t.tone}`} aria-hidden="true" />
                   <p className="wa-agent-muted">{t.label}</p>
                   <h2 className="wa-agent-kpi-value">{t.value}</h2>
                   {t.note && <p className="wa-agent-muted">{t.note}</p>}
