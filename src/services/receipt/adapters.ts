@@ -47,6 +47,13 @@ function resolveQuantity(unitPrice: number, subtotal: number, quantity?: number)
   return 1;
 }
 
+// sp_tickets_one returns unitPrice=0 for option-priced services (e.g. Servicio
+// Completo, priced by its Ciclo choice) — derive it from the line subtotal.
+function resolveUnitPrice(unitPrice: number, subtotal: number, quantity: number): number {
+  if (unitPrice > 0) return unitPrice;
+  return quantity > 0 ? Math.round((subtotal / quantity) * 100) / 100 : subtotal;
+}
+
 function mapTicketProductOptions(product: any): any[] | undefined {
   if (!product.options || !Array.isArray(product.options)) return undefined;
   const options = product.options.map((option: any) => ({
@@ -95,9 +102,9 @@ export function adaptTicketToUnifiedReceipt(ticket: Ticket): UnifiedReceiptData 
   const { date: transactionDate, time: transactionTime } = toEsDateTime(ticket.paymentDate);
 
   const products: UnifiedProduct[] = ticket.products.map((product: any, index: number) => {
-    const unitPrice = product.unitPrice || 0;
     const subtotal = product.subtotal || 0;
-    const quantity = resolveQuantity(unitPrice, subtotal, product.quantity);
+    const quantity = resolveQuantity(product.unitPrice || 0, subtotal, product.quantity);
+    const unitPrice = resolveUnitPrice(product.unitPrice || 0, subtotal, quantity);
 
     return {
       id: product.incomeDetailId || index,
@@ -154,9 +161,9 @@ export function adaptTicketToLegacyIncome(ticket: Ticket): LegacyIncomeData {
   const { date: transactionDate, time: transactionTime } = toEsDateTime(ticket.paymentDate);
 
   const legacyProducts: any[] = ticket.products.map((product: any) => {
-    const unitPrice = product.unitPrice || 0;
     const subtotal = product.subtotal || 0;
-    const quantity = resolveQuantity(unitPrice, subtotal, product.quantity);
+    const quantity = resolveQuantity(product.unitPrice || 0, subtotal, product.quantity);
+    const unitPrice = resolveUnitPrice(product.unitPrice || 0, subtotal, quantity);
 
     return {
       name: product.name,
