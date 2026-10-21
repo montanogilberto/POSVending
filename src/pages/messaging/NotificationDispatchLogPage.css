@@ -226,9 +226,18 @@ ion-button.ndl-counter {
 }
 
 ion-button.ndl-counter::part(native) {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* Two lines per KPI: label on top, value below (Ionic's button wrapper is a row,
+   so the stacking lives on this inner element). */
+.ndl-counter-body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 2px;
+  white-space: normal;
 }
 
 .ndl-counter:first-child {
@@ -243,6 +252,7 @@ ion-button.ndl-counter::part(native) {
 
 .ndl-counter strong {
   font-size: 1.3rem;
+  line-height: 1.2;
   color: var(--ion-color-dark);
 }
 
