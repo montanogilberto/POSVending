@@ -10,7 +10,17 @@
 .wa-agent-kpi-card ion-card-content {
   display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px;
 }
-.wa-agent-kpi-icon { color: #6b7280; font-size: 1.4rem; }
+.wa-agent-kpi-icon {
+  color: var(--tone, #6b7280); background: var(--tone-bg, #f3f4f6);
+  font-size: 1.3rem; padding: 8px; border-radius: 12px; margin-bottom: 2px;
+}
+/* One tone per KPI. Blue and amber are the chart's Mensajes / Reservaciones bars. */
+.wa-agent-tone-teal   { --tone: #0d9488; --tone-bg: #ccfbf1; }
+.wa-agent-tone-blue   { --tone: #2563eb; --tone-bg: #dbeafe; }
+.wa-agent-tone-violet { --tone: #7c3aed; --tone-bg: #ede9fe; }
+.wa-agent-tone-rose   { --tone: #e11d48; --tone-bg: #ffe4e6; }
+.wa-agent-tone-amber  { --tone: #d97706; --tone-bg: #fef3c7; }
+.wa-agent-tone-green  { --tone: #059669; --tone-bg: #d1fae5; }
 .wa-agent-kpi-value { font-size: 1.4rem; font-weight: 700; margin: 0; }
 
 .wa-agent-card { border-radius: 20px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07); margin: 8px 4px; }

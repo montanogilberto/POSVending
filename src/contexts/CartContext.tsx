@@ -40,6 +40,15 @@ export const calculateCartItemQuantity = (
   return total || 1;
 };
 
+// Same product + same choices (ignoring their quantities) + same pieces.
+const cartMergeKey = (item: CartItem): string => JSON.stringify({
+  productId: item.productId,
+  choices: Object.entries(item.selectedChoices || {})
+    .map(([optId, choices]) => [optId, choices.map((c) => c.id).sort()])
+    .sort(([a], [b]) => String(a).localeCompare(String(b))),
+  pieces: item.pieces,
+});
+
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
 
@@ -62,18 +71,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // produced two $40 x1 lines instead of one $80 x2 line — and every
     // quantity-based discount (2x1, etc.) reads item.quantity per line, so it
     // silently never had anything to discount.
-    const mergeKey = JSON.stringify({
-      productId: item.productId,
-      selectedChoices: item.selectedChoices,
-      pieces: item.pieces,
-    });
+    const mergeKey = cartMergeKey(item);
 
     setCart((prev) => {
-      const existingIndex = prev.findIndex((existing) => JSON.stringify({
-        productId: existing.productId,
-        selectedChoices: existing.selectedChoices,
-        pieces: existing.pieces,
-      }) === mergeKey);
+      const existingIndex = prev.findIndex((existing) => cartMergeKey(existing) === mergeKey);
 
       if (existingIndex !== -1) {
         const merged = [...prev];
@@ -87,6 +88,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...existing,
           quantity: existing.quantity + computedQuantity,
           price: existing.price + item.price,
+          // Keep choice quantities in sync with the line quantity — otherwise
+          // the income payload says product ×2 but Ciclo ×1 (tickets 5968/5969).
+          selectedChoices: Object.fromEntries(
+            Object.entries(existing.selectedChoices).map(([optId, choices]) => [
+              optId,
+              choices.map((c) => {
+                const added = item.selectedChoices[Number(optId)]?.find((n) => n.id === c.id);
+                return { ...c, quantity: c.quantity + (added?.quantity ?? 0) };
+              }),
+            ])
+          ),
         };
         return merged;
       }
