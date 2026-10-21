@@ -229,9 +229,13 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
                   {/* PRODUCT ROWS */}
                   {opts.length > 0 ? (
                     opts.map((option, optIndex) => {
-                      const qty = Number(option.quantity ?? 0);
+                      // product.quantity is the line total (Σ choice quantities). With a
+                      // single choice show it — legacy merged lines stored the choice at 1.
+                      const qty = opts.length === 1
+                        ? Number(product.quantity ?? option.quantity ?? 1)
+                        : Number(option.quantity ?? 1);
                       const displayPrice =
-                        opts.length === 1 ? serviceSubtotal : Number(option.price ?? 0);
+                        opts.length === 1 ? serviceSubtotal : Number(option.price ?? 0) * qty;
 
                       return (
                         <div key={optIndex} className="product-option-row">
