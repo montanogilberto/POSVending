@@ -1,10 +1,11 @@
 import React from 'react';
-import { IonContent, IonFab, IonFabButton, IonIcon, IonPage, IonRefresher, IonRefresherContent, IonSpinner, IonToast } from '@ionic/react';
+import { IonContent, IonFab, IonFabButton, IonIcon, IonPage, IonRefresher, IonRefresherContent, IonToast } from '@ionic/react';
 import { addOutline, notificationsOutline } from 'ionicons/icons';
 import Header from '../../../components/layout/Header';
 import AlertPopover from '../../../components/popovers/AlertPopover';
 import MailPopover from '../../../components/popovers/MailPopover';
 import EmptyState from '../../../components/ui/EmptyState';
+import PageLoading from '../../../components/ui/PageLoading';
 import { usePopovers } from '../../../hooks/usePopovers';
 import { usePushNotifications } from './PushNotificationsLogic';
 import PushTopBar from './components/PushTopBar';
@@ -41,13 +42,15 @@ const PushNotificationsView: React.FC = () => {
         <div className={`pnd-layout${drawerOpen ? ' pnd-layout--drawer' : ''}`}>
           <div className="pnd-container">
             <PushTopBar vm={vm} />
-            <PushKpis vm={vm} />
-            <PushInsights vm={vm} />
 
-            {vm.loading && vm.total === 0 && <div className="pnd-loading"><IonSpinner name="dots" /></div>}
-            {!vm.loading && vm.total === 0
-              ? <EmptyState icon={notificationsOutline} text="Todavía no se ha enviado ninguna notificación push." />
-              : vm.isPhone ? <PushPhoneList vm={vm} /> : <PushTable vm={vm} />}
+            {vm.initialLoading ? <PageLoading text="Cargando notificaciones push…" /> : <>
+              <PushKpis vm={vm} />
+              <PushInsights vm={vm} />
+
+              {vm.total === 0
+                ? <EmptyState icon={notificationsOutline} text="Todavía no se ha enviado ninguna notificación push." />
+                : vm.isPhone ? <PushPhoneList vm={vm} /> : <PushTable vm={vm} />}
+            </>}
           </div>
           <PushDetailDrawer vm={vm} />
         </div>

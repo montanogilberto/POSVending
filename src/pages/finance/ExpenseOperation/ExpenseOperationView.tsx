@@ -91,7 +91,9 @@ const ExpenseOperationView: React.FC = () => {
               <SupplierSection draft={draft} suppliers={vm.suppliers}
                 invalid={vm.submitAttempted && draft.supplier.mode === 'none'} onChange={vm.setSupplier} />
               <LinesSection draft={draft} products={vm.products} submitAttempted={vm.submitAttempted}
-                onDecision={vm.setLineDecision} onUpdate={vm.updateLine} />
+                onDecision={vm.setLineDecision} onUpdate={vm.updateLine}
+                webLookups={vm.webLookups} onLookupWeb={vm.lookupWeb} onApplyWeb={vm.applyWebLookup}
+                categories={vm.categories} />
               <TotalsSection draft={draft} total={vm.total} difference={vm.difference} agrees={vm.agrees}
                 submitAttempted={vm.submitAttempted} onMethod={vm.setPaymentMethod} onDate={vm.setPaymentDate} />
             </>

@@ -33,6 +33,7 @@ const NewSupplyProductModal: React.FC<NewSupplyProductModalProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState<number>(0);
   const [saving, setSaving] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
 
   useEffect(() => {
@@ -41,6 +42,7 @@ const NewSupplyProductModal: React.FC<NewSupplyProductModalProps> = ({
 
   useEffect(() => {
     if (!isOpen || categories.length > 0) return;
+    setLoadingCategories(true);
     fetchCategories(String(companyId))
       .then((list) => {
         setCategories(list);
@@ -48,7 +50,8 @@ const NewSupplyProductModal: React.FC<NewSupplyProductModalProps> = ({
         const preferred = list.find((c) => c.name.trim().toLowerCase() === 'productos') ?? list[0];
         if (preferred) setCategoryId(preferred.categoryId);
       })
-      .catch((err) => console.error('[NewSupplyProductModal] fetchCategories failed:', err));
+      .catch((err) => console.error('[NewSupplyProductModal] fetchCategories failed:', err))
+      .finally(() => setLoadingCategories(false));
   }, [isOpen, companyId, categories.length]);
 
   const close = () => {
@@ -70,7 +73,7 @@ const NewSupplyProductModal: React.FC<NewSupplyProductModalProps> = ({
     }
     setSaving(true);
     try {
-      const productId = await createSupplyProduct({ companyId, categoryId, name: trimmed, code: code.trim() });
+      const productId = await createSupplyProduct({ companyId, categoryId, name: trimmed, barCode: code.trim() });
       notifyDataChanged('product-created');
       onCreated({ productId, name: trimmed, code: code.trim() });
       setName('');
@@ -105,9 +108,11 @@ const NewSupplyProductModal: React.FC<NewSupplyProductModalProps> = ({
           <IonInput fill="outline" label="Código (opcional)" labelPlacement="stacked" maxlength={50}
             value={code} onIonInput={(e) => setCode(String(e.detail.value ?? ''))} />
           <IonSelect fill="outline" labelPlacement="stacked" interface="popover"
-            placeholder="Seleccionar categoría"
+            placeholder={loadingCategories ? 'Cargando categorías…' : 'Seleccionar categoría'}
+            disabled={loadingCategories}
             value={categoryId || undefined} onIonChange={(e) => setCategoryId(Number(e.detail.value) || 0)}>
             <div slot="label">Categoría <span className="expense-required">*</span></div>
+            {loadingCategories && <IonSpinner slot="end" name="dots" />}
             {categories.map((c) => (
               <IonSelectOption key={c.categoryId} value={c.categoryId}>{c.name}</IonSelectOption>
             ))}

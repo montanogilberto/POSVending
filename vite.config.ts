@@ -7,6 +7,12 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   base: './',
+  // react-router v5 imports CJS prop-types; pre-bundle them up front so a
+  // mid-session dep re-optimization can't leave a stale react-router chunk
+  // that imports raw /node_modules/prop-types (no default export).
+  optimizeDeps: {
+    include: ['prop-types', 'react-router', 'react-router-dom'],
+  },
   build: {
     target: 'esnext',
     chunkSizeWarningLimit: 1000,

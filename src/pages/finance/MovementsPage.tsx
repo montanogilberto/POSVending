@@ -25,6 +25,7 @@ import { toHermosilloDate, fmtMXN } from '../../utils/format';
 import { fetchMonthlyLaundry } from '../../api/laundryApi';
 import { useUser } from '../../contexts/UserContext';
 import EmptyState from '../../components/ui/EmptyState';
+import PageLoading from '../../components/ui/PageLoading';
 import IncomeMovementList from '../../components/finance/IncomeMovementList';
 import { fetchTicket } from '../../api/ticketApi';
 import { useToast } from '../../hooks/useToast';
@@ -94,6 +95,7 @@ const MovementsPage: React.FC = () => {
   const [rangeEnd, setRangeEnd] = useState<string>('');
   const [selectedType, setSelectedType] = useState<IncomeType | 'all'>('all');
   const [showCalendar, setShowCalendar] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   // Movimientos solo muestra el mes actual -- para meses anteriores, el
   // módulo de Incomes permite consultar el histórico completo.
@@ -106,6 +108,8 @@ const MovementsPage: React.FC = () => {
       setFilteredIncome(monthlyIncome);
     } catch (error) {
       console.error('[Movements] fetchMonthlyIncome error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -318,7 +322,9 @@ const MovementsPage: React.FC = () => {
               <IonCardTitle>Movimientos del Mes</IonCardTitle>
             </IonCardHeader>
             <IonCardContent>
-              {filteredIncome.length === 0 ? (
+              {loading ? (
+                <PageLoading text="Cargando movimientos…" />
+              ) : filteredIncome.length === 0 ? (
                 <EmptyState
                   className="movements-empty"
                   icon={receiptOutline}

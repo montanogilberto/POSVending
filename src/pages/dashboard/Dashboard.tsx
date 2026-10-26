@@ -15,6 +15,7 @@ import LogoutAlert from '../../components/alerts/LogoutAlert';
 import MailPopover from '../../components/popovers/MailPopover';
 
 import { useDashboard } from './hooks/useDashboard';
+import PageLoading from '../../components/ui/PageLoading';
 import { usePopovers } from '../../hooks/usePopovers';
 import { useViewEnterLoad } from '../../hooks/useViewEnterLoad';
 import { useUser } from '../../contexts/UserContext';
@@ -51,6 +52,7 @@ const Dashboard: React.FC = () => {
     loadingReceiptId,
     getTitleFromPath,
     refreshDashboardData,
+    initialLoading,
   } = useDashboard();
 
   const pops = usePopovers();
@@ -81,6 +83,7 @@ const Dashboard: React.FC = () => {
       <IonContent fullscreen={true} className="dashboard-content">
         <div className="dashboard-container">
 
+          {initialLoading ? <PageLoading text="Cargando ventas del día…" /> : <>
           {/* ✅ Hero: Ventas Hoy */}
           <MetricsGrid
             calculateDailySales={calculateDailySales}
@@ -129,6 +132,7 @@ const Dashboard: React.FC = () => {
               loadingReceiptId={loadingReceiptId}
             />
           )}
+          </>}
 
         </div>
 

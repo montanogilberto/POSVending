@@ -21,12 +21,6 @@
   padding: 12px 12px 24px;
 }
 
-.pnd-loading {
-  display: flex;
-  justify-content: center;
-  padding: 24px 0;
-}
-
 .pnd-section-title {
   margin: 0 0 6px;
   font-size: 0.95rem;

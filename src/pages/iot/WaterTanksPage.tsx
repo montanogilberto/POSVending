@@ -20,6 +20,7 @@ import {
 import { waterOutline, barChart, refresh } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 import Header from '../../components/layout/Header';
+import PageLoading from '../../components/ui/PageLoading';
 import { usePopovers } from '../../hooks/usePopovers';
 import { fetchWaterTanks, WaterTank, startPeriodicWaterTanksUpdate } from '../../api/waterTanksApi';
 
@@ -84,9 +85,7 @@ const WaterTanksPage: React.FC = () => {
       <IonPage>
         <Header {...pops.headerProps} screenTitle="Tanques de Agua" />
         <IonContent>
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <IonText>Cargando tanques...</IonText>
-          </div>
+          <PageLoading text="Cargando tanques…" />
         </IonContent>
       </IonPage>
     );

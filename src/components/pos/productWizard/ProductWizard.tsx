@@ -9,8 +9,9 @@ import { useProduct } from '../../../contexts/ProductContext';
 import { useUser } from '../../../contexts/UserContext';
 import { Product } from '../../../data/type_products';
 import { fmtMXN } from '../../../utils/format';
-import { ProductLabelReading } from '../../../api/productAgentApi';
+import { ProductLabelReading, WebProductLookup } from '../../../api/productAgentApi';
 import ProductLabelReader from './ProductLabelReader';
+import ProductWebSearch from './ProductWebSearch';
 import { uploadProductImage } from '../../../api/productsApi';
 import { pickProductLabelPhoto } from '../../../utils/pickAvatarPhoto';
 import './ProductWizard.css';
@@ -169,8 +170,8 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         options: mappedOptions,
         formQuantity: product.form?.quantity ?? '',
         additionalDescription: principalDescription?.Dosage ?? '',
-        packingName: '',
-        packingPresentationName: '',
+        packingName: product.form?.packingName ?? '',
+        packingPresentationName: product.form?.packingPresentationName ?? '',
       });
       return;
     }
@@ -267,6 +268,26 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
       upd('dateOfExpire', r.expirationDate);
       filled.push('Fecha de expiración');
     }
+    return filled;
+  };
+  /** Product web lookup -> form. Same rule as the label reader: only empty fields;
+   *  the price found online goes to "Precio en el mercado" (reference, never charged). */
+  const applyWebLookup = (r: WebProductLookup): string[] => {
+    const filled: string[] = [];
+    const fill = (f: keyof WizardData, value: string, label: string) => {
+      if (!value || String(data[f] ?? '').trim()) return;
+      upd(f, value);
+      filled.push(label);
+    };
+    fill('name', r.suggestedName || r.fullName, 'Nombre');
+    fill('description', r.description, 'Descripción');
+    if (r.netContent > 0 && UNITS.some(u => u.value === r.unitOfMeasure) && !data.netContent && !data.unitOfMeasure) {
+      upd('netContent', String(r.netContent));
+      upd('unitOfMeasure', r.unitOfMeasure);
+      filled.push('Contenido neto');
+    }
+    // "Precio en el mercado" is in pesos: only an MXN price fills it.
+    if (r.price > 0 && (!r.currency || r.currency === 'MXN')) fill('referencePrice', r.price.toFixed(2), 'Precio en el mercado');
     return filled;
   };
   /** Reader photos changed: default the product image to the first one (the front). */
@@ -488,15 +509,12 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         companyId: normalizedCompanyId,
         productFormId: product?.productFormId ?? 0,
         manufactureId: product?.manufactureId ?? 0,
-        productForm: data.formQuantity.trim()
-          ? {
-              action: isEdit ? 2 : 1,
-              productFormId: product?.form?.productFormId ?? null,
-              quantity: data.formQuantity.trim(),
-              productPackingPresentationId: product?.form?.productPackingPresentationId ?? null,
-              productsPackingTypeId: product?.form?.productsPackingTypeId ?? null,
-            }
-          : undefined,
+        // Always sent: sp_products resolves the packing names; all three empty clears the form.
+        productForm: {
+          quantity: data.formQuantity.trim(),
+          packingName: data.packingName.trim(),
+          packingPresentationName: data.packingPresentationName.trim(),
+        },
         productDetails: {
           action: isEdit ? 2 : 1,
           productDetailId: (product as any)?.details?.[0]?.productDetailId ?? (product as any)?.productDetails?.[0]?.productDetailId ?? null,
@@ -643,7 +661,10 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         <p className="wizard-step-subtitle">Datos básicos de identificación</p>
       </div>
       {!isReadOnly && effectiveMode !== 'edit' && (
-        <ProductLabelReader companyId={Number(companyId)} onApply={applyLabelReading} onPhotosChange={onLabelPhotos} />
+        <>
+          <ProductLabelReader companyId={Number(companyId)} onApply={applyLabelReading} onPhotosChange={onLabelPhotos} />
+          <ProductWebSearch companyId={Number(companyId)} barCode={data.barCode} name={data.name} onApply={applyWebLookup} />
+        </>
       )}
       <div className="wizard-form">
         {renderCategoryField()}
@@ -685,7 +706,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         <div className="wizard-field-row">
           <div className="wizard-field">
             <label className="wizard-label">Código</label>
-            {/* Assigned by sp_products_save on insert: MAX(numeric code) + 1 for the company. */}
+            {/* Assigned by sp_products on insert: MAX(numeric code) + 1 for the company. */}
             <div className="wizard-auto-code">{data.code || 'Automático al guardar'}</div>
           </div>
           <div className="wizard-field">
@@ -905,13 +926,13 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const renderS5 = () => {
     const sections = [
       { icon:'📋', cls:'blue',   title:'Forma del producto',      desc:'Cantidad y presentación',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Cantidad</label><input className="wizard-input" placeholder="Ej. 500ml, 1kg..." value={data.formQuantity} onChange={e=>upd('formQuantity',e.target.value)} disabled={isReadOnly}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Cantidad</label><input className="wizard-input" maxLength={50} placeholder="Ej. 500ml, 1kg..." value={data.formQuantity} onChange={e=>upd('formQuantity',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'📝', cls:'green',  title:'Descripción adicional',   desc:'Información técnica',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Descripción técnica</label><textarea className="wizard-textarea" rows={3} placeholder="Información adicional..." value={data.additionalDescription} onChange={e=>upd('additionalDescription',e.target.value)} disabled={isReadOnly}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Descripción técnica</label><textarea className="wizard-textarea" rows={3} maxLength={500} placeholder="Información adicional..." value={data.additionalDescription} onChange={e=>upd('additionalDescription',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'📦', cls:'orange', title:'Empaque',                 desc:'Tipo de empaque',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre del empaque</label><input className="wizard-input" placeholder="Ej. Caja, Bolsa..." value={data.packingName} onChange={e=>upd('packingName',e.target.value)} disabled={isReadOnly}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre del empaque</label><input className="wizard-input" maxLength={50} placeholder="Ej. Caja, Bolsa..." value={data.packingName} onChange={e=>upd('packingName',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'🎁', cls:'purple', title:'Presentación de empaque', desc:'Presentación o tamaño',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre de la presentación</label><input className="wizard-input" placeholder="Ej. Individual, Pack x6..." value={data.packingPresentationName} onChange={e=>upd('packingPresentationName',e.target.value)} disabled={isReadOnly}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre de la presentación</label><input className="wizard-input" maxLength={50} placeholder="Ej. Individual, Pack x6..." value={data.packingPresentationName} onChange={e=>upd('packingPresentationName',e.target.value)} disabled={isReadOnly}/></div> },
     ];
     return (
       <div>

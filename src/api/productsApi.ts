@@ -2,7 +2,13 @@ const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 import { Product, ProductCategory, ProductPackingType } from '../data/type_products';
 
-const inFlightProductsByCompanyRequests = new Map<number, Promise<Product[]>>();
+const inFlightProductsByCompanyRequests = new Map<string, Promise<Product[]>>();
+
+/** Admin screens see what the POS menu hides; the POS sends neither flag. */
+export interface ProductListOptions {
+  includeInactive?: boolean;
+  includeSupplies?: boolean;
+}
 
 const parseResponseBody = async (response: Response): Promise<unknown> => {
   const rawBody = await response.text().catch(() => '');
@@ -55,6 +61,14 @@ export interface ProductFormPayload {
   quantity: string;
   productPackingPresentationId: number | null;
   productsPackingTypeId: number | null;
+}
+
+/** Product form as the wizard captures it; sp_products resolves the packing names
+ *  to their lookup rows. All three empty clears the product's form. */
+export interface ProductFormNamesPayload {
+  quantity: string;
+  packingName: string;
+  packingPresentationName: string;
 }
 
 export interface ProductDetailsPayload {
@@ -119,7 +133,7 @@ export interface CreateProductRequest {
     imageUrl?: string | null;
     manufactureId: number | null;
     description: string;
-    productForm?: ProductFormPayload | null;
+    productForm?: ProductFormPayload | ProductFormNamesPayload | null;
     productDetails?: ProductDetailsPayload | null;
     productDescriptions?: ProductDescriptionPayload[];
     productOptions?: ProductOptionPayload[];
@@ -155,15 +169,7 @@ export interface GetOneProductResponse {
   }>;
 }
 
-export interface DeleteProductRequest {
-  products: Array<{
-    productId: number;
-    companyId?: number;
-    action?: number | string;
-  }>;
-}
-
-export interface DeleteProductResponse {
+export interface ProductActiveResponse {
   result: Array<{
     value: string;
     msg: string;
@@ -181,14 +187,22 @@ export const createOrUpdateProduct = async (data: CreateProductRequest): Promise
     body: JSON.stringify(data),
   });
 
-  const parsedBody = (await parseResponseBody(response)) as any;
+  let parsedBody = (await parseResponseBody(response)) as any;
 
   if (!response.ok) {
     const httpErrorMessage =
       parsedBody?.result?.[0]?.msg ||
       parsedBody?.message ||
+      parsedBody?.error || // products_sp answers 500 with {"error": str(exception)}
       `Failed to create or update product (HTTP ${response.status})`;
     throw new Error(httpErrorMessage);
+  }
+
+  // Until migration 2026-10-26_products_unify_sp_products runs, the write SP ends
+  // with a plain rowset and the backend keeps only its first column: the body
+  // arrives as the bare productId (e.g. 123). Rebuild the {result:[{value}]} shape.
+  if (typeof parsedBody === 'number' || (typeof parsedBody === 'string' && /^\d+$/.test(parsedBody.trim()))) {
+    parsedBody = { result: [{ value: String(parsedBody).trim(), msg: '', error: '' }] };
   }
 
   const firstResult = parsedBody?.result?.[0];
@@ -235,7 +249,10 @@ export const getAllProducts = async (): Promise<Product[]> => {
 };
 
 /** Fetch products strictly filtered by companyId (no global fallback). */
-export const getProductsByCompany = async (companyId: number): Promise<Product[]> => {
+export const getProductsByCompany = async (
+  companyId: number,
+  options: ProductListOptions = {},
+): Promise<Product[]> => {
   const normalizedCompanyId = Number(companyId);
 
   if (!Number.isFinite(normalizedCompanyId) || normalizedCompanyId <= 0) {
@@ -243,14 +260,23 @@ export const getProductsByCompany = async (companyId: number): Promise<Product[]
     throw new Error('No valid company selected');
   }
 
-  const existingRequest = inFlightProductsByCompanyRequests.get(normalizedCompanyId);
+  const includeInactive = Boolean(options.includeInactive);
+  const includeSupplies = Boolean(options.includeSupplies);
+  const requestKey = `${normalizedCompanyId}:${includeInactive ? 1 : 0}:${includeSupplies ? 1 : 0}`;
+  const existingRequest = inFlightProductsByCompanyRequests.get(requestKey);
   if (existingRequest) {
     return existingRequest;
   }
 
   const requestPromise = (async (): Promise<Product[]> => {
     const endpoint = `${API_BASE_URL}/by_company_products`;
-    const payload = { products: [{ companyId: normalizedCompanyId.toString() }] };
+    const payload = {
+      products: [{
+        companyId: normalizedCompanyId.toString(),
+        ...(includeInactive ? { includeInactive: 1 } : {}),
+        ...(includeSupplies ? { includeSupplies: 1 } : {}),
+      }],
+    };
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -304,12 +330,12 @@ export const getProductsByCompany = async (companyId: number): Promise<Product[]
     return [];
   })();
 
-  inFlightProductsByCompanyRequests.set(normalizedCompanyId, requestPromise);
+  inFlightProductsByCompanyRequests.set(requestKey, requestPromise);
 
   try {
     return await requestPromise;
   } finally {
-    inFlightProductsByCompanyRequests.delete(normalizedCompanyId);
+    inFlightProductsByCompanyRequests.delete(requestKey);
   }
 };
 
@@ -338,107 +364,32 @@ export const getOneProduct = async (data: GetOneProductRequest): Promise<Product
   }
 };
 
-export const deleteProduct = async (data: DeleteProductRequest): Promise<DeleteProductResponse> => {
-  const normalizedProductId = Number(data?.products?.[0]?.productId ?? 0);
-  const normalizedCompanyIdRaw = data?.products?.[0]?.companyId;
-  const normalizedCompanyId = Number(normalizedCompanyIdRaw ?? 0);
-  const hasValidCompanyId = Number.isFinite(normalizedCompanyId) && normalizedCompanyId > 0;
-
-  console.log('[productsApi.deleteProduct] incoming payload', {
-    originalPayload: data,
-    extractedProductId: normalizedProductId,
-    extractedCompanyId: hasValidCompanyId ? normalizedCompanyId : null,
+/**
+ * Soft delete / restore: sp_products action 3 sets isActive = 0 (hidden from the POS,
+ * the ticket agent and Nuevo Egreso; history stays linked), action 4 sets it back to 1.
+ */
+export const setProductActive = async (params: {
+  productId: number;
+  companyId: number;
+  active: boolean;
+}): Promise<ProductActiveResponse> => {
+  const payload = {
+    products: [{ action: params.active ? 4 : 3, productId: params.productId, companyId: params.companyId }],
+  };
+  console.log('[productsApi.setProductActive] payload', payload);
+  const response = await fetch(`${API_BASE_URL}/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   });
-
-  const candidateRequests: Array<{
-    endpoint: string;
-    payload: unknown;
-    note: string;
-  }> = [
-    {
-      endpoint: `${API_BASE_URL}/delete_products`,
-      payload: data,
-      note: 'primary endpoint with canonical payload',
-    },
-    {
-      endpoint: `${API_BASE_URL}/products`,
-      payload: {
-        products: [{
-          action: 3,
-          productId: normalizedProductId,
-          ...(hasValidCompanyId ? { companyId: normalizedCompanyId } : {}),
-        }],
-      },
-      note: 'fallback: products endpoint action=3 with numeric action (+companyId when available)',
-    },
-    {
-      endpoint: `${API_BASE_URL}/products`,
-      payload: {
-        products: [{
-          action: '3',
-          productId: normalizedProductId,
-          ...(hasValidCompanyId ? { companyId: normalizedCompanyId } : {}),
-        }],
-      },
-      note: 'fallback: products endpoint action="3" with string action (+companyId when available)',
-    },
-  ];
-
-  let lastError: Error | null = null;
-
-  for (const candidate of candidateRequests) {
-    console.log('[productsApi.deleteProduct] trying candidate', {
-      endpoint: candidate.endpoint,
-      note: candidate.note,
-      payload: candidate.payload,
-    });
-
-    const response = await fetch(candidate.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(candidate.payload),
-    });
-
-    const parsedBody = (await parseResponseBody(response)) as any;
-
-    if (!response.ok) {
-      console.warn('[productsApi.deleteProduct] Candidate failed', {
-        endpoint: candidate.endpoint,
-        note: candidate.note,
-        status: response.status,
-        statusText: response.statusText,
-        responseBody: parsedBody,
-      });
-      lastError = new Error(`Delete candidate failed (HTTP ${response.status})`);
-      continue;
-    }
-
-    const firstResult = parsedBody?.result?.[0];
-    const value = String(firstResult?.value ?? '').toLowerCase().trim();
-    const msg = String(firstResult?.msg ?? '').trim();
-    const error = String(firstResult?.error ?? '').trim();
-
-    const isBusinessError =
-      (value === 'msg' && !!msg) ||
-      error === '1' ||
-      /required|error|invalid|not found/i.test(msg);
-
-    if (isBusinessError) {
-      console.warn('[productsApi.deleteProduct] Candidate business error', {
-        endpoint: candidate.endpoint,
-        note: candidate.note,
-        result: firstResult,
-      });
-      lastError = new Error(msg || 'Database error while deleting product');
-      continue;
-    }
-
-    return parsedBody as DeleteProductResponse;
+  const parsedBody = (await parseResponseBody(response)) as any;
+  const firstResult = parsedBody?.result?.[0];
+  const msg = String(firstResult?.msg ?? parsedBody?.error ?? '').trim();
+  if (!response.ok || String(firstResult?.error ?? '').trim() === '1' || !firstResult) {
+    console.error('[productsApi.setProductActive] failed', { status: response.status, body: parsedBody });
+    throw new Error(msg || (params.active ? 'No se pudo reactivar el producto.' : 'No se pudo desactivar el producto.'));
   }
-
-  throw lastError ?? new Error('Failed to delete product');
+  return parsedBody as ProductActiveResponse;
 };
 
 /**
@@ -455,13 +406,19 @@ export const getCompanyProducts = async (companyId: number): Promise<Product[]> 
  * Creates a supply product (isSupply=true) straight from the expense form.
  * Created WITHOUT options/price on purpose: sp_products_by_company only lists
  * products that have options, so it never shows up in the POS sales menu.
- * sp_products_save returns the new productId in result[0].value.
+ * sp_products returns the new productId in result[0].value.
+ * barCode carries the supplier's item code (e.g. Sam's "981055673"): `code` is
+ * not sent because sp_products always assigns it (MAX(code) + 1 per company).
  */
 export const createSupplyProduct = async (params: {
   companyId: number;
   categoryId: number;
   name: string;
-  code?: string;
+  barCode?: string;
+  /** Size of one piece (500 + 'ml'), e.g. from the ticket or the web lookup. */
+  netContent?: number;
+  unitOfMeasure?: string;
+  description?: string;
 }): Promise<number> => {
   const res = await createOrUpdateProduct({
     products: [{
@@ -470,11 +427,14 @@ export const createSupplyProduct = async (params: {
       companyId: params.companyId,
       categoryId: params.categoryId,
       name: params.name,
-      barCode: '',
-      code: params.code ?? '',
+      barCode: params.barCode ?? '',
+      code: '', // assigned by sp_products
       dateOfExpire: null,
       manufactureId: null,
-      description: '',
+      description: params.description ?? '',
+      ...(params.netContent && params.netContent > 0 && params.unitOfMeasure
+        ? { netContent: params.netContent, unitOfMeasure: params.unitOfMeasure }
+        : {}),
       isSupply: true,
     }],
   });
