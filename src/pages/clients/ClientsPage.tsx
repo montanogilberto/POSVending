@@ -32,6 +32,7 @@ import {
   IonSpinner,
   IonLoading,
   IonFooter,
+  IonChip,
 } from '@ionic/react';
 import {
   add,
@@ -69,7 +70,7 @@ import {
   chevronDown,
   chevronUp,
 } from 'ionicons/icons';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useLocation } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
@@ -105,6 +106,7 @@ import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
 import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
 import { PLAY_STORE_URL, APP_STORE_URL } from '../../utils/appLinks';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   nombre: '',
@@ -174,7 +176,7 @@ const productsFromClientType = (t?: ClientType): ClientCapability[] => {
   }
 };
 
-const API_BASE = 'https://smartloansbackend.azurewebsites.net';
+const API_BASE = API_BASE_URL;
 
 async function stripeCreateAccount(clientId: number, companyId: number, email: string) {
   const res = await fetch(`${API_BASE}/stripe/connected-accounts`, {
@@ -202,6 +204,7 @@ const emptyErrors = {
 const ClientsPage: React.FC = () => {
   const { companyId, userId } = useUser();
   const history = useHistory();
+  const location = useLocation();
 
   // ── List state ─────────────────────────────────────────────────────────────
   const [clients, setClients] = useState<Client[]>([]);
@@ -209,6 +212,11 @@ const ClientsPage: React.FC = () => {
   const [faceRecordMap, setFaceRecordMap] = useState<Record<number, ClientFaceRecognition>>({});
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  // ?clientId=N (e.g. "Ver perfil del cliente" in the notification log) shows only that client.
+  const focusClientId = useMemo(() => {
+    const id = Number(new URLSearchParams(location.search).get('clientId'));
+    return Number.isFinite(id) && id > 0 ? id : null;
+  }, [location.search]);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -429,7 +437,13 @@ const ClientsPage: React.FC = () => {
     ];
   };
 
+  const focusedClient = useMemo(
+    () => (focusClientId ? clients.find(c => c.clientId === focusClientId) ?? null : null),
+    [clients, focusClientId],
+  );
+
   const filteredClients = useMemo(() => {
+    if (focusClientId) return clients.filter(c => c.clientId === focusClientId);
     const t = searchTerm.toLowerCase().trim();
     if (!t) return clients;
     return clients.filter(c =>
@@ -438,7 +452,16 @@ const ClientsPage: React.FC = () => {
       c.cellphone?.includes(t) ||
       c.email?.toLowerCase().includes(t)
     );
-  }, [clients, searchTerm]);
+  }, [clients, searchTerm, focusClientId]);
+
+  const clearClientFocus = () => history.replace('/clients');
+
+  // Tapping a POS client's card opens its detail page — except taps on the
+  // card's own buttons (QR, Editar, Más…), which keep their own action.
+  const openPosDashboard = (e: React.MouseEvent, client: Client) => {
+    if ((e.target as HTMLElement).closest('ion-button, ion-chip, a')) return;
+    history.push(`/client-pos/${client.clientId}`);
+  };
 
   // ── Delete ─────────────────────────────────────────────────────────────────
   const buildShareMessage = (client: Client): string => {
@@ -1881,11 +1904,25 @@ const ClientsPage: React.FC = () => {
             placeholder="Buscar por nombre, teléfono o email..."
             className="clients-searchbar"
           />
+          {focusClientId && (
+            <IonChip className="clients-focus-chip" onClick={clearClientFocus}>
+              <IonLabel>
+                {focusedClient
+                  ? `Cliente: ${focusedClient.first_name ?? ''} ${focusedClient.last_name ?? ''}`.trim()
+                  : `Cliente #${focusClientId}`}
+              </IonLabel>
+              <IonIcon icon={closeCircle} />
+            </IonChip>
+          )}
         </div>
 
         <div className="clients-list">
           {filteredClients.map((client) => (
-            <IonCard key={client.clientId} className={`client-card${client.isActive === false ? ' client-card-inactive' : ''}`}>
+            <IonCard
+              key={client.clientId}
+              className={`client-card${client.isActive === false ? ' client-card-inactive' : ''}${client.clientType === 'pos' ? ' client-card-clickable' : ''}`}
+              onClick={client.clientType === 'pos' ? (e) => openPosDashboard(e, client) : undefined}
+            >
               <IonCardContent className="client-card-content">
                 <div className="client-card-row">
                   <div className="client-left" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -1964,10 +2001,13 @@ const ClientsPage: React.FC = () => {
                         <IonIcon icon={walletOutline} slot="start" /> Portfolio
                       </IonButton>
                     )}
+                    {client.clientType === 'pos' && (
+                      <IonButton fill="outline" size="small" color="tertiary" onClick={() => history.push(`/client-pos/${client.clientId}`)} className="action-button">
+                        <IonIcon icon={barChartOutline} slot="start" /> Dashboard
+                      </IonButton>
+                    )}
                     <IonButton fill="outline" size="small" color="secondary" onClick={() => history.push(`/rewards-dashboard/${client.clientId}`)} className="action-button">
-                      {client.clientType === 'pos'
-                        ? <><IonIcon icon={barChartOutline} slot="start" /> Dashboard</>
-                        : <><IonIcon icon={giftOutline} slot="start" /> Recompensas</>}
+                      <IonIcon icon={giftOutline} slot="start" /> Recompensas
                     </IonButton>
                     <IonButton fill="outline" size="small" color="warning" onClick={() => history.push(`/client-followup/${client.clientId}`)} className="action-button">
                       <IonIcon icon={calendarOutline} slot="start" /> Seguimiento

@@ -61,6 +61,7 @@ import {
   starOutline,
   giftOutline,
   chatbubblesOutline,
+  logoWhatsapp,
   chatbubbleEllipsesOutline,
   chevronBackOutline,
   chevronForwardOutline,
@@ -144,6 +145,7 @@ const lazyPage = <P extends object>(load: () => Promise<{ default: React.Compone
 const ClientsPage = lazyPage(() => import('./pages/clients/ClientsPage'));
 const MissionCleanRoomPage = lazyPage(() => import('./pages/game/MissionCleanRoomPage'));
 import ClientDashboardPage from './pages/clients/ClientDashboardPage';
+import ClientDashboardPOSPage from './pages/clients/ClientDashboardPOSPage';
 import ExpedienteDigitalPage from './pages/clients/ExpedienteDigitalPage';
 import LenderDashboardPage from './pages/clients/LenderDashboardPage';
 import RewardsDashboardPage from './pages/clients/RewardsDashboardPage';
@@ -151,6 +153,7 @@ import MyQrPage from './pages/clients/MyQrPage';
 import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
+import WhatsAppAgentPage from './pages/messaging/WhatsAppAgentPage';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import NotificationDetailPage from './pages/messaging/NotificationDetailPage';
 import type { NotificationTapState } from './pages/messaging/NotificationDetail/NotificationDetailTypes';
@@ -208,6 +211,7 @@ import { myLoansRoute, notificationDetailRoute, p2pLendingRoute } from './utils/
 import { PRODUCT_LABELS, productLandingRoute, discoverProducts, DiscoverProduct } from './utils/productContext';
 import DiscoverProductModal from './components/layout/DiscoverProductModal';
 import './components/layout/DiscoverProductModal.css';
+import { API_BASE_URL } from './utils/appEnv';
 
 setupIonicReact();
 
@@ -252,11 +256,11 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 const POS_ONLY_ROUTE_PREFIXES = [
   '/dashboard', '/category', '/products', '/product', '/cart',
   '/expense-categories', '/expense-products', '/expense-cart',
-  '/movements', '/led-status', '/clients', '/products-management',
+  '/movements', '/led-status', '/clients', '/client-pos', '/products-management',
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
   '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
-  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log',
+  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
 ];
 
@@ -445,7 +449,7 @@ const AppShell: React.FC = () => {
       registrationHandle = await PushNotifications.addListener('registration', async (token) => {
         const platform = Capacitor.getPlatform();
         try {
-          await fetch(`${import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net'}/registerDevice`, {
+          await fetch(`${API_BASE_URL}/registerDevice`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -674,6 +678,15 @@ const AppShell: React.FC = () => {
                 {notificationAttention > 0 && (
                   <IonBadge slot="end" color="danger" title="Mensajes fallidos o pendientes (últimos 7 días)">{notificationAttention}</IonBadge>
                 )}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'notificationDispatchLog') && (
+              <IonItem button routerLink="/whatsapp-agent" title="Agente WhatsApp">
+                <IonIcon icon={logoWhatsapp} slot="start" />
+                {!menuCollapsed && <IonLabel>Agente WhatsApp</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -995,6 +1008,7 @@ const AppShell: React.FC = () => {
               <PrivateRoute exact path="/clientFaceRecognitions" component={ClientFaceRecognitionPage} />
             </React.Suspense>
             <PrivateRoute exact path="/client-dashboard/:clientId" component={ClientDashboardPage} />
+            <PrivateRoute exact path="/client-pos/:clientId" feature="clients" component={ClientDashboardPOSPage} />
             <PrivateRoute exact path="/client-expediente/:clientId" component={ExpedienteDigitalPage} />
             <PrivateRoute exact path="/lender-dashboard/:clientId" component={LenderDashboardPage} />
             <PrivateRoute exact path="/rewards-dashboard/:clientId" component={RewardsDashboardPage} />
@@ -1037,6 +1051,8 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/loan-detail/:loanId" component={LoanDetailPage} />
             <PrivateRoute exact path="/pushNotifications" feature="pushNotifications" component={PushNotificationPage} />
             <PrivateRoute exact path="/notification-dispatch-log" feature="notificationDispatchLog" component={NotificationDispatchLogPage} />
+            {/* Same permission as Notificaciones: role features come from GET /roles, a new one would need a DB change first. */}
+            <PrivateRoute exact path="/whatsapp-agent" feature="notificationDispatchLog" component={WhatsAppAgentPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
             <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />
           </IonRouterOutlet>

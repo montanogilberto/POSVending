@@ -1,6 +1,7 @@
 //products.ts
 
 import { Product, ApiResponse } from "./type_products"
+import { API_BASE_URL } from '../utils/appEnv';
 
 export async function getProducts(categoryId?: number): Promise<Product[]> {
   const body = JSON.stringify({
@@ -11,7 +12,7 @@ export async function getProducts(categoryId?: number): Promise<Product[]> {
       }
     ]
   });
-  const response = await fetch('https://smartloansbackend.azurewebsites.net/by_company_products', {
+  const response = await fetch(`${API_BASE_URL}/by_company_products`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

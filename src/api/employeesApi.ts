@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
 const LOG = '[employeesApi]';
 
 export interface Employee {

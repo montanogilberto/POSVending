@@ -1,5 +1,6 @@
+import { API_BASE_URL } from '../utils/appEnv';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "https://smartloansbackend.azurewebsites.net";
+const BASE_URL = API_BASE_URL;
 
 export interface ClientDashboard {
   clientDashboardId: number;

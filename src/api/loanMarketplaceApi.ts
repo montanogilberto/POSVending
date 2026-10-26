@@ -1,7 +1,8 @@
+import { API_BASE_URL } from '../utils/appEnv';
 // P2P marketplace reads (offers + proposals) shared by the dashboards.
 // Components must import from here — no inline fetch() in pages.
 
-const BASE = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const BASE = API_BASE_URL;
 
 export type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled' | 'countered';
 

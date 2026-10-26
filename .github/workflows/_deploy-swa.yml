@@ -1,0 +1,97 @@
+# Reusable build + deploy to an Azure Static Web App.
+# Called by deploy-dev.yml (development), deploy-qa.yml (qa) and
+# azure-static-web-apps-mango-smoke-0323ed91e.yml (main = production).
+#
+# Per-environment config lives in GitHub → Settings → Environments → <environment>:
+#   vars:    VITE_API_URL, VITE_STRIPE_PUBLISHABLE_KEY   (optional — code has fallbacks)
+#   secrets: VITE_WORKER_KEY                             (optional)
+# The SWA deployment token is a repo secret whose NAME is passed in `token_secret`.
+name: Deploy to Azure SWA (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment name (dev | qa | production)
+        type: string
+        required: true
+      app_env:
+        description: Value baked into VITE_APP_ENV (dev | qa | prod)
+        type: string
+        required: true
+      token_secret:
+        description: Name of the repo secret holding the SWA deployment token
+        type: string
+        required: true
+
+jobs:
+  build_and_deploy:
+    name: Build and deploy (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.builddeploy.outputs.static_web_app_url }}
+    concurrency:
+      group: swa-${{ inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - name: Check deployment token
+        id: token
+        env:
+          TOKEN: ${{ secrets[inputs.token_secret] }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::Secret ${{ inputs.token_secret }} is not set — skipping deploy to ${{ inputs.environment }}."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.present == 'true'
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Setup Node.js
+        if: steps.token.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Write .env for this environment
+        if: steps.token.outputs.present == 'true'
+        # Only write non-empty values: an empty VITE_API_URL would beat the
+        # `?? 'https://…'` fallback in src/api/* and break every request.
+        env:
+          VITE_APP_ENV: ${{ inputs.app_env }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
+          VITE_WORKER_KEY: ${{ secrets.VITE_WORKER_KEY }}
+        run: |
+          : > .env
+          for k in VITE_APP_ENV VITE_API_URL VITE_STRIPE_PUBLISHABLE_KEY VITE_WORKER_KEY; do
+            v="${!k}"
+            if [ -n "$v" ]; then echo "$k=$v" >> .env; echo "set $k"; fi
+          done
+
+      - name: Install dependencies
+        if: steps.token.outputs.present == 'true'
+        run: npm ci
+
+      - name: Build project
+        if: steps.token.outputs.present == 'true'
+        run: npm run build
+
+      - name: Deploy to Azure Static Web Apps
+        if: steps.token.outputs.present == 'true'
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets[inputs.token_secret] }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "/"
+          api_location: ""
+          output_location: "dist"

@@ -1,7 +1,8 @@
 import { IS_DEV_BUILD } from '../utils/appEnv';
 import type { GameEvent } from '../pages/game/MissionCleanRoom/MissionCleanRoomTypes';
+import { API_BASE_URL } from '../utils/appEnv';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const BASE_URL = API_BASE_URL;
 
 /**
  * `/gameEvents` doesn't exist on the backend yet — no table/SP has been authored for it. This

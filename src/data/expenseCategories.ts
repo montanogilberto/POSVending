@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../utils/appEnv';
 export interface ExpenseCategory {
   categoryId: number;
   name: string;
@@ -22,7 +23,7 @@ export async function fetchExpenseCategories(companyId: number): Promise<Expense
       ]
     });
     console.log('Request body:', body);
-    const response = await fetch('https://smartloansbackend.azurewebsites.net/all_products_categorie', {
+    const response = await fetch(`${API_BASE_URL}/all_products_categorie`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

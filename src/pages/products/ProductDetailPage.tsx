@@ -25,7 +25,7 @@ import {
 import { addOutline, removeOutline } from 'ionicons/icons';
 
 import { useParams, useHistory, useLocation } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import { Product, Piezas } from '../../data/type_products';
 import Header from '../../components/layout/Header';
@@ -61,6 +61,10 @@ const ProductDetailPage: React.FC = () => {
   const [product, setProduct] = useState<Product | undefined>(undefined);
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  // A fast double-tap on "Agregar al carrito" fires twice before history.push
+  // navigates away; CartContext merges identical lines, so the sale silently
+  // became 2× (e.g. one $200 Colcha Grande charged $400). One add per visit.
+  const addingRef = useRef(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<number, SelectedOptionValue>>({});
   // Radio rows get their own −/+ too (Garrafón · Tamaño 19 L x3): optionId → qty of the picked choice.
   const [radioQty, setRadioQty] = useState<Record<number, number>>({});
@@ -83,6 +87,7 @@ const ProductDetailPage: React.FC = () => {
   // Ionic keeps this page mounted after navigating away, so without this the
   // last checkboxes/quantities were still selected on the next visit.
   useIonViewDidLeave(() => {
+    addingRef.current = false;
     setQuantity(1);
     setSelectedOptions({});
     setRadioQty({});
@@ -284,6 +289,7 @@ const ProductDetailPage: React.FC = () => {
 
   // ---- Add to cart ----
   const handleAddToCart = () => {
+    if (addingRef.current) return;
     const requiredOptions = product.options ?? [];
     const missingGroups: string[] = [];
 
@@ -422,6 +428,7 @@ const ProductDetailPage: React.FC = () => {
       selectedOptionLabels['Piezas'] = piecesLabel;
     }
 
+    addingRef.current = true;
     addToCart({
       id: String(product.productId),
       productId: String(product.productId),

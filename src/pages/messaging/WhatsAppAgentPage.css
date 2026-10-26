@@ -1,0 +1,42 @@
+/* /whatsapp-agent — same card language as Puntos POS › Resumen (PosRewardsPage.css). */
+.wa-agent-container { max-width: 1100px; margin: 0 auto; padding: 8px 8px 24px; }
+.wa-agent-toolbar { display: flex; align-items: center; justify-content: space-between; }
+.wa-agent-loading { display: flex; justify-content: center; padding: 48px 0; }
+.wa-agent-muted { font-size: 0.75rem; color: #6b7280; margin: 0; padding: 0 8px; }
+.wa-agent-kpi-card .wa-agent-muted { padding: 0; }
+
+.wa-agent-kpi-grid { padding: 0; margin-bottom: 4px; }
+.wa-agent-kpi-card { margin: 4px; border-radius: 20px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07); }
+.wa-agent-kpi-card ion-card-content {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px;
+}
+.wa-agent-kpi-icon {
+  color: var(--tone, #6b7280); background: var(--tone-bg, #f3f4f6);
+  font-size: 1.3rem; padding: 8px; border-radius: 12px; margin-bottom: 2px;
+}
+/* One tone per KPI. Blue and amber are the chart's Mensajes / Reservaciones bars. */
+.wa-agent-tone-teal   { --tone: #0d9488; --tone-bg: #ccfbf1; }
+.wa-agent-tone-blue   { --tone: #2563eb; --tone-bg: #dbeafe; }
+.wa-agent-tone-violet { --tone: #7c3aed; --tone-bg: #ede9fe; }
+.wa-agent-tone-rose   { --tone: #e11d48; --tone-bg: #ffe4e6; }
+.wa-agent-tone-amber  { --tone: #d97706; --tone-bg: #fef3c7; }
+.wa-agent-tone-green  { --tone: #059669; --tone-bg: #d1fae5; }
+.wa-agent-kpi-value { font-size: 1.4rem; font-weight: 700; margin: 0; }
+
+.wa-agent-card { border-radius: 20px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07); margin: 8px 4px; }
+.wa-agent-note { --background: #eff6ff; color: #1e3a8a; }
+.wa-agent-chart { height: 220px; }
+
+.wa-agent-funnel-row {
+  display: grid; grid-template-columns: minmax(120px, 210px) 1fr auto; align-items: center;
+  gap: 12px; margin-bottom: 10px;
+}
+.wa-agent-funnel-label { font-size: 0.85rem; color: #374151; }
+.wa-agent-funnel-track { background: #eef0f3; border-radius: 6px; height: 14px; overflow: hidden; }
+.wa-agent-funnel-bar { background: #2563eb; height: 100%; border-radius: 6px; }
+.wa-agent-funnel-value { font-size: 0.85rem; font-weight: 600; color: #111827; white-space: nowrap; }
+
+@media (max-width: 575px) {
+  .wa-agent-funnel-row { grid-template-columns: 1fr auto; }
+  .wa-agent-funnel-track { grid-column: 1 / -1; grid-row: 2; }
+}

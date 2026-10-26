@@ -1,6 +1,6 @@
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 import { Product, ProductCategory, ProductPackingType } from '../data/type_products';
+import { API_BASE_URL } from '../utils/appEnv';
 
 const inFlightProductsByCompanyRequests = new Map<string, Promise<Product[]>>();
 

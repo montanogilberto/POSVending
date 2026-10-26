@@ -1,0 +1,43 @@
+# Manual release: Actions → "Promote release" → Run workflow.
+# Opens (or reuses) the promotion PR; merging it triggers the deploy of the target env.
+# Requires Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests".
+name: Promote release
+
+on:
+  workflow_dispatch:
+    inputs:
+      promotion:
+        description: Which promotion
+        type: choice
+        options:
+          - development → qa
+          - qa → main (production)
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open promotion PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PROMOTION: ${{ inputs.promotion }}
+        run: |
+          if [[ "$PROMOTION" == development* ]]; then HEAD=development; BASE=qa; TITLE="Release to QA"
+          else HEAD=qa; BASE=main; TITLE="Release to PRODUCTION"; fi
+
+          existing=$(gh pr list --head "$HEAD" --base "$BASE" --state open --json url -q '.[0].url')
+          if [ -n "$existing" ]; then echo "Already open: $existing"; echo "$existing" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+
+          AHEAD=$(gh api "repos/$GH_REPO/compare/$BASE...$HEAD" -q '.ahead_by')
+          if [ "$AHEAD" = "0" ]; then echo "$HEAD has nothing new for $BASE."; exit 0; fi
+
+          BODY=$(printf '%s\n\n%s\n' "Promotes **$HEAD → $BASE** ($AHEAD commits)." \
+            "$(gh api "repos/$GH_REPO/compare/$BASE...$HEAD" -q '.commits[] | "- " + (.sha[0:7]) + " " + (.commit.message | split("\n")[0])' | tail -50)")
+          url=$(gh pr create --head "$HEAD" --base "$BASE" --title "$TITLE ($(date -u +%Y-%m-%d))" --body "$BODY")
+          echo "Opened $url"; echo "$url" >> "$GITHUB_STEP_SUMMARY"

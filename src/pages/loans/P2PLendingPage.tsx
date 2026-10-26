@@ -35,7 +35,6 @@ import { myLoansRoute, P2PTab } from '../../utils/routes';
 import { useUser } from '../../contexts/UserContext';
 import { hasCapability } from '../../config/rolePermissions';
 import { getAllClients, Client, ClientType } from '../../api/clientsApi';
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
 
 // Shows the "Simular depósito SPEI" test tool. There is no real SPEI-in until
 // STP virtual CLABEs exist, so this is how the deposit→saldo→retiro loop is
@@ -205,6 +204,7 @@ import { createLoan } from '../../api/loanApi';
 import { getChatConfig } from '../../api/loanChatApi';
 import { createLoanContract } from '../../api/digitalContractsApi';
 import './P2PLendingPage.css';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 

@@ -34,7 +34,7 @@ import { useUser } from '../../contexts/UserContext';
 import { p2pLendingRoute } from '../../utils/routes';
 // ── Stripe / Payment types & fetchers (single-use, kept inline) ──────────────
 
-const _api = import.meta.env.VITE_API_URL ?? 'https://smartloansbackend.azurewebsites.net';
+const _api = API_BASE_URL;
 
 interface ConnectedAccount {
   connectedAccountId: string;
@@ -108,6 +108,7 @@ import { notifyDataChanged } from '../../utils/refreshBus';
 import { fmtMXN as fmt } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
 import './LoanPaymentPage.css';
+import { API_BASE_URL } from '../../utils/appEnv';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';

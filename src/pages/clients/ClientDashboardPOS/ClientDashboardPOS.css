@@ -1,0 +1,415 @@
+/* ==========================================================================
+   ClientDashboardPOS — same card language as the /clients list
+   ========================================================================== */
+
+.cpos-content {
+  --background: var(--ion-background-color, #ffffff);
+}
+
+.cpos-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+
+.cpos-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 14px 16px 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.cpos-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .cpos-layout {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: start;
+  }
+}
+
+/* Card */
+.cpos-card {
+  margin: 0;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.cpos-card--inactive {
+  opacity: 0.72;
+}
+
+.cpos-card-content {
+  padding: 16px;
+}
+
+/* Profile */
+.cpos-profile-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.cpos-avatar {
+  flex-shrink: 0;
+  font-size: 56px;
+  color: var(--ion-color-primary, #0056D2);
+  background: rgba(0, 86, 210, 0.12);
+  border-radius: 50%;
+  padding: 4px;
+}
+
+.cpos-avatar-photo {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border: 2px solid rgba(0, 86, 210, 0.2);
+  background: #f3f4f6;
+}
+
+.cpos-profile-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cpos-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 2px;
+  line-height: 1.35;
+  letter-spacing: -0.1px;
+}
+
+.cpos-subtitle {
+  font-size: 13px;
+  color: #6B7280;
+  margin: 0 0 10px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.cpos-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cpos-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F4F6F9;
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.cpos-meta-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.cpos-meta-value {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.cpos-meta-badge--active {
+  background: #DCFCE7;
+}
+
+.cpos-meta-badge--active .cpos-meta-value {
+  color: #15803D;
+}
+
+.cpos-meta-badge--inactive {
+  background: #FEE2E2;
+}
+
+.cpos-meta-badge--inactive .cpos-meta-value {
+  color: #B91C1C;
+}
+
+.cpos-meta-badge--active .cpos-meta-value,
+.cpos-meta-badge--inactive .cpos-meta-value {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+
+.cpos-caps {
+  margin-top: 14px;
+}
+
+.cpos-caps-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.cpos-cap-chip {
+  margin: 0;
+  height: 26px;
+  font-size: 12px;
+  font-weight: 600;
+  --background: #EEF2FF;
+  --color: #3730A3;
+}
+
+.cpos-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cpos-action {
+  flex: 1 1 120px;
+  margin: 0;
+  --border-radius: 10px;
+  --border-width: 1.5px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Section headings */
+.cpos-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cpos-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 10px;
+}
+
+.cpos-section-head .cpos-section-title {
+  margin-bottom: 0;
+}
+
+.cpos-section-head + * {
+  margin-top: 10px;
+}
+
+.cpos-link {
+  margin: 0;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* KPIs */
+.cpos-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 480px) {
+  .cpos-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cpos-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #F4F6F9;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.cpos-kpi--accent {
+  background: rgba(0, 86, 210, 0.08);
+}
+
+.cpos-kpi-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.cpos-kpi--accent .cpos-kpi-value {
+  color: var(--ion-color-primary, #0056D2);
+}
+
+.cpos-kpi-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Stamp cards */
+.cpos-stamp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cpos-stamp-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.cpos-stamp-count {
+  color: #6B7280;
+  font-weight: 600;
+}
+
+.cpos-stamp-ready {
+  color: #15803D;
+  font-weight: 700;
+}
+
+.cpos-stamp-bar {
+  height: 6px;
+  border-radius: 3px;
+}
+
+/* Lists */
+.cpos-list {
+  padding: 0;
+  margin: 0 -16px;
+  background: transparent;
+}
+
+.cpos-item {
+  --background: transparent;
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+}
+
+.cpos-item h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.cpos-item p {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.cpos-item-icon {
+  color: var(--ion-color-primary, #0056D2);
+  font-size: 20px;
+  margin-inline-end: 12px;
+}
+
+.cpos-badge {
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.cpos-amount {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cpos-amount--positive {
+  color: #15803D;
+}
+
+.cpos-amount--negative {
+  color: #B91C1C;
+}
+
+.cpos-empty {
+  padding: 20px 8px;
+}
+
+/* QR — always present; built from clientId + name */
+.cpos-qr-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.cpos-qr-code {
+  flex-shrink: 0;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #E8ECF0;
+  line-height: 0;
+}
+
+.cpos-qr-info {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.cpos-qr-hint {
+  font-size: 13px;
+  color: #6B7280;
+  margin: -4px 0 10px;
+  line-height: 1.5;
+}
+
+.cpos-qr-uses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.cpos-qr-use {
+  margin: 0;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  --background: #ECFDF5;
+  --color: #047857;
+}
+
+.cpos-qr-download {
+  width: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cpos-name,
+  .cpos-section-title,
+  .cpos-kpi-value,
+  .cpos-item h3 {
+    color: #F3F4F6;
+  }
+  .cpos-meta-badge,
+  .cpos-kpi {
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .cpos-meta-value,
+  .cpos-stamp-head {
+    color: #D1D5DB;
+  }
+}

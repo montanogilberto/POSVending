@@ -34,10 +34,12 @@ const HealthPanel: React.FC<PanelProps> = ({ vm, channel, title, icon, counters,
       <div className="ndl-counters">
         {counters.map(c => (c.target ? (
           <IonButton key={c.label} fill="clear" className="ndl-counter" onClick={() => vm.showInList({ channel, ...c.target })}>
-            <span>{c.label}</span><strong>{c.value}</strong>
+            <span className="ndl-counter-body"><span>{c.label}</span><strong>{c.value}</strong></span>
           </IonButton>
         ) : (
-          <div key={c.label} className="ndl-counter ndl-counter--static"><span>{c.label}</span><strong>{c.value}</strong></div>
+          <div key={c.label} className="ndl-counter ndl-counter--static">
+            <span className="ndl-counter-body"><span>{c.label}</span><strong>{c.value}</strong></span>
+          </div>
         )))}
       </div>
       {children}

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://smartloansbackend.azurewebsites.net';
+import { API_BASE_URL } from '../utils/appEnv';
 
 // 'pos' = plain POS retail customer, no lending relationship — added
 // 2026-09-14 (CK_clients_clientType on the backend updated to match).
