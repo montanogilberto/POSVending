@@ -18,6 +18,7 @@ import {
   IonHeader,
 } from '@ionic/react';
 import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
+import PageLoading from '../../components/ui/PageLoading';
 import { waterOutline, timeOutline, barChartOutline } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { fetchWaterTanks, WaterTank, TankWaterDetail } from '../../api/waterTanksApi';
@@ -87,9 +88,7 @@ const WaterTanksHistoryPage: React.FC = () => {
           </IonToolbar>
         </IonHeader>
         <IonContent>
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <IonText>Cargando historial...</IonText>
-          </div>
+          <PageLoading text="Cargando historial…" />
         </IonContent>
       </IonPage>
     );

@@ -8,6 +8,7 @@ import Header from '../../../components/layout/Header';
 import AlertPopover from '../../../components/popovers/AlertPopover';
 import MailPopover from '../../../components/popovers/MailPopover';
 import EmptyState from '../../../components/ui/EmptyState';
+import PageLoading from '../../../components/ui/PageLoading';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import { NOTIFICATION_PRIORITY, NOTIFICATION_TYPE } from '../../../components/ui/statusMaps';
 import { usePopovers } from '../../../hooks/usePopovers';
@@ -32,7 +33,7 @@ const NotificationDetailView: React.FC = () => {
         </IonRefresher>
 
         {!info && (vm.loading
-          ? <div className="ntd-loading"><IonSpinner name="crescent" /></div>
+          ? <PageLoading text="Cargando notificación…" />
           : <EmptyState icon={notificationsOutline} text="No hay información de esta notificación." />)}
 
         {info && (

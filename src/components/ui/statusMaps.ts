@@ -142,3 +142,9 @@ export const NOTIFICATION_PRIORITY: Record<string, StatusMeta> = {
   high:     { label: 'Alta',    color: 'warning' },
   critical: { label: 'Crítica', color: 'danger'  },
 };
+
+/** Catálogo de productos (products.isSupply / products.isActive). */
+export const PRODUCT_STATUS: Record<string, StatusMeta> = {
+  supply:   { label: 'Insumo',   color: 'tertiary' },
+  inactive: { label: 'Inactivo', color: 'medium'   },
+};

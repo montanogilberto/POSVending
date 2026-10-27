@@ -1,7 +1,7 @@
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { Product } from '../data/type_products';
-import { getProductsByCompany, getOneProduct, createOrUpdateProduct, deleteProduct, CreateProductRequest, GetOneProductRequest, DeleteProductRequest } from '../api/productsApi';
+import { getProductsByCompany, getOneProduct, createOrUpdateProduct, setProductActive as setProductActiveApi, CreateProductRequest, GetOneProductRequest, ProductListOptions } from '../api/productsApi';
 import { useUser } from './UserContext';
 
 type CreateProductInput = Omit<Product, 'productId' | 'createdAt' | 'updatedAt'> & {
@@ -21,11 +21,13 @@ interface ProductContextType {
   clearProductsList: () => void;
   clearProductsDetail: () => void;
   clearAllProducts: () => void;
-  fetchProducts: () => Promise<void>;
+  /** options are remembered: the refresh after a create/update/deactivate reuses them. */
+  fetchProducts: (options?: ProductListOptions) => Promise<void>;
   fetchProductById: (productId: number) => Promise<void>;
   createProduct: (productData: CreateProductInput) => Promise<number | null>;
   updateProduct: (productId: number, productData: Partial<Product>) => Promise<void>;
-  removeProduct: (productId: number) => Promise<void>;
+  /** false = soft delete (isActive = 0), true = reactivate. */
+  setProductActive: (productId: number, active: boolean) => Promise<void>;
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
@@ -36,6 +38,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [productsDetail, setProductsDetail] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const listOptionsRef = useRef<ProductListOptions>({});
 
   const clearProductsList = () => setProductsList([]);
   const clearProductsDetail = () => setProductsDetail(null);
@@ -44,7 +47,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     clearProductsDetail();
   };
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (options?: ProductListOptions) => {
+    if (options) listOptionsRef.current = options;
     const normalizedCompanyId = Number(companyId);
 
     if (!Number.isFinite(normalizedCompanyId) || normalizedCompanyId <= 0) {
@@ -56,7 +60,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setLoading(true);
     setError(null);
     try {
-      const products = await getProductsByCompany(normalizedCompanyId);
+      const products = await getProductsByCompany(normalizedCompanyId, listOptionsRef.current);
       const normalizedProducts = (products ?? []).map((p: any) => {
         const resolvedProductId = Number(p?.productId ?? p?.id ?? 0);
         return {
@@ -131,6 +135,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
           productDetails: (productData as any).productDetails ?? undefined,
           productDescriptions: (productData as any).productDescriptions ?? [],
           productOptions: (productData as any).productOptions ?? [],
+          stockUnit: (productData as any).stockUnit,
+          stableOptionIds: (productData as any).stableOptionIds,
         }]
       };
       const response = await createOrUpdateProduct(request);
@@ -177,6 +183,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
           productDetails: (productData as any).productDetails ?? undefined,
           productDescriptions: (productData as any).productDescriptions ?? [],
           productOptions: (productData as any).productOptions ?? [],
+          stockUnit: (productData as any).stockUnit,
+          stableOptionIds: (productData as any).stableOptionIds,
         }]
       };
 
@@ -200,31 +208,19 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const removeProduct = async (productId: number) => {
+  const setProductActive = async (productId: number, active: boolean) => {
     setLoading(true);
     setError(null);
     try {
-      const normalizedCompanyId = Number(companyId);
-      const request: DeleteProductRequest = {
-        products: [{
-          productId,
-          ...(Number.isFinite(normalizedCompanyId) && normalizedCompanyId > 0
-            ? { companyId: normalizedCompanyId, action: 3 }
-            : { action: 3 }),
-        }],
-      };
-      await deleteProduct(request);
-      setProductsList(productsList.filter(p => p.productId !== productId));
+      await setProductActiveApi({ productId, companyId: Number(companyId), active });
+      await fetchProducts();
       if (productsDetail && productsDetail.productId === productId) {
         setProductsDetail(null);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete product';
+      const message = err instanceof Error ? err.message : 'Failed to change product status';
       setError(message);
-      console.error('[ProductContext.removeProduct] Failed to delete product', {
-        productId,
-        error: err,
-      });
+      console.error('[ProductContext.setProductActive] Failed', { productId, active, error: err });
       throw err;
     } finally {
       setLoading(false);
@@ -246,7 +242,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
       fetchProductById,
       createProduct,
       updateProduct,
-      removeProduct
+      setProductActive
     }}>
       {children}
     </ProductContext.Provider>

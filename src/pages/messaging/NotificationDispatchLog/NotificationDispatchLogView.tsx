@@ -1,10 +1,11 @@
 import React from 'react';
-import { IonContent, IonPage, IonRefresher, IonRefresherContent, IonSpinner, IonToast } from '@ionic/react';
+import { IonContent, IonPage, IonRefresher, IonRefresherContent, IonToast } from '@ionic/react';
 import { notificationsOutline } from 'ionicons/icons';
 import Header from '../../../components/layout/Header';
 import AlertPopover from '../../../components/popovers/AlertPopover';
 import MailPopover from '../../../components/popovers/MailPopover';
 import EmptyState from '../../../components/ui/EmptyState';
+import PageLoading from '../../../components/ui/PageLoading';
 import { usePopovers } from '../../../hooks/usePopovers';
 import { useNotificationDispatchLog } from './NotificationDispatchLogLogic';
 import FilterBar from './components/FilterBar';
@@ -41,15 +42,17 @@ const NotificationDispatchLogView: React.FC = () => {
         <div className={`ndl-layout${drawerOpen ? ' ndl-layout--drawer' : ''}`}>
           <div className="ndl-container">
             <FilterBar vm={vm} />
-            <KpiGrid vm={vm} />
-            <KeyMetrics vm={vm} />
-            <ChannelUsageCard vm={vm} />
-            <ActionCenter vm={vm} />
 
-            {vm.loading && vm.total === 0 && <div className="ndl-loading"><IonSpinner name="dots" /></div>}
-            {!vm.loading && vm.total === 0
-              ? <EmptyState icon={notificationsOutline} text="No hay notificaciones registradas todavía." />
-              : <DispatchTable vm={vm} />}
+            {vm.initialLoading ? <PageLoading text="Cargando notificaciones…" /> : <>
+              <KpiGrid vm={vm} />
+              <KeyMetrics vm={vm} />
+              <ChannelUsageCard vm={vm} />
+              <ActionCenter vm={vm} />
+
+              {vm.total === 0
+                ? <EmptyState icon={notificationsOutline} text="No hay notificaciones registradas todavía." />
+                : <DispatchTable vm={vm} />}
+            </>}
           </div>
           <DetailDrawer vm={vm} />
         </div>

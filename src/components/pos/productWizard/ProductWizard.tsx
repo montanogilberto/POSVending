@@ -9,21 +9,26 @@ import { useProduct } from '../../../contexts/ProductContext';
 import { useUser } from '../../../contexts/UserContext';
 import { Product } from '../../../data/type_products';
 import { fmtMXN } from '../../../utils/format';
-import { ProductLabelReading } from '../../../api/productAgentApi';
+import { ProductLabelReading, WebProductLookup } from '../../../api/productAgentApi';
 import ProductLabelReader from './ProductLabelReader';
+import ProductWebSearch from './ProductWebSearch';
 import { uploadProductImage } from '../../../api/productsApi';
 import { pickProductLabelPhoto } from '../../../utils/pickAvatarPhoto';
 import './ProductWizard.css';
 
-/** quantity + unit: the size of this choice (19 L, 600 ml). Empty for services. */
-interface OptionChoice { name: string; extraPrice: number; quantity: string; unit: string; }
+/** quantity + unit: the size of this choice (19 L, 600 ml). Empty for services.
+ *  productOptionChoiceId: the saved row (null = new); sent back so sp_products updates it
+ *  in place and sales/history keep pointing at the same choice. */
+interface OptionChoice { productOptionChoiceId: number | null; name: string; extraPrice: number; quantity: string; unit: string; }
 /** isRequired: the POS does not let the line into the cart until a choice is picked. */
-interface ProductOptionData { name: string; optionType: 'radio' | 'checkbox'; isRequired: boolean; choices: OptionChoice[]; }
+interface ProductOptionData { productOptionId: number | null; name: string; optionType: 'radio' | 'checkbox'; isRequired: boolean; choices: OptionChoice[]; }
+/** What inventory counts for this product: pieces, or ml / g for supplies sold by portion. */
+type StockUnit = 'pz' | 'ml' | 'g';
 interface WizardData {
   categoryId: number; categoryName: string;
   name: string; code: string; barCode: string; description: string; dateOfExpire: string; noExpire: boolean;
   netContent: string; unitOfMeasure: string;
-  salePrice: string; unitPrice: string; stockQuantity: string;
+  salePrice: string; unitPrice: string; stockQuantity: string; stockUnit: StockUnit;
   /** Precio al que lo vende la competencia (OXXO, súper…) — referencia, no se cobra. */
   referencePrice: string;
   /** Saved product photo (blob URL). */
@@ -69,10 +74,21 @@ const pricePerBaseUnit = (sale: number, content: number, unit: string) => {
   if (unit === 'pz') return { value: sale / content, unit: 'pz' };
   return null;
 };
+/** Stock units in ONE piece (same rule as dbo.fn_stockFactor): 8 L counted in ml → 8000. null = can't convert. */
+const stockFactor = (unit: StockUnit, content: number, contentUnit: string): number | null => {
+  if (unit === 'pz') return 1;
+  if (!(content > 0)) return null;
+  if (unit === 'ml') return contentUnit === 'ml' ? content : contentUnit === 'L' ? content * 1000 : null;
+  return contentUnit === 'g' ? content : contentUnit === 'kg' ? content * 1000 : null;
+};
+/** The portion unit a product can be counted in, from its net content: ml for ml/L, g for g/kg. */
+const portionUnitOf = (contentUnit: string): StockUnit | null =>
+  contentUnit === 'ml' || contentUnit === 'L' ? 'ml' : contentUnit === 'g' || contentUnit === 'kg' ? 'g' : null;
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const INIT: WizardData = {
   categoryId:0, categoryName:'', name:'', code:'', barCode:'', description:'', dateOfExpire:'', noExpire:false,
   netContent:'', unitOfMeasure:'',
-  salePrice:'', unitPrice:'', stockQuantity:'', referencePrice:'', imageUrl:'', options:[],
+  salePrice:'', unitPrice:'', stockQuantity:'', stockUnit:'pz', referencePrice:'', imageUrl:'', options:[],
   formQuantity:'', additionalDescription:'', packingName:'', packingPresentationName:'',
 };
 
@@ -130,10 +146,12 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
 
       const sourceOptions = product.options ?? anyProduct.productOptions ?? [];
       const mappedOptions: ProductOptionData[] = sourceOptions.map((opt: any) => ({
+        productOptionId: Number(opt.productOptionId ?? opt.id) || null,
         name: opt.name ?? '',
         optionType: (opt.type === 'checkbox' ? 'checkbox' : 'radio'),
         isRequired: Boolean(opt.isRequired),
         choices: (opt.choices ?? opt.optionChoices ?? []).map((ch: any) => ({
+          productOptionChoiceId: Number(ch.productOptionChoiceId) || null,
           name: ch.name ?? '',
           extraPrice: Number(ch.price ?? 0),
           quantity: ch.quantity != null ? String(Number(ch.quantity)) : '',
@@ -164,13 +182,14 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         salePrice: details?.salePrice != null ? String(details.salePrice) : '0',
         unitPrice: details?.unitPrice != null ? String(details.unitPrice) : '0',
         stockQuantity: stockText,
+        stockUnit: (['ml', 'g'].includes(anyProduct.stockUnit) ? anyProduct.stockUnit : 'pz') as StockUnit,
         imageUrl: String(anyProduct.imageUrl ?? anyProduct.image ?? ''),
         referencePrice: anyProduct.referencePrice != null && Number(anyProduct.referencePrice) > 0 ? String(Number(anyProduct.referencePrice)) : '',
         options: mappedOptions,
         formQuantity: product.form?.quantity ?? '',
         additionalDescription: principalDescription?.Dosage ?? '',
-        packingName: '',
-        packingPresentationName: '',
+        packingName: product.form?.packingName ?? '',
+        packingPresentationName: product.form?.packingPresentationName ?? '',
       });
       return;
     }
@@ -245,6 +264,19 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     if (!saleTouched && cost > 0) upd('salePrice', shelfPrice(cost, TARGET_MARGIN).toFixed(2));
   };
   const updSale = (v: string) => { setSaleTouched(true); upd('salePrice', v); };
+  /** Pieces ↔ ml/g: the shown stock (and the opening value it is compared to) is converted,
+   *  so switching the unit alone never posts a stock adjustment — sp_products converts the
+   *  ledger balance itself ('unit_change'). */
+  const changeStockUnit = (next: StockUnit) => {
+    const content = parseFloat(data.netContent);
+    const from = stockFactor(data.stockUnit, content, data.unitOfMeasure);
+    const to = stockFactor(next, content, data.unitOfMeasure);
+    if (!from || !to || next === data.stockUnit) return;
+    const convert = (v: string) => (v === '' ? v : String(round3((parseFloat(v) || 0) / from * to)));
+    upd('stockQuantity', convert(data.stockQuantity));
+    setInitialStock(convert(initialStock));
+    upd('stockUnit', next);
+  };
 
   /** Product label agent -> form. Only fills fields that are still empty, so it
    *  never overwrites what the user typed; Código, category and prices stay manual. */
@@ -267,6 +299,26 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
       upd('dateOfExpire', r.expirationDate);
       filled.push('Fecha de expiración');
     }
+    return filled;
+  };
+  /** Product web lookup -> form. Same rule as the label reader: only empty fields;
+   *  the price found online goes to "Precio en el mercado" (reference, never charged). */
+  const applyWebLookup = (r: WebProductLookup): string[] => {
+    const filled: string[] = [];
+    const fill = (f: keyof WizardData, value: string, label: string) => {
+      if (!value || String(data[f] ?? '').trim()) return;
+      upd(f, value);
+      filled.push(label);
+    };
+    fill('name', r.suggestedName || r.fullName, 'Nombre');
+    fill('description', r.description, 'Descripción');
+    if (r.netContent > 0 && UNITS.some(u => u.value === r.unitOfMeasure) && !data.netContent && !data.unitOfMeasure) {
+      upd('netContent', String(r.netContent));
+      upd('unitOfMeasure', r.unitOfMeasure);
+      filled.push('Contenido neto');
+    }
+    // "Precio en el mercado" is in pesos: only an MXN price fills it.
+    if (r.price > 0 && (!r.currency || r.currency === 'MXN')) fill('referencePrice', r.price.toFixed(2), 'Precio en el mercado');
     return filled;
   };
   /** Reader photos changed: default the product image to the first one (the front). */
@@ -300,6 +352,8 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
       // Priced by options (sizes/cycles): the base must be allowed to be $0,
       // otherwise base + option is charged twice (Garrafón $10 + 19 lts $10).
       const pricedByOptions = data.options.some(o => o.choices.some(c => Number(c.extraPrice) > 0));
+      if (data.stockUnit !== 'pz' && !stockFactor(data.stockUnit, parseFloat(data.netContent), data.unitOfMeasure))
+        e.stockQuantity = `Para contar en ${data.stockUnit} captura el contenido neto en ${data.stockUnit === 'ml' ? 'ml o L' : 'g o kg'} (paso Producto).`;
       if (!data.salePrice || !(sale >= 0)) e.salePrice='Ingresa un precio válido';
       else if (!pricedByOptions && cost > 0 && sale < suggestedPrice(cost)) e.salePrice=`El margen mínimo es ${TARGET_MARGIN*100}%. Precio mínimo: ${fmtMXN(suggestedPrice(cost))}`;
     }
@@ -326,10 +380,10 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const countValidChoices = (choices: OptionChoice[]) =>
     choices.filter((ch) => ch.name.trim() !== '').length;
 
-  const addOpt    = () => { if (isReadOnly) return; upd('options',[...data.options,{name:'',optionType:'radio',isRequired:true,choices:[{name:'',extraPrice:0,quantity:'',unit:''}]}]); };
+  const addOpt    = () => { if (isReadOnly) return; upd('options',[...data.options,{productOptionId:null,name:'',optionType:'radio',isRequired:true,choices:[{productOptionChoiceId:null,name:'',extraPrice:0,quantity:'',unit:''}]}]); };
   const remOpt    = (i:number) => { if (isReadOnly) return; upd('options',data.options.filter((_,x)=>x!==i)); };
   const updOpt    = (i:number,f:keyof ProductOptionData,v:any) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,[f]:v}:o)); };
-  const addCh     = (i:number) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,choices:[...o.choices,{name:'',extraPrice:0,quantity:'',unit:''}]}:o)); };
+  const addCh     = (i:number) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,choices:[...o.choices,{productOptionChoiceId:null,name:'',extraPrice:0,quantity:'',unit:''}]}:o)); };
   const remCh     = (i:number,ci:number) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,choices:o.choices.filter((_,cx)=>cx!==ci)}:o)); };
   const updCh     = (i:number,ci:number,f:keyof OptionChoice,v:any) => { if (isReadOnly) return; upd('options',data.options.map((o,x)=>x===i?{...o,choices:o.choices.map((c,cx)=>cx===ci?{...c,[f]:v}:c)}:o)); };
 
@@ -366,7 +420,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         .filter((opt) => opt.name !== '')
         .map((opt) => ({
           action: 1,
-          productOptionId: null,
+          productOptionId: opt.productOptionId,
           optionKey: opt.name.toLowerCase().replace(/\s+/g, '_'),
           name: opt.name,
           type: opt.optionType,
@@ -376,7 +430,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
             .filter((ch) => ch.name !== '')
             .map((ch) => ({
               action: 1,
-              productOptionChoiceId: null,
+              productOptionChoiceId: ch.productOptionChoiceId,
               choiceKey: ch.name.toLowerCase().replace(/\s+/g, '_'),
               name: ch.name,
               price: Number(ch.extraPrice || 0),
@@ -488,15 +542,12 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         companyId: normalizedCompanyId,
         productFormId: product?.productFormId ?? 0,
         manufactureId: product?.manufactureId ?? 0,
-        productForm: data.formQuantity.trim()
-          ? {
-              action: isEdit ? 2 : 1,
-              productFormId: product?.form?.productFormId ?? null,
-              quantity: data.formQuantity.trim(),
-              productPackingPresentationId: product?.form?.productPackingPresentationId ?? null,
-              productsPackingTypeId: product?.form?.productsPackingTypeId ?? null,
-            }
-          : undefined,
+        // Always sent: sp_products resolves the packing names; all three empty clears the form.
+        productForm: {
+          quantity: data.formQuantity.trim(),
+          packingName: data.packingName.trim(),
+          packingPresentationName: data.packingPresentationName.trim(),
+        },
         productDetails: {
           action: isEdit ? 2 : 1,
           productDetailId: (product as any)?.details?.[0]?.productDetailId ?? (product as any)?.productDetails?.[0]?.productDetailId ?? null,
@@ -505,24 +556,15 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
           salePrice: Number(data.salePrice || 0),
         },
         productDescriptions,
-        productOptions: sanitizedOptions.map((opt: any, index: number) => {
-          const sourceOptions = (product as any)?.options ?? (product as any)?.productOptions ?? [];
-          const existingOption = sourceOptions[index];
-          const existingChoices = existingOption?.choices ?? existingOption?.optionChoices ?? [];
-          return {
-            ...opt,
-            action: isEdit ? 2 : 1,
-            productOptionId: existingOption?.productOptionId ?? null,
-            optionChoices: (opt.optionChoices ?? []).map((choice: any, choiceIndex: number) => {
-              const existingChoice = existingChoices[choiceIndex];
-              return {
-                ...choice,
-                action: isEdit ? 2 : 1,
-                productOptionChoiceId: existingChoice?.productOptionChoiceId ?? null,
-              };
-            }),
-          };
-        }),
+        // Each option/choice carries its OWN saved id (null = new): sp_products updates
+        // those rows in place (stableOptionIds) instead of deleting and re-creating them.
+        productOptions: sanitizedOptions.map((opt) => ({
+          ...opt,
+          action: isEdit ? 2 : 1,
+          optionChoices: opt.optionChoices.map((choice) => ({ ...choice, action: isEdit ? 2 : 1 })),
+        })),
+        stableOptionIds: 1,
+        stockUnit: data.stockUnit,
       } as any;
 
       console.log('[ProductWizard] handleSubmit:payload', payload);
@@ -643,7 +685,10 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         <p className="wizard-step-subtitle">Datos básicos de identificación</p>
       </div>
       {!isReadOnly && effectiveMode !== 'edit' && (
-        <ProductLabelReader companyId={Number(companyId)} onApply={applyLabelReading} onPhotosChange={onLabelPhotos} />
+        <>
+          <ProductLabelReader companyId={Number(companyId)} onApply={applyLabelReading} onPhotosChange={onLabelPhotos} />
+          <ProductWebSearch companyId={Number(companyId)} barCode={data.barCode} name={data.name} onApply={applyWebLookup} />
+        </>
       )}
       <div className="wizard-form">
         {renderCategoryField()}
@@ -685,7 +730,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
         <div className="wizard-field-row">
           <div className="wizard-field">
             <label className="wizard-label">Código</label>
-            {/* Assigned by sp_products_save on insert: MAX(numeric code) + 1 for the company. */}
+            {/* Assigned by sp_products on insert: MAX(numeric code) + 1 for the company. */}
             <div className="wizard-auto-code">{data.code || 'Automático al guardar'}</div>
           </div>
           <div className="wizard-field">
@@ -736,6 +781,8 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
     const pricedByOptions = data.options.some(o => o.choices.some(c => Number(c.extraPrice) > 0));
     const belowTarget = !pricedByOptions && minPrice !== null && data.salePrice !== '' && sale < minPrice;
     const perUnit = pricePerBaseUnit(sale, parseFloat(data.netContent), data.unitOfMeasure);
+    const portionUnit = portionUnitOf(data.unitOfMeasure);
+    const pieceFactor = stockFactor(data.stockUnit, parseFloat(data.netContent), data.unitOfMeasure);
     const ref = parseFloat(data.referencePrice) || 0;
     const refMargin = ref > 0 && cost > 0 ? marginOf(ref, cost) : null;
     /** Costo máximo para vender al precio de mercado con el margen objetivo. */
@@ -800,8 +847,23 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
             )}
           </div>
           <div className="wizard-field">
-            <label className="wizard-label">Cantidad en stock</label>
-            <input className="wizard-input" type="number" min="0" placeholder="0" value={data.stockQuantity} onChange={e=>upd('stockQuantity',e.target.value)} disabled={isReadOnly}/>
+            <label className="wizard-label">Cantidad en stock{data.stockUnit !== 'pz' ? ` (${data.stockUnit})` : ''}</label>
+            <input className={`wizard-input${errors.stockQuantity ? ' error' : ''}`} type="number" min="0" step="any" placeholder="0" value={data.stockQuantity} onChange={e=>upd('stockQuantity',e.target.value)} disabled={isReadOnly}/>
+            {(portionUnit || data.stockUnit !== 'pz') && (
+              <>
+                <IonSegment className="wizard-unit-segment wizard-stock-unit" value={data.stockUnit} disabled={isReadOnly}
+                  onIonChange={e => changeStockUnit(String(e.detail.value) as StockUnit)}>
+                  <IonSegmentButton value="pz"><IonLabel>Piezas</IonLabel></IonSegmentButton>
+                  {portionUnit && <IonSegmentButton value={portionUnit}><IonLabel>Por {portionUnit}</IonLabel></IonSegmentButton>}
+                </IonSegment>
+                <span className="wizard-image-hint">
+                  {data.stockUnit !== 'pz' && pieceFactor
+                    ? `Se cuenta en ${data.stockUnit}: 1 pieza = ${pieceFactor.toLocaleString('es-MX')} ${data.stockUnit}. Úsalo para lo que se vende por porción (jabón, suavizante a granel).`
+                    : `Se cuenta por pieza. Elige "Por ${portionUnit}" si lo vendes por porción.`}
+                </span>
+              </>
+            )}
+            {errors.stockQuantity && <span className="wizard-field-error">{errors.stockQuantity}</span>}
           </div>
           {data.salePrice && (
             <div className="wizard-price-summary">
@@ -813,7 +875,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
                 </div>
               )}
               {perUnit && <div className="price-summary-row"><span>Precio por {perUnit.unit}</span><strong className="price-blue">{fmtMXN(perUnit.value)}</strong></div>}
-              {data.stockQuantity && <div className="price-summary-row"><span>Valor en inventario</span><strong className="price-blue">{fmt(((parseFloat(data.salePrice)||0)*(parseInt(data.stockQuantity)||0)).toString())}</strong></div>}
+              {data.stockQuantity && data.stockUnit === 'pz' && <div className="price-summary-row"><span>Valor en inventario</span><strong className="price-blue">{fmt(((parseFloat(data.salePrice)||0)*(parseInt(data.stockQuantity)||0)).toString())}</strong></div>}
             </div>
           )}
         </div>
@@ -905,13 +967,13 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   const renderS5 = () => {
     const sections = [
       { icon:'📋', cls:'blue',   title:'Forma del producto',      desc:'Cantidad y presentación',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Cantidad</label><input className="wizard-input" placeholder="Ej. 500ml, 1kg..." value={data.formQuantity} onChange={e=>upd('formQuantity',e.target.value)} disabled={isReadOnly}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Cantidad</label><input className="wizard-input" maxLength={50} placeholder="Ej. 500ml, 1kg..." value={data.formQuantity} onChange={e=>upd('formQuantity',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'📝', cls:'green',  title:'Descripción adicional',   desc:'Información técnica',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Descripción técnica</label><textarea className="wizard-textarea" rows={3} placeholder="Información adicional..." value={data.additionalDescription} onChange={e=>upd('additionalDescription',e.target.value)} disabled={isReadOnly}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Descripción técnica</label><textarea className="wizard-textarea" rows={3} maxLength={500} placeholder="Información adicional..." value={data.additionalDescription} onChange={e=>upd('additionalDescription',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'📦', cls:'orange', title:'Empaque',                 desc:'Tipo de empaque',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre del empaque</label><input className="wizard-input" placeholder="Ej. Caja, Bolsa..." value={data.packingName} onChange={e=>upd('packingName',e.target.value)} disabled={isReadOnly}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre del empaque</label><input className="wizard-input" maxLength={50} placeholder="Ej. Caja, Bolsa..." value={data.packingName} onChange={e=>upd('packingName',e.target.value)} disabled={isReadOnly}/></div> },
       { icon:'🎁', cls:'purple', title:'Presentación de empaque', desc:'Presentación o tamaño',
-        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre de la presentación</label><input className="wizard-input" placeholder="Ej. Individual, Pack x6..." value={data.packingPresentationName} onChange={e=>upd('packingPresentationName',e.target.value)} disabled={isReadOnly}/></div> },
+        body:<div className="wizard-field" style={{marginTop:12}}><label className="wizard-label">Nombre de la presentación</label><input className="wizard-input" maxLength={50} placeholder="Ej. Individual, Pack x6..." value={data.packingPresentationName} onChange={e=>upd('packingPresentationName',e.target.value)} disabled={isReadOnly}/></div> },
     ];
     return (
       <div>
@@ -941,7 +1003,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
   /* ── Step 6: Review ── */
   const renderS6 = () => {
     const rows2 = [{k:'Categoría',v:data.categoryName},{k:'Nombre',v:data.name},{k:'Código',v:data.code},{k:'Código de barras',v:data.barCode},{k:'Descripción',v:data.description},{k:'Contenido neto',v:data.netContent?`${data.netContent} ${data.unitOfMeasure}`:''},{k:'Fecha expiración',v:data.noExpire?'Sin expiración':data.dateOfExpire}];
-    const rows3 = [{k:'Precio de venta',v:data.salePrice?fmt(data.salePrice):''},{k:'Costo unitario',v:data.unitPrice?fmt(data.unitPrice):''},{k:'Margen',v:parseFloat(data.unitPrice)>0&&data.salePrice?`${(marginOf(parseFloat(data.salePrice)||0,parseFloat(data.unitPrice))*100).toFixed(1)}%`:''},{k:'Precio en mercado',v:data.referencePrice?fmt(data.referencePrice):''},{k:'Stock inicial',v:data.stockQuantity}];
+    const rows3 = [{k:'Precio de venta',v:data.salePrice?fmt(data.salePrice):''},{k:'Costo unitario',v:data.unitPrice?fmt(data.unitPrice):''},{k:'Margen',v:parseFloat(data.unitPrice)>0&&data.salePrice?`${(marginOf(parseFloat(data.salePrice)||0,parseFloat(data.unitPrice))*100).toFixed(1)}%`:''},{k:'Precio en mercado',v:data.referencePrice?fmt(data.referencePrice):''},{k:'Stock inicial',v:data.stockQuantity ? `${data.stockQuantity}${data.stockUnit !== 'pz' ? ` ${data.stockUnit}` : ''}` : ''}];
     const ReviewCard = ({title,rows,editStep}:{title:string;rows:{k:string;v:string}[];editStep:number}) => (
       <div className="wizard-review-card">
         <div className="wizard-review-card-header">

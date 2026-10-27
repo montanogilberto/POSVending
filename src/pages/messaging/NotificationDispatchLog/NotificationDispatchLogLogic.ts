@@ -31,6 +31,7 @@ export const useNotificationDispatchLog = () => {
   const [rows, setRows] = useState<DispatchRow[]>([]);
   const [usage, setUsage] = useState<NotificationUsage | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [selected, setSelected] = useState<DispatchRow | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>('info');
@@ -63,6 +64,7 @@ export const useNotificationDispatchLog = () => {
       showToast((err as Error).message || 'No se pudo cargar el historial de notificaciones');
     } finally {
       setLoading(false);
+      setLoadedOnce(true);
     }
   }, [companyId, showToast]);
 
@@ -156,7 +158,11 @@ export const useNotificationDispatchLog = () => {
   };
 
   return {
-    loading, lastUpdated, refresh: load, toastProps, total: rows.length, isDesktop, historyRef,
+    loading, lastUpdated,
+    // Until the first load ends the KPIs would read 0 — show a loader instead. Later
+    // refreshes keep the numbers on screen while they update.
+    initialLoading: !loadedOnce && !!companyId,
+    refresh: load, toastProps, total: rows.length, isDesktop, historyRef,
     kpis, metrics, health, actions, providers, quota, usage, configWarnings,
     filtered, pageData, setPage, sortKey, setSortKey, showInList,
     selected, openDetail, closeDetail, detailTab, setDetailTab, history, openClientProfile, copyText,

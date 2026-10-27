@@ -22,6 +22,9 @@ export interface ProductForm {
   quantity: string;
   productPackingPresentationId: number;
   productsPackingTypeId: number;
+  /** Resolved names (sp_products_one). */
+  packingName?: string;
+  packingPresentationName?: string;
 }
 
 export interface ProductOptionChoice {
@@ -72,6 +75,10 @@ export interface Product {
   companyId: number;
   /** Consumable bought for the business (detergent, soap…), never sold in the POS menu. */
   isSupply?: boolean;
+  /** false = deactivated (soft delete): hidden from the POS, the ticket agent and Nuevo Egreso. */
+  isActive?: boolean;
+  /** What the stock counts: 'pz', or 'ml' / 'g' for supplies sold by portion. */
+  stockUnit?: 'pz' | 'ml' | 'g';
   /** Ledger stock (inventoryStock) returned by by_company_products / products_one. */
   stockQuantity?: number;
   options?: ProductOption[];

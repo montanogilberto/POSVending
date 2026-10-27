@@ -33,6 +33,7 @@ export const usePushNotifications = () => {
 
   const [rows, setRows] = useState<PushNotification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [period, setPeriod] = useState<PeriodFilter>('month');
   const [customRange, setCustomRange] = useState<CustomRange>(monthToDate);
@@ -68,6 +69,7 @@ export const usePushNotifications = () => {
       showToast((err as Error).message || 'No se pudieron cargar las notificaciones');
     } finally {
       setLoading(false);
+      setLoadedOnce(true);
     }
   }, [companyId, showToast]);
 
@@ -193,7 +195,10 @@ export const usePushNotifications = () => {
   };
 
   return {
-    loading, lastUpdated, refresh: load, toastProps, total: rows.length, isDesktop, isPhone, historyRef,
+    loading, lastUpdated,
+    // Until the first load ends the KPIs would read 0 — show a loader instead.
+    initialLoading: !loadedOnce && !!companyId,
+    refresh: load, toastProps, total: rows.length, isDesktop, isPhone, historyRef,
     period, setPeriod, customRange, setCustomRange,
     kpis, groups, unsentRole, showInList,
     filtered, pageData, setPage, sortKey, setSortKey, search, setSearch,

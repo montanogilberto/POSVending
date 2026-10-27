@@ -28,6 +28,7 @@ import { Product } from '../../data/type_products';
 import { useCallback, useEffect, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import Header from '../../components/layout/Header';
+import PageLoading from '../../components/ui/PageLoading';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
@@ -129,7 +130,7 @@ const ProductListPage: React.FC = () => {
           backButtonHref="/dashboard"
         />
         <IonContent className="ion-padding">
-          <p>Cargando productos...</p>
+          <PageLoading text="Cargando productos…" />
         </IonContent>
       </IonPage>
     );
