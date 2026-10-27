@@ -135,6 +135,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
           productDetails: (productData as any).productDetails ?? undefined,
           productDescriptions: (productData as any).productDescriptions ?? [],
           productOptions: (productData as any).productOptions ?? [],
+          stockUnit: (productData as any).stockUnit,
+          stableOptionIds: (productData as any).stableOptionIds,
         }]
       };
       const response = await createOrUpdateProduct(request);
@@ -181,6 +183,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
           productDetails: (productData as any).productDetails ?? undefined,
           productDescriptions: (productData as any).productDescriptions ?? [],
           productOptions: (productData as any).productOptions ?? [],
+          stockUnit: (productData as any).stockUnit,
+          stableOptionIds: (productData as any).stableOptionIds,
         }]
       };
 

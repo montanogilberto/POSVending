@@ -77,6 +77,8 @@ export interface Product {
   isSupply?: boolean;
   /** false = deactivated (soft delete): hidden from the POS, the ticket agent and Nuevo Egreso. */
   isActive?: boolean;
+  /** What the stock counts: 'pz', or 'ml' / 'g' for supplies sold by portion. */
+  stockUnit?: 'pz' | 'ml' | 'g';
   /** Ledger stock (inventoryStock) returned by by_company_products / products_one. */
   stockQuantity?: number;
   options?: ProductOption[];

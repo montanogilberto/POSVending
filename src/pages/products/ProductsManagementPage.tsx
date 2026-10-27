@@ -476,6 +476,7 @@ const ProductsManagementPage: React.FC = () => {
                           <span className="detail-label">Stock</span>
                           <span className="detail-value">
                             {product.stockQuantity ?? product.details[0].stockQuantity}
+                            {product.stockUnit && product.stockUnit !== 'pz' ? ` ${product.stockUnit}` : ''}
                           </span>
                         </span>
                         {product.details[0].unitPrice !== product.details[0].salePrice && (

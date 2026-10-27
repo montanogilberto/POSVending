@@ -137,6 +137,10 @@ export interface CreateProductRequest {
     productDetails?: ProductDetailsPayload | null;
     productDescriptions?: ProductDescriptionPayload[];
     productOptions?: ProductOptionPayload[];
+    /** What inventory counts: 'pz' (default) or 'ml' / 'g' for supplies sold by portion. */
+    stockUnit?: 'pz' | 'ml' | 'g';
+    /** 1 = productOptionId / productOptionChoiceId are the rows' own ids: update them in place. */
+    stableOptionIds?: number;
     // Backward-compatible fields for existing API behavior
     productFormId?: number;
     isSupply?: boolean;
