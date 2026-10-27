@@ -1,0 +1,69 @@
+/* "Buscar en internet" — product web lookup panel (Nuevo Producto, step 1) */
+.web-search {
+  margin: 0 0 20px;
+  border-radius: 16px;
+  box-shadow: none;
+  border: 1px dashed #A7F3D0;
+  background: #ECFDF5;
+}
+
+.web-search-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #065F46;
+}
+
+.web-search-hint {
+  margin: 4px 0 12px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.web-search ion-button ion-spinner { width: 18px; height: 18px; margin-right: 6px; }
+
+.web-search-result {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #FFFFFF;
+}
+
+.web-search-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.web-search-head strong { font-size: 0.95rem; color: #1A202C; line-height: 1.3; }
+.web-search-chip { height: 22px; margin: 0; font-size: 0.7rem; flex-shrink: 0; }
+
+.web-search-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 10px 0;
+  font-size: 0.85rem;
+}
+
+.web-search-fields dt { color: #64748B; }
+.web-search-fields dd { margin: 0; color: #1E293B; }
+
+.web-search-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 6px 0;
+  font-size: 0.82rem;
+  color: #B45309;
+}
+
+.web-search-issue { margin: 4px 0; font-size: 0.78rem; color: #B7791F; }
+.web-search-source { margin: 4px 0 10px; font-size: 0.74rem; color: #718096; }
+
+.web-search-status { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 0.85rem; }
+.web-search-status--error { color: #B91C1C; }
+.web-search-status--ok { color: #047857; }

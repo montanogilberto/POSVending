@@ -22,6 +22,14 @@
   padding: 0;
 }
 
+/* "?clientId=N" filter chip — tap to clear and see all clients */
+.clients-focus-chip {
+  margin: 8px 0 0;
+  --background: #EEF2FF;
+  --color: #3730A3;
+  font-weight: 600;
+}
+
 /* Client List Container */
 .clients-list {
   padding: 14px 16px;
@@ -55,6 +63,11 @@
 
 .client-card-content {
   padding: 16px !important;
+}
+
+/* POS cards open /client-pos/:clientId on tap */
+.client-card-clickable {
+  cursor: pointer;
 }
 
 .client-card-row {

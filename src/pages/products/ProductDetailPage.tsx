@@ -29,6 +29,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import { Product, Piezas } from '../../data/type_products';
 import Header from '../../components/layout/Header';
+import PageLoading from '../../components/ui/PageLoading';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
@@ -58,6 +59,7 @@ const ProductDetailPage: React.FC = () => {
   const { addToCart } = useCart();
 
   const [product, setProduct] = useState<Product | undefined>(undefined);
+  const [loadingProduct, setLoadingProduct] = useState(false);
   const [quantity, setQuantity] = useState(1);
   // A fast double-tap on "Agregar al carrito" fires twice before history.push
   // navigates away; CartContext merges identical lines, so the sale silently
@@ -111,6 +113,7 @@ const ProductDetailPage: React.FC = () => {
     } else {
       console.log('[ProductDetail] no product in navigation state, fetching by id', productId);
       const fetchProduct = async () => {
+        setLoadingProduct(true);
         try {
           const products = await getOneProduct({ products: [{ productId: parseInt(productId) }] });
           console.log('[ProductDetail] product fetched', JSON.stringify({
@@ -122,6 +125,8 @@ const ProductDetailPage: React.FC = () => {
         } catch (error) {
           console.error('Error fetching product:', error);
           setProduct(undefined);
+        } finally {
+          setLoadingProduct(false);
         }
       };
       fetchProduct();
@@ -133,7 +138,7 @@ const ProductDetailPage: React.FC = () => {
     return (
       <IonPage>
         <IonContent>
-          <p>Producto no encontrado.</p>
+          {loadingProduct ? <PageLoading text="Cargando producto…" /> : <p>Producto no encontrado.</p>}
         </IonContent>
       </IonPage>
     );

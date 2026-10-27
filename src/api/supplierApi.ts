@@ -42,6 +42,12 @@ export async function getAllSuppliers(companyId: number): Promise<Supplier[]> {
  * back as status:'error', not as an HTTP error.
  */
 async function mutateSupplier(body: Record<string, unknown>): Promise<void> {
+  // UQ_Suppliers_Email_CompanyId / UQ_Suppliers_Phone_CompanyId are unique
+  // indexes filtered on IS NOT NULL: a blank '' still counts, so a second
+  // supplier without email/phone collides. Send blanks as null instead.
+  for (const key of ['email', 'phone'] as const) {
+    if (key in body && String(body[key] ?? '').trim() === '') body[key] = null;
+  }
   const res = await fetch(`${BASE_URL}/suppliers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

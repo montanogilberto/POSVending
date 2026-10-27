@@ -7,7 +7,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   IonPage, IonContent, IonRefresher, IonRefresherContent, IonIcon, IonBadge,
-  IonSpinner, useIonViewWillEnter,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import {
   notificationsOutline, checkmarkCircleOutline, alertCircleOutline,
@@ -19,6 +19,7 @@ import { canAccess } from '../../config/rolePermissions';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
+import PageLoading from '../../components/ui/PageLoading';
 import {
   fetchMyNotifications, markNotificationsRead, InboxNotification,
 } from '../../api/myNotificationsApi';
@@ -86,7 +87,7 @@ const NotificationsInboxPage: React.FC = () => {
         </IonRefresher>
 
         {loading && items.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 24 }}><IonSpinner name="crescent" /></div>
+          <PageLoading text="Cargando tus notificaciones…" />
         )}
 
         {!loading && items.length === 0 && (

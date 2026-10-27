@@ -53,6 +53,8 @@ export const useDashboard = () => {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [loadingReceiptId, setLoadingReceiptId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
   // Only used to price a card sale the backend has not stamped yet.
   const [cardTerminal, setCardTerminal] = useState<CommissionTerminal | null>(null);
   //const [pieData, setPieData] = useState<any>(null);
@@ -60,11 +62,12 @@ export const useDashboard = () => {
   const refreshDashboardData = () => {
     console.log('[Dashboard] refreshDashboardData: loading incomes, companyId =', companyId);
     const controller = new AbortController();
-    loadIncomes(companyId, controller.signal).catch(() => {});
+    setLoading(true);
+    const incomesLoad = loadIncomes(companyId, controller.signal).catch(() => {});
 
     // Egresos KPIs (hoy / mes): this company's current Hermosillo month only —
     // /all_expense summed every company's history.
-    if (companyId) {
+    const expensesLoad = !companyId ? Promise.resolve() :
       fetchMonthlyExpenses(companyId, undefined, controller.signal)
         .then(({ expenses }) => {
           if (!controller.signal.aborted) setAllExpenses(expenses);
@@ -72,7 +75,13 @@ export const useDashboard = () => {
         .catch((err) => {
           if (!controller.signal.aborted) console.warn('[Dashboard] fetchMonthlyExpenses failed:', err);
         });
-    }
+
+    // The KPIs need both. An aborted (superseded) refresh leaves the flag to the one that replaced it.
+    Promise.all([incomesLoad, expensesLoad]).finally(() => {
+      if (controller.signal.aborted) return;
+      setLoading(false);
+      setLoadedOnce(true);
+    });
 
     getAllCommissionTerminals()
       .then((terminals) => {
@@ -453,5 +462,7 @@ export const useDashboard = () => {
 
     getTitleFromPath,
     refreshDashboardData,
+    // First load only: later refreshes keep the numbers on screen while they update.
+    initialLoading: loading && !loadedOnce,
   };
 };

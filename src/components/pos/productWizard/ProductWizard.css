@@ -1259,3 +1259,9 @@
   font-size: 12px;
   color: #6B7280;
 }
+
+/* Stock unit (Piezas / Por ml / Por g) under "Cantidad en stock" */
+.wizard-stock-unit {
+  margin-top: 8px;
+  max-width: 260px;
+}

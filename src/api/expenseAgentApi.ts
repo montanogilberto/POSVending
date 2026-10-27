@@ -74,11 +74,17 @@ export interface RecordMatch {
 }
 
 export interface TicketLine {
+  /** Store item code printed with the line ("981055673"), '' if none. Absent from agents builds before 2026-10-26. */
+  code?: string;
+  /** Description WITHOUT that code. */
   name: string;
   quantity: number;
   /** 0 when the ticket prints no unit price. */
   unitPrice: number;
+  /** Printed amount, before the promotion. */
   lineTotal: number;
+  /** Promotion printed under this item (positive), folded in by the agent. Absent before 2026-10-26. */
+  discount?: number;
   needsReview: boolean;
   productMatch: RecordMatch;
 }
@@ -95,16 +101,27 @@ export interface ProposalSupplier {
 
 export interface ProposalLine {
   index: number;
+  /** As printed: code + description. */
   ticketName: string;
+  /** Store item code read off the ticket; saved as the new product's barCode. Absent before 2026-10-26. */
+  code?: string;
   quantity: number;
-  /** Purchase cost PER UNIT. */
+  /** Purchase cost PER UNIT, after the promotion. */
   unitCost: number;
+  /** Net: printed amount − discount. */
   lineTotal: number;
+  /** Promotion applied to this line (positive). Absent before 2026-10-26. */
+  discount?: number;
   action: ProposalAction;
   productId: number | null;
   name: string;
   candidates: MatchCandidate[];
   needsReview: boolean;
+  /** Presentation read off the ticket ("45/500ML" → 45 × 500 ml). quantity/unitCost stay per pack. Absent before 2026-10-27. */
+  unitsPerPack?: number;
+  netContent?: number;
+  /** 'g' | 'kg' | 'ml' | 'L' | '' */
+  unitOfMeasure?: string;
 }
 
 export interface TicketProposal {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   IonPage,
   IonContent,
@@ -8,12 +8,20 @@ import {
   IonIcon,
   IonAlert,
   IonLoading,
+  IonChip,
+  IonButton,
+  IonToast,
+  useIonViewWillEnter,
 } from '@ionic/react';
-import { add, trash, pencil, funnelOutline, swapVerticalOutline } from 'ionicons/icons';
+import { add, trash, pencil, funnelOutline, swapVerticalOutline, refreshOutline } from 'ionicons/icons';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
+import { useToast } from '../../hooks/useToast';
+import { onDataChanged, notifyDataChanged } from '../../utils/refreshBus';
+import StatusBadge from '../../components/ui/StatusBadge';
+import { PRODUCT_STATUS } from '../../components/ui/statusMaps';
 import { fmtMXN } from '../../utils/format';
 import ProductForm from '../../components/pos/ProductForm';
 import ProductWizard from '../../components/pos/productWizard/ProductWizard';
@@ -23,7 +31,21 @@ import { useProductCategories, categoryIdsFor } from '../../hooks/useProductCate
 import { Product } from '../../data/type_products';
 import './ProductsManagementPage.css';
 
-type FilterType = 'all' | 'withBarcode' | 'noCategory';
+type FilterType = 'all' | 'withBarcode' | 'noCategory' | 'supplies' | 'inactive';
+
+/** Admin list: supplies (bought, never sold) and deactivated products included. */
+const ADMIN_LIST = { includeInactive: true, includeSupplies: true };
+/** SQL bits arrive as true/false (FOR JSON) or 1/0 / '1'/'0' from older SPs. */
+const isOn = (v: unknown) => v === true || v === 1 || v === '1';
+const isInactive = (p: Product) => p.isActive !== undefined && p.isActive !== null && !isOn(p.isActive);
+
+const FILTERS: { value: FilterType; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'withBarcode', label: 'Con código de barras' },
+  { value: 'noCategory', label: 'Sin categoría' },
+  { value: 'supplies', label: 'Insumos' },
+  { value: 'inactive', label: 'Inactivos' },
+];
 
 const ProductsManagementPage: React.FC = () => {
   const {
@@ -33,12 +55,15 @@ const ProductsManagementPage: React.FC = () => {
     error,
     fetchProducts,
     fetchProductById,
-    removeProduct,
+    setProductActive,
   } = useProduct();
+  const { showToast, toastProps } = useToast();
 
   // ── UI state ──────────────────────────────────────────────────────────
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  /** Product being deactivated/reactivated: drives the overlay text and blocks repeats. */
+  const [statusBusy, setStatusBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -57,10 +82,15 @@ const ProductsManagementPage: React.FC = () => {
   const pops = usePopovers();
 
   // ── Data fetch ────────────────────────────────────────────────────────
-  useEffect(() => {
-    console.log('[Products][Management] mount -> fetchProducts');
-    fetchProducts();
+  const load = useCallback(() => {
+    console.log('[Products][Management] load -> fetchProducts', ADMIN_LIST);
+    return fetchProducts(ADMIN_LIST);
   }, [fetchProducts]);
+
+  // Ionic keeps the page mounted: reload on every entry and after any mutation
+  // elsewhere (e.g. a supply created from Nuevo Egreso emits 'product-created').
+  useIonViewWillEnter(() => { void load(); });
+  useEffect(() => onDataChanged(() => { void load(); }), [load]);
 
   useEffect(() => {
     console.log('[Products][Management] state:productsList', {
@@ -90,7 +120,7 @@ const ProductsManagementPage: React.FC = () => {
 
   // ── CRUD handlers ─────────────────────────────────────────────────────
   const handleDelete = (product: Product) => {
-    console.log('[Products][Management] action:delete:open-confirm', {
+    console.log('[Products][Management] action:deactivate:open-confirm', {
       productId: product.productId,
       name: product.name,
     });
@@ -98,29 +128,27 @@ const ProductsManagementPage: React.FC = () => {
     setShowDeleteAlert(true);
   };
 
-  const confirmDelete = async () => {
-    if (selectedProduct) {
-      console.log('[Products][Management] action:delete:confirm', {
-        productId: selectedProduct.productId,
-        name: selectedProduct.name,
-      });
-      try {
-        await removeProduct(selectedProduct.productId);
-        console.log('[Products][Management] action:delete:success', {
-          productId: selectedProduct.productId,
-        });
-      } catch (e) {
-        console.error('[Products][Management] action:delete:error', {
-          productId: selectedProduct.productId,
-          error: e,
-        });
-      } finally {
-        setSelectedProduct(null);
-      }
-    } else {
-      console.log('[Products][Management] action:delete:confirm without selectedProduct');
+  const changeActive = async (product: Product, active: boolean) => {
+    if (statusBusy) return;
+    console.log('[Products][Management] action:set-active', { productId: product.productId, active });
+    setStatusBusy(true);
+    try {
+      await setProductActive(product.productId, active);
+      notifyDataChanged(active ? 'product-reactivated' : 'product-deactivated');
+      showToast(active ? `«${product.name}» se reactivó.` : `«${product.name}» se desactivó.`, 'success');
+    } catch (e) {
+      console.error('[Products][Management] action:set-active:error', { productId: product.productId, error: e });
+      showToast(e instanceof Error ? e.message : 'No se pudo actualizar el producto.', 'danger');
+    } finally {
+      setStatusBusy(false);
     }
+  };
+
+  const confirmDelete = async () => {
+    const product = selectedProduct;
     setShowDeleteAlert(false);
+    setSelectedProduct(null);
+    if (product) await changeActive(product, false);
   };
 
   const handleCreate = () => {
@@ -241,8 +269,15 @@ const ProductsManagementPage: React.FC = () => {
       result = result.filter((p) => categoryIds.has(Number(p.categoryId)));
     }
 
-    // Chip filter
-    if (activeFilter === 'withBarcode') {
+    // Chip filter. Inactive products only show under "Inactivos".
+    if (activeFilter === 'inactive') {
+      result = result.filter(isInactive);
+    } else {
+      result = result.filter((p) => !isInactive(p));
+    }
+    if (activeFilter === 'supplies') {
+      result = result.filter((p) => isOn(p.isSupply));
+    } else if (activeFilter === 'withBarcode') {
       result = result.filter((p) => p.barCode && p.barCode.trim() !== '');
     } else if (activeFilter === 'noCategory') {
       result = result.filter((p) => !p.categoryId || p.categoryId === 0);
@@ -272,7 +307,7 @@ const ProductsManagementPage: React.FC = () => {
       />
 
       <IonContent className="products-content">
-        <IonLoading isOpen={loading} message="Cargando productos..." />
+        <IonLoading isOpen={loading || statusBusy} message={statusBusy ? 'Actualizando producto...' : 'Cargando productos...'} />
 
         {/* ── Search & Filter Section ── */}
         <div className="products-search-section">
@@ -325,34 +360,20 @@ const ProductsManagementPage: React.FC = () => {
 
           {/* Filter chips */}
           <div className="products-chips-row">
-            <button
-              className={`products-chip${activeFilter === 'all' ? ' active' : ''}`}
-              onClick={() => {
-                console.log('[Products][Management] action:set-filter', { filter: 'all' });
-                setActiveFilter('all');
-              }}
-            >
-              Todos
-            </button>
-            <button
-              className={`products-chip${activeFilter === 'withBarcode' ? ' active' : ''}`}
-              onClick={() => {
-                console.log('[Products][Management] action:set-filter', { filter: 'withBarcode' });
-                setActiveFilter('withBarcode');
-              }}
-            >
-              Con código de barras
-            </button>
-            <button
-              className={`products-chip${activeFilter === 'noCategory' ? ' active' : ''}`}
-              onClick={() => {
-                console.log('[Products][Management] action:set-filter', { filter: 'noCategory' });
-                setActiveFilter('noCategory');
-                setSelectedCategoryId(null);
-              }}
-            >
-              Sin categoría
-            </button>
+            {FILTERS.map((f) => (
+              <IonChip
+                key={f.value}
+                className={`products-chip${activeFilter === f.value ? ' active' : ''}`}
+                onClick={() => {
+                  console.log('[Products][Management] action:set-filter', { filter: f.value });
+                  setActiveFilter(f.value);
+                  // "Sin categoría" and a category are mutually exclusive.
+                  if (f.value === 'noCategory') setSelectedCategoryId(null);
+                }}
+              >
+                {f.label}
+              </IonChip>
+            ))}
           </div>
         </div>
 
@@ -375,16 +396,22 @@ const ProductsManagementPage: React.FC = () => {
           {!loading && filteredProducts.length === 0 ? (
             <div className="products-empty">
               <div className="products-empty-icon">📦</div>
-              <p>No se encontraron productos</p>
+              <p>{activeFilter === 'inactive' ? 'No hay productos inactivos' : 'No se encontraron productos'}</p>
               <span>
                 {searchText.trim()
                   ? 'Intenta con otro término de búsqueda'
-                  : 'Agrega tu primer producto con el botón +'}
+                  : activeFilter === 'inactive'
+                    ? 'Los productos que desactives aparecerán aquí para reactivarlos.'
+                    : activeFilter === 'supplies'
+                      ? 'Los insumos se crean al registrar un egreso con ticket.'
+                      : 'Agrega tu primer producto con el botón +'}
               </span>
             </div>
           ) : (
-            filteredProducts.map((product, index) => (
-              <div key={product.productId ?? `${product.code || product.name || 'product'}-${index}`} className="product-card">
+            filteredProducts.map((product, index) => {
+              const inactive = isInactive(product);
+              return (
+              <div key={product.productId ?? `${product.code || product.name || 'product'}-${index}`} className={`product-card${inactive ? ' inactive' : ''}`}>
                 <div className="product-card-body">
                   {/* ── Left: info ── */}
                   <div
@@ -401,6 +428,12 @@ const ProductsManagementPage: React.FC = () => {
                     aria-label={`Abrir detalles de ${product.name}`}
                   >
                     <h3 className="product-name">{product.name}</h3>
+                    {(isOn(product.isSupply) || inactive) && (
+                      <div className="product-status-row">
+                        {isOn(product.isSupply) && <StatusBadge status="supply" map={PRODUCT_STATUS} />}
+                        {inactive && <StatusBadge status="inactive" map={PRODUCT_STATUS} />}
+                      </div>
+                    )}
 
                     {product.description && (
                       <p className="product-description">{product.description}</p>
@@ -443,6 +476,7 @@ const ProductsManagementPage: React.FC = () => {
                           <span className="detail-label">Stock</span>
                           <span className="detail-value">
                             {product.stockQuantity ?? product.details[0].stockQuantity}
+                            {product.stockUnit && product.stockUnit !== 'pz' ? ` ${product.stockUnit}` : ''}
                           </span>
                         </span>
                         {product.details[0].unitPrice !== product.details[0].salePrice && (
@@ -459,32 +493,54 @@ const ProductsManagementPage: React.FC = () => {
 
                   {/* ── Right: action buttons ── */}
                   <div className="product-card-actions">
-                    <button
-                      className="product-action-btn edit"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleEdit(product);
-                      }}
-                      title="Editar producto"
-                      aria-label="Editar"
-                    >
-                      <IonIcon icon={pencil} />
-                    </button>
-                    <button
-                      className="product-action-btn delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(product);
-                      }}
-                      title="Eliminar producto"
-                      aria-label="Eliminar"
-                    >
-                      <IonIcon icon={trash} />
-                    </button>
+                    {inactive ? (
+                      <IonButton
+                        fill="clear"
+                        className="product-action-btn restore"
+                        disabled={statusBusy}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void changeActive(product, true);
+                        }}
+                        title="Reactivar producto"
+                        aria-label="Reactivar"
+                      >
+                        <IonIcon slot="icon-only" icon={refreshOutline} />
+                      </IonButton>
+                    ) : (
+                      <>
+                        <IonButton
+                          fill="clear"
+                          className="product-action-btn edit"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleEdit(product);
+                          }}
+                          title="Editar producto"
+                          aria-label="Editar"
+                        >
+                          <IonIcon slot="icon-only" icon={pencil} />
+                        </IonButton>
+                        <IonButton
+                          fill="clear"
+                          className="product-action-btn delete"
+                          disabled={statusBusy}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(product);
+                          }}
+                          title="Desactivar producto"
+                          aria-label="Desactivar"
+                        >
+                          <IonIcon slot="icon-only" icon={trash} />
+                        </IonButton>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -505,8 +561,8 @@ const ProductsManagementPage: React.FC = () => {
             console.log('[Products][Management] action:delete-alert:dismiss');
             setShowDeleteAlert(false);
           }}
-          header="Eliminar producto"
-          message={`¿Estás seguro de que quieres eliminar "${selectedProduct?.name}"? Esta acción no se puede deshacer.`}
+          header="Desactivar producto"
+          message={`"${selectedProduct?.name}" dejará de aparecer en el POS, en los tickets y en Nuevo Egreso. Su historial se conserva y puedes reactivarlo desde el filtro "Inactivos".`}
           buttons={[
             {
               text: 'Cancelar',
@@ -517,9 +573,9 @@ const ProductsManagementPage: React.FC = () => {
               },
             },
             {
-              text: 'Eliminar',
+              text: 'Desactivar',
               role: 'destructive',
-              handler: confirmDelete,
+              handler: () => { void confirmDelete(); },
             },
           ]}
         />
@@ -534,12 +590,13 @@ const ProductsManagementPage: React.FC = () => {
         <ProductWizard
           isOpen={showWizard}
           onClose={handleWizardClose}
-          onSuccess={() => { fetchProducts(); reloadCategories(); }}
+          onSuccess={() => { void load(); reloadCategories(); }}
           product={editingProduct}
           mode={wizardMode}
         />
       </IonContent>
 
+      <IonToast {...toastProps} />
       <AlertPopover {...pops.alertPopoverProps} />
       <MailPopover {...pops.mailPopoverProps} />
     </IonPage>
