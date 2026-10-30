@@ -19,6 +19,7 @@ import {
 } from '../../../api/posRewardsApi';
 import { downloadClientQrPdf } from '../../../utils/clientQrPdf';
 import { useClientQr } from '../../../hooks/useClientQr';
+import { usePosWallet } from './ClientDashboardPOSWallet';
 import { CLIENT_TYPE_LABEL, LIST_PREVIEW } from './ClientDashboardPOSConstants';
 import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboardPOSTypes';
 
@@ -31,7 +32,7 @@ import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboar
 export const useClientDashboardPOS = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const clientId = Number(clientIdParam);
-  const { companyId } = useUser();
+  const { companyId, userId } = useUser();
   const history = useHistory();
   const { showToast, toastProps } = useToast();
 
@@ -90,6 +91,7 @@ export const useClientDashboardPOS = () => {
   }), [load]);
 
   const fullName = client ? `${client.first_name ?? ''} ${client.last_name ?? ''}`.trim() : `Cliente #${clientId}`;
+  const wallet = usePosWallet(companyId, clientId, userId, fullName, showToast);
   const typeLabel = client?.clientType ? CLIENT_TYPE_LABEL[client.clientType] : CLIENT_TYPE_LABEL.borrower;
 
   const purchases = useMemo<PosPurchase[]>(
@@ -198,6 +200,7 @@ export const useClientDashboardPOS = () => {
     reloadQr,
     qrDownloading,
     downloadQr,
+    ...wallet,
     loading,
     toastProps,
     openReceipt: (incomeId: number) => history.push(`/receipt/${incomeId}`),

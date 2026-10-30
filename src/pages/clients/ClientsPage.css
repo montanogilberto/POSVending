@@ -13,6 +13,14 @@
   box-shadow: none;
 }
 
+.clients-scan-btn {
+  --border-radius: 12px;
+  width: 100%;
+  margin: 6px 0 0;
+  text-transform: none;
+  font-weight: 600;
+}
+
 .clients-searchbar {
   --border-radius: 12px;
   --background: #F4F6F9;

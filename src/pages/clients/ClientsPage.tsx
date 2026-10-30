@@ -55,6 +55,7 @@ import {
   shieldCheckmarkOutline,
   clipboardOutline,
   qrCodeOutline,
+  scanOutline,
   downloadOutline,
   barChartOutline,
   walletOutline,
@@ -83,6 +84,7 @@ import { ClientCapability, grantClientCapability, revokeClientCapability, listCl
 import QRCode from 'qrcode';
 import { downloadClientQrPdf } from '../../utils/clientQrPdf';
 import { useClientQr } from '../../hooks/useClientQr';
+import ClientQrScannerModal from '../../components/pos/ClientQrScannerModal';
 import {
   submitContractClientFaceRecognition,
   getAllClientFaceRecognitions,
@@ -255,6 +257,8 @@ const ClientsPage: React.FC = () => {
   const [shareClient, setShareClient] = useState<Client | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [qrDownloading, setQrDownloading] = useState(false);
+  // Caja: escanear el QR del cliente abre su ficha POS (saldo, abono en efectivo).
+  const [showQrScanner, setShowQrScanner] = useState(false);
   // Signed GMO1 QR values from the backend — wizard (new client) and the list's QR modal.
   const wizardQr = useClientQr(Number(companyId) || undefined, createdClientId ?? undefined);
   const modalQr = useClientQr(Number(companyId) || undefined, qrModalClient?.clientId);
@@ -1916,6 +1920,9 @@ const ClientsPage: React.FC = () => {
             placeholder="Buscar por nombre, teléfono o email..."
             className="clients-searchbar"
           />
+          <IonButton fill="outline" className="clients-scan-btn" onClick={() => setShowQrScanner(true)}>
+            <IonIcon icon={scanOutline} slot="start" /> Escanear QR
+          </IonButton>
           {focusClientId && (
             <IonChip className="clients-focus-chip" onClick={clearClientFocus}>
               <IonLabel>
@@ -2084,6 +2091,12 @@ const ClientsPage: React.FC = () => {
           color={toastMessage.toLowerCase().includes('error') ? 'danger' : toastMessage.startsWith('⚠️') ? 'warning' : 'success'}
         />
       </IonContent>
+
+      <ClientQrScannerModal
+        isOpen={showQrScanner}
+        onClose={() => setShowQrScanner(false)}
+        onClientFound={(client) => history.push(`/client-pos/${client.clientId}`)}
+      />
 
       {/* ── QR View Modal ──────────────────────────────────────────────────── */}
       <IonModal isOpen={showQrModal} onDidDismiss={() => { setShowQrModal(false); setQrModalClient(null); }} breakpoints={[0, 0.6]} initialBreakpoint={0.6}>

@@ -54,3 +54,98 @@
   font-size: 0.9rem;
   color: #6b7280;
 }
+
+/* Saldo prepago (lavandería) */
+.my-qr-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.my-qr-balance-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.my-qr-balance-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.my-qr-balance-amount {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.my-qr-balance-error {
+  font-size: 0.85rem;
+}
+
+.my-qr-topup-btn {
+  --border-radius: 12px;
+  margin: 0;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.my-qr-topup-hint {
+  margin: 0 0 12px;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.my-qr-topup-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.my-qr-topup-input {
+  margin-bottom: 12px;
+}
+
+.my-qr-topup-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: #f8f9fb;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.my-qr-topup-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.my-qr-topup-net {
+  padding-top: 6px;
+  border-top: 1px solid #e5e7eb;
+  color: #111827;
+}
+
+.my-qr-topup-min {
+  margin: 8px 0 0;
+  color: var(--ion-color-danger);
+  font-size: 0.82rem;
+}
+
+.my-qr-topup-continue {
+  --border-radius: 12px;
+  margin-top: 20px;
+  height: 48px;
+  font-weight: 700;
+  text-transform: none;
+}
