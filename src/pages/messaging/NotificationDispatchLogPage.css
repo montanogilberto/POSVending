@@ -619,6 +619,121 @@ ion-button.ndl-counter::part(native) {
   display: none;
 }
 
+/* ── Notification Center tabs ───────────────────────────────── */
+
+.ndl-tabs {
+  max-width: 520px;
+  margin: 4px 4px 8px;
+}
+
+/* The count sits on the tab's corner so "Operaciones" keeps its full width on phones. */
+.ndl-tabs ion-segment-button {
+  position: relative;
+  overflow: visible;
+  --padding-start: 6px;
+  --padding-end: 6px;
+}
+
+.ndl-tabs ion-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.65rem;
+  --padding-start: 4px;
+  --padding-end: 4px;
+}
+
+/* ── Resumen: trend + channel comparison ────────────────────── */
+
+.ndl-trend,
+.ndl-compare,
+.ndl-failures {
+  margin: 12px 4px 0;
+}
+
+.ndl-trend-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ndl-trend-head .ndl-section-title {
+  margin: 0;
+}
+
+.ndl-trend-granularity {
+  width: auto;
+  min-width: 220px;
+}
+
+.ndl-trend-canvas {
+  position: relative;
+  height: 260px;
+}
+
+.ndl-trend-empty {
+  margin: 24px 0;
+  text-align: center;
+  color: var(--ion-color-medium);
+}
+
+.ndl-compare-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.4fr) repeat(3, minmax(70px, 1fr));
+  align-items: center;
+  row-gap: 2px;
+}
+
+.ndl-compare-grid > * {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+}
+
+.ndl-compare-corner,
+.ndl-compare-label {
+  color: var(--ion-color-medium);
+  font-size: 0.85rem;
+}
+
+.ndl-compare-head {
+  margin: 0;
+  height: auto;
+  min-height: 0;
+  --padding-start: 4px;
+  --padding-end: 4px;
+  font-weight: 600;
+  justify-self: stretch;
+}
+
+.ndl-compare-head::part(native) {
+  justify-content: flex-end;
+}
+
+.ndl-compare-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ion-color-dark);
+}
+
+/* ── Operaciones ───────────────────────────────────────────── */
+
+.ndl-ops-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.ndl-ops-grid .ndl-actions {
+  margin-top: 12px;
+}
+
+.ndl-layout--drawer .ndl-ops-grid {
+  grid-template-columns: 1fr;
+}
+
 /* ── Tablet ─────────────────────────────────────────────────── */
 
 @media (max-width: 1199px) {
@@ -627,7 +742,8 @@ ion-button.ndl-counter::part(native) {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .ndl-channels {
+  .ndl-channels,
+  .ndl-ops-grid {
     grid-template-columns: 1fr;
   }
 
@@ -666,6 +782,37 @@ ion-button.ndl-counter::part(native) {
 
   .ndl-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .ndl-trend-granularity {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .ndl-trend-canvas {
+    height: 220px;
+  }
+
+  .ndl-compare-grid {
+    grid-template-columns: minmax(96px, 1.2fr) repeat(3, minmax(56px, 1fr));
+  }
+
+  .ndl-tabs ion-segment-button {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.95rem;
+  }
+
+  .ndl-compare-head {
+    font-size: 0.8rem;
+    text-transform: none;
+    letter-spacing: 0;
+    --padding-start: 0;
+    --padding-end: 0;
+  }
+
+  .ndl-compare-head ion-icon {
+    display: none;
   }
 
   .ndl-table {

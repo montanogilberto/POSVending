@@ -13,6 +13,14 @@
   box-shadow: none;
 }
 
+.clients-scan-btn {
+  --border-radius: 12px;
+  width: 100%;
+  margin: 6px 0 0;
+  text-transform: none;
+  font-weight: 600;
+}
+
 .clients-searchbar {
   --border-radius: 12px;
   --background: #F4F6F9;
@@ -763,6 +771,13 @@
   font-size: 14px;
 }
 
+.client-qr-error {
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+}
+
 .client-qr-download-btn {
   margin-top: 16px;
   --border-radius: 12px;
@@ -1415,4 +1430,11 @@
   .button-container {
     margin-top: 24px;
   }
+}
+
+.client-qr-loading {
+  flex-direction: column;
+  gap: 10px;
+  color: #6b7280;
+  font-size: 13px;
 }

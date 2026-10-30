@@ -1,0 +1,35 @@
+.sps-content {
+  --padding-start: 18px;
+  --padding-end: 18px;
+  --padding-top: 16px;
+  --padding-bottom: 24px;
+}
+
+.sps-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ion-color-step-150, rgba(0, 0, 0, 0.08));
+  font-size: 0.92rem;
+  color: var(--ion-color-medium);
+}
+
+.sps-summary strong {
+  font-size: 1.05rem;
+  color: var(--ion-text-color, #1f2333);
+}
+
+.sps-error {
+  display: block;
+  margin-top: 12px;
+  font-size: 0.84rem;
+}
+
+.sps-pay {
+  --border-radius: 12px;
+  height: 48px;
+  margin-top: 20px;
+  font-weight: 700;
+}

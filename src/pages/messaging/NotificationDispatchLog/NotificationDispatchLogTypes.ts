@@ -80,7 +80,8 @@ export type DeliveryFilter = 'all' | 'confirmed' | 'awaiting' | 'failed';
 
 /** Extra narrowing set by a KPI / action-center click; shown as a removable chip. */
 export type FocusFilter =
-  | 'none' | 'retry' | 'stale' | 'config' | 'recentFailures' | 'final' | 'pushNoDevice' | 'pushRejected';
+  | 'none' | 'retry' | 'stale' | 'config' | 'recentFailures' | 'final' | 'pushNoDevice' | 'pushRejected'
+  | 'failTemporary' | 'failRecipient' | 'failUnknown';
 
 export interface RetryEligibility {
   eligible: boolean;
@@ -136,3 +137,35 @@ export interface TimelineStep {
 }
 
 export type DetailTab = 'info' | 'retries' | 'client' | 'trace';
+
+/** Notification Center tabs: Resumen → Operaciones → Historial. */
+export type CenterSection = 'overview' | 'operations' | 'history';
+
+/** Trend bucket size; buckets follow the Hermosillo calendar (weeks start Monday). */
+export type TrendGranularity = 'hour' | 'day' | 'week';
+
+export interface TrendPoint {
+  /** Bucket start, Hermosillo wall-clock as epoch ms (sortable, gap-fillable). */
+  start: number;
+  label: string;
+  total: number;
+  delivered: number;
+  awaiting: number;
+  failed: number;
+}
+
+/** One channel's column in the comparison table. Push `delivered` is always 0: the Hub sends no receipts. */
+export interface ChannelComparisonRow extends ChannelCounts {
+  channel: NotificationChannel;
+  /** delivered / (delivered + failed); null when nothing reached a final state. */
+  deliveryRate: number | null;
+  clientsReached: number;
+}
+
+/** Why failures happened, from the provider error code. */
+export type FailureCause = 'temporary' | 'config' | 'recipient' | 'unknown';
+
+export interface FailureBreakdown {
+  total: number;
+  causes: Record<FailureCause, number>;
+}

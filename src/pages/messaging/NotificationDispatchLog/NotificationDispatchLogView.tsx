@@ -15,8 +15,15 @@ import ChannelUsageCard from './components/ChannelUsageCard';
 import ActionCenter from './components/ActionCenter';
 import DispatchTable from './components/DispatchTable';
 import DetailDrawer from './components/DetailDrawer';
+import CenterTabs from './components/CenterTabs';
+import TrendChart from './components/TrendChart';
+import ChannelComparison from './components/ChannelComparison';
+import FailureBreakdown from './components/FailureBreakdown';
 
-/** A KPIs → B channel health → C action center → D history; details in a side drawer. */
+/**
+ * Centro de notificaciones: Resumen (KPIs, tendencia, canales) · Operaciones (salud de
+ * proveedores, fallos por causa, acciones) · Historial (mensajes); details in a side drawer.
+ */
 const NotificationDispatchLogView: React.FC = () => {
   const vm = useNotificationDispatchLog();
   const pops = usePopovers();
@@ -26,7 +33,7 @@ const NotificationDispatchLogView: React.FC = () => {
     <IonPage>
       <Header
         {...pops.headerProps}
-        screenTitle="Notificaciones"
+        screenTitle="Centro de notificaciones"
         showBackButton={true}
         backButtonText="Menú"
         backButtonHref="/dashboard"
@@ -43,15 +50,27 @@ const NotificationDispatchLogView: React.FC = () => {
           <div className="ndl-container">
             <FilterBar vm={vm} />
 
-            {vm.initialLoading ? <PageLoading text="Cargando notificaciones…" /> : <>
-              <KpiGrid vm={vm} />
-              <KeyMetrics vm={vm} />
-              <ChannelUsageCard vm={vm} />
-              <ActionCenter vm={vm} />
+            <CenterTabs vm={vm} />
 
-              {vm.total === 0
+            {vm.initialLoading ? <PageLoading text="Cargando notificaciones…" /> : <>
+              {vm.section === 'overview' && <>
+                <KpiGrid vm={vm} />
+                <KeyMetrics vm={vm} />
+                <TrendChart vm={vm} />
+                <ChannelComparison vm={vm} />
+              </>}
+
+              {vm.section === 'operations' && <>
+                <ChannelUsageCard vm={vm} />
+                <div className="ndl-ops-grid">
+                  <FailureBreakdown vm={vm} />
+                  <ActionCenter vm={vm} />
+                </div>
+              </>}
+
+              {vm.section === 'history' && (vm.total === 0
                 ? <EmptyState icon={notificationsOutline} text="No hay notificaciones registradas todavía." />
-                : <DispatchTable vm={vm} />}
+                : <DispatchTable vm={vm} />)}
             </>}
           </div>
           <DetailDrawer vm={vm} />

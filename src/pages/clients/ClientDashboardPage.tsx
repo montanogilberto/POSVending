@@ -19,6 +19,7 @@ import {
   IonToast,
   IonIcon,
   IonText,
+  IonSpinner,
   IonAvatar,
   IonBadge,
   IonModal,
@@ -83,7 +84,7 @@ const SHOW_BANKING_TEST_TOOLS = false;
 // El código de Stripe se conserva detrás de este flag por si vuelve a hacer falta.
 const SHOW_STRIPE_RAIL = false;
 import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../api/clientFaceRecognitionApi';
-import { Client, getOneClient, createOrUpdateClient, uploadClientQr } from '../../api/clientsApi';
+import { Client, getOneClient, createOrUpdateClient, uploadClientQr, fetchClientQr } from '../../api/clientsApi';
 import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/stripeApi';
 import LoanCompletionRing, { LoanStep } from '../../components/loans/LoanCompletionRing';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
@@ -94,7 +95,8 @@ import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import ZoomableImage from '../../components/ui/ZoomableImage';
 import { pickAvatarPhoto } from '../../utils/pickAvatarPhoto';
-import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
+import { downloadClientQrPdf } from '../../utils/clientQrPdf';
+import { useClientQr } from '../../hooks/useClientQr';
 import { onDataChanged } from '../../utils/refreshBus';
 import { PLAY_STORE_URL, APP_STORE_URL } from '../../utils/appLinks';
 import { usePopovers } from '../../hooks/usePopovers';
@@ -279,6 +281,8 @@ const ClientDashboardPage: React.FC = () => {
   // staff-facing versions, minus the staff-only bits like Eliminar)
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrDownloading, setQrDownloading] = useState(false);
+  // Signed GMO1 value, under the client's own companyId (see ensureQrGenerated).
+  const clientQr = useClientQr(clientRecord?.companyId ?? companyId, clientRecord?.clientId);
   const [qrGenerating, setQrGenerating] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -447,11 +451,12 @@ const ClientDashboardPage: React.FC = () => {
   };
 
   const handleDownloadQrPdf = async () => {
-    if (!clientRecord) return;
+    if (!clientRecord || !clientQr.qrValue) return;
     setQrDownloading(true);
     try {
       await downloadClientQrPdf({
         clientId: clientRecord.clientId,
+        qrValue: clientQr.qrValue,
         firstName: clientRecord.first_name,
         lastName: clientRecord.last_name,
         cellphone: clientRecord.cellphone,
@@ -472,8 +477,6 @@ const ClientDashboardPage: React.FC = () => {
     if (!clientRecord) return false;
     if (clientRecord.qrBlobUrl) return true;
     try {
-      const qrValue = buildClientQrValue(clientRecord.clientId, clientRecord.first_name, clientRecord.last_name);
-      const dataUrl = await QRCode.toDataURL(qrValue, { width: 512, errorCorrectionLevel: 'H' });
       // Persist under the CLIENT's own companyId, not the session's. Legacy
       // borrower rows live under company 1 while the session runs as 1008
       // (the companyId split); the upload SP scopes its UPDATE by
@@ -481,6 +484,8 @@ const ClientDashboardPage: React.FC = () => {
       // the QR silently never persists. Fall back to the session value only if
       // the client row somehow lacks one.
       const qrCompanyId = clientRecord.companyId ?? companyId;
+      const qrValue = await fetchClientQr(qrCompanyId, clientRecord.clientId);
+      const dataUrl = await QRCode.toDataURL(qrValue, { width: 512, errorCorrectionLevel: 'H' });
       const { qrBlobUrl } = await uploadClientQr(clientRecord.clientId, qrCompanyId, dataUrl);
       setClientRecord(prev => (prev ? { ...prev, qrBlobUrl } : prev));
       return true;
@@ -1732,19 +1737,23 @@ const ClientDashboardPage: React.FC = () => {
         <IonContent className="ion-padding">
           {clientRecord && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-              <QRCodeSVG
-                value={buildClientQrValue(clientRecord.clientId, clientRecord.first_name, clientRecord.last_name)}
-                size={220}
-                level="H"
-                includeMargin
-              />
+              {clientQr.qrValue ? (
+                <QRCodeSVG value={clientQr.qrValue} size={220} level="H" includeMargin />
+              ) : clientQr.error ? (
+                <div className="cd-qr-placeholder">
+                  <IonText color="danger"><p>{clientQr.error}</p></IonText>
+                  <IonButton fill="clear" size="small" onClick={clientQr.reload}>Reintentar</IonButton>
+                </div>
+              ) : (
+                <div className="cd-qr-placeholder"><IonSpinner name="crescent" /><span className="cd-qr-loading-text">Generando código QR…</span></div>
+              )}
               <div style={{ textAlign: 'center' }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 18 }}>{clientRecord.first_name} {clientRecord.last_name}</p>
                 <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>{clientRecord.cellphone}</p>
                 <p style={{ margin: '2px 0 0', color: '#9ca3af', fontSize: 12 }}>ID: {clientRecord.clientId}</p>
               </div>
-              <IonButton expand="block" onClick={handleDownloadQrPdf} disabled={qrDownloading} style={{ width: '100%' }}>
-                {qrDownloading ? 'Generando...' : (<><IonIcon icon={downloadOutline} slot="start" /> Descargar QR como PDF</>)}
+              <IonButton expand="block" onClick={handleDownloadQrPdf} disabled={qrDownloading || !clientQr.qrValue} style={{ width: '100%' }}>
+                {qrDownloading ? <IonSpinner name="dots" /> : (<><IonIcon icon={downloadOutline} slot="start" /> Descargar QR como PDF</>)}
               </IonButton>
             </div>
           )}
