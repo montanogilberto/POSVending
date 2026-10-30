@@ -426,3 +426,8 @@
     color: #D1D5DB;
   }
 }
+
+.cpos-qr-loading-text {
+  margin-top: 8px;
+  color: #6B7280;
+}

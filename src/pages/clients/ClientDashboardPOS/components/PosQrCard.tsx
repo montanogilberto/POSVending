@@ -25,7 +25,7 @@ const PosQrCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => {
                   <IonText color="danger"><p>{vm.qrError}</p></IonText>
                   <IonButton fill="clear" size="small" onClick={vm.reloadQr}>Reintentar</IonButton>
                 </>
-              ) : <IonSpinner name="crescent" />}
+              ) : <><IonSpinner name="crescent" /><span className="cpos-qr-loading-text">Generando código QR…</span></>}
             </div>
           )}
         </div>

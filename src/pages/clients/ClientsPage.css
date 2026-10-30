@@ -1423,3 +1423,10 @@
     margin-top: 24px;
   }
 }
+
+.client-qr-loading {
+  flex-direction: column;
+  gap: 10px;
+  color: #6b7280;
+  font-size: 13px;
+}

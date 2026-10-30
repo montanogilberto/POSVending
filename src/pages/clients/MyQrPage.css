@@ -47,3 +47,10 @@
   color: #6b7280;
   max-width: 280px;
 }
+
+.my-qr-loading--busy {
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: #6b7280;
+}

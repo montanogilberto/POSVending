@@ -1745,7 +1745,7 @@ const ClientDashboardPage: React.FC = () => {
                   <IonButton fill="clear" size="small" onClick={clientQr.reload}>Reintentar</IonButton>
                 </div>
               ) : (
-                <div className="cd-qr-placeholder"><IonSpinner name="crescent" /></div>
+                <div className="cd-qr-placeholder"><IonSpinner name="crescent" /><span className="cd-qr-loading-text">Generando código QR…</span></div>
               )}
               <div style={{ textAlign: 'center' }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 18 }}>{clientRecord.first_name} {clientRecord.last_name}</p>

@@ -1136,7 +1136,7 @@ const ClientsPage: React.FC = () => {
             <IonButton fill="clear" size="small" onClick={wizardQr.reload}>Reintentar</IonButton>
           </div>
         ) : (
-          <div className="client-qr-placeholder"><IonSpinner name="crescent" /></div>
+          <div className="client-qr-placeholder client-qr-loading"><IonSpinner name="crescent" /><span>Generando código QR…</span></div>
         )}
       </div>
 
@@ -2106,7 +2106,7 @@ const ClientsPage: React.FC = () => {
                   <IonButton fill="clear" size="small" onClick={modalQr.reload}>Reintentar</IonButton>
                 </div>
               ) : (
-                <div className="client-qr-placeholder"><IonSpinner name="crescent" /></div>
+                <div className="client-qr-placeholder client-qr-loading"><IonSpinner name="crescent" /><span>Generando código QR…</span></div>
               )}
               <div style={{ textAlign: 'center' }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 18 }}>{qrModalClient.first_name} {qrModalClient.last_name}</p>

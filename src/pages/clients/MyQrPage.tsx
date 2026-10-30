@@ -44,7 +44,7 @@ const MyQrPage: React.FC = () => {
           ) : qrDataUrl ? (
             <img src={qrDataUrl} alt="Tu código QR" className="my-qr-image" />
           ) : (
-            <div className="my-qr-loading"><IonSpinner name="dots" /></div>
+            <div className="my-qr-loading my-qr-loading--busy"><IonSpinner name="crescent" /><span>Generando código QR…</span></div>
           )}
           <p className="my-qr-name">{username || 'Cliente'}</p>
           <p className="my-qr-hint">Muestra este código en caja para identificarte y ganar puntos.</p>
