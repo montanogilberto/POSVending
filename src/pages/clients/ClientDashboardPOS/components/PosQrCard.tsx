@@ -1,5 +1,5 @@
 import React from 'react';
-import { IonButton, IonCard, IonCardContent, IonChip, IonIcon, IonLabel, IonSpinner } from '@ionic/react';
+import { IonButton, IonCard, IonCardContent, IonChip, IonIcon, IonLabel, IonSpinner, IonText } from '@ionic/react';
 import { bicycleOutline, bagHandleOutline, cartOutline, downloadOutline } from 'ionicons/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { ClientDashboardPOSVM } from '../ClientDashboardPOSLogic';
@@ -11,12 +11,23 @@ const USES = [
 ];
 
 const PosQrCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => {
-  if (!vm.qrValue) return null;
+  if (!vm.client) return null;
   return (
     <IonCard className="cpos-card">
       <IonCardContent className="cpos-card-content cpos-qr-content">
         <div className="cpos-qr-code">
-          <QRCodeSVG value={vm.qrValue} size={168} level="H" includeMargin />
+          {vm.qrValue ? (
+            <QRCodeSVG value={vm.qrValue} size={168} level="H" includeMargin />
+          ) : (
+            <div className="cpos-qr-placeholder">
+              {vm.qrError ? (
+                <>
+                  <IonText color="danger"><p>{vm.qrError}</p></IonText>
+                  <IonButton fill="clear" size="small" onClick={vm.reloadQr}>Reintentar</IonButton>
+                </>
+              ) : <IonSpinner name="crescent" />}
+            </div>
+          )}
         </div>
         <div className="cpos-qr-info">
           <h2 className="cpos-section-title">Código QR del cliente</h2>
@@ -34,7 +45,7 @@ const PosQrCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => {
             size="small"
             color="success"
             onClick={vm.downloadQr}
-            disabled={vm.qrDownloading}
+            disabled={vm.qrDownloading || !vm.qrValue}
             className="cpos-action cpos-qr-download"
           >
             {vm.qrDownloading

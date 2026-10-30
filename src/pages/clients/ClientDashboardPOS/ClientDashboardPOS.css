@@ -365,6 +365,19 @@
   line-height: 0;
 }
 
+.cpos-qr-placeholder {
+  width: 168px;
+  height: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
 .cpos-qr-info {
   flex: 1 1 200px;
   min-width: 0;

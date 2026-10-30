@@ -3,24 +3,22 @@ import QRCode from 'qrcode';
 
 export interface ClientQrPdfParams {
   clientId: number;
+  /** Signed `GMO1.…` value from fetchClientQr / useClientQr — never built locally. */
+  qrValue: string;
   firstName: string;
   lastName: string;
   cellphone?: string;
   email?: string;
 }
 
-export function buildClientQrValue(clientId: number, firstName: string, lastName: string): string {
-  return `CLIENT:${clientId}:${firstName} ${lastName}`;
-}
-
 export async function downloadClientQrPdf({
   clientId,
+  qrValue,
   firstName,
   lastName,
   cellphone,
   email,
 }: ClientQrPdfParams): Promise<void> {
-  const qrValue = buildClientQrValue(clientId, firstName, lastName);
   const qrDataUrl = await QRCode.toDataURL(qrValue, {
     width: 512,
     margin: 2,

@@ -17,7 +17,8 @@ import {
   PosRewardTransaction,
   stampUnits,
 } from '../../../api/posRewardsApi';
-import { buildClientQrValue, downloadClientQrPdf } from '../../../utils/clientQrPdf';
+import { downloadClientQrPdf } from '../../../utils/clientQrPdf';
+import { useClientQr } from '../../../hooks/useClientQr';
 import { CLIENT_TYPE_LABEL, LIST_PREVIEW } from './ClientDashboardPOSConstants';
 import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboardPOSTypes';
 
@@ -142,17 +143,21 @@ export const useClientDashboardPOS = () => {
 
   const pendingFollowUps = followUps.filter((f) => f.status === 'pending').length;
 
-  // Every client has a QR: it's built from clientId + name (same value as
-  // /clients and /my-qr), not read from qrBlobUrl. The client shows it at the
-  // register to start a sale, a Recolección or a Delivery.
-  const qrValue = client ? buildClientQrValue(client.clientId, client.first_name, client.last_name) : '';
+  // Every client has a QR: the signed GMO1 value from the backend (same value
+  // as /clients and /my-qr), not read from qrBlobUrl. The client shows it at
+  // the register or a laundry machine to start a sale, a Recolección or a Delivery.
+  const { qrValue, loading: qrLoading, error: qrError, reload: reloadQr } = useClientQr(
+    companyId,
+    client?.clientId,
+  );
 
   const downloadQr = async () => {
-    if (!client) return;
+    if (!client || !qrValue) return;
     setQrDownloading(true);
     try {
       await downloadClientQrPdf({
         clientId: client.clientId,
+        qrValue,
         firstName: client.first_name,
         lastName: client.last_name,
         cellphone: client.cellphone,
@@ -188,6 +193,9 @@ export const useClientDashboardPOS = () => {
     followUps,
     pendingFollowUps,
     qrValue,
+    qrLoading,
+    qrError,
+    reloadQr,
     qrDownloading,
     downloadQr,
     loading,

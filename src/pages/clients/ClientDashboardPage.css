@@ -786,3 +786,16 @@
 .cd-cuota-paid .cd-cuota-info strong {
   color: #059669;
 }
+
+/* QR modal placeholder while the signed GMO1 value loads / on error */
+.cd-qr-placeholder {
+  width: 220px;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+}

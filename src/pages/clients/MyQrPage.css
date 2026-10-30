@@ -29,6 +29,11 @@
   justify-content: center;
 }
 
+.my-qr-error {
+  flex-direction: column;
+  gap: 8px;
+}
+
 .my-qr-name {
   margin-top: 20px;
   font-size: 1.1rem;

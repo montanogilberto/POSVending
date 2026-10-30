@@ -763,6 +763,13 @@
   font-size: 14px;
 }
 
+.client-qr-error {
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+}
+
 .client-qr-download-btn {
   margin-top: 16px;
   --border-radius: 12px;
