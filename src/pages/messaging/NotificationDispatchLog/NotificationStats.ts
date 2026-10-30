@@ -1,5 +1,5 @@
 import type { NotificationDispatch } from '../../../api/notificationDispatchApi';
-import { percent } from '../../../utils/format';
+import { percent, toHermosilloDate } from '../../../utils/format';
 import { hermosilloMonthKey, inPeriod } from '../../../utils/period';
 
 export { hermosilloDayKey, hermosilloMonthKey } from '../../../utils/period';
@@ -7,9 +7,9 @@ export { paginate, pageWindow } from '../../../utils/paging';
 export { percent } from '../../../utils/format';
 import { NON_RETRYABLE_ERRORS, STALE_PENDING_HOURS, WHATSAPP_LOW_QUOTA_RATIO } from './NotificationDispatchLogConstants';
 import type {
-  ActionItems, ChannelCounts, ChannelHealth, CustomRange, DateFilter, DeliveryFilter, DeliveryState, DispatchAttempt,
+  ActionItems, ChannelComparisonRow, ChannelCounts, ChannelHealth, CustomRange, DateFilter, DeliveryFilter, DeliveryState, DispatchAttempt,
   DispatchRow, FocusFilter, KeyMetrics, NotificationKpis, ProviderHealth, RetryEligibility, SortKey, TimelineStep,
-  WhatsappQuota,
+  FailureBreakdown, FailureCause, TrendGranularity, TrendPoint, WhatsappQuota,
 } from './NotificationDispatchLogTypes';
 
 const createdMs = (r: DispatchRow) => new Date(r.created_At.includes('Z') ? r.created_At : `${r.created_At}Z`).getTime();
@@ -215,6 +215,9 @@ export const matchesFocus = (r: DispatchRow, focus: FocusFilter, now: Date = new
     case 'recentFailures': return isRecentFailure(r, now);
     case 'final': return r.delivery === 'confirmed' || r.delivery === 'failed';
     case 'pushNoDevice': return r.attempts.some(a => a.channel === 'push' && a.outcome === 'NO_DEVICE');
+    case 'failTemporary': return failureCause(r) === 'temporary';
+    case 'failRecipient': return failureCause(r) === 'recipient';
+    case 'failUnknown': return failureCause(r) === 'unknown';
     case 'pushRejected': return r.attempts.some(a => a.channel === 'push' && (a.outcome === 'PUSH_REJECTED' || a.outcome === 'PUSH_TIMEOUT'));
     default: return true;
   }
@@ -251,3 +254,110 @@ export const deliveryTimeline = (row: DispatchRow, errorText = ''): TimelineStep
 export const clientHistory = (rows: DispatchRow[], row: DispatchRow): DispatchRow[] =>
   row.recipientType !== 'client' ? [] : sortRows(rows.filter(r => r.recipientType === 'client'
     && r.recipientId === row.recipientId && r.notificationDispatchId !== row.notificationDispatchId), 'newest');
+
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+const TREND_STEP: Record<TrendGranularity, number> = { hour: HOUR_MS, day: DAY_MS, week: 7 * DAY_MS };
+/** Gap-filling stops here so an 'all' range on hours can't build thousands of empty bars. */
+const MAX_TREND_POINTS = 400;
+
+/** Start of the bucket a UTC timestamp falls in, as Hermosillo wall-clock epoch ms. */
+export const trendBucketStart = (utc: string, g: TrendGranularity): number => {
+  const t = toHermosilloDate(utc).getTime();
+  if (g === 'hour') return Math.floor(t / HOUR_MS) * HOUR_MS;
+  const day = Math.floor(t / DAY_MS) * DAY_MS;
+  if (g === 'day') return day;
+  return day - ((new Date(day).getUTCDay() + 6) % 7) * DAY_MS;
+};
+
+const two = (n: number) => String(n).padStart(2, '0');
+
+export const trendLabel = (start: number, g: TrendGranularity): string => {
+  const d = new Date(start);
+  const dm = `${two(d.getUTCDate())}/${two(d.getUTCMonth() + 1)}`;
+  if (g === 'hour') return `${dm} ${two(d.getUTCHours())}:00`;
+  return g === 'week' ? `Sem ${dm}` : dm;
+};
+
+/** Bucket size that fits the period: hours for today, weeks once a range spans ~2 months. */
+export const defaultGranularity = (range: DateFilter, rows: DispatchRow[]): TrendGranularity => {
+  if (range === 'today') return 'hour';
+  if (range === 'week' || range === 'month') return 'day';
+  if (rows.length === 0) return 'day';
+  const times = rows.map(createdMs);
+  return Math.max(...times) - Math.min(...times) > 62 * DAY_MS ? 'week' : 'day';
+};
+
+/**
+ * Messages per bucket by final state, oldest first, with empty buckets filled in so
+ * the time axis is continuous. Same state rules as the KPIs (deliveryState).
+ */
+export const trendSeries = (rows: DispatchRow[], g: TrendGranularity): TrendPoint[] => {
+  if (rows.length === 0) return [];
+  const buckets = new Map<number, TrendPoint>();
+  for (const r of rows) {
+    const start = trendBucketStart(r.created_At, g);
+    const p = buckets.get(start) ?? { start, label: trendLabel(start, g), total: 0, delivered: 0, awaiting: 0, failed: 0 };
+    p.total += 1;
+    if (r.delivery === 'confirmed') p.delivered += 1;
+    else if (r.delivery === 'failed') p.failed += 1;
+    else p.awaiting += 1;
+    buckets.set(start, p);
+  }
+  const starts = [...buckets.keys()].sort((a, b) => a - b);
+  const first = starts[0];
+  const last = starts[starts.length - 1];
+  if ((last - first) / TREND_STEP[g] >= MAX_TREND_POINTS) return starts.map(s => buckets.get(s)!);
+  const out: TrendPoint[] = [];
+  for (let s = first; s <= last; s += TREND_STEP[g]) {
+    out.push(buckets.get(s) ?? { start: s, label: trendLabel(s, g), total: 0, delivered: 0, awaiting: 0, failed: 0 });
+  }
+  return out;
+};
+
+/**
+ * WhatsApp / SMS / Push side by side. Each channel keeps its own meaning: Push has no
+ * delivery receipt, so its rate stays null instead of being compared with WhatsApp's.
+ */
+export const channelComparison = (rows: DispatchRow[]): ChannelComparisonRow[] =>
+  (['whatsapp', 'sms', 'push'] as const).map(channel => {
+    const own = rows.filter(r => r.selectedChannel === channel);
+    const delivered = own.filter(r => r.delivery === 'confirmed');
+    const failed = own.filter(r => r.delivery === 'failed').length;
+    const final = delivered.length + failed;
+    return {
+      channel,
+      total: own.length,
+      delivered: delivered.length,
+      failed,
+      awaiting: own.filter(isAwaiting).length,
+      deliveryRate: channel === 'push' || final === 0 ? null : percent(delivered.length, final),
+      clientsReached: new Set(delivered.filter(r => r.recipientType === 'client').map(r => r.recipientId)).size,
+    };
+  });
+
+/**
+ * Cause of a failed message, from its provider code: our setup (config), the number
+ * itself (recipient), a code with no permanent cause (temporary), or no code at all —
+ * failures before 2026-10-16 were saved without one (unknown). null when not failed.
+ */
+export const failureCause = (row: DispatchRow): FailureCause | null => {
+  if (row.delivery !== 'failed') return null;
+  const code = (row.providerErrorCode ?? '').trim();
+  if (!code) return 'unknown';
+  const rule = NON_RETRYABLE_ERRORS[code];
+  if (!rule) return 'temporary';
+  return rule.config ? 'config' : 'recipient';
+};
+
+export const failureBreakdown = (rows: DispatchRow[]): FailureBreakdown => {
+  const causes: Record<FailureCause, number> = { temporary: 0, config: 0, recipient: 0, unknown: 0 };
+  let total = 0;
+  for (const r of rows) {
+    const c = failureCause(r);
+    if (!c) continue;
+    causes[c] += 1;
+    total += 1;
+  }
+  return { total, causes };
+};

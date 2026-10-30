@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { NotificationDispatch } from '../../../api/notificationDispatchApi';
 import {
-  actionItems, attentionCount, channelHealth, clientHistory, computeKpis, deliveryState, deliveryTimeline, hermosilloMonthKey,
+  actionItems, attentionCount, channelComparison, defaultGranularity, failureBreakdown, failureCause, trendBucketStart, trendSeries, channelHealth, clientHistory, computeKpis, deliveryState, deliveryTimeline, hermosilloMonthKey,
   inDateRange, inMonth, isConfigFailure, isShownOnScreen, isStale, keyMetrics, matchesDelivery, matchesFocus, matchesSearch, pageWindow,
   paginate, parseAttempts, percent, providerHealth, retryEligibility, sortRows, toRow, whatsappQuota,
 } from './NotificationStats';
@@ -336,5 +336,85 @@ describe('isShownOnScreen', () => {
     expect(isShownOnScreen(row({ providerName: 'meta_whatsapp' }))).toBe(true);
     expect(isShownOnScreen(row({ selectedChannel: 'sms', providerName: 'twilio_sms' }))).toBe(true);
     expect(isShownOnScreen(row())).toBe(true);
+  });
+});
+
+describe('trendSeries', () => {
+  // created_At is UTC; Hermosillo is UTC-7.
+  it('buckets by Hermosillo day and fills empty days', () => {
+    const rows = [
+      toRow(row({ notificationDispatchId: 1, status: 'confirmed', created_At: '2026-10-02T23:07:15.000' })), // 02/10 16:07
+      toRow(row({ notificationDispatchId: 2, status: 'failed', created_At: '2026-10-03T06:30:00.000' })),    // 02/10 23:30
+      toRow(row({ notificationDispatchId: 3, status: 'sent', created_At: '2026-10-05T08:00:00.000' })),      // 05/10 01:00
+    ];
+    const s = trendSeries(rows, 'day');
+    expect(s.map(p => p.label)).toEqual(['02/10', '03/10', '04/10', '05/10']);
+    expect(s[0]).toMatchObject({ total: 2, delivered: 1, failed: 1, awaiting: 0 });
+    expect(s[1].total).toBe(0);
+    expect(s[3]).toMatchObject({ total: 1, awaiting: 1 });
+  });
+  it('weeks start on Monday', () => {
+    // 2026-10-07 is a Wednesday (Hermosillo) → week of Mon 05/10.
+    const start = trendBucketStart('2026-10-07T19:00:00.000', 'week');
+    expect(new Date(start).toISOString().slice(0, 10)).toBe('2026-10-05');
+  });
+  it('hours use Hermosillo wall clock', () => {
+    const s = trendSeries([toRow(row({ created_At: '2026-10-02T23:07:15.000' }))], 'hour');
+    expect(s[0].label).toBe('02/10 16:00');
+  });
+  it('is empty without rows', () => {
+    expect(trendSeries([], 'day')).toEqual([]);
+  });
+});
+
+describe('defaultGranularity', () => {
+  it('follows the period', () => {
+    expect(defaultGranularity('today', [])).toBe('hour');
+    expect(defaultGranularity('month', [])).toBe('day');
+  });
+  it('switches to weeks for long custom ranges', () => {
+    const rows = [toRow(row({ created_At: '2026-06-01T12:00:00' })), toRow(row({ created_At: '2026-10-01T12:00:00' }))];
+    expect(defaultGranularity('all', rows)).toBe('week');
+    expect(defaultGranularity('all', rows.slice(0, 1))).toBe('day');
+  });
+});
+
+describe('channelComparison', () => {
+  it('rates each channel on its final states and never rates push', () => {
+    const rows = [
+      toRow(row({ notificationDispatchId: 1, selectedChannel: 'whatsapp', status: 'confirmed', recipientId: 1 })),
+      toRow(row({ notificationDispatchId: 2, selectedChannel: 'whatsapp', status: 'confirmed', recipientId: 1 })),
+      toRow(row({ notificationDispatchId: 3, selectedChannel: 'whatsapp', status: 'failed' })),
+      toRow(row({ notificationDispatchId: 4, selectedChannel: 'whatsapp', status: 'sent' })),
+      toRow(row({ notificationDispatchId: 5, selectedChannel: 'push', status: 'sent' })),
+    ];
+    const [wa, sms, push] = channelComparison(rows);
+    expect(wa).toMatchObject({ channel: 'whatsapp', total: 4, delivered: 2, failed: 1, awaiting: 1, deliveryRate: 66.7, clientsReached: 1 });
+    expect(sms).toMatchObject({ total: 0, deliveryRate: null });
+    expect(push).toMatchObject({ total: 1, awaiting: 1, deliveryRate: null });
+  });
+});
+
+describe('failureCause', () => {
+  it('classifies by provider code', () => {
+    expect(failureCause(toRow(row({ status: 'failed', providerErrorCode: '131047' })))).toBe('config');
+    expect(failureCause(toRow(row({ status: 'failed', providerErrorCode: '21211' })))).toBe('recipient');
+    expect(failureCause(toRow(row({ status: 'failed', providerErrorCode: '30008' })))).toBe('temporary');
+    expect(failureCause(toRow(row({ status: 'failed', providerErrorCode: '' })))).toBe('unknown');
+    expect(failureCause(toRow(row({ status: 'confirmed' })))).toBeNull();
+  });
+  it('the breakdown adds up to the failures', () => {
+    const b = failureBreakdown([
+      toRow(row({ status: 'failed', providerErrorCode: '131047' })),
+      toRow(row({ status: 'failed' })),
+      toRow(row({ status: 'confirmed' })),
+    ]);
+    expect(b.total).toBe(2);
+    expect(b.causes).toEqual({ temporary: 0, config: 1, recipient: 0, unknown: 1 });
+  });
+  it('focus filters match the breakdown', () => {
+    const r = toRow(row({ status: 'failed', providerErrorCode: '21211' }));
+    expect(matchesFocus(r, 'failRecipient')).toBe(true);
+    expect(matchesFocus(r, 'failTemporary')).toBe(false);
   });
 });

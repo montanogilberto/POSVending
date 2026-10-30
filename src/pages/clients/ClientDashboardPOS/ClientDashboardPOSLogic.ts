@@ -17,7 +17,9 @@ import {
   PosRewardTransaction,
   stampUnits,
 } from '../../../api/posRewardsApi';
-import { buildClientQrValue, downloadClientQrPdf } from '../../../utils/clientQrPdf';
+import { downloadClientQrPdf } from '../../../utils/clientQrPdf';
+import { useClientQr } from '../../../hooks/useClientQr';
+import { usePosWallet } from './ClientDashboardPOSWallet';
 import { CLIENT_TYPE_LABEL, LIST_PREVIEW } from './ClientDashboardPOSConstants';
 import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboardPOSTypes';
 
@@ -30,7 +32,7 @@ import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboar
 export const useClientDashboardPOS = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const clientId = Number(clientIdParam);
-  const { companyId } = useUser();
+  const { companyId, userId } = useUser();
   const history = useHistory();
   const { showToast, toastProps } = useToast();
 
@@ -89,6 +91,7 @@ export const useClientDashboardPOS = () => {
   }), [load]);
 
   const fullName = client ? `${client.first_name ?? ''} ${client.last_name ?? ''}`.trim() : `Cliente #${clientId}`;
+  const wallet = usePosWallet(companyId, clientId, userId, fullName, showToast);
   const typeLabel = client?.clientType ? CLIENT_TYPE_LABEL[client.clientType] : CLIENT_TYPE_LABEL.borrower;
 
   const purchases = useMemo<PosPurchase[]>(
@@ -142,17 +145,21 @@ export const useClientDashboardPOS = () => {
 
   const pendingFollowUps = followUps.filter((f) => f.status === 'pending').length;
 
-  // Every client has a QR: it's built from clientId + name (same value as
-  // /clients and /my-qr), not read from qrBlobUrl. The client shows it at the
-  // register to start a sale, a Recolección or a Delivery.
-  const qrValue = client ? buildClientQrValue(client.clientId, client.first_name, client.last_name) : '';
+  // Every client has a QR: the signed GMO1 value from the backend (same value
+  // as /clients and /my-qr), not read from qrBlobUrl. The client shows it at
+  // the register or a laundry machine to start a sale, a Recolección or a Delivery.
+  const { qrValue, loading: qrLoading, error: qrError, reload: reloadQr } = useClientQr(
+    companyId,
+    client?.clientId,
+  );
 
   const downloadQr = async () => {
-    if (!client) return;
+    if (!client || !qrValue) return;
     setQrDownloading(true);
     try {
       await downloadClientQrPdf({
         clientId: client.clientId,
+        qrValue,
         firstName: client.first_name,
         lastName: client.last_name,
         cellphone: client.cellphone,
@@ -188,8 +195,12 @@ export const useClientDashboardPOS = () => {
     followUps,
     pendingFollowUps,
     qrValue,
+    qrLoading,
+    qrError,
+    reloadQr,
     qrDownloading,
     downloadQr,
+    ...wallet,
     loading,
     toastProps,
     openReceipt: (incomeId: number) => history.push(`/receipt/${incomeId}`),

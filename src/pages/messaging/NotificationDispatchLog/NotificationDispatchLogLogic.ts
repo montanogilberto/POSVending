@@ -10,12 +10,13 @@ import {
 } from '../../../api/notificationDispatchApi';
 import { getAllClients } from '../../../api/clientsApi';
 import {
-  actionItems, channelHealth, clientHistory, computeKpis, hermosilloMonthKey, inDateRange, inMonth,
-  isShownOnScreen, keyMetrics, matchesDelivery, matchesFocus, matchesSearch, paginate, providerHealth, sortRows, toRow, whatsappQuota,
+  actionItems, channelComparison, channelHealth, clientHistory, computeKpis, defaultGranularity, failureBreakdown,
+  hermosilloMonthKey, inDateRange, inMonth, isShownOnScreen, keyMetrics, matchesDelivery, matchesFocus, matchesSearch, paginate, providerHealth, sortRows, toRow, trendSeries, whatsappQuota,
 } from './NotificationStats';
 import { clientProfileRoute, PAGE_SIZE } from './NotificationDispatchLogConstants';
 import type {
-  ChannelFilter, CustomRange, DateFilter, DeliveryFilter, DetailTab, DispatchRow, FocusFilter, SortKey,
+  CenterSection, ChannelFilter, CustomRange, DateFilter, DeliveryFilter, DetailTab, DispatchRow, FocusFilter, SortKey,
+  TrendGranularity,
 } from './NotificationDispatchLogTypes';
 
 /** Desktop shows the detail as a side drawer next to the dashboard; below this it is a modal. */
@@ -44,6 +45,9 @@ export const useNotificationDispatchLog = () => {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('newest');
   const [page, setPage] = useState(1);
+  const [section, setSection] = useState<CenterSection>('overview');
+  /** null = follow the period (defaultGranularity); set once the user picks Hora/Día/Semana. */
+  const [granularityPick, setGranularity] = useState<TrendGranularity | null>(null);
 
   const load = useCallback(async () => {
     if (!companyId) return;
@@ -90,6 +94,13 @@ export const useNotificationDispatchLog = () => {
   const metrics = useMemo(() => keyMetrics(periodRows), [periodRows]);
   const health = useMemo(() => channelHealth(periodRows), [periodRows]);
   const actions = useMemo(() => actionItems(periodRows), [periodRows]);
+  const failures = useMemo(() => failureBreakdown(periodRows), [periodRows]);
+  const channels = useMemo(() => channelComparison(periodRows), [periodRows]);
+
+  // A new period goes back to the bucket size that fits it.
+  useEffect(() => { setGranularity(null); }, [dateFilter, customRange]);
+  const granularity = granularityPick ?? defaultGranularity(dateFilter, periodRows);
+  const trend = useMemo(() => trendSeries(periodRows, granularity), [periodRows, granularity]);
   const twilioReachable = usage ? usage.twilio.ok : null;
   const providers = useMemo(() => providerHealth(rows, twilioReachable), [rows, twilioReachable]);
 
@@ -131,7 +142,9 @@ export const useNotificationDispatchLog = () => {
     setChannelFilter(next.channel ?? 'all');
     setDeliveryFilter(next.delivery ?? 'all');
     setFocus(next.focus ?? 'none');
-    scrollToHistory();
+    setSection('history');
+    // The history tab mounts on this render; scroll once it is there.
+    requestAnimationFrame(scrollToHistory);
   };
 
   const openDetail = (row: DispatchRow) => {
@@ -164,6 +177,7 @@ export const useNotificationDispatchLog = () => {
     initialLoading: !loadedOnce && !!companyId,
     refresh: load, toastProps, total: rows.length, isDesktop, historyRef,
     kpis, metrics, health, actions, providers, quota, usage, configWarnings,
+    section, setSection, granularity, setGranularity, trend, channels, failures,
     filtered, pageData, setPage, sortKey, setSortKey, showInList,
     selected, openDetail, closeDetail, detailTab, setDetailTab, history, openClientProfile, copyText,
     search, setSearch, focus, setFocus,

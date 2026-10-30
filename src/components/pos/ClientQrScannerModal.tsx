@@ -12,12 +12,25 @@ interface Props {
   onClientFound: (client: Client) => void;
 }
 
-/** Parses the `CLIENT:<id>:<name>` string encoded by src/utils/clientQrPdf.ts's buildClientQrValue. */
+/**
+ * Extracts the clientId from a client QR. Accepts the signed laundry format
+ * `GMO1.<companyId>.<clientId>.<firma>` (served by /laundryDevices/clientQr)
+ * and, during the transition, the legacy `CLIENT:<id>:<name>`. The signature
+ * is only verified server-side; here the id just picks the client to load.
+ */
 function parseClientQrValue(raw: string): number | null {
-  const parts = raw.split(':');
-  if (parts[0] !== 'CLIENT') return null;
-  const clientId = parseInt(parts[1], 10);
-  return Number.isFinite(clientId) ? clientId : null;
+  const value = raw.trim();
+  let idPart: string | undefined;
+  if (value.startsWith('GMO1.')) {
+    const parts = value.split('.');
+    if (parts.length !== 4) return null;
+    idPart = parts[2];
+  } else if (value.startsWith('CLIENT:')) {
+    idPart = value.split(':')[1];
+  }
+  if (!idPart || !/^\d+$/.test(idPart)) return null;
+  const clientId = parseInt(idPart, 10);
+  return clientId > 0 ? clientId : null;
 }
 
 const ClientQrScannerModal: React.FC<Props> = ({ isOpen, onClose, onClientFound }) => {

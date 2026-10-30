@@ -189,6 +189,29 @@ export const uploadClientQr = async (
   return res.json();
 };
 
+/**
+ * Signed laundry QR (`GMO1.<companyId>.<clientId>.<firma>`) the ESP32 washers
+ * accept. The signature is an HMAC with a server-only secret, so the value must
+ * always come from the backend — never build it on the device. 503 = the
+ * backend is missing LAUNDRY_QR_SECRET.
+ */
+export const fetchClientQr = async (companyId: number, clientId: number): Promise<string> => {
+  const res = await fetch(`${API_BASE_URL}/laundryDevices/clientQr`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ laundryDevices: [{ companyId, clientId }] }),
+  });
+  if (!res.ok) {
+    console.log('[clientsApi] fetchClientQr failed:', res.status);
+    throw new Error(res.status === 503
+      ? 'El código QR no está disponible por el momento.'
+      : 'No se pudo obtener el código QR. Intenta de nuevo.');
+  }
+  const data: { clientQr?: string } = await res.json();
+  if (!data.clientQr) throw new Error('No se pudo obtener el código QR. Intenta de nuevo.');
+  return data.clientQr;
+};
+
 export const getOneClient = async (data: GetOneClientRequest): Promise<Client[]> => {
   const response = await fetch(`${API_BASE_URL}/one_clients`, {
     method: 'POST',

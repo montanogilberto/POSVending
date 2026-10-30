@@ -55,6 +55,7 @@ import {
   shieldCheckmarkOutline,
   clipboardOutline,
   qrCodeOutline,
+  scanOutline,
   downloadOutline,
   barChartOutline,
   walletOutline,
@@ -81,7 +82,9 @@ import { Client, ClientType, getAllClients, createOrUpdateClient, CreateClientRe
 import { posRewardsApi } from '../../api/posRewardsApi';
 import { ClientCapability, grantClientCapability, revokeClientCapability, listClientCapabilities } from '../../api/clientCapabilitiesApi';
 import QRCode from 'qrcode';
-import { buildClientQrValue, downloadClientQrPdf } from '../../utils/clientQrPdf';
+import { downloadClientQrPdf } from '../../utils/clientQrPdf';
+import { useClientQr } from '../../hooks/useClientQr';
+import ClientQrScannerModal from '../../components/pos/ClientQrScannerModal';
 import {
   submitContractClientFaceRecognition,
   getAllClientFaceRecognitions,
@@ -254,6 +257,11 @@ const ClientsPage: React.FC = () => {
   const [shareClient, setShareClient] = useState<Client | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [qrDownloading, setQrDownloading] = useState(false);
+  // Caja: escanear el QR del cliente abre su ficha POS (saldo, abono en efectivo).
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  // Signed GMO1 QR values from the backend — wizard (new client) and the list's QR modal.
+  const wizardQr = useClientQr(Number(companyId) || undefined, createdClientId ?? undefined);
+  const modalQr = useClientQr(Number(companyId) || undefined, qrModalClient?.clientId);
 
   // Step 6 — Stripe
   const [stripeAccountId, setStripeAccountId] = useState('');
@@ -356,11 +364,16 @@ const ClientsPage: React.FC = () => {
   // ── Helpers ────────────────────────────────────────────────────────────────
   const toast = (msg: string) => { setToastMessage(msg); setShowToast(true); };
 
-  const handleDownloadQrPdf = async (client: Pick<Client, 'clientId' | 'first_name' | 'last_name' | 'cellphone' | 'email'>) => {
+  const handleDownloadQrPdf = async (
+    client: Pick<Client, 'clientId' | 'first_name' | 'last_name' | 'cellphone' | 'email'>,
+    qrValue: string | null,
+  ) => {
+    if (!qrValue) return;
     setQrDownloading(true);
     try {
       await downloadClientQrPdf({
         clientId: client.clientId,
+        qrValue,
         firstName: client.first_name,
         lastName: client.last_name,
         cellphone: client.cellphone,
@@ -976,10 +989,8 @@ const ClientsPage: React.FC = () => {
     if (target < wizardStep) { setWizardStep(target); setCaptureSubStep('doc-intro'); }
   };
 
-  // QR value encodes enough to identify the client at any POS terminal
-  const qrValue = createdClientId
-    ? buildClientQrValue(createdClientId, newClient.first_name ?? '', newClient.last_name ?? '')
-    : '';
+  // Signed GMO1 value identifies the client at any POS terminal and laundry machine
+  const qrValue = wizardQr.qrValue;
 
   // Auto-upload QR when wizard reaches step 1 and we have a clientId
   useEffect(() => {
@@ -1123,8 +1134,13 @@ const ClientsPage: React.FC = () => {
       <div className="client-qr-box">
         {qrValue ? (
           <QRCodeSVG value={qrValue} size={200} level="H" includeMargin />
+        ) : wizardQr.error ? (
+          <div className="client-qr-placeholder client-qr-error">
+            <IonText color="danger"><p>{wizardQr.error}</p></IonText>
+            <IonButton fill="clear" size="small" onClick={wizardQr.reload}>Reintentar</IonButton>
+          </div>
         ) : (
-          <div className="client-qr-placeholder">Sin datos</div>
+          <div className="client-qr-placeholder client-qr-loading"><IonSpinner name="crescent" /><span>Generando código QR…</span></div>
         )}
       </div>
 
@@ -1154,7 +1170,7 @@ const ClientsPage: React.FC = () => {
             last_name: newClient.last_name ?? '',
             cellphone: newClient.cellphone ?? '',
             email: newClient.email ?? '',
-          })}
+          }, qrValue)}
           disabled={qrDownloading}
         >
           {qrDownloading ? (
@@ -1904,6 +1920,9 @@ const ClientsPage: React.FC = () => {
             placeholder="Buscar por nombre, teléfono o email..."
             className="clients-searchbar"
           />
+          <IonButton fill="outline" className="clients-scan-btn" onClick={() => setShowQrScanner(true)}>
+            <IonIcon icon={scanOutline} slot="start" /> Escanear QR
+          </IonButton>
           {focusClientId && (
             <IonChip className="clients-focus-chip" onClick={clearClientFocus}>
               <IonLabel>
@@ -2073,6 +2092,12 @@ const ClientsPage: React.FC = () => {
         />
       </IonContent>
 
+      <ClientQrScannerModal
+        isOpen={showQrScanner}
+        onClose={() => setShowQrScanner(false)}
+        onClientFound={(client) => history.push(`/client-pos/${client.clientId}`)}
+      />
+
       {/* ── QR View Modal ──────────────────────────────────────────────────── */}
       <IonModal isOpen={showQrModal} onDidDismiss={() => { setShowQrModal(false); setQrModalClient(null); }} breakpoints={[0, 0.6]} initialBreakpoint={0.6}>
         <IonHeader className="ion-no-border">
@@ -2086,12 +2111,16 @@ const ClientsPage: React.FC = () => {
         <IonContent className="ion-padding">
           {qrModalClient && (
             <div className="client-qr-modal-content">
-              <QRCodeSVG
-                value={buildClientQrValue(qrModalClient.clientId, qrModalClient.first_name, qrModalClient.last_name)}
-                size={220}
-                level="H"
-                includeMargin
-              />
+              {modalQr.qrValue ? (
+                <QRCodeSVG value={modalQr.qrValue} size={220} level="H" includeMargin />
+              ) : modalQr.error ? (
+                <div className="client-qr-placeholder client-qr-error">
+                  <IonText color="danger"><p>{modalQr.error}</p></IonText>
+                  <IonButton fill="clear" size="small" onClick={modalQr.reload}>Reintentar</IonButton>
+                </div>
+              ) : (
+                <div className="client-qr-placeholder client-qr-loading"><IonSpinner name="crescent" /><span>Generando código QR…</span></div>
+              )}
               <div style={{ textAlign: 'center' }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 18 }}>{qrModalClient.first_name} {qrModalClient.last_name}</p>
                 <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>{qrModalClient.cellphone}</p>
@@ -2100,8 +2129,8 @@ const ClientsPage: React.FC = () => {
               <IonButton
                 expand="block"
                 className="client-qr-download-btn"
-                onClick={() => handleDownloadQrPdf(qrModalClient)}
-                disabled={qrDownloading}
+                onClick={() => handleDownloadQrPdf(qrModalClient, modalQr.qrValue)}
+                disabled={qrDownloading || !modalQr.qrValue}
               >
                 {qrDownloading ? (
                   <IonSpinner name="crescent" style={{ width: 18, height: 18 }} />

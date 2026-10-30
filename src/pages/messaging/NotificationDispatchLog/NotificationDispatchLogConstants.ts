@@ -49,7 +49,21 @@ export const FOCUS_LABELS: Record<string, string> = {
   final: 'Con estado final',
   pushNoDevice: 'Push sin dispositivo registrado',
   pushRejected: 'Push rechazado o sin respuesta',
+  failTemporary: 'Fallos temporales',
+  failRecipient: 'Fallos por el número del cliente',
+  failUnknown: 'Fallos sin código del proveedor',
 };
+
+/** Failure causes in the Operaciones breakdown, in the order an admin acts on them. */
+export const FAILURE_CAUSE_LABELS: Record<string, { title: string; detail: string }> = {
+  config: { title: 'Configuración', detail: 'Plantilla, ventana de 24 h, pago o cuenta de prueba: se corrige en Meta/Twilio.' },
+  recipient: { title: 'Número del cliente', detail: 'Número inválido o sin WhatsApp: corrige el teléfono o usa otro canal.' },
+  temporary: { title: 'Temporales', detail: 'El proveedor dio un código sin causa permanente: reenviar puede funcionar.' },
+  unknown: { title: 'Sin código', detail: 'El proveedor no dio motivo (fallos anteriores al 16/10 no lo guardaban).' },
+};
+
+/** Trend bucket sizes offered above the chart. */
+export const GRANULARITY_LABELS: Record<string, string> = { hour: 'Hora', day: 'Día', week: 'Semana' };
 
 export const CHANNEL_LABELS: Record<string, string> = {
   push: 'Push',

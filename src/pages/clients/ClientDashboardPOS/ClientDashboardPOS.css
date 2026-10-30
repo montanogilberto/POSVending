@@ -365,6 +365,19 @@
   line-height: 0;
 }
 
+.cpos-qr-placeholder {
+  width: 168px;
+  height: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
 .cpos-qr-info {
   flex: 1 1 200px;
   min-width: 0;
@@ -412,4 +425,35 @@
   .cpos-stamp-head {
     color: #D1D5DB;
   }
+}
+
+.cpos-qr-loading-text {
+  margin-top: 8px;
+  color: #6B7280;
+}
+
+/* Saldo lavandería + abono en efectivo */
+.cpos-wallet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cpos-wallet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cpos-wallet-amount {
+  font-size: 24px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.cpos-wallet-error {
+  font-size: 13px;
 }
