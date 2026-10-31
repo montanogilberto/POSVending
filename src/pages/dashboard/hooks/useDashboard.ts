@@ -19,19 +19,24 @@ import { API_BASE_URL } from '../../../utils/appEnv';
 
 type PaymentMethod = PaymentMethodLabel;
 
-const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
+// Monedero = machine use paid from prepaid balance: income, but no cash enters the drawer.
+const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta', 'Monedero'];
+// Expenses are never paid from a client's prepaid balance.
+const EXPENSE_PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
 
 // PAGOS (expenses) uses the expense red of the Egresos trends chart.
 const EXPENSE_PAYMENT_COLORS: Record<PaymentMethod, string> = {
   Efectivo: '#DC2626',
   Transferencia: '#F87171',
   Tarjeta: '#FCA5A5',
+  Monedero: '#FECACA',
 };
 
 const PAYMENT_COLORS: Record<PaymentMethod, string> = {
   Efectivo: '#16A34A',
   Transferencia: '#22C55E',
   Tarjeta: '#86EFAC',
+  Monedero: '#0EA5E9',
 };
 
 export const useDashboard = () => {
@@ -133,8 +138,8 @@ export const useDashboard = () => {
 
     if (!monthly.length) return [];
 
-    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
-    const commissions: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
+    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0, Monedero: 0 };
+    const commissions: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0, Monedero: 0 };
     monthly.forEach((income) => {
       const method = normalizePaymentMethod(income.paymentMethod);
       if (!method) return;
@@ -158,16 +163,16 @@ export const useDashboard = () => {
   // COBROS (no terminal commission on money going out). allExpenses is
   // already this company's current month (fetchMonthlyExpenses).
   const expenseBreakdown = useMemo(() => {
-    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0 };
+    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0, Monedero: 0 };
     allExpenses.forEach((expense) => {
       const method = normalizePaymentMethod(expense.paymentMethod);
       if (method) totals[method] += Number(expense.total) || 0;
     });
 
-    const total = PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
+    const total = EXPENSE_PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
     if (total === 0) return [];
 
-    return PAYMENT_METHODS.map((method) => ({
+    return EXPENSE_PAYMENT_METHODS.map((method) => ({
       method,
       amount: totals[method],
       commission: 0,

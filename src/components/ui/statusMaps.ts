@@ -83,6 +83,7 @@ export const PAYMENT_METHOD: Record<string, StatusMeta> = {
   efectivo:      { label: 'Efectivo',      color: 'success'  },
   tarjeta:       { label: 'Tarjeta',       color: 'primary'  },
   transferencia: { label: 'Transferencia', color: 'tertiary' },
+  monedero:      { label: 'Monedero',      color: 'secondary' },
 };
 
 /** Tipo de egreso (expenses.expenseType). */

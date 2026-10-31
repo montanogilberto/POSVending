@@ -51,6 +51,7 @@ const IncomesFilters: React.FC<IncomesFiltersProps> = ({
             <IonSelectOption value="efectivo">Efectivo</IonSelectOption>
             <IonSelectOption value="tarjeta">Tarjeta</IonSelectOption>
             <IonSelectOption value="transferencia">Transferencia</IonSelectOption>
+            <IonSelectOption value="monedero">Monedero</IonSelectOption>
           </IonSelect>
         </IonItem>
         <IonItem>
