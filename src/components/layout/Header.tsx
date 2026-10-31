@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonTitle, IonBadge, IonMenuButton } from '@ionic/react';
 import ConfirmBackButton from '../ui/ConfirmBackButton';
 import TokenBalanceChip from './TokenBalanceChip';
-import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline, qrCodeOutline } from 'ionicons/icons';
+import { helpCircleOutline, notificationsOutline, mailOutline, cartOutline, chatbubblesOutline, sparklesOutline } from 'ionicons/icons';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
@@ -47,8 +47,7 @@ const Header: React.FC<HeaderProps> = ({
   const isSmartLoansRole = activeProduct
     ? activeProduct === 'borrower' || activeProduct === 'lender'
     : roleCode === 'borrower' || roleCode === 'lender';
-  // POS customer (same rule as App.tsx's client tab bar): their QR is what they
-  // show at the register and scan at the laundry machines, so it lives up here.
+  // POS customer (same rule as App.tsx's client tab bar).
   const isClientRole = activeProduct ? activeProduct === 'pos' : roleCode === 'pos';
   const [unreadCount, setUnreadCount] = useState(0);
   const listenerRef = useRef<any>(null);
@@ -112,14 +111,8 @@ const Header: React.FC<HeaderProps> = ({
           {IS_DEV_BUILD && <IonBadge color="warning" className="header-env-badge">{APP_ENV.toUpperCase()}</IonBadge>}
         </IonTitle>
         <IonButtons slot="end">
-          {isClientRole && (
-            <IonButton fill="solid" color="primary" onClick={() => history.push('/my-qr')} title="Mi QR" className="header-qr-button">
-              <IonIcon icon={qrCodeOutline} slot="start" />
-              <span className="header-qr-label">Mi QR</span>
-            </IonButton>
-          )}
           {/* Company AI-token balance — POS staff only (hidden until the balance is known);
-              a customer has no use for it and it would push their QR off a phone's header. */}
+              a customer has no use for it. */}
           {!isSmartLoansRole && !isClientRole && <TokenBalanceChip />}
           {/* Cart is the cashier's checkout — only roles with POS access. */}
           {!isSmartLoansRole && canAccess(roleCode, 'pos') && (

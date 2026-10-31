@@ -353,3 +353,61 @@
 .rewards-dashboard-borrower-cta {
   padding: 4px 16px 24px;
 }
+
+/* Mi QR — top of the customer's Inicio */
+.rewards-qr-card {
+  margin: 12px 12px 4px;
+  border-radius: 18px;
+  --background: #2563eb;
+  --color: #ffffff;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+
+.rewards-qr-card-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+}
+
+.rewards-qr-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 32px;
+}
+
+.rewards-qr-card-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  color: #ffffff;
+}
+
+.rewards-qr-card-text strong {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.rewards-qr-card-text span {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.rewards-qr-card-chevron {
+  flex-shrink: 0;
+  font-size: 22px;
+  color: #ffffff;
+}
+
+/* Odd tile count: the last one takes the full row */
+.rewards-quick-action-tile:last-child:nth-child(odd) {
+  grid-column: span 2;
+}
