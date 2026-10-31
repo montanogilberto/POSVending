@@ -55,6 +55,9 @@ const UNITS = [
   { value: 'L',  label: 'L'  },
   { value: 'pz', label: 'pz' },
 ];
+/** Units for an option choice's size: the product units plus minutes, the length of a
+ *  laundry machine cycle (the ESP32 shows it; backend sp_laundryDevices reads unit 'min'). */
+const CHOICE_UNITS = [...UNITS, { value: 'min', label: 'min' }];
 /** Margen mínimo de utilidad sobre el precio de venta: (venta - costo) / venta. */
 const TARGET_MARGIN = 0.30;
 /** Precio mínimo para el margen objetivo, redondeado hacia arriba al centavo. */
@@ -934,7 +937,7 @@ const ProductWizard: React.FC<ProductWizardProps> = ({ isOpen, onClose, onSucces
                             value={ch.quantity} onChange={e=>updCh(oi,ci,'quantity',e.target.value)} disabled={isReadOnly}/>
                           <select className="wizard-select" aria-label="Unidad" value={ch.unit} onChange={e=>updCh(oi,ci,'unit',e.target.value)} disabled={isReadOnly}>
                             <option value="">—</option>
-                            {UNITS.map(u=>(<option key={u.value} value={u.value}>{u.label}</option>))}
+                            {CHOICE_UNITS.map(u=>(<option key={u.value} value={u.value}>{u.label}</option>))}
                           </select>
                         </div>
                         <div className="wizard-input-prefix">
