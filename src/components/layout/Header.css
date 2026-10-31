@@ -152,3 +152,34 @@
   font-weight: 600;
   letter-spacing: 0;
 }
+
+/* "Mi QR" del cliente POS: botón destacado para mostrarlo en caja o en la lavadora. */
+.header-qr-button {
+  --border-radius: 999px;
+  --box-shadow: none;
+  --padding-start: 14px;
+  --padding-end: 16px;
+  min-height: 40px;
+  margin: 4px 6px;
+  font-weight: 700;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.header-qr-button ion-icon {
+  font-size: 22px;
+  margin-inline-end: 6px;
+}
+
+@media (max-width: 400px) {
+  .header-qr-button {
+    --padding-start: 10px;
+    --padding-end: 12px;
+    margin: 4px 2px;
+  }
+
+  .header-qr-button ion-icon {
+    font-size: 20px;
+    margin-inline-end: 4px;
+  }
+}
