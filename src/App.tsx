@@ -157,6 +157,7 @@ import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
 import WhatsAppAgentPage from './pages/messaging/WhatsAppAgentPage';
 import WhatsAppConversationsPage from './pages/messaging/WhatsAppConversationsPage';
+import WhatsAppDock from './components/messaging/WhatsAppDock';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import NotificationDetailPage from './pages/messaging/NotificationDetailPage';
 import type { NotificationTapState } from './pages/messaging/NotificationDetail/NotificationDetailTypes';
@@ -558,7 +559,12 @@ const AppShell: React.FC = () => {
     });
   };
 
+  // LinkedIn-style WhatsApp dock: staff who attend customers (same access as Agente WhatsApp).
+  const showWhatsAppDock = !isSmartLoansRole && !isClientRole && !isOwnDashboardProduct
+    && canAccess(roleCode, 'notificationDispatchLog');
+
   return (
+    <>
     <IonSplitPane
       contentId="main"
       when="(min-width: 792px)"
@@ -1206,6 +1212,8 @@ const AppShell: React.FC = () => {
         </IonTabs>
       </IonPage>
     </IonSplitPane>
+    {showWhatsAppDock && <WhatsAppDock />}
+    </>
   );
 };
 

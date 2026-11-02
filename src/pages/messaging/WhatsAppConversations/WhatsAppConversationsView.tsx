@@ -13,7 +13,7 @@ import ThreadView from './components/ThreadView';
 const WhatsAppConversationsView: React.FC = () => {
   const vm = useWhatsAppConversations();
   const pops = usePopovers();
-  const busy = vm.listLoading || vm.threadLoading;
+  const busy = vm.listLoading || vm.chat.threadLoading;
 
   return (
     <IonPage>

@@ -33,15 +33,28 @@ export interface WhatsAppAgentDashboard {
   hours: { weekday: number; hour: number; messages: number }[];
   /** Where: the business number / branch the customer wrote to (null = no branch). */
   branches: { branchId: number | null; branchName: string | null; messages: number; customers: number; failures: number }[];
-  /** Did we answer well — signals, not a grade. A conversation = one customer on one day. */
+  /** Did each chat END correctly. A conversation = one customer on one day; each gets one outcome. */
   quality: {
     conversations: number;
-    /** Ended with "gracias/ok/sí" or a booking, no failure, no handoff. */
-    resolved: number;
-    handedOff: number;
+    /** Finalized correctly = closed + helped. */
+    finalized: number;
+    finalizedRatePct: number | null;
+    /** Said "no" to "¿Hay algo más…?" (the agent said goodbye) or booked. */
+    closed: number;
+    /** Said "sí" to "¿Te funcionó la respuesta?" (no formal goodbye). */
+    helped: number;
+    /** Their last answer to "¿Te funcionó?" was no. */
+    notHelped: number;
+    /** An agent call failed (generic fallback text). */
     withFailure: number;
-    /** The customer just stopped writing. */
+    /** Handed off and nobody from the team wrote after. */
+    handedOff: number;
+    /** Left mid-conversation. */
     noClosure: number;
+    helpfulYes: number;
+    helpfulNo: number;
+    /** = finalized (kept for older screens). */
+    resolved: number;
     /** Same topic asked again within 15 min of the answer. */
     reasked: number;
     reaskedRatePct: number | null;
@@ -49,9 +62,23 @@ export interface WhatsAppAgentDashboard {
     complaints: number;
     /** First time they ever wrote to the agent. */
     newCustomers: number;
+    /** Chats that did not end correctly, newest first (max 30). */
+    unfinished: WhatsAppUnfinishedChat[];
   };
   /** First Hermosillo day with data per source; null = nothing recorded yet. */
   dataSince: { agentCalls: string | null; bookings: string | null; topics: string | null };
+}
+
+export type WhatsAppChatOutcome = 'cerrada' | 'le_sirvio' | 'no_le_sirvio' | 'falla_agente' | 'pidio_persona' | 'sin_cierre';
+
+export interface WhatsAppUnfinishedChat {
+  phone10: string;
+  customerName: string | null;
+  /** Hermosillo day of the conversation. */
+  date: string;
+  lastAtUtc: string;
+  outcome: WhatsAppChatOutcome;
+  lastMessage: string | null;
 }
 
 /** "¿Qué quieren mis clientes?" — AI summary of the period's customer messages. */
@@ -80,9 +107,12 @@ export const whatsappAgentApi = {
       topics: d.topics ?? [],
       hours: d.hours ?? [],
       branches: d.branches ?? [],
-      quality: d.quality ?? {
-        conversations: 0, resolved: 0, handedOff: 0, withFailure: 0, noClosure: 0,
-        reasked: 0, reaskedRatePct: null, complaints: 0, newCustomers: 0,
+      quality: {
+        conversations: 0, finalized: 0, finalizedRatePct: null, closed: 0, helped: 0, notHelped: 0,
+        withFailure: 0, handedOff: 0, noClosure: 0, helpfulYes: 0, helpfulNo: 0, resolved: 0,
+        reasked: 0, reaskedRatePct: null, complaints: 0, newCustomers: 0, unfinished: [],
+        // An older SP leaves fields out — the response is only partially typed.
+        ...((d.quality ?? {}) as Partial<WhatsAppAgentDashboard['quality']>),
       },
       dataSince: { ...d.dataSince, topics: d.dataSince?.topics ?? null },
     };
@@ -116,6 +146,17 @@ export interface WhatsAppConversationSummary {
   handedOff: number;
   proposed: number;
   bookings: number;
+  /** Customer's last message (null = only our side in the period). */
+  lastInboundUtc: string | null;
+  /** Who wrote the last message of the chat, and what. */
+  lastKind: 'client' | 'bot' | 'staff' | null;
+  lastText: string | null;
+  /** The agent is silent in this chat until then (a person is handling it). */
+  staffPausedUntilUtc: string | null;
+  /** 1 = waiting for a person: the customer wrote last, or the agent handed off / failed
+   *  and nobody from the team wrote after. */
+  needsReply: number;
+  source: 'messages' | 'agent_log';
 }
 
 /** One entry of a customer's timeline (sp_whatsappAgentConversations "thread"). */

@@ -1,0 +1,94 @@
+/* WhatsApp customer chat — shared by /whatsapp-agent/conversations and the chat dock. */
+
+/* Chat row */
+.wac-avatar {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: #d1fae5; color: #047857; font-weight: 700;
+}
+.wac-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.wac-item-top h3 { margin: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wac-item-top ion-note { font-size: 0.72rem; flex-shrink: 0; }
+.wac-item-phone { font-size: 0.72rem !important; color: #6b7280 !important; }
+.wac-item-preview { color: #374151 !important; }
+.wac-item-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.wac-item-badges ion-badge { font-weight: 500; font-size: 0.68rem; }
+.wac-item-bottom { display: flex; align-items: center; gap: 8px; }
+.wac-item-bottom .wac-item-preview { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
+.wac-unread-dot { width: 10px; height: 10px; border-radius: 50%; background: #25d366; flex-shrink: 0; }
+.wac-item--unread h3 { font-weight: 700; }
+.wac-item--unread .wac-item-top ion-note { color: #059669; font-weight: 600; }
+.wac-item--unread .wac-item-preview { color: #111827 !important; font-weight: 500; }
+
+/* Timeline */
+.wac-messages {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 12px; overflow-y: auto; max-height: 70vh;
+  background: #f0f2f5;
+  flex: 1;
+}
+.wac-day { display: flex; justify-content: center; margin: 8px 0 4px; }
+.wac-day span {
+  font-size: 0.7rem; color: #4b5563; background: #e5e7eb;
+  padding: 2px 10px; border-radius: 10px;
+}
+
+.wac-bubble {
+  max-width: 78%;
+  padding: 8px 10px 4px;
+  border-radius: 12px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
+  display: flex; flex-direction: column;
+}
+.wac-bubble p { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.9rem; color: #111827; }
+.wac-bubble--client { align-self: flex-start; background: #fff; border-top-left-radius: 4px; }
+.wac-bubble--agent { align-self: flex-end; background: #d9fdd3; border-top-right-radius: 4px; }
+.wac-bubble--staff { align-self: flex-end; background: #dbeafe; border-top-right-radius: 4px; }
+.wac-bubble--failed { align-self: flex-end; background: #fee2e2; border-top-right-radius: 4px; }
+.wac-bubble--failed p { color: #991b1b; font-size: 0.8rem; }
+.wac-time { align-self: flex-end; font-size: 0.66rem; color: #6b7280; margin-top: 2px; }
+.wac-action {
+  align-self: flex-end;
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.72rem; color: #166534;
+  background: #ecfdf5; padding: 3px 8px; border-radius: 8px;
+}
+.wac-event {
+  align-self: center;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
+  background: #fff7ed; color: #9a3412; font-size: 0.75rem;
+  padding: 6px 10px; border-radius: 10px; margin: 4px 0;
+}
+.wac-footnote { margin: 12px 0 0; font-size: 0.7rem; color: #6b7280; text-align: center; }
+
+.wac-event--notification {
+  align-self: stretch; justify-content: flex-start; flex-wrap: nowrap; align-items: flex-start;
+  background: #f5f3ff; color: #3730a3; text-align: left;
+}
+.wac-event--notification ion-icon { margin-top: 2px; flex-shrink: 0; }
+.wac-event--notification p { margin: 2px 0 0; color: #1f2937; white-space: pre-wrap; word-break: break-word; }
+.wac-event-head { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.wac-event-head ion-badge { font-weight: 500; font-size: 0.66rem; }
+.wac-event-head .wac-time { margin: 0 0 0 auto; }
+.wac-event-error { color: #b91c1c !important; font-size: 0.7rem; }
+
+/* Reply box */
+.wac-reply { border-top: 1px solid #eef0f3; padding: 8px 10px 10px; background: #fff; }
+.wac-reply-note {
+  margin: 0 0 6px; font-size: 0.72rem; color: #6b7280;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.wac-reply-row { display: flex; align-items: flex-end; gap: 6px; }
+.wac-reply-input {
+  flex: 1;
+  --background: #f3f4f6; --padding-start: 12px; --padding-end: 12px;
+  --padding-top: 8px; --padding-bottom: 8px;
+  border-radius: 18px; margin: 0; min-height: 0;
+}
+.wac-reply-send { --border-radius: 50%; width: 44px; height: 44px; margin: 0; }
+.wac-reply--closed {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: #fffbeb; color: #92400e;
+}
+.wac-reply--closed p { margin: 0; font-size: 0.78rem; }
+.wac-reply--closed ion-icon { flex-shrink: 0; margin-top: 2px; }
