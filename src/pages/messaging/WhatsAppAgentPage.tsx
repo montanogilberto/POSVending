@@ -19,6 +19,11 @@ import { usePopovers } from '../../hooks/usePopovers';
 import { fmtInt as fmt, fmtMXN, percent } from '../../utils/format';
 import { hermosilloDayKey, monthToDate, type CustomRange, type PeriodFilter } from '../../utils/period';
 import { whatsappAgentApi, type WhatsAppAgentDashboard } from '../../api/whatsappAgentApi';
+import TopicsCard from './WhatsAppAgent/components/TopicsCard';
+import InsightsCard from './WhatsAppAgent/components/InsightsCard';
+import HoursCard from './WhatsAppAgent/components/HoursCard';
+import BranchesCard from './WhatsAppAgent/components/BranchesCard';
+import QualityCard from './WhatsAppAgent/components/QualityCard';
 import './WhatsAppAgentPage.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
@@ -81,9 +86,14 @@ const WhatsAppAgentPage: React.FC = () => {
     <div className="wa-agent-toolbar">
       <PeriodSegment idPrefix="wa-agent" value={period} onChange={setPeriod}
         custom={customRange} onCustomChange={setCustomRange} />
-      <IonButton fill="clear" size="small" onClick={load} aria-label="Actualizar">
-        <IonIcon icon={refreshOutline} slot="icon-only" />
-      </IonButton>
+      <div className="wa-agent-toolbar-actions">
+        <IonButton fill="clear" size="small" routerLink="/whatsapp-agent/conversations">
+          <IonIcon icon={chatbubblesOutline} slot="start" /> Conversaciones
+        </IonButton>
+        <IonButton fill="clear" size="small" onClick={load} aria-label="Actualizar">
+          <IonIcon icon={refreshOutline} slot="icon-only" />
+        </IonButton>
+      </div>
     </div>
   );
 
@@ -130,7 +140,10 @@ const Dashboard: React.FC<{ d: WhatsAppAgentDashboard }> = ({ d }) => {
       : null;
 
   const kpis = [
-    { icon: peopleOutline, tone: 'teal', label: 'Clientes que escribieron', value: fmt(k.customers) },
+    { icon: peopleOutline, tone: 'teal', label: 'Clientes que escribieron', value: fmt(k.customers),
+      note: d.quality.conversations > 0
+        ? `${fmt(d.quality.newCustomers)} nuevos · ${fmt(k.customers - d.quality.newCustomers)} ya habían escrito`
+        : undefined },
     { icon: chatbubblesOutline, tone: 'blue', label: 'Mensajes respondidos', value: fmt(k.messagesAnswered),
       note: k.failedCalls > 0 ? `${fmt(k.failedCalls)} sin responder (${k.failureRatePct ?? 0}%)` : 'Sin fallas' },
     { icon: timerOutline, tone: 'violet', label: 'Tiempo de respuesta', value: seconds(k.avgLatencyMs),
@@ -196,6 +209,14 @@ const Dashboard: React.FC<{ d: WhatsAppAgentDashboard }> = ({ d }) => {
           ))}
         </IonRow>
       </IonGrid>
+
+      <div className="wa-agent-columns">
+        <TopicsCard d={d} />
+        <InsightsCard startDate={d.period.startDate} endDate={d.period.endDate} />
+      </div>
+      <QualityCard d={d} />
+      <HoursCard d={d} />
+      <BranchesCard d={d} />
 
       <IonCard className="wa-agent-card">
         <IonCardHeader><IonCardTitle>De la conversación a la venta</IonCardTitle></IonCardHeader>
