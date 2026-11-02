@@ -149,3 +149,19 @@ export const PRODUCT_STATUS: Record<string, StatusMeta> = {
   supply:   { label: 'Insumo',   color: 'tertiary' },
   inactive: { label: 'Inactivo', color: 'medium'   },
 };
+
+/** Estado en vivo de una máquina ESP32 (laundryDevices: isActive / isOnline / lastStatus + uso activo). */
+export const LAUNDRY_DEVICE_STATUS: Record<string, StatusMeta> = {
+  running:  { label: 'En uso',      color: 'primary' },
+  idle:     { label: 'Disponible',  color: 'success' },
+  error:    { label: 'Error',       color: 'danger'  },
+  offline:  { label: 'Sin conexión', color: 'warning' },
+  inactive: { label: 'Desactivada', color: 'medium'  },
+};
+
+/** Cobro de una máquina (laundryDeviceUses.status). */
+export const LAUNDRY_USE_STATUS: Record<string, StatusMeta> = {
+  authorized: { label: 'Cobrado',   color: 'success' },
+  rejected:   { label: 'Rechazado', color: 'danger'  },
+  pending:    { label: 'Pendiente', color: 'warning' },
+};

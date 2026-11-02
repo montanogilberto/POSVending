@@ -39,6 +39,7 @@ import {
   home,
   qrCode,
   bulb,
+  hardwareChipOutline,
   logOutOutline,
   people,
   locationOutline,
@@ -96,6 +97,7 @@ import ProductDetailPage from './pages/products/ProductDetailPage';
 import CartPage from './pages/cart/CartPage';
 import MovementsPage from './pages/finance/MovementsPage';
 import LedStatusPage from './pages/iot/LedStatusPage';
+import IotDashboardPage from './pages/iot/IotDashboardPage';
 import EnrollmentPage from './pages/enrollment/EnrollmentPage';
 import JuridicalDashboardPage from './pages/juridical/JuridicalDashboardPage';
 import FactoryDashboardPage from './pages/factory/FactoryDashboardPage';
@@ -256,7 +258,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
 const POS_ONLY_ROUTE_PREFIXES = [
   '/dashboard', '/category', '/products', '/product', '/cart',
   '/expense-categories', '/expense-products', '/expense-cart',
-  '/movements', '/led-status', '/clients', '/client-pos', '/products-management',
+  '/movements', '/led-status', '/iot-dashboard', '/clients', '/client-pos', '/products-management',
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
   '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
@@ -890,6 +892,15 @@ const AppShell: React.FC = () => {
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'iot') && (
+              <IonItem button routerLink="/iot-dashboard" title="Tablero IOT">
+                <IonIcon icon={hardwareChipOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Tablero IOT</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'iot') && (
               <IonItem button routerLink="/led-status" title="LED Status">
                 <IonIcon icon={bulb} slot="start" />
                 {!menuCollapsed && <IonLabel>LED Status</IonLabel>}
@@ -978,6 +989,7 @@ const AppShell: React.FC = () => {
 
             <PrivateRoute exact path="/movements" component={MovementsPage} />
             <PrivateRoute exact path="/led-status" feature="iot" component={LedStatusPage} />
+            <PrivateRoute exact path="/iot-dashboard" feature="iot" component={IotDashboardPage} />
             <PrivateRoute exact path="/clients" feature="clients" component={ClientsPage} />
             <PrivateRoute exact path="/clients-map" feature="clients" component={ClientsMapPage} />
             <PrivateRoute exact path="/products-management" feature="products" component={ProductsManagementPage} />

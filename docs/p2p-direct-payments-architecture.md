@@ -1,6 +1,6 @@
 # SmartLoans — Arquitectura P2P de Pagos Directos (SPEI sin custodia)
 
-> **Versión 1.3 · 2026-10-30 · ARQUITECTURA CONGELADA** — documento base del dominio.
+> **Versión 1.4 · 2026-10-31 · ARQUITECTURA CONGELADA** — documento base del dominio.
 > Cambios posteriores SOLO vía RFC (§16). Changelogs al final.
 >
 > Principio rector: **SmartLoans nunca recibe, guarda, transfiere ni custodia dinero.**
@@ -412,6 +412,7 @@ class PaymentProvider(Protocol):
 | RFC-006 Collections Engine | Mora, planes, LoanSettlement (D20) | fase posterior |
 | RFC-007 Legal Recovery | Pagaré → vía mercantil, expediente probatorio | fase posterior |
 | RFC-008 Open Finance Integration | Confirmación bancaria automática | adapter |
+| RFC-010 Laundry Wallet Top-ups | Recarga en efectivo, tarjeta (direct charge en la cuenta conectada de la lavandería) y SPEI a su CLABE con confirmación humana | PRD laundryWalletTopUp |
 | RFC-009 Laundry Prepaid Wallet | Monedero de la lavandería (companyId 1) fuera de `walletTransactions`; recarga en mostrador; uso de máquina = ticket del POS | PRD laundryWallet |
 
 Los RFC-001 a 003 son el MVP del modelo sin custodia; sus PRDs van al posgmo-factory.
@@ -419,6 +420,9 @@ Los RFC-001 a 003 son el MVP del modelo sin custodia; sus PRDs van al posgmo-fac
 ---
 
 ## Changelog
+
+**v1.3 → v1.4 (RFC-010, 2026-10-31):**
+1. **Tres formas de recarga del monedero de la lavandería** (`docs/rfcs/RFC-010-laundry-wallet-topups.md`): efectivo en mostrador, tarjeta y transferencia SPEI. El dinero llega siempre a una cuenta de la lavandería: tarjeta como *direct charge* en su cuenta conectada de Stripe (nunca en la cuenta de plataforma), SPEI a su CLABE con `transferEvidence` y confirmación de un empleado (la IA sólo aconseja). Reafirma D1 y la regla de oro.
 
 **v1.2 → v1.3 (RFC-009, 2026-10-30):**
 1. **Monedero prepagado de la lavandería** (`docs/rfcs/RFC-009-laundry-prepaid-wallet.md`): el saldo que cobran las máquinas ESP32 es un pasivo de la lavandería con su cliente, en un libro propio append-only (`laundryWalletEntries`), no en `walletTransactions`. Reafirma D1/D2: `walletTransactions` sigue siendo informativo de SmartLoans y `LAUNDRY_USAGE` queda en desuso.

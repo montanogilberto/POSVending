@@ -1,5 +1,8 @@
-/** The 6-digit PIN a phone-login customer uses instead of a password. */
-export const PIN_LENGTH = 6;
+/** The 4-digit PIN a phone-login customer uses instead of a password. */
+export const PIN_LENGTH = 4;
+
+/** PINs created before the switch to 4 digits are 6 long and must still sign in. */
+export const PIN_LOGIN_MAX_LENGTH = 6;
 
 export const isPinFormat = (pin: string) => new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin);
 
@@ -15,7 +18,7 @@ export const isWeakPin = (pin: string) => {
 /** Spanish reason a PIN can't be used, or null when it is fine. */
 export const pinProblem = (pin: string, confirm: string): string | null => {
   if (!isPinFormat(pin)) return `El PIN debe tener ${PIN_LENGTH} dígitos`;
-  if (isWeakPin(pin)) return 'Elige un PIN menos obvio (no repitas dígitos ni uses 123456)';
+  if (isWeakPin(pin)) return 'Elige un PIN menos obvio (no repitas dígitos ni uses 1234)';
   if (pin !== confirm) return 'Los PIN no coinciden';
   return null;
 };
