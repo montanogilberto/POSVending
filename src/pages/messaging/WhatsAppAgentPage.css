@@ -1,6 +1,7 @@
 /* /whatsapp-agent — same card language as Puntos POS › Resumen (PosRewardsPage.css). */
 .wa-agent-container { max-width: 1100px; margin: 0 auto; padding: 8px 8px 24px; }
 .wa-agent-toolbar { display: flex; align-items: center; justify-content: space-between; }
+.wa-agent-toolbar-actions { display: flex; align-items: center; }
 .wa-agent-loading { display: flex; justify-content: center; padding: 48px 0; }
 .wa-agent-muted { font-size: 0.75rem; color: #6b7280; margin: 0; padding: 0 8px; }
 .wa-agent-kpi-card .wa-agent-muted { padding: 0; }
@@ -40,3 +41,47 @@
   .wa-agent-funnel-row { grid-template-columns: 1fr auto; }
   .wa-agent-funnel-track { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* ¿Qué preguntan? / ¿Respondimos bien? / ¿Cuándo? / ¿Dónde? / IA */
+.wa-agent-columns { display: grid; grid-template-columns: 1fr; }
+@media (min-width: 992px) { .wa-agent-columns { grid-template-columns: 1fr 1fr; align-items: start; } }
+.wa-agent-topic-row, .wa-agent-quality-row { margin-bottom: 10px; }
+.wa-agent-topic-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  font-size: 0.85rem; color: #111827; margin-bottom: 4px;
+}
+.wa-agent-topic-head .wa-agent-muted { padding: 0; white-space: nowrap; }
+.wa-agent-topic-head ion-icon { vertical-align: -2px; }
+.wa-agent-quality-row .wa-agent-muted { padding: 2px 0 0; }
+.wa-agent-topic-row ion-progress-bar, .wa-agent-quality-row ion-progress-bar { height: 8px; border-radius: 4px; }
+.wa-agent-topic-other { padding: 4px 0 0; }
+.wa-agent-quality-hero { margin: 0 0 12px; font-size: 0.95rem; color: #111827; }
+.wa-agent-quality-hero strong { font-size: 1.6rem; color: #059669; margin-right: 4px; }
+.wa-agent-quality-signals {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 12px 0 8px; padding: 10px; border-radius: 12px; background: #f9fafb;
+  font-size: 0.82rem; color: #374151;
+}
+.wa-agent-quality-signals div { display: flex; gap: 6px; align-items: flex-start; }
+.wa-agent-quality-signals ion-icon { flex-shrink: 0; margin-top: 2px; color: #6b7280; }
+
+.wa-agent-heat-peak { padding: 0 0 8px; }
+.wa-agent-heat-scroll { overflow-x: auto; }
+.wa-agent-heat { border-collapse: separate; border-spacing: 2px; font-size: 0.66rem; }
+.wa-agent-heat th { color: #6b7280; font-weight: 500; padding: 0 2px; text-align: center; }
+.wa-agent-heat tbody th { text-align: right; padding-right: 4px; }
+.wa-agent-heat td {
+  min-width: 22px; height: 22px; border-radius: 4px; text-align: center; color: #fff;
+}
+/* One hue, light → dark (sequential). */
+.wa-agent-heat-l0 { background: #f3f4f6; }
+.wa-agent-heat-l1 { background: #bfdbfe; color: #1e3a8a !important; }
+.wa-agent-heat-l2 { background: #60a5fa; }
+.wa-agent-heat-l3 { background: #2563eb; }
+.wa-agent-heat-l4 { background: #1e3a8a; }
+
+.wa-agent-insights-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.wa-agent-insights-summary { margin: 0 0 8px; color: #111827; font-size: 0.9rem; line-height: 1.4; }
+.wa-agent-subtitle { margin: 12px 0 4px; font-size: 0.85rem; font-weight: 700; color: #374151; }
+.wa-agent-needs { margin: 0 0 8px; padding-left: 18px; font-size: 0.85rem; color: #374151; }
+.wa-agent-error { color: #b91c1c; padding: 0; }

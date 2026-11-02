@@ -156,6 +156,7 @@ import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
 import WhatsAppAgentPage from './pages/messaging/WhatsAppAgentPage';
+import WhatsAppConversationsPage from './pages/messaging/WhatsAppConversationsPage';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import NotificationDetailPage from './pages/messaging/NotificationDetailPage';
 import type { NotificationTapState } from './pages/messaging/NotificationDetail/NotificationDetailTypes';
@@ -1065,6 +1066,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/notification-dispatch-log" feature="notificationDispatchLog" component={NotificationDispatchLogPage} />
             {/* Same permission as Notificaciones: role features come from GET /roles, a new one would need a DB change first. */}
             <PrivateRoute exact path="/whatsapp-agent" feature="notificationDispatchLog" component={WhatsAppAgentPage} />
+            <PrivateRoute exact path="/whatsapp-agent/conversations" feature="notificationDispatchLog" component={WhatsAppConversationsPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
             <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />
           </IonRouterOutlet>

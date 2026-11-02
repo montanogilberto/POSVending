@@ -165,3 +165,10 @@ export const LAUNDRY_USE_STATUS: Record<string, StatusMeta> = {
   rejected:   { label: 'Rechazado', color: 'danger'  },
   pending:    { label: 'Pendiente', color: 'warning' },
 };
+
+/** Reservaciones (reservations.status). */
+export const RESERVATION_STATUS: Record<string, StatusMeta> = {
+  pending:   { label: 'Pendiente',  color: 'warning' },
+  confirmed: { label: 'Confirmada', color: 'success' },
+  cancelled: { label: 'Cancelada',  color: 'medium'  },
+};
