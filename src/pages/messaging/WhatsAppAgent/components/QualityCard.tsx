@@ -1,65 +1,117 @@
 import React from 'react';
-import { IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon, IonProgressBar } from '@ionic/react';
 import {
-  alertCircleOutline, checkmarkCircleOutline, personOutline, removeCircleOutline, repeatOutline, sadOutline,
+  IonBadge, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonIcon, IonItem, IonLabel,
+  IonList, IonProgressBar,
+} from '@ionic/react';
+import {
+  alertCircleOutline, checkmarkCircleOutline, chatbubblesOutline, personOutline, removeCircleOutline,
+  repeatOutline, sadOutline, thumbsDownOutline, thumbsUpOutline,
 } from 'ionicons/icons';
+import { useHistory } from 'react-router-dom';
 import EmptyState from '../../../../components/ui/EmptyState';
-import { fmtInt, percent } from '../../../../utils/format';
-import type { WhatsAppAgentDashboard } from '../../../../api/whatsappAgentApi';
+import { fmtInt, mxChatDate, percent } from '../../../../utils/format';
+import { fmtPhone10, openWhatsAppChat } from '../../../../utils/whatsappChat';
+import type { WhatsAppAgentDashboard, WhatsAppChatOutcome, WhatsAppUnfinishedChat } from '../../../../api/whatsappAgentApi';
+import { CHAT_OUTCOME } from '../WhatsAppAgentConstants';
 
 interface Props { d: WhatsAppAgentDashboard }
 
-/** ¿Respondimos bien? — how conversations ended, plus re-asked topics and complaints. */
+const OUTCOME_ICON: Record<WhatsAppChatOutcome, string> = {
+  cerrada: checkmarkCircleOutline,
+  le_sirvio: thumbsUpOutline,
+  no_le_sirvio: thumbsDownOutline,
+  falla_agente: alertCircleOutline,
+  pidio_persona: personOutline,
+  sin_cierre: removeCircleOutline,
+};
+
+/** ¿Los chats terminaron bien? — one outcome per conversation, and the ones to fix. */
 const QualityCard: React.FC<Props> = ({ d }) => {
   const q = d.quality;
-  const outcomes = [
-    { icon: checkmarkCircleOutline, color: 'success', label: 'Resueltas',
-      help: 'Terminaron en "gracias / ok / sí" o en una reservación', n: q.resolved },
-    { icon: personOutline, color: 'tertiary', label: 'Pasadas a una persona',
-      help: 'El agente no pudo y pidió ayuda del equipo', n: q.handedOff },
-    { icon: alertCircleOutline, color: 'danger', label: 'Con falla del agente',
-      help: 'El cliente recibió el mensaje genérico de respaldo', n: q.withFailure },
-    { icon: removeCircleOutline, color: 'medium', label: 'Sin cierre',
-      help: 'El cliente dejó de escribir sin confirmar', n: q.noClosure },
+  const history = useHistory();
+  const rows: { key: WhatsAppChatOutcome; n: number }[] = [
+    { key: 'cerrada', n: q.closed },
+    { key: 'le_sirvio', n: q.helped },
+    { key: 'no_le_sirvio', n: q.notHelped },
+    { key: 'falla_agente', n: q.withFailure },
+    { key: 'pidio_persona', n: q.handedOff },
+    { key: 'sin_cierre', n: q.noClosure },
   ];
+
+  /** In the dock on desktop; the full Conversaciones page on a phone. */
+  const open = (c: WhatsAppUnfinishedChat) => {
+    if (!openWhatsAppChat({ phone10: c.phone10, customerName: c.customerName })) {
+      history.push('/whatsapp-agent/conversations', { openPhone10: c.phone10, customerName: c.customerName });
+    }
+  };
 
   return (
     <IonCard className="wa-agent-card">
-      <IonCardHeader><IonCardTitle>¿Respondimos bien?</IonCardTitle></IonCardHeader>
+      <IonCardHeader><IonCardTitle>¿Los chats terminaron bien?</IonCardTitle></IonCardHeader>
       <IonCardContent>
         {q.conversations === 0 ? (
           <EmptyState icon={checkmarkCircleOutline} text="Sin conversaciones en el periodo." />
         ) : (
           <>
             <p className="wa-agent-quality-hero">
-              <strong>{percent(q.resolved, q.conversations)}%</strong> de {fmtInt(q.conversations)} conversaciones
-              terminaron resueltas
+              <strong>{q.finalizedRatePct ?? percent(q.finalized, q.conversations)}%</strong> de{' '}
+              {fmtInt(q.conversations)} conversaciones terminaron bien
             </p>
-            {outcomes.map(o => (
-              <div className="wa-agent-quality-row" key={o.label}>
-                <div className="wa-agent-topic-head">
-                  <span><IonIcon icon={o.icon} color={o.color} /> {o.label}</span>
-                  <span className="wa-agent-muted">{fmtInt(o.n)} · {percent(o.n, q.conversations)}%</span>
+            {rows.map(r => {
+              const meta = CHAT_OUTCOME[r.key];
+              return (
+                <div className="wa-agent-quality-row" key={r.key}>
+                  <div className="wa-agent-topic-head">
+                    <span><IonIcon icon={OUTCOME_ICON[r.key]} color={meta.color} /> {meta.label}</span>
+                    <span className="wa-agent-muted">{fmtInt(r.n)} · {percent(r.n, q.conversations)}%</span>
+                  </div>
+                  <IonProgressBar value={r.n / q.conversations} color={meta.color} />
+                  <p className="wa-agent-muted">{meta.help}</p>
                 </div>
-                <IonProgressBar value={q.conversations ? o.n / q.conversations : 0} color={o.color} />
-                <p className="wa-agent-muted">{o.help}</p>
-              </div>
-            ))}
+              );
+            })}
             <div className="wa-agent-quality-signals">
+              <div>
+                <IonIcon icon={thumbsUpOutline} />
+                <span>"¿Te funcionó la respuesta?": <strong>{fmtInt(q.helpfulYes)}</strong> sí ·{' '}
+                  <strong>{fmtInt(q.helpfulNo)}</strong> no.</span>
+              </div>
               <div>
                 <IonIcon icon={repeatOutline} />
                 <span><strong>{fmtInt(q.reasked)}</strong> veces volvieron a preguntar lo mismo
-                  {q.reaskedRatePct != null ? ` (${q.reaskedRatePct}% de las preguntas)` : ''}: la respuesta no les sirvió.</span>
+                  {q.reaskedRatePct != null ? ` (${q.reaskedRatePct}% de las preguntas)` : ''}.</span>
               </div>
               <div>
                 <IonIcon icon={sadOutline} />
                 <span><strong>{fmtInt(q.complaints)}</strong> clientes con una queja.</span>
               </div>
             </div>
-            <p className="wa-agent-muted">
-              Son señales, no una calificación: para ver si una respuesta fue correcta, abre la conversación en
-              Conversaciones.
-            </p>
+
+            <h4 className="wa-agent-subtitle">Chats que no terminaron bien</h4>
+            {q.unfinished.length === 0 ? (
+              <p className="wa-agent-muted">Ninguno: todos los chats del periodo terminaron bien.</p>
+            ) : (
+              <IonList lines="full" className="wa-agent-unfinished">
+                {q.unfinished.map(c => {
+                  const meta = CHAT_OUTCOME[c.outcome];
+                  return (
+                    <IonItem key={`${c.phone10}-${c.date}`}>
+                      <IonLabel className="ion-text-wrap">
+                        <h3>
+                          {c.customerName || fmtPhone10(c.phone10)}{' '}
+                          <span className="wa-agent-muted">· {mxChatDate(c.lastAtUtc)}</span>
+                        </h3>
+                        <p>{c.lastMessage ? `"${c.lastMessage}"` : '—'}</p>
+                        <IonBadge color={meta.color}>{meta.label}</IonBadge>
+                      </IonLabel>
+                      <IonButton slot="end" fill="outline" size="small" onClick={() => open(c)}>
+                        <IonIcon icon={chatbubblesOutline} slot="start" /> Abrir
+                      </IonButton>
+                    </IonItem>
+                  );
+                })}
+              </IonList>
+            )}
           </>
         )}
       </IonCardContent>

@@ -85,3 +85,7 @@
 .wa-agent-subtitle { margin: 12px 0 4px; font-size: 0.85rem; font-weight: 700; color: #374151; }
 .wa-agent-needs { margin: 0 0 8px; padding-left: 18px; font-size: 0.85rem; color: #374151; }
 .wa-agent-error { color: #b91c1c; padding: 0; }
+.wa-agent-unfinished { padding: 0; }
+.wa-agent-unfinished h3 { font-size: 0.9rem; font-weight: 600; }
+.wa-agent-unfinished p { margin: 2px 0 4px; }
+.wa-agent-unfinished ion-badge { font-weight: 500; font-size: 0.68rem; }

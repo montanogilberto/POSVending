@@ -1,23 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIonViewDidLeave, useIonViewWillEnter } from '@ionic/react';
+import { useLocation } from 'react-router-dom';
 import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
-import { notifyDataChanged, onDataChanged } from '../../../utils/refreshBus';
+import { useWhatsAppSeen } from '../../../hooks/useWhatsAppSeen';
+import { useWhatsAppThread } from '../../../hooks/useWhatsAppThread';
+import { onDataChanged } from '../../../utils/refreshBus';
 import { monthToDate, periodDayRange, type CustomRange, type PeriodFilter } from '../../../utils/period';
-import {
-  sendWhatsAppStaffReply, whatsappConversationsApi,
-  type WhatsAppConversationSummary, type WhatsAppConversationThread,
-} from '../../../api/whatsappAgentApi';
-import {
-  REPLY_ERROR_TEXT, SEARCH_DEBOUNCE_MS, SERVICE_WINDOW_MS, THREAD_POLL_MS, utcMs,
-} from './WhatsAppConversationsConstants';
+import { LIST_POLL_MS, stubConversation } from '../../../utils/whatsappChat';
+import { whatsappConversationsApi, type WhatsAppConversationSummary } from '../../../api/whatsappAgentApi';
+import { SEARCH_DEBOUNCE_MS, type InboxFilter } from './WhatsAppConversationsConstants';
 
-/** Agente WhatsApp › Conversaciones: who wrote, what they said, what the agent answered. */
+/** Agente WhatsApp › Conversaciones: the inbox to attend WhatsApp customers and follow up. */
 export const useWhatsAppConversations = () => {
-  const { companyId, userId } = useUser();
+  const { companyId } = useUser();
   const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
+  const { isUnread } = useWhatsAppSeen(companyId);
 
-  const [period, setPeriod] = useState<PeriodFilter>('week');
+  const [period, setPeriod] = useState<PeriodFilter>('month');
+  const [filter, setFilter] = useState<InboxFilter>('all');
   const [customRange, setCustomRange] = useState<CustomRange>(monthToDate());
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
@@ -26,127 +27,85 @@ export const useWhatsAppConversations = () => {
   const [listLoading, setListLoading] = useState(false);
   const [listLoadedOnce, setListLoadedOnce] = useState(false);
   const [listError, setListError] = useState(false);
-
   const [selected, setSelected] = useState<WhatsAppConversationSummary | null>(null);
-  const [thread, setThread] = useState<WhatsAppConversationThread | null>(null);
-  const [threadLoading, setThreadLoading] = useState(false);
-  const [threadError, setThreadError] = useState(false);
-
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
   const [viewActive, setViewActive] = useState(false);
 
-  // Only the newest request of each kind may write state (fast clicks / typing).
+  const range = useMemo(() => periodDayRange(period, customRange), [period, customRange]);
+  // Only the newest request may write state (fast typing in the search).
   const listSeq = useRef(0);
-  const threadSeq = useRef(0);
 
-  const loadList = useCallback(async () => {
+  /** silent = background refresh: no spinner, no error toast. */
+  const loadList = useCallback(async (silent = false) => {
     if (!companyId) return;
     const seq = ++listSeq.current;
-    const { start, end } = periodDayRange(period, customRange);
-    setListLoading(true);
+    if (!silent) setListLoading(true);
     try {
-      const res = await whatsappConversationsApi.list(companyId, start, end, appliedSearch || undefined);
+      const res = await whatsappConversationsApi.list(companyId, range.start, range.end, appliedSearch || undefined);
       if (seq !== listSeq.current) return;
       setConversations(res.conversations ?? []);
       setListError(false);
     } catch {
-      if (seq !== listSeq.current) return;
+      if (seq !== listSeq.current || silent) return;
       setListError(true);
       showToast('No se pudieron cargar las conversaciones.');
     } finally {
-      if (seq === listSeq.current) {
+      if (seq === listSeq.current && !silent) {
         setListLoading(false);
         setListLoadedOnce(true);
       }
     }
-  }, [companyId, period, customRange, appliedSearch, showToast]);
+  }, [companyId, range, appliedSearch, showToast]);
 
-  /** silent = background refresh: keeps the current thread on screen and no spinner. */
-  const loadThread = useCallback(async (conv: WhatsAppConversationSummary, silent = false) => {
-    if (!companyId) return;
-    const seq = ++threadSeq.current;
-    const { start, end } = periodDayRange(period, customRange);
-    if (!silent) {
-      setThreadLoading(true);
-      setThreadError(false);
-    }
-    try {
-      const res = await whatsappConversationsApi.thread(companyId, conv.phone10, start, end);
-      if (seq === threadSeq.current) { setThread(res); setNow(Date.now()); }
-    } catch {
-      if (seq === threadSeq.current && !silent) setThreadError(true);
-    } finally {
-      if (seq === threadSeq.current && !silent) setThreadLoading(false);
-    }
-  }, [companyId, period, customRange]);
+  const chat = useWhatsAppThread({
+    conv: selected, startDate: range.start, endDate: range.end, active: viewActive,
+    showToast, onSent: () => loadList(true),
+  });
 
-  const openConversation = (conv: WhatsAppConversationSummary) => {
-    setSelected(conv);
-    setThread(null);
-    setDraft('');
-    loadThread(conv);
-  };
+  const counts = useMemo(() => ({
+    all: conversations.length,
+    needsReply: conversations.filter(c => c.needsReply).length,
+    unread: conversations.filter(isUnread).length,
+    handedOff: conversations.filter(c => c.handedOff).length,
+  }), [conversations, isUnread]);
 
-  const closeConversation = () => {
-    threadSeq.current++;
-    setSelected(null);
-    setThread(null);
-    setThreadLoading(false);
-  };
+  const visible = useMemo(() => conversations.filter(c =>
+    filter === 'all' ? true
+      : filter === 'needsReply' ? !!c.needsReply
+        : filter === 'unread' ? isUnread(c)
+          : !!c.handedOff), [conversations, filter, isUnread]);
 
   const reload = () => {
     loadList();
-    if (selected) loadThread(selected);
+    chat.refresh();
   };
+
+  // Opened from a link elsewhere (dashboard "Abrir" on a phone): the chat comes in the
+  // navigation state — never in the URL (no personal data in URLs).
+  const location = useLocation<{ openPhone10?: string; customerName?: string | null } | undefined>();
+  useEffect(() => {
+    const target = location.state?.openPhone10;
+    if (target) setSelected(stubConversation(target, location.state?.customerName ?? null));
+  }, [location.state]);
 
   useIonViewWillEnter(() => { setViewActive(true); loadList(); }, [loadList]);
   useIonViewDidLeave(() => setViewActive(false));
 
-  // While a chat is open, pick up the customer's new messages (and our sent ones).
+  // New chats and new messages show up without reloading.
   useEffect(() => {
-    if (!selected || !viewActive) return undefined;
-    const id = setInterval(() => loadThread(selected, true), THREAD_POLL_MS);
+    if (!viewActive) return undefined;
+    const id = setInterval(() => loadList(true), LIST_POLL_MS);
     return () => clearInterval(id);
-  }, [selected, viewActive, loadThread]);
-
-  const lastInboundMs = thread?.lastInboundUtc ? utcMs(thread.lastInboundUtc) : null;
-  const windowOpen = lastInboundMs != null && now - lastInboundMs < SERVICE_WINDOW_MS;
-  const windowClosesAt = lastInboundMs != null ? new Date(lastInboundMs + SERVICE_WINDOW_MS) : null;
-  const botPausedUntil = thread?.staffPausedUntilUtc && utcMs(thread.staffPausedUntilUtc) > now
-    ? new Date(utcMs(thread.staffPausedUntilUtc)) : null;
-
-  const sendReply = async () => {
-    const body = draft.trim();
-    if (!companyId || !userId || !selected || !body || sending) return;
-    setSending(true);
-    try {
-      const res = await sendWhatsAppStaffReply(companyId, userId, selected.phone10, body);
-      if (res.ok) {
-        setDraft('');
-        showToast('Mensaje enviado por WhatsApp.', 'success');
-        notifyDataChanged('whatsapp_staff_reply');
-        await loadThread(selected, true);
-      } else {
-        showToast(REPLY_ERROR_TEXT[res.error]);
-        if (res.error === 'outside_24h') await loadThread(selected, true);
-      }
-    } finally {
-      setSending(false);
-    }
-  };
+  }, [viewActive, loadList]);
 
   // Period / applied search changed → reload; the first render is covered by useIonViewWillEnter.
   const firstRun = useRef(true);
   useEffect(() => {
     if (firstRun.current) { firstRun.current = false; return; }
-    closeConversation();
+    setSelected(null);
     loadList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadList]);
 
-  useEffect(() => onDataChanged(() => { loadList(); }), [loadList]);
+  useEffect(() => onDataChanged(() => { loadList(true); }), [loadList]);
 
   useEffect(() => {
     const id = setTimeout(() => setAppliedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
@@ -156,11 +115,10 @@ export const useWhatsAppConversations = () => {
   return {
     period, setPeriod, customRange, setCustomRange,
     search, setSearch, appliedSearch,
-    conversations, listLoading, listFirstLoad: listLoading && !listLoadedOnce, listError,
-    selected, thread, threadLoading, threadError,
-    openConversation, closeConversation, retryThread: () => selected && loadThread(selected),
-    draft, setDraft, sending, sendReply, windowOpen, windowClosesAt, botPausedUntil,
-    reload, toastProps,
+    conversations, visible, filter, setFilter, counts, isUnread,
+    listLoading, listFirstLoad: listLoading && !listLoadedOnce, listError,
+    selected, openConversation: setSelected, closeConversation: () => setSelected(null),
+    chat, reload, toastProps,
   };
 };
 
