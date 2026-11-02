@@ -1,7 +1,12 @@
 import { API_BASE_URL } from './usersApi';
 
+/** Where the login code goes; WhatsApp falls back to SMS server side when it can't be sent. */
+export type CodeChannel = 'sms' | 'whatsapp';
+
 export interface SendClientLoginCodeResult {
   found: boolean;
+  /** The channel that actually carried the code (absent when none was sent). */
+  channel?: CodeChannel;
   message?: string;
   error?: string;
   // true once this client finished password onboarding on a previous
@@ -39,13 +44,19 @@ export interface VerifyClientPasswordResult {
   error?: string;
 }
 
-/** POST /send_client_login_code — sends a 6-digit SMS OTP to a registered POS client. */
-export const sendClientLoginCode = async (phone: string): Promise<SendClientLoginCodeResult> => {
-  console.log('[sendClientLoginCode] phone=', phone);
+/**
+ * POST /send_client_login_code — sends a 6-digit OTP (SMS or WhatsApp) to a registered POS client.
+ * `resetPin` ("Olvidé mi PIN") sends it even when the client already has a PIN.
+ */
+export const sendClientLoginCode = async (
+  phone: string,
+  { resetPin = false, channel = 'sms' }: { resetPin?: boolean; channel?: CodeChannel } = {},
+): Promise<SendClientLoginCodeResult> => {
+  console.log('[sendClientLoginCode] phone=%s resetPin=%s channel=%s', phone, resetPin, channel);
   const res = await fetch(`${API_BASE_URL}/send_client_login_code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientLoginCodes: [{ phone }] }),
+    body: JSON.stringify({ clientLoginCodes: [{ phone, resetPin, channel }] }),
   });
   const data = await res.json();
   console.log('[sendClientLoginCode] RESPONSE status=%d', res.status, data);

@@ -68,7 +68,7 @@ export class ReceiptService {
   }
   private static normalizePaymentMethod(
     method: string
-  ): 'efectivo' | 'tarjeta' | 'transferencia' {
+  ): 'efectivo' | 'tarjeta' | 'transferencia' | 'monedero' {
     return normalizePaymentMethod(method);
   }
   private static parseSelectedOptions(selectedOptions: Record<string, any>): any {

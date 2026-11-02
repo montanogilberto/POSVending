@@ -14,8 +14,9 @@ export function formatClientName(name: string): string {
 
 export function normalizePaymentMethod(
   method: string
-): 'efectivo' | 'tarjeta' | 'transferencia' {
+): 'efectivo' | 'tarjeta' | 'transferencia' | 'monedero' {
   const normalized = method.toLowerCase().trim();
+  if (normalized.includes('monedero')) return 'monedero';
   if (normalized.includes('efectivo') || normalized.includes('cash')) return 'efectivo';
   if (normalized.includes('tarjeta') || normalized.includes('card')) return 'tarjeta';
   return 'transferencia';
@@ -29,6 +30,8 @@ export function getPaymentMethodText(method: string): string {
       return 'Tarjeta';
     case 'transferencia':
       return 'Transferencia';
+    case 'monedero':
+      return 'Monedero';
     default:
       return method;
   }

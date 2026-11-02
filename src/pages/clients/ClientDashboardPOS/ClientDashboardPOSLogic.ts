@@ -8,6 +8,7 @@ import { getOneClient, Client } from '../../../api/clientsApi';
 import { listClientCapabilities, ClientCapabilityRow } from '../../../api/clientCapabilitiesApi';
 import { getAllClientFaceRecognitions } from '../../../api/clientFaceRecognitionApi';
 import { getAllClientFollowUps, ClientFollowUp } from '../../../api/clientFollowUpApi';
+import { getCompanyProducts } from '../../../api/productsApi';
 import {
   posRewardsApi,
   PosRewardBalance,
@@ -46,6 +47,7 @@ export const useClientDashboardPOS = () => {
   const [catalog, setCatalog] = useState<PosRewardCatalogItem[]>([]);
   const [productCounts, setProductCounts] = useState<PosRewardProductCount[]>([]);
   const [followUps, setFollowUps] = useState<ClientFollowUp[]>([]);
+  const [productNames, setProductNames] = useState<Map<number, string>>(new Map());
   const [showAllPurchases, setShowAllPurchases] = useState(false);
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [qrDownloading, setQrDownloading] = useState(false);
@@ -55,7 +57,7 @@ export const useClientDashboardPOS = () => {
     setLoading(true);
     try {
       // Each source fails on its own — one missing table must not blank the page.
-      const [clientRes, faceRes, capsRes, balanceRes, ledgerRes, redemptionsRes, catalogRes, countsRes, followRes] =
+      const [clientRes, faceRes, capsRes, balanceRes, ledgerRes, redemptionsRes, catalogRes, countsRes, followRes, productsRes] =
         await Promise.all([
           getOneClient({ clients: [{ clientId }] }).catch(() => [] as Client[]),
           getAllClientFaceRecognitions(Number(companyId)).catch(() => []),
@@ -66,6 +68,7 @@ export const useClientDashboardPOS = () => {
           posRewardsApi.listCatalog(companyId, true).catch(() => []),
           posRewardsApi.getProductCounts(companyId, clientId).catch(() => []),
           getAllClientFollowUps(Number(companyId), clientId).catch(() => []),
+          getCompanyProducts(Number(companyId)).catch(() => []),
         ]);
       setClient(clientRes?.[0] ?? null);
       setSelfieUrl(faceRes.find((r) => r.clientId === clientId)?.clientSelfieBlobUrl || null);
@@ -76,6 +79,7 @@ export const useClientDashboardPOS = () => {
       setCatalog(catalogRes);
       setProductCounts(countsRes);
       setFollowUps(followRes);
+      setProductNames(new Map(productsRes.map((p) => [Number(p.productId), p.name])));
     } catch (error) {
       console.error('[useClientDashboardPOS] load failed:', error);
       showToast('No se pudo cargar la información del cliente', 'danger');
@@ -138,9 +142,12 @@ export const useClientDashboardPOS = () => {
         const requiredUnits = stampUnits(i);
         const unitsAvailable = productCounts.find((p) => p.productId === i.freeProductId)?.unitsAvailable ?? 0;
         const pct = requiredUnits > 0 ? Math.min(100, Math.round((unitsAvailable / requiredUnits) * 100)) : 0;
-        return { catalogItemId: i.catalogItemId as number, name: i.name, unitsAvailable, requiredUnits, pct };
+        // A card counts one exact product (not its category) — name it so
+        // Básico vs Alto is never ambiguous.
+        const productName = productNames.get(Number(i.freeProductId)) || `Producto #${i.freeProductId}`;
+        return { catalogItemId: i.catalogItemId as number, name: i.name, productName, unitsAvailable, requiredUnits, pct };
       }),
-    [catalog, productCounts],
+    [catalog, productCounts, productNames],
   );
 
   const pendingFollowUps = followUps.filter((f) => f.status === 'pending').length;
