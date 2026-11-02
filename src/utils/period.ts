@@ -51,3 +51,20 @@ export const inPeriod = (utc: string, range: PeriodFilter, now: Date = new Date(
   if (range === 'today') return hermosilloDayKey(utc) === hermosilloDayKey(nowIso);
   return now.getTime() - toHermosilloDate(utc).getTime() - 7 * 3600_000 <= 7 * 86_400_000;
 };
+
+/** Inclusive Hermosillo days { start, end } ('YYYY-MM-DD') for a period, as backend
+ *  date-range SPs take them. 'week' = the last 7 days; 'all' is treated as 'month'. */
+export const periodDayRange = (period: PeriodFilter, custom: CustomRange, now: Date = new Date()) => {
+  const today = hermosilloDayKey(now.toISOString());
+  if (period === 'custom') {
+    const [start, end] = custom.from <= custom.to ? [custom.from, custom.to] : [custom.to, custom.from];
+    return { start, end };
+  }
+  if (period === 'today') return { start: today, end: today };
+  if (period === 'week') {
+    const d = new Date(`${today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 6);
+    return { start: d.toISOString().slice(0, 10), end: today };
+  }
+  return { start: `${today.slice(0, 8)}01`, end: today };
+};
