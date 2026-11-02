@@ -40,7 +40,7 @@ export interface UnifiedReceiptData {
     originalTotal?: number;
   };
   payment: {
-    method: 'efectivo' | 'tarjeta' | 'transferencia';
+    method: 'efectivo' | 'tarjeta' | 'transferencia' | 'monedero';
     amountReceived: number;
     change: number;
     cashPaid?: number;

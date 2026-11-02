@@ -16,6 +16,8 @@ export interface PosPurchase {
 export interface PosStampProgress {
   catalogItemId: number;
   name: string;
+  /** The one product whose purchases fill the card and that it gives free. */
+  productName: string;
   unitsAvailable: number;
   requiredUnits: number;
   /** 0–100 */

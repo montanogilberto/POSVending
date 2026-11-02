@@ -105,7 +105,7 @@ const MODULES: ModuleDef[] = [
   {
     name: 'IOT',
     features: [
-      { code: 'iot', label: 'LED Status / Water Tanks', icon: bulbOutline },
+      { code: 'iot', label: 'Tablero IOT / LED Status / Water Tanks', icon: bulbOutline },
     ],
   },
 ];

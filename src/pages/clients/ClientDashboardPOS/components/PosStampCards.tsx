@@ -12,7 +12,10 @@ const PosStampCards: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => {
           {vm.stampCards.map((s) => (
             <div key={s.catalogItemId} className="cpos-stamp">
               <div className="cpos-stamp-head">
-                <strong>{s.name}</strong>
+                <div className="cpos-stamp-title">
+                  <strong>{s.name}</strong>
+                  <span className="cpos-stamp-product">Aplica a: {s.productName}</span>
+                </div>
                 <span className={s.pct >= 100 ? 'cpos-stamp-ready' : 'cpos-stamp-count'}>
                   {s.pct >= 100 ? 'Lista para canjear' : `${s.unitsAvailable} / ${s.requiredUnits}`}
                 </span>

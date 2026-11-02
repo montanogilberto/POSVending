@@ -1,6 +1,6 @@
 import React from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
-import { starOutline, giftOutline, qrCodeOutline, gameControllerOutline } from 'ionicons/icons';
+import { starOutline, giftOutline, gameControllerOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
 
 interface Props {
@@ -14,7 +14,6 @@ const RewardsQuickActions: React.FC<Props> = ({ onViewPoints, onViewCatalog }) =
   const tiles = [
     { icon: starOutline, label: 'Mis Puntos', sub: 'Ver y canjear', color: 'amber', onClick: onViewPoints },
     { icon: giftOutline, label: 'Recompensas', sub: 'Tus beneficios', color: 'green', onClick: onViewCatalog },
-    { icon: qrCodeOutline, label: 'Mi QR', sub: 'Para el cajero', color: 'blue', onClick: () => history.push('/my-qr') },
     { icon: gameControllerOutline, label: 'Arcade', sub: 'Juega y gana', color: 'purple', onClick: () => history.push('/arcade') },
   ];
 

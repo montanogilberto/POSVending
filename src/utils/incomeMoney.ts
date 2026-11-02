@@ -11,7 +11,7 @@
 
 import { CommissionTerminal } from '../api/commissionTerminalsApi';
 
-export type PaymentMethodLabel = 'Efectivo' | 'Tarjeta' | 'Transferencia';
+export type PaymentMethodLabel = 'Efectivo' | 'Tarjeta' | 'Transferencia' | 'Monedero';
 
 // Every spelling that reaches dbo.income.paymentMethod. The cart saves
 // 'transferir' (its button label, lowercased) — before this map it was
@@ -22,6 +22,8 @@ const PAYMENT_METHOD_MAP: Record<string, PaymentMethodLabel> = {
   terminal: 'Tarjeta',
   transferencia: 'Transferencia',
   transferir: 'Transferencia',
+  // Laundry machine use paid from the client's prepaid balance (laundryDevices/authorize).
+  monedero: 'Monedero',
 };
 
 export const normalizePaymentMethod = (method?: string | null): PaymentMethodLabel | null =>

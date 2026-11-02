@@ -280,6 +280,18 @@
   margin-bottom: 6px;
 }
 
+.cpos-stamp-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cpos-stamp-product {
+  font-size: 12px;
+  color: #6B7280;
+}
+
 .cpos-stamp-count {
   color: #6B7280;
   font-weight: 600;

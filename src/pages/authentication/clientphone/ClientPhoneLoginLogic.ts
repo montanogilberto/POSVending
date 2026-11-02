@@ -3,7 +3,7 @@ import { useHistory } from 'react-router-dom';
 import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
 import {
-  sendClientLoginCode, verifyClientLoginCode, setClientPassword, verifyClientPassword,
+  sendClientLoginCode, verifyClientLoginCode, setClientPassword, verifyClientPassword, CodeChannel,
 } from '../../../api/clientLoginApi';
 import { normalizeRoleCode } from '../../../config/rolePermissions';
 import { appDestination, LoginApp } from '../../../utils/loginApps';
@@ -17,8 +17,9 @@ import { pinProblem } from '../../../utils/pin';
 
 // 'quick': this device already has a remembered number + biometric lock —
 //   "Continuar como +52 662...4567" instead of retyping the phone.
-// 'code': SMS step, only ever reached on a client's first login.
-// 'set-pin': mandatory right after that first SMS verification — the 6-digit
+// 'code': SMS step, reached on a client's first login or from "Olvidé mi PIN"
+//   (resettingPin), which then leads to 'set-pin' to replace the old PIN.
+// 'set-pin': mandatory right after that first SMS verification — the 4-digit
 //   PIN created here replaces the SMS on every later login.
 // 'pin': what a returning client (firstLoginCompleted) sees instead of 'code'.
 //   Accounts created before PINs existed keep working with their old password
@@ -54,6 +55,8 @@ export const useClientPhoneLogin = (app: LoginApp) => {
   const [phone, setPhone] = useState('');
   const [savedPhone, setSavedPhone] = useState<string | null>(null);
   const [legacyPassword, setLegacyPassword] = useState(false);
+  const [resettingPin, setResettingPin] = useState(false);
+  const [codeChannel, setCodeChannel] = useState<CodeChannel>('sms');
   const [loading, setLoading] = useState(false);
   // Shared toast (top, red by default); a resend confirmation passes 'success'.
   const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
@@ -86,6 +89,8 @@ export const useClientPhoneLogin = (app: LoginApp) => {
       }
       setPhone(value);
       setLegacyPassword(false);
+      setResettingPin(false);
+      setCodeChannel(result.channel ?? 'sms');
       // Onboarding already done: no SMS was sent this time, ask for the PIN.
       setStep(result.firstLoginCompleted ? 'pin' : 'code');
     } catch (err) {
@@ -116,7 +121,28 @@ export const useClientPhoneLogin = (app: LoginApp) => {
     }
   };
 
-  const useAnotherNumber = () => setStep('phone');
+  const useAnotherNumber = () => {
+    setResettingPin(false);
+    setStep('phone');
+  };
+
+  // "Olvidé mi PIN": prove the phone again by SMS, then 'set-pin' overwrites the old PIN.
+  const forgotPin = async () => {
+    setLoading(true);
+    try {
+      const result = await sendClientLoginCode(phone, { resetPin: true });
+      setCodeChannel(result.channel ?? 'sms');
+      setResettingPin(true);
+      setLegacyPassword(false);
+      codeRef.current = '';
+      setStep('code');
+      showToast('Te enviamos un código por SMS', 'success');
+    } catch (err) {
+      showToast(`No se pudo enviar el código: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const completeLogin = () => {
     const pending = pendingLoginRef.current;
@@ -178,7 +204,7 @@ export const useClientPhoneLogin = (app: LoginApp) => {
         roleCode: normalizeRoleCode(result.roleCode ?? 'pos'),
         roleName: result.roleName?.trim() || 'Cliente',
       };
-      // Mandatory right after the SMS-verified first login — every later login skips 'code'.
+      // Mandatory right after the SMS-verified first login (or a PIN reset) — every later login skips 'code'.
       setStep('set-pin');
     } catch (err) {
       showToast(`No se pudo verificar el código: ${err instanceof Error ? err.message : 'Error desconocido'}`);
@@ -198,7 +224,7 @@ export const useClientPhoneLogin = (app: LoginApp) => {
     }
     setLoading(true);
     try {
-      // The PIN is stored as the account's password (6–50 chars server side): no schema change.
+      // The PIN is stored as the account's password (4–50 chars server side): no schema change.
       const result = await setClientPassword(pending.userId, newPinRef.current.trim());
       if (!result.success) {
         showToast(result.error || 'No se pudo guardar el PIN');
@@ -256,11 +282,17 @@ export const useClientPhoneLogin = (app: LoginApp) => {
     }
   };
 
-  const resendCode = async () => {
+  const resendCode = async (channel: CodeChannel) => {
     setLoading(true);
     try {
-      await sendClientLoginCode(phone);
-      showToast('Código reenviado', 'success');
+      const result = await sendClientLoginCode(phone, { resetPin: resettingPin, channel });
+      const sentBy = result.channel ?? 'sms';
+      setCodeChannel(sentBy);
+      if (channel === 'whatsapp' && sentBy === 'sms') {
+        showToast('WhatsApp no está disponible, te lo enviamos por SMS', 'warning');
+      } else {
+        showToast(sentBy === 'whatsapp' ? 'Código enviado por WhatsApp' : 'Código reenviado por SMS', 'success');
+      }
       resetCodeInput();
     } catch (err) {
       showToast(`No se pudo reenviar el código: ${err instanceof Error ? err.message : 'Error desconocido'}`);
@@ -272,10 +304,10 @@ export const useClientPhoneLogin = (app: LoginApp) => {
   return {
     step, loading, toastProps,
     country, setCountry, national, setNational, phone, savedPhone,
-    legacyPassword, toggleLegacyPassword: () => setLegacyPassword(v => !v),
+    legacyPassword, toggleLegacyPassword: () => setLegacyPassword(v => !v), resettingPin, codeChannel,
     codeRef, codeInputRef, pinRef, newPinRef, confirmPinRef,
     submitPhone, quickContinue, useAnotherNumber, submitCode, resendCode,
-    submitNewPin, submitPin, enableBiometric, skipBiometric: completeLogin,
+    submitNewPin, submitPin, forgotPin, enableBiometric, skipBiometric: completeLogin,
   };
 };
 

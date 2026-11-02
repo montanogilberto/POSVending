@@ -34,6 +34,10 @@ describe('normalizePaymentMethod', () => {
     expect(normalizePaymentMethod('transferir')).toBe('Transferencia');
   });
 
+  it('counts a laundry machine use paid from the prepaid balance as Monedero', () => {
+    expect(normalizePaymentMethod('monedero')).toBe('Monedero');
+  });
+
   it('returns null for unknown or empty', () => {
     expect(normalizePaymentMethod('')).toBeNull();
     expect(normalizePaymentMethod(undefined)).toBeNull();

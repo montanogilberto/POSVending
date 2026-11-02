@@ -114,6 +114,8 @@ const UnifiedReceipt: React.FC<UnifiedReceiptProps> = ({
         return 'Tarjeta';
       case 'transferencia':
         return 'Transferencia';
+      case 'monedero':
+        return 'Monedero';
       default:
         return method;
     }

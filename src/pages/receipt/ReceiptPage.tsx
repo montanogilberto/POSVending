@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { IonPage, IonContent, IonLoading, IonToast, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonIcon, IonList, IonItem, IonLabel, IonText } from '@ionic/react';
 import { useExitConfirm } from '../../contexts/ExitConfirmContext';
 import { closeOutline } from 'ionicons/icons';
 import { ReceiptService } from '../../services/ReceiptService';
+import { fetchTicket } from '../../api/ticketApi';
 import ReceiptHeader from './components/ReceiptHeader';
 import ReceiptBody from './components/ReceiptBody';
 import ReceiptActions from './components/ReceiptActions';
@@ -29,15 +30,37 @@ const ReceiptPage: React.FC = () => {
   const [printStatus, setPrintStatus] = useState<TicketPrintStatus>({ printed: false, printedDate: null });
   const [printing, setPrinting] = useState(false);
 
-  const ticketData = location.state?.ticketData;
+  const { incomeId } = useParams<{ incomeId?: string }>();
+  // Screens that already fetched the ticket pass it in the navigation state;
+  // /receipt/:incomeId opened directly (client dashboard, reload, shared link)
+  // has none, so it is fetched here.
+  const [ticketData, setTicketData] = useState<any>(location.state?.ticketData);
 
   useEffect(() => {
-    console.log('ReceiptPage - ticketData:', ticketData);
+    if (location.state?.ticketData) setTicketData(location.state.ticketData);
+  }, [location.state]);
 
+  useEffect(() => {
+    console.log('ReceiptPage - ticketData:', ticketData, 'incomeId:', incomeId);
+
+    const controller = new AbortController();
+    let fetchedTicket = false; // the re-run with the ticket ends the spinner
     const loadReceipt = async () => {
       try {
         if (!ticketData) {
-          setError('No hay datos de recibo');
+          if (!incomeId) {
+            setError('No hay datos de recibo');
+            return;
+          }
+          setLoading(true);
+          const fetched = await fetchTicket(incomeId, controller.signal);
+          if (controller.signal.aborted) return;
+          if (!fetched) {
+            setError('No se encontró el recibo');
+            return;
+          }
+          fetchedTicket = true;
+          setTicketData(fetched); // re-runs this effect with the ticket
           return;
         }
 
@@ -64,12 +87,13 @@ const ReceiptPage: React.FC = () => {
         setToastMessage('Error al cargar el recibo');
         setShowToast(true);
       } finally {
-        setLoading(false);
+        if (!fetchedTicket && !controller.signal.aborted) setLoading(false);
       }
     };
 
     loadReceipt();
-  }, [ticketData]);
+    return () => controller.abort();
+  }, [ticketData, incomeId]);
 
   const isReprint = printStatus.printed;
 

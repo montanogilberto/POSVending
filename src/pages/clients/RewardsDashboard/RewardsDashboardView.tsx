@@ -4,6 +4,7 @@ import Header from '../../../components/layout/Header';
 import { usePopovers } from '../../../hooks/usePopovers';
 import { useRewardsDashboard } from './RewardsDashboardLogic';
 import RewardsHeroCard from './components/RewardsHeroCard';
+import RewardsQrCard from './components/RewardsQrCard';
 import RewardsQuickActions from './components/RewardsQuickActions';
 import RewardsPromoBanner from './components/RewardsPromoBanner';
 import RewardsPointsTabs from './components/RewardsPointsTabs';
@@ -30,6 +31,8 @@ const RewardsDashboardView: React.FC = () => {
         {...pops.headerProps}
       />
       <IonContent fullscreen className="rewards-dashboard-content">
+        {vm.isSelfServiceClient && <RewardsQrCard />}
+
         <RewardsHeroCard vm={vm} onViewDetails={() => scrollTo(pointsRef)} />
 
         <RewardsQuickActions

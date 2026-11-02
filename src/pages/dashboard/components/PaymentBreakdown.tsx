@@ -1,9 +1,10 @@
 import React from 'react';
 import { IonCard, IonCardContent, IonIcon } from '@ionic/react';
-import { cashOutline, cardOutline, swapHorizontalOutline } from 'ionicons/icons';
+import { cashOutline, cardOutline, swapHorizontalOutline, walletOutline } from 'ionicons/icons';
 import { fmtMXN } from '../../../utils/format';
+import type { PaymentMethodLabel } from '../../../utils/incomeMoney';
 
-type PaymentMethod = 'Efectivo' | 'Transferencia' | 'Tarjeta';
+type PaymentMethod = PaymentMethodLabel;
 
 interface BreakdownEntry {
   method: PaymentMethod;
@@ -24,6 +25,7 @@ const METHOD_ICONS: Record<PaymentMethod, string> = {
   Efectivo: cashOutline,
   Tarjeta: cardOutline,
   Transferencia: swapHorizontalOutline,
+  Monedero: walletOutline,
 };
 
 const PaymentBreakdown: React.FC<PaymentBreakdownProps> = ({
