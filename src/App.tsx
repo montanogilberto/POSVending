@@ -157,6 +157,7 @@ import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
 import WhatsAppAgentPage from './pages/messaging/WhatsAppAgentPage';
 import WhatsAppConversationsPage from './pages/messaging/WhatsAppConversationsPage';
+import WhatsAppSetupPage from './pages/messaging/WhatsAppSetupPage';
 import WhatsAppDock from './components/messaging/WhatsAppDock';
 import NotificationsInboxPage from './pages/messaging/NotificationsInboxPage';
 import NotificationDetailPage from './pages/messaging/NotificationDetailPage';
@@ -1073,6 +1074,7 @@ const AppShell: React.FC = () => {
             {/* Same permission as Notificaciones: role features come from GET /roles, a new one would need a DB change first. */}
             <PrivateRoute exact path="/whatsapp-agent" feature="notificationDispatchLog" component={WhatsAppAgentPage} />
             <PrivateRoute exact path="/whatsapp-agent/conversations" feature="notificationDispatchLog" component={WhatsAppConversationsPage} />
+            <PrivateRoute exact path="/whatsapp-agent/setup" feature="notificationDispatchLog" component={WhatsAppSetupPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
             <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />
           </IonRouterOutlet>

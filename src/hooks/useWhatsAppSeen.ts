@@ -42,8 +42,10 @@ export function useWhatsAppSeen(companyId: number | null | undefined) {
     window.dispatchEvent(new Event(CHANGED));
   }, [companyId]);
 
+  /** Waiting for a person and not read here yet. A chat the agent or the team already
+   *  answered isn't unread, even if this device never opened it. */
   const isUnread = useCallback((c: WhatsAppConversationSummary) =>
-    !!c.lastInboundUtc && (!seen[c.phone10] || c.lastInboundUtc > seen[c.phone10]), [seen]);
+    !!c.needsReply && !!c.lastInboundUtc && (!seen[c.phone10] || c.lastInboundUtc > seen[c.phone10]), [seen]);
 
   return { markSeen, isUnread };
 }

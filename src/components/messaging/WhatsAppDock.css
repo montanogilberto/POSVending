@@ -17,6 +17,8 @@
 .wad-list { width: 320px; max-height: min(560px, calc(100vh - 80px)); }
 .wad-window { width: 340px; height: min(460px, calc(100vh - 80px)); }
 .wad-window--min { height: auto; }
+/* Agrandar: as wide as fits next to the list (320 + gaps), almost the full height. */
+.wad-window--big { width: min(680px, calc(100vw - 380px)); height: min(820px, calc(100vh - 80px)); }
 
 /* Bars */
 .wad-list-head, .wad-head-item {
@@ -31,7 +33,7 @@
 .wad-head-item { flex: 1; min-width: 0; }
 .wad-head-item h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wad-head-avatar { width: 32px; height: 32px; font-size: 0.85rem; margin-inline-end: 10px; }
-.wad-head-btn { margin: 0 4px 0 0; --padding-start: 6px; --padding-end: 6px; border-bottom: 1px solid #eef0f3; }
+.wad-head-btn { margin: 0 4px 0 0; --padding-start: 6px; --padding-end: 6px; --color: #374151; border-bottom: 1px solid #eef0f3; }
 
 /* List */
 .wad-list-body { display: flex; flex-direction: column; min-height: 0; flex: 1; }
@@ -78,4 +80,8 @@
 /* A second window doesn't fit next to the list on small laptops. */
 @media (max-width: 1099px) {
   .wad-window ~ .wad-window { display: none; }
+}
+/* Next to a big window, a second one only fits on wide screens. */
+@media (max-width: 1499px) {
+  .wad-dock:has(.wad-window--big) .wad-window:not(.wad-window--big) { display: none; }
 }
