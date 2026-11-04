@@ -14,7 +14,13 @@ const OPEN_KEY = 'wad-list-open';
 /** The full inbox page already shows everything — the dock steps aside there. */
 const INBOX_ROUTE = '/whatsapp-agent/conversations';
 
-export interface DockWindow { conv: WhatsAppConversationSummary; minimized: boolean }
+export interface DockWindow { conv: WhatsAppConversationSummary; minimized: boolean; expanded?: boolean }
+
+/** Opens a chat as the first window; one already open keeps its size. */
+const withChatOpen = (prev: DockWindow[], conv: WhatsAppConversationSummary): DockWindow[] => [
+  { conv, minimized: false, expanded: prev.find(w => w.conv.phone10 === conv.phone10)?.expanded },
+  ...prev.filter(w => w.conv.phone10 !== conv.phone10),
+].slice(0, MAX_WINDOWS);
 
 /** LinkedIn-style WhatsApp dock: chat list + chat windows on every staff screen. */
 export const useWhatsAppDock = () => {
@@ -86,7 +92,7 @@ export const useWhatsAppDock = () => {
   useEffect(() => onOpenWhatsAppChat(({ phone10, customerName }) => {
     if (hidden || window.matchMedia('(max-width: 767px)').matches) return false;
     const conv = convRef.current.find(c => c.phone10 === phone10) ?? stubConversation(phone10, customerName);
-    setWindows(prev => [{ conv, minimized: false }, ...prev.filter(w => w.conv.phone10 !== phone10)].slice(0, MAX_WINDOWS));
+    setWindows(prev => withChatOpen(prev, conv));
     return true;
   }), [hidden]);
 
@@ -101,18 +107,20 @@ export const useWhatsAppDock = () => {
       || (c.lastText ?? '').toLowerCase().includes(q));
   }, [conversations, search]);
 
-  const openChat = (conv: WhatsAppConversationSummary) =>
-    setWindows(prev => [{ conv, minimized: false }, ...prev.filter(w => w.conv.phone10 !== conv.phone10)].slice(0, MAX_WINDOWS));
+  const openChat = (conv: WhatsAppConversationSummary) => setWindows(prev => withChatOpen(prev, conv));
   const closeChat = (phone10: string) => setWindows(prev => prev.filter(w => w.conv.phone10 !== phone10));
   const toggleMinimized = (phone10: string) =>
     setWindows(prev => prev.map(w => (w.conv.phone10 === phone10 ? { ...w, minimized: !w.minimized } : w)));
+  /** Only one big window at a time: two don't fit next to the list. */
+  const toggleExpanded = (phone10: string) =>
+    setWindows(prev => prev.map(w => ({ ...w, expanded: w.conv.phone10 === phone10 && !w.expanded })));
 
   return {
     hidden, inboxRoute: INBOX_ROUTE, range,
     conversations, visible, firstLoad: loading && !loadedOnce, error, reload: () => load(),
     search, setSearch, listOpen, setListOpen,
     unreadCount, needsReplyCount, isUnread,
-    windows, openChat, closeChat, toggleMinimized,
+    windows, openChat, closeChat, toggleMinimized, toggleExpanded,
     showToast, toastProps,
   };
 };

@@ -5,7 +5,7 @@ import {
 } from '@ionic/react';
 import {
   alertCircleOutline, calendarOutline, cashOutline, chatbubblesOutline, informationCircleOutline,
-  logoWhatsapp, peopleOutline, personOutline, refreshOutline, timerOutline,
+  logoWhatsapp, peopleOutline, personOutline, refreshOutline, settingsOutline, timerOutline,
 } from 'ionicons/icons';
 import { Bar } from 'react-chartjs-2';
 import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js';
@@ -89,6 +89,9 @@ const WhatsAppAgentPage: React.FC = () => {
       <div className="wa-agent-toolbar-actions">
         <IonButton fill="clear" size="small" routerLink="/whatsapp-agent/conversations">
           <IonIcon icon={chatbubblesOutline} slot="start" /> Conversaciones
+        </IonButton>
+        <IonButton fill="clear" size="small" routerLink="/whatsapp-agent/setup">
+          <IonIcon icon={settingsOutline} slot="start" /> Configurar
         </IonButton>
         <IonButton fill="clear" size="small" onClick={load} aria-label="Actualizar">
           <IonIcon icon={refreshOutline} slot="icon-only" />
