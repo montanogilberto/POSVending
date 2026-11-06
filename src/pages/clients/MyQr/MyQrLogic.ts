@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useUser } from '../../../contexts/UserContext';
+import { useTopUpOptions } from '../../../hooks/useTopUpOptions';
+import { useSaveCardPrompt } from '../../../hooks/useSaveCardPrompt';
 import { useClientQr } from '../../../hooks/useClientQr';
 import { useToast } from '../../../hooks/useToast';
 import { useViewEnterLoad } from '../../../hooks/useViewEnterLoad';
@@ -20,6 +22,7 @@ import { TOP_UP_MIN_MXN } from './MyQrConstants';
 export const useMyQr = () => {
   const { clientId, companyId, username } = useUser();
   const { showToast, toastProps } = useToast({ duration: 4000 });
+  const askToSaveCard = useSaveCardPrompt(companyId, showToast);
 
   // ── QR ────────────────────────────────────────────────────────────────
   const { qrValue, error: qrError, reload: reloadQr } = useClientQr(companyId, clientId);
@@ -56,6 +59,9 @@ export const useMyQr = () => {
   const [amountInput, setAmountInput] = useState('');
   const [startingPayment, setStartingPayment] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripeAccount, setStripeAccount] = useState<string | undefined>();
+  const { cardTopUpAvailable, transferAccount } = useTopUpOptions(companyId);
+  const [canSaveCard, setCanSaveCard] = useState(false);
 
   const amount = Number(amountInput) || 0;
   const fee = stripeFee(amount);
@@ -71,6 +77,8 @@ export const useMyQr = () => {
     try {
       const intent = await createLaundryTopUpIntent(companyId, clientId, amount);
       setShowAmountSheet(false);
+      setStripeAccount(intent.stripeAccount);
+      setCanSaveCard(!!intent.canSaveCard);
       setClientSecret(intent.clientSecret);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'No se pudo iniciar el pago.', 'danger');
@@ -81,7 +89,7 @@ export const useMyQr = () => {
 
   const onPaid = async (paymentIntentId: string) => {
     try {
-      const r = await confirmLaundryTopUp(companyId, paymentIntentId);
+      const r = await confirmLaundryTopUp(companyId, paymentIntentId, stripeAccount);
       showToast(`✓ Recarga exitosa: se abonaron ${fmtMXN(r.netCreditedMXN ?? net)} a tu saldo`);
     } catch {
       // The charge already succeeded; the Stripe webhook credits the balance.
@@ -90,12 +98,14 @@ export const useMyQr = () => {
       setClientSecret(null);
       notifyDataChanged('laundry_top_up');
     }
+    if (canSaveCard) askToSaveCard(paymentIntentId, stripeAccount);
   };
 
   return {
     username,
     qrDataUrl, qrError, reloadQr,
     balance, balanceError, loadBalance,
+    cardTopUpAvailable, transferAccount, stripeAccount,
     showAmountSheet, openTopUp, closeTopUp,
     amountInput, setAmountInput, amount, fee, net, amountValid,
     startingPayment, startPayment,

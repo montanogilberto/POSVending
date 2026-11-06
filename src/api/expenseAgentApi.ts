@@ -2,7 +2,7 @@
 // /expenses/categorize on the LoanAgents service (same host as loan analysis
 // and transfer evidence). Advisory only — never creates or edits the
 // expense itself; the user still saves it through expensesApi.
-const AGENT_BASE = 'https://loanagents-smartloans.azurewebsites.net';
+export const AGENT_BASE = 'https://loanagents-smartloans.azurewebsites.net';
 
 export interface ExpenseCategorizeRequest {
   companyId: number;

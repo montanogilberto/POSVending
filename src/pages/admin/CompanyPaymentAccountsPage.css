@@ -1,0 +1,42 @@
+.cpa-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 0;
+}
+
+.cpa-card {
+  margin: 0 auto;
+  max-width: 560px;
+}
+
+.cpa-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cpa-text {
+  margin: 8px 0;
+}
+
+.cpa-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.cpa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.cpa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

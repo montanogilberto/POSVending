@@ -453,6 +453,34 @@
   flex-wrap: wrap;
 }
 
+.cpos-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 auto;
+  max-width: 520px;
+}
+
+.cpos-transfer-photo {
+  border-radius: 12px;
+  max-height: 280px;
+  object-fit: contain;
+  width: 100%;
+}
+
+.cpos-transfer-center {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cpos-wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .cpos-wallet-info {
   display: flex;
   flex-direction: column;
@@ -469,3 +497,13 @@
 .cpos-wallet-error {
   font-size: 13px;
 }
+
+/* Conversaciones: WhatsApp + push (the timeline's look comes from WhatsAppChat.css). */
+.cpos-messages-filter { margin-bottom: 10px; }
+.cpos-messages .wac-messages { max-height: 420px; border-radius: 12px; }
+.cpos-messages-loading {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 32px 0; color: #6b7280; font-size: 0.85rem;
+}
+.cpos-messages-loading p { margin: 0; }
+.cpos-messages-note { margin: 8px 0 0; font-size: 0.75rem; color: #6b7280; }

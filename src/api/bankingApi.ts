@@ -255,12 +255,21 @@ export interface TransferEvidence {
 export async function submitTransferEvidence(payload: {
   companyId: number; referenceId: number; claveRastreo: string; transferDate: string;
   bankFrom?: string; amountMXN: number; evidenceFileUrl?: string; evidenceHash?: string;
-  uploadedByClientId: number;
+  uploadedByClientId: number; referenceType?: 'FUNDING' | 'WALLET_TOPUP';
 }): Promise<TransferEvidence> {
   console.log('[Banking] submitTransferEvidence →', JSON.stringify({ referenceId: payload.referenceId, claveRastreo: payload.claveRastreo }));
   const r = await post("/transferEvidence", { transferEvidence: [{ action: 'create', referenceType: 'FUNDING', ...payload }] });
   console.log('[Banking] submitTransferEvidence ←', JSON.stringify({ transferEvidenceId: r.transferEvidenceId, error: r.error }));
   return r;
+}
+
+/** Comprobantes de recarga que el cliente envió (WhatsApp) y esperan al personal. */
+export async function listPendingTopUpEvidence(companyId: number, clientId: number): Promise<TransferEvidence[]> {
+  const r = await post("/transferEvidence", { transferEvidence: [{
+    action: 'list', companyId, referenceType: 'WALLET_TOPUP', referenceId: clientId,
+  }] });
+  const list: TransferEvidence[] = Array.isArray(r) ? r : [];
+  return list.filter((e) => e.validationStatus === 'PENDING');
 }
 
 // Uploads just the bytes — pair with submitTransferEvidence(evidenceFileUrl)

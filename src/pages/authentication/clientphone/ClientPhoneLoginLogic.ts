@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../../contexts/UserContext';
-import { getOneCompany } from '../../../api/companiesApi';
 import { useToast } from '../../../hooks/useToast';
 import {
   sendClientLoginCode, verifyClientLoginCode, setClientPassword, verifyClientPassword, CodeChannel,
@@ -41,7 +40,7 @@ interface PendingLogin {
 /** Phone → (SMS code → PIN) → (biometric) sign-in for customers, shared by /client-login and the Arcade / Rewards login. */
 export const useClientPhoneLogin = (app: LoginApp) => {
   const history = useHistory();
-  const { login, setUserData } = useUser();
+  const { login } = useUser();
 
   const codeRef = useRef<string>('');
   const pinRef = useRef<string>('');
@@ -161,10 +160,6 @@ export const useClientPhoneLogin = (app: LoginApp) => {
       roleCode: pending.roleCode,
       roleName: pending.roleName,
     });
-    // Never holds up the login: the name only labels screens and receipts.
-    getOneCompany(pending.companyId)
-      .then((company) => { if (company?.name) setUserData({ companyName: company.name }); })
-      .catch((err) => console.log('[ClientPhoneLogin] company name failed:', err));
     history.push(appDestination(app, pending.roleCode, pending.clientId).route);
   };
 

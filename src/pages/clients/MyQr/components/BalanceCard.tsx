@@ -20,10 +20,12 @@ const BalanceCard: React.FC<{ vm: MyQrVM }> = ({ vm }) => (
         <strong className="my-qr-balance-amount">{fmtMXN(vm.balance)}</strong>
       )}
     </div>
-    <IonButton className="my-qr-topup-btn" onClick={vm.openTopUp}>
-      <IonIcon icon={addCircleOutline} slot="start" />
-      Recargar
-    </IonButton>
+    {vm.cardTopUpAvailable && (
+      <IonButton className="my-qr-topup-btn" onClick={vm.openTopUp}>
+        <IonIcon icon={addCircleOutline} slot="start" />
+        Recargar
+      </IonButton>
+    )}
   </div>
 );
 

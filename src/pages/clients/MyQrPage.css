@@ -149,3 +149,12 @@
   font-weight: 700;
   text-transform: none;
 }
+
+.my-qr-transfer {
+  margin-top: 16px;
+}
+
+.my-qr-transfer h2 {
+  font-size: 16px;
+  font-weight: 700;
+}

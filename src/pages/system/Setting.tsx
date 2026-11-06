@@ -94,6 +94,7 @@ const MODULES: ModuleDef[] = [
     name: 'Administración',
     features: [
       { code: 'users',    label: 'Usuarios',      icon: personOutline },
+      { code: 'companyPaymentAccounts', label: 'Cuentas de cobro', icon: cartOutline },
       { code: 'ingresos', label: 'Ingresos',      icon: barChartOutline },
       { code: 'egresos',  label: 'Egresos',       icon: trendingDownOutline },
       { code: 'sells',    label: 'Ventas',        icon: cartOutline },
