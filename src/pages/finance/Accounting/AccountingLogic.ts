@@ -16,6 +16,9 @@ import {
   CommissionTerminal, CreateCommissionTerminalRequest, UpdateCommissionTerminalRequest,
   getAllCommissionTerminals, createCommissionTerminal, updateCommissionTerminal, deactivateCommissionTerminal,
 } from '../../../api/commissionTerminalsApi';
+import {
+  addCompanyTransferAccount, CompanyPaymentAccount, listCompanyPaymentAccounts,
+} from '../../../api/companyPaymentAccountsApi';
 import { AccountingTab } from './AccountingTypes';
 
 export const useAccounting = () => {
@@ -43,6 +46,7 @@ export const useAccounting = () => {
   const [terminals, setTerminals] = useState<CommissionTerminal[]>([]);
   const [showTerminalForm, setShowTerminalForm] = useState(false);
   const [editingTerminal, setEditingTerminal] = useState<CommissionTerminal | null>(null);
+  const [terminalAccounts, setTerminalAccounts] = useState<CompanyPaymentAccount[]>([]);
 
   const loadAccounts = useCallback(async () => {
     if (!companyId) return;
@@ -99,6 +103,32 @@ export const useAccounting = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
+  // Per company: the terminal catalog is global, the account that receives its money is not.
+  const loadTerminalAccounts = useCallback(async () => {
+    try {
+      const rows = await listCompanyPaymentAccounts(companyId);
+      setTerminalAccounts(rows.filter((a) => a.accountType === 'spei' && a.accountStatus !== 'ARCHIVED'));
+    } catch (error) {
+      console.log('[useAccounting] terminal accounts failed:', error);
+    }
+  }, [companyId]);
+
+  const terminalAccount = (terminalId?: number) =>
+    terminalAccounts.find((a) => a.commissionTerminalId === terminalId) ?? null;
+
+  const handleSaveTerminalAccount = async (terminalId: number, holderName: string, clabe: string) => {
+    try {
+      await addCompanyTransferAccount(companyId, userId, holderName, clabe, terminalId);
+      showToast('✓ Cuenta guardada. Falta que otro administrador la confirme en Cuentas de cobro.');
+      await loadTerminalAccounts();
+      notifyDataChanged('commissionTerminal:accountAdded');
+      return true;
+    } catch (error: any) {
+      showToast(error?.message || 'No se pudo guardar la cuenta', 'danger');
+      return false;
+    }
+  };
+
   const loadTerminals = useCallback(async () => {
     try {
       setTerminals(await getAllCommissionTerminals());
@@ -111,10 +141,10 @@ export const useAccounting = () => {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([loadAccounts(), loadEntries(), loadTerminals()]);
+    await Promise.all([loadAccounts(), loadEntries(), loadTerminals(), loadTerminalAccounts()]);
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadAccounts, loadEntries, loadTerminals]);
+  }, [loadAccounts, loadEntries, loadTerminals, loadTerminalAccounts]);
 
   useIonViewWillEnter(() => {
     loadAll();
@@ -278,7 +308,7 @@ export const useAccounting = () => {
     setShowTerminalForm,
     editingTerminal,
     setEditingTerminal,
-    handleCreateTerminal,
+    terminalAccount, handleSaveTerminalAccount, handleCreateTerminal,
     handleUpdateTerminal,
     handleDeactivateTerminal,
 

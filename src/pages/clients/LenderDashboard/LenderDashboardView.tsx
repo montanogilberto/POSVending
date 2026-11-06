@@ -41,7 +41,7 @@ const LenderDashboardView: React.FC = () => {
           isOpen={vm.slowLoad}
           message="La carga está tardando más de lo normal — seguimos obteniendo tus datos…"
           duration={4000}
-          position="top"
+          position="bottom"
           color="warning"
           onDidDismiss={() => vm.setSlowLoad(false)}
         />

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { appDestination, isLoginApp, readLastLoginApp, saveLastLoginApp } from './loginApps';
+import { appDestination, isLoginApp, loginAppFromSearch, readLastLoginApp, saveLastLoginApp } from './loginApps';
 
 describe('appDestination', () => {
   it('pos keeps the usual landing for every role', () => {
@@ -39,5 +39,13 @@ describe('last app memory', () => {
     expect(readLastLoginApp()).toBe('rewards');
     localStorage.setItem('login.app', 'garbage');
     expect(readLastLoginApp()).toBe('pos');
+  });
+});
+
+describe('app from a link', () => {
+  it('reads a known app and ignores anything else', () => {
+    expect(loginAppFromSearch('?app=arcade')).toBe('arcade');
+    expect(loginAppFromSearch('?app=nope')).toBeNull();
+    expect(loginAppFromSearch('')).toBeNull();
   });
 });

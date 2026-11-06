@@ -6,10 +6,13 @@ import {
 import {
   CommissionTerminal, CreateCommissionTerminalRequest, UpdateCommissionTerminalRequest,
 } from '../../../../api/commissionTerminalsApi';
+import { CompanyPaymentAccount } from '../../../../api/companyPaymentAccountsApi';
 
 interface Props {
   isOpen: boolean;
   terminal: CommissionTerminal | null;
+  account: CompanyPaymentAccount | null;
+  onSaveAccount: (terminalId: number, holderName: string, clabe: string) => Promise<boolean>;
   onClose: () => void;
   onCreate: (data: CreateCommissionTerminalRequest) => Promise<void>;
   onUpdate: (data: UpdateCommissionTerminalRequest) => Promise<void>;
@@ -17,7 +20,9 @@ interface Props {
 
 const PAYMENT_METHODS = ['tarjeta', 'efectivo', 'transferencia'];
 
-const CommissionTerminalFormModal: React.FC<Props> = ({ isOpen, terminal, onClose, onCreate, onUpdate }) => {
+const CommissionTerminalFormModal: React.FC<Props> = ({
+  isOpen, terminal, account, onSaveAccount, onClose, onCreate, onUpdate,
+}) => {
   const isEditing = !!terminal;
   const [provider, setProvider] = useState('');
   const [terminalName, setTerminalName] = useState('');
@@ -26,6 +31,24 @@ const CommissionTerminalFormModal: React.FC<Props> = ({ isOpen, terminal, onClos
   const [fixedFeeAmount, setFixedFeeAmount] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [holderName, setHolderName] = useState('');
+  const [clabe, setClabe] = useState('');
+  const [savingAccount, setSavingAccount] = useState(false);
+
+  useEffect(() => {
+    setHolderName(account?.holderName ?? '');
+    setClabe(account?.clabe ?? '');
+  }, [account, isOpen]);
+
+  const handleSaveAccount = async () => {
+    if (!terminal || savingAccount) return;
+    setSavingAccount(true);
+    try {
+      await onSaveAccount(terminal.commissionTerminalId, holderName.trim(), clabe.trim());
+    } finally {
+      setSavingAccount(false);
+    }
+  };
 
   useEffect(() => {
     if (terminal) {
@@ -128,6 +151,33 @@ const CommissionTerminalFormModal: React.FC<Props> = ({ isOpen, terminal, onClos
         <IonButton expand="block" className="ion-margin-top" onClick={handleSave} disabled={saving}>
           {saving ? <IonSpinner name="dots" /> : (isEditing ? 'Guardar cambios' : 'Crear terminal')}
         </IonButton>
+
+        <h3>Cuenta para transferencias</h3>
+        {isEditing ? (
+          <>
+            <IonList>
+              <IonItem>
+                <IonLabel position="stacked">Titular</IonLabel>
+                <IonInput value={holderName} onIonInput={(e) => setHolderName(e.detail.value ?? '')} />
+              </IonItem>
+              <IonItem>
+                <IonLabel position="stacked">CLABE</IonLabel>
+                <IonInput value={clabe} inputmode="numeric" maxlength={18}
+                  onIonInput={(e) => setClabe(e.detail.value ?? '')} />
+              </IonItem>
+              {account?.bankName && (
+                <IonItem><IonLabel>Banco: {account.bankName}</IonLabel></IonItem>
+              )}
+            </IonList>
+            <IonButton expand="block" fill="outline" onClick={handleSaveAccount}
+              disabled={savingAccount || !holderName.trim() || clabe.trim().length !== 18
+                || (clabe.trim() === account?.clabe && holderName.trim() === account?.holderName)}>
+              {savingAccount ? <IonSpinner name="dots" /> : 'Guardar cuenta'}
+            </IonButton>
+          </>
+        ) : (
+          <p>Crea la terminal y ábrela para agregar su cuenta.</p>
+        )}
       </IonContent>
     </IonModal>
   );

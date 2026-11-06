@@ -58,6 +58,12 @@ export const appDestination = (
   }
 };
 
+/** The app asked for by a link (`/login?app=arcade`), e.g. from the official web page. */
+export const loginAppFromSearch = (search: string): LoginApp | null => {
+  const app = new URLSearchParams(search).get('app');
+  return isLoginApp(app) ? app : null;
+};
+
 const STORAGE_KEY = 'login.app';
 
 /** The app picked last time on this device; storage may be blocked, so it never throws. */

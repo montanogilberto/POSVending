@@ -3,12 +3,24 @@ import {
   IonList, IonItem, IonLabel, IonButton, IonIcon, IonBadge, IonNote,
 } from '@ionic/react';
 import { addOutline, banOutline, createOutline } from 'ionicons/icons';
+import { CompanyPaymentAccount } from '../../../../api/companyPaymentAccountsApi';
+import StatusBadge from '../../../../components/ui/StatusBadge';
+import { COMPANY_PAYMENT_ACCOUNT_STATUS } from '../../../../components/ui/statusMaps';
 import { AccountingVM } from '../AccountingLogic';
 import CommissionTerminalFormModal from './CommissionTerminalFormModal';
 
 interface Props {
   vm: AccountingVM;
 }
+
+const TerminalAccountLine: React.FC<{ account: CompanyPaymentAccount | null }> = ({ account }) => (
+  <p>
+    {account
+      ? <>{account.holderName} · CLABE {account.clabe}{account.bankName ? ` · ${account.bankName}` : ''}{' '}
+          <StatusBadge status={account.accountStatus} map={COMPANY_PAYMENT_ACCOUNT_STATUS} /></>
+      : 'Sin cuenta para transferencias'}
+  </p>
+);
 
 const CommissionTerminalsTab: React.FC<Props> = ({ vm }) => {
   return (
@@ -35,6 +47,7 @@ const CommissionTerminalsTab: React.FC<Props> = ({ vm }) => {
                 {terminal.fixedFeeAmount ? ` + $${terminal.fixedFeeAmount}` : ''}
                 {terminal.paymentMethod ? ` · ${terminal.paymentMethod}` : ''}
               </p>
+              <TerminalAccountLine account={vm.terminalAccount(terminal.commissionTerminalId)} />
             </IonLabel>
             <IonIcon icon={createOutline} slot="end" color="medium" />
             {terminal.isActive && (
@@ -58,6 +71,8 @@ const CommissionTerminalsTab: React.FC<Props> = ({ vm }) => {
       <CommissionTerminalFormModal
         isOpen={vm.showTerminalForm || !!vm.editingTerminal}
         terminal={vm.editingTerminal}
+        account={vm.terminalAccount(vm.editingTerminal?.commissionTerminalId)}
+        onSaveAccount={vm.handleSaveTerminalAccount}
         onClose={() => { vm.setShowTerminalForm(false); vm.setEditingTerminal(null); }}
         onCreate={vm.handleCreateTerminal}
         onUpdate={vm.handleUpdateTerminal}

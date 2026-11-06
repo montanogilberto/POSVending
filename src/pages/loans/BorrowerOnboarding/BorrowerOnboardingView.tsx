@@ -44,7 +44,7 @@ const BorrowerOnboardingView: React.FC = () => {
       <IonContent className="bop-content">
         <IonLoading isOpen={vm.loading || vm.saving} message={vm.saving ? 'Guardando...' : 'Cargando...'} />
         <IonToast isOpen={!!vm.toast} message={vm.toast ?? ''} duration={3000}
-          onDidDismiss={() => vm.setToast(null)} color="warning" position="top" />
+          onDidDismiss={() => vm.setToast(null)} color="warning" position="bottom" />
 
         <IonProgressBar value={(vm.step + (vm.stepDone[vm.step] ? 1 : 0)) / 3} color="primary" className="bop-progress" />
 

@@ -3,6 +3,7 @@ import { RoleCode, normalizeRoleCode, loadRoleCatalog } from '../config/rolePerm
 import { DEFAULT_AVATAR_URL } from '../utils/formatters';
 import { ClientType } from '../api/clientsApi';
 import { listClientCapabilities } from '../api/clientCapabilitiesApi';
+import { getOneCompany } from '../api/companiesApi';
 import { ProductContext, availableProducts, defaultProduct } from '../utils/productContext';
 import { SESSION_EXPIRED_EVENT, clearSessionTokens } from '../utils/sessionTokens';
 
@@ -153,6 +154,24 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .catch(err => console.warn('[UserContext] listClientCapabilities failed:', err));
     return () => { cancelled = true; };
   }, [auth.isAuthenticated, auth.companyId, auth.clientId]);
+
+  // Every login path starts without companies.name (staff auto-confirm their
+  // default company, phone logins have no selector), so it is resolved once here.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.companyId || auth.companyName) return;
+    let cancelled = false;
+    getOneCompany(auth.companyId)
+      .then(company => {
+        if (cancelled || !company?.name) return;
+        setAuth(prev => {
+          const next = { ...prev, companyName: company.name };
+          persistAuth(next);
+          return next;
+        });
+      })
+      .catch(err => console.warn('[UserContext] company name failed:', err));
+    return () => { cancelled = true; };
+  }, [auth.isAuthenticated, auth.companyId, auth.companyName]);
 
   const refreshCapabilities = async (): Promise<string[]> => {
     if (!auth.companyId || !auth.clientId) return [];

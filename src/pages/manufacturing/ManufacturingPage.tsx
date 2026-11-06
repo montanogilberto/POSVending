@@ -784,7 +784,7 @@ const ManufacturingPage: React.FC = () => {
         </IonModal>
 
         <IonToast isOpen={!!toast} message={toast ?? ''} duration={2500}
-          onDidDismiss={() => setToast(null)} position="top" />
+          onDidDismiss={() => setToast(null)} position="bottom" />
       </IonContent>
     </IonPage>
   );

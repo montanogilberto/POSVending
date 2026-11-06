@@ -9,6 +9,7 @@ import PosStampCards from './components/PosStampCards';
 import PosPurchasesCard from './components/PosPurchasesCard';
 import PosActivityCard from './components/PosActivityCard';
 import PosFollowUpsCard from './components/PosFollowUpsCard';
+import PosMessagesCard from './components/PosMessagesCard';
 import PosQrCard from './components/PosQrCard';
 import PosWalletCard from './components/PosWalletCard';
 
@@ -43,6 +44,7 @@ const ClientDashboardPOSView: React.FC = () => {
               <PosStampCards vm={vm} />
             </div>
             <div className="cpos-col">
+              <PosMessagesCard vm={vm} />
               <PosPurchasesCard vm={vm} />
               <PosActivityCard vm={vm} />
               <PosFollowUpsCard vm={vm} />

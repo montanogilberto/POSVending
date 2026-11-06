@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
+import { useIonActionSheet } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
+import { canAccess } from '../../../config/rolePermissions';
 import { useToast } from '../../../hooks/useToast';
 import { useViewEnterLoad } from '../../../hooks/useViewEnterLoad';
 import { onDataChanged } from '../../../utils/refreshBus';
@@ -21,6 +23,9 @@ import {
 import { downloadClientQrPdf } from '../../../utils/clientQrPdf';
 import { useClientQr } from '../../../hooks/useClientQr';
 import { usePosWallet } from './ClientDashboardPOSWallet';
+import { usePosCardTopUp } from './ClientDashboardPOSCardTopUp';
+import { usePosTransfer } from './ClientDashboardPOSTransfer';
+import { usePosMessages } from './ClientDashboardPOSMessages';
 import { CLIENT_TYPE_LABEL, LIST_PREVIEW } from './ClientDashboardPOSConstants';
 import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboardPOSTypes';
 
@@ -33,7 +38,7 @@ import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboar
 export const useClientDashboardPOS = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const clientId = Number(clientIdParam);
-  const { companyId, companyName, userId } = useUser();
+  const { companyId, companyName, userId, roleCode } = useUser();
   const history = useHistory();
   const { showToast, toastProps } = useToast();
 
@@ -96,6 +101,32 @@ export const useClientDashboardPOS = () => {
 
   const fullName = client ? `${client.first_name ?? ''} ${client.last_name ?? ''}`.trim() : `Cliente #${clientId}`;
   const wallet = usePosWallet(companyId, clientId, userId, fullName, showToast);
+  const cardTopUp = usePosCardTopUp(companyId, clientId, fullName, showToast);
+  const transfer = usePosTransfer(companyId, clientId, userId, fullName, showToast);
+  const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, canAccess(roleCode, 'notificationDispatchLog'));
+  const [presentTopUpOptions] = useIonActionSheet();
+
+  const canManageAccounts = canAccess(roleCode, 'companyPaymentAccounts');
+  const openPaymentAccounts = () => {
+    transfer.closeTransfer();
+    history.push('/company-payment-accounts');
+  };
+
+  const payByCard = () => {
+    if (cardTopUp.cardTopUpAvailable) cardTopUp.openCardTopUp();
+    else if (canManageAccounts) history.push('/company-payment-accounts');
+    else showToast('La compañía aún no activa los pagos con tarjeta. Avisa a un administrador.', 'warning');
+  };
+
+  const openTopUp = () => presentTopUpOptions({
+    header: 'Abonar saldo',
+    buttons: [
+      { text: 'Efectivo', handler: wallet.openCashTopUp },
+      { text: 'Tarjeta de crédito o débito', handler: payByCard },
+      { text: 'Transferencia', handler: transfer.openTransferTopUp },
+      { text: 'Cancelar', role: 'cancel' },
+    ],
+  });
   const typeLabel = client?.clientType ? CLIENT_TYPE_LABEL[client.clientType] : CLIENT_TYPE_LABEL.borrower;
 
   const purchases = useMemo<PosPurchase[]>(
@@ -208,6 +239,13 @@ export const useClientDashboardPOS = () => {
     qrDownloading,
     downloadQr,
     ...wallet,
+    ...cardTopUp,
+    ...transfer,
+    ...messages,
+    openTopUp,
+    canManageAccounts,
+    openPaymentAccounts,
+    topUpBusy: wallet.cashSaving || transfer.transferSaving || cardTopUp.cardStarting,
     walletTitle: companyName ? `Saldo ${companyName}` : 'Saldo',
     loading,
     toastProps,
