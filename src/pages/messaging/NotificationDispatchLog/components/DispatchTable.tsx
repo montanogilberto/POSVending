@@ -6,6 +6,7 @@ import StatusBadge from '../../../../components/ui/StatusBadge';
 import { NOTIFICATION_DISPATCH_STATUS } from '../../../../components/ui/statusMaps';
 import { toHermosillo } from '../../../../utils/format';
 import { CHANNEL_ICONS, CHANNEL_LABELS, SOURCE_LABELS } from '../NotificationDispatchLogConstants';
+import { failureReason } from '../NotificationStats';
 import type { NotificationDispatchLogVM } from '../NotificationDispatchLogLogic';
 import HistoryToolbar from './HistoryToolbar';
 
@@ -37,7 +38,10 @@ const DispatchTable: React.FC<{ vm: NotificationDispatchLogVM }> = ({ vm }) => {
               <span className="ndl-cell-source">{SOURCE_LABELS[row.sourceType] ?? row.sourceType} #{row.sourceId}</span>
               <span className="ndl-cell-client">{row.clientName || (row.recipientType === 'client' ? `Cliente #${row.recipientId}` : `Usuario #${row.recipientId}`)}</span>
               <span className="ndl-cell-message">{row.messagePreview || '—'}</span>
-              <span className="ndl-cell-status"><StatusBadge status={row.delivery} map={NOTIFICATION_DISPATCH_STATUS} /></span>
+              <span className="ndl-cell-status">
+                <StatusBadge status={row.delivery} map={NOTIFICATION_DISPATCH_STATUS} />
+                {row.delivery === 'failed' && <small className="ndl-cell-reason">{failureReason(row)}</small>}
+              </span>
               <span className="ndl-cell-attempts">{row.attempts.length}<em> intentos</em></span>
             </div>
           </IonItem>

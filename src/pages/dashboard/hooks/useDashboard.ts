@@ -43,7 +43,7 @@ export const useDashboard = () => {
   const location = useLocation();
   const history = useHistory();
   const { allIncome, loadIncomes } = useIncome();
-  const { companyId, userId, logout } = useUser();
+  const { companyId, companyName, userId, logout } = useUser();
 
 
   // 🔹 UI State
@@ -408,7 +408,7 @@ export const useDashboard = () => {
   };
 
   // ✅ TITLE (clean)
-  const getTitleFromPath = () => 'Lavandería';
+  const getTitleFromPath = () => companyName || 'GMO';
 
   return {
     location,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { IonButton, IonCard, IonCardContent, IonIcon, IonProgressBar } from '@ionic/react';
+import { IonButton, IonCard, IonCardContent, IonIcon } from '@ionic/react';
 import { alertCircleOutline, arrowForward, chatbubbleOutline, logoWhatsapp, notificationsOutline } from 'ionicons/icons';
 import { fmtInt } from '../../../../utils/format';
 import type { ChannelFilter, DeliveryFilter, FocusFilter } from '../NotificationDispatchLogTypes';
@@ -52,9 +52,8 @@ const HealthPanel: React.FC<PanelProps> = ({ vm, channel, title, icon, counters,
  * alone (never summed): Meta delivered ≠ Twilio delivered ≠ Hub accepted.
  */
 const ChannelUsageCard: React.FC<{ vm: NotificationDispatchLogVM }> = ({ vm }) => {
-  const { health, quota, usage } = vm;
+  const { health, quota } = vm;
   const { metaWhatsapp: meta, sms, push } = health;
-  const quotaColor = quota?.exceeded ? 'danger' : quota?.low ? 'warning' : 'success';
 
   return (
     <div className="ndl-channels">
@@ -62,13 +61,10 @@ const ChannelUsageCard: React.FC<{ vm: NotificationDispatchLogVM }> = ({ vm }) =
         { label: 'Entregados', value: fmtInt(meta.delivered), target: { delivery: 'confirmed' } },
         { label: 'Fallidos', value: fmtInt(meta.failed), target: { delivery: 'failed' } },
         { label: 'Esperando', value: fmtInt(meta.awaiting), target: { delivery: 'awaiting' } },
-        { label: 'Cupo del mes', value: quota ? `${fmtInt(quota.used)}/${fmtInt(quota.limit)}` : '—' },
       ]}>
-        {quota && <IonProgressBar value={quota.ratio} color={quotaColor} />}
-        {quota?.exceeded && <p className="ndl-note-warn">Pasaste el cupo gratis: los siguientes mensajes pueden tener costo.</p>}
-        {usage && !quota && (
+        {quota?.exceeded && (
           <p className="ndl-note-warn">
-            <IonIcon icon={alertCircleOutline} /> Configuración requerida: falta el cupo gratis (WHATSAPP_FREE_MONTHLY_LIMIT), no se sabe cuántos quedan.
+            <IonIcon icon={alertCircleOutline} /> Llegaste al límite de 24 h de Meta: los siguientes mensajes pueden no enviarse.
           </p>
         )}
       </HealthPanel>

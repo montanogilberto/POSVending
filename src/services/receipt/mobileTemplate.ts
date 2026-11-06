@@ -127,7 +127,7 @@ function buildPaymentSection(data: UnifiedReceiptData): string {
 }
 
 export function generateMobileReceiptHTML(data: UnifiedReceiptData): string {
-  const companyName = escapeHtml(data.company?.name || 'Lavandería GMO');
+  const companyName = escapeHtml(data.company?.name || 'GMO');
   const branch = '';
   const receiptNumber = escapeHtml(data.id || '-');
   const dateTime = escapeHtml(`${data.date || ''} ${data.time || ''}`.trim());

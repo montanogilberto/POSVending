@@ -19,6 +19,7 @@ import CenterTabs from './components/CenterTabs';
 import TrendChart from './components/TrendChart';
 import ChannelComparison from './components/ChannelComparison';
 import FailureBreakdown from './components/FailureBreakdown';
+import PhoneIssuesCard from './components/PhoneIssuesCard';
 
 /**
  * Centro de notificaciones: Resumen (KPIs, tendencia, canales) · Operaciones (salud de
@@ -66,6 +67,7 @@ const NotificationDispatchLogView: React.FC = () => {
                   <FailureBreakdown vm={vm} />
                   <ActionCenter vm={vm} />
                 </div>
+                <PhoneIssuesCard vm={vm} />
               </>}
 
               {vm.section === 'history' && (vm.total === 0

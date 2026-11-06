@@ -3,7 +3,7 @@ import type { NotificationDispatch } from '../../../api/notificationDispatchApi'
 import {
   actionItems, attentionCount, channelComparison, defaultGranularity, failureBreakdown, failureCause, trendBucketStart, trendSeries, channelHealth, clientHistory, computeKpis, deliveryState, deliveryTimeline, hermosilloMonthKey,
   inDateRange, inMonth, isConfigFailure, isShownOnScreen, isStale, keyMetrics, matchesDelivery, matchesFocus, matchesSearch, pageWindow,
-  paginate, parseAttempts, percent, providerHealth, retryEligibility, sortRows, toRow, whatsappQuota,
+  paginate, parseAttempts, percent, failureReason, phoneIssues, providerHealth, retryEligibility, sortRows, toRow, whatsappQuota, whatsappRecipients24h,
 } from './NotificationStats';
 
 const row = (over: Partial<NotificationDispatch> = {}): NotificationDispatch => ({
@@ -186,6 +186,27 @@ describe('whatsappQuota', () => {
   it('flags low and going over the allowance', () => {
     expect(whatsappQuota(9, 10, 0.2)).toMatchObject({ remaining: 1, low: true, exceeded: false });
     expect(whatsappQuota(3, 2)).toMatchObject({ used: 3, remaining: 0, ratio: 1, exceeded: true, low: true });
+  });
+});
+
+describe('whatsappRecipients24h', () => {
+  const now = new Date('2026-10-03T00:00:00Z');
+  const meta = { selectedChannel: 'whatsapp' as const, providerName: 'meta_whatsapp' };
+  it('counts each recipient once, inside the last 24 h only', () => {
+    const rows = [
+      toRow(row({ ...meta, recipientId: 1 })),
+      toRow(row({ ...meta, recipientId: 1 })),
+      toRow(row({ ...meta, recipientId: 2 })),
+      toRow(row({ ...meta, recipientId: 3, created_At: '2026-10-01T23:59:00.000' })),
+    ];
+    expect(whatsappRecipients24h(rows, now)).toBe(2);
+  });
+  it('leaves out failed sends and other providers', () => {
+    const rows = [
+      toRow(row({ ...meta, status: 'failed' })),
+      toRow(row({ selectedChannel: 'sms', providerName: 'twilio_sms' })),
+    ];
+    expect(whatsappRecipients24h(rows, now)).toBe(0);
   });
 });
 
@@ -412,9 +433,62 @@ describe('failureCause', () => {
     expect(b.total).toBe(2);
     expect(b.causes).toEqual({ temporary: 0, config: 1, recipient: 0, unknown: 1 });
   });
+  it('21614 is the number, not a retry candidate', () => {
+    const r = toRow(row({ status: 'failed', selectedChannel: 'sms', providerErrorCode: '21614' }));
+    expect(failureCause(r)).toBe('recipient');
+    expect(retryEligibility(r).eligible).toBe(false);
+  });
   it('focus filters match the breakdown', () => {
     const r = toRow(row({ status: 'failed', providerErrorCode: '21211' }));
     expect(matchesFocus(r, 'failRecipient')).toBe(true);
     expect(matchesFocus(r, 'failTemporary')).toBe(false);
+  });
+});
+
+describe('failureReason', () => {
+  it('says why in a few words, only for failures', () => {
+    expect(failureReason(toRow(row({ status: 'failed', providerErrorCode: '131026' })))).toBe('No recibe WhatsApp');
+    expect(failureReason(toRow(row({ status: 'failed', providerErrorCode: '21614' })))).toBe('Número inválido');
+    expect(failureReason(toRow(row({ status: 'failed', providerErrorCode: '99999' })))).toBe('Código 99999');
+    expect(failureReason(toRow(row({ status: 'failed' })))).toBe('Sin código del proveedor');
+    expect(failureReason(toRow(row({ status: 'confirmed', providerErrorCode: '131026' })))).toBe('');
+  });
+});
+
+describe('phoneIssues', () => {
+  const at = (n: number) => `2026-10-0${n}T12:00:00.000`;
+  const wa = (n: number, over: Partial<NotificationDispatch>) => toRow(row({ notificationDispatchId: n, created_At: at(n), ...over }), 'Ana', '+526620000000');
+  const sms = (n: number, over: Partial<NotificationDispatch>) => wa(n, { selectedChannel: 'sms', ...over });
+  const noWa = { status: 'failed', providerErrorCode: '131026' } as const;
+  const bad = { status: 'failed', providerErrorCode: '21614' } as const;
+
+  it('counts the failures of one client and keeps its name and phone', () => {
+    expect(phoneIssues([wa(1, noWa), wa(2, noWa)])).toEqual([{
+      clientId: 2330, clientName: 'Ana', clientPhone: '+526620000000', problem: 'noWhatsapp', failures: 2, lastAt: at(2),
+    }]);
+  });
+  it('a bad number wins over no WhatsApp for the same client', () => {
+    expect(phoneIssues([wa(1, noWa), sms(2, bad)]).map(i => i.problem)).toEqual(['invalid']);
+  });
+  it('lists bad numbers first', () => {
+    const issues = phoneIssues([sms(1, { ...bad, recipientId: 1 }), wa(2, { ...noWa, recipientId: 2 })]);
+    expect(issues.map(i => i.clientId)).toEqual([1, 2]);
+  });
+  it('a later WhatsApp delivery clears both problems', () => {
+    expect(phoneIssues([wa(1, noWa), sms(2, bad), wa(3, { status: 'confirmed' })])).toEqual([]);
+  });
+  it('a later accepted SMS clears a bad number but says nothing about WhatsApp', () => {
+    expect(phoneIssues([sms(1, bad), sms(2, { status: 'sent' })])).toEqual([]);
+    expect(phoneIssues([wa(1, noWa), sms(2, { status: 'sent' })]).map(i => i.problem)).toEqual(['noWhatsapp']);
+  });
+  it('a failure after a delivery counts again', () => {
+    expect(phoneIssues([wa(1, { status: 'confirmed' }), wa(2, noWa)])).toHaveLength(1);
+  });
+  it('ignores config failures, delivered-after-failure and users', () => {
+    expect(phoneIssues([
+      wa(1, { status: 'failed', providerErrorCode: '132001' }),
+      wa(2, { ...noWa, status: 'sent', failedAt: at(2), confirmedAt: at(3) }),
+      wa(3, { ...noWa, recipientType: 'user' }),
+    ])).toEqual([]);
   });
 });

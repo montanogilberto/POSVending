@@ -24,6 +24,7 @@ import {
   fetchMyNotifications, markNotificationsRead, InboxNotification,
 } from '../../api/myNotificationsApi';
 import { resolveNotificationRoute } from '../../utils/routes';
+import { getPostLoginRoute } from '../../utils/postLoginRoute';
 
 const TYPE_ICON: Record<string, string> = {
   Success: checkmarkCircleOutline,
@@ -76,6 +77,8 @@ const NotificationsInboxPage: React.FC = () => {
     <IonPage>
       <Header
         screenTitle="Mis notificaciones"
+        showBackButton={true}
+        backButtonHref={getPostLoginRoute(roleCode, clientId)}
         presentAlertPopover={(e) => { setPopEvent(e); setShowAlert(true); }}
         presentMailPopover={(e) => { setPopEvent(e); setShowMail(true); }}
       />

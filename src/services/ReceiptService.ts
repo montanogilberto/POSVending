@@ -17,7 +17,6 @@ import { formatClientName, getPaymentMethodText, normalizePaymentMethod } from '
 import { generatePrintHTML } from './receipt/printTemplate';
 import { generateMobileReceiptHTML } from './receipt/mobileTemplate';
 import { generateReceiptBlob, printReceipt } from './receipt/printRuntime';
-import { COMPANY_INFO } from './receipt/companyInfo';
 
 export class ReceiptService {
   // Keep public API and method names for backward compatibility
@@ -59,7 +58,6 @@ export class ReceiptService {
 
   // Keep internal helpers reachable if any legacy callsites used them via bracket access/tests.
   // These wrappers preserve behavior while moving logic to dedicated modules.
-  private static readonly COMPANY_INFO = COMPANY_INFO;
   private static formatClientName(name: string): string {
     return formatClientName(name);
   }

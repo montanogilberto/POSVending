@@ -131,7 +131,7 @@ export interface NotificationUsage {
   since: string;
   /** 'meta' when WA_SENDER_PHONE_NUMBER_ID is set on the backend. */
   whatsappProvider: 'meta' | 'none';
-  /** WHATSAPP_FREE_MONTHLY_LIMIT; null when the owner has not configured it. */
+  /** WHATSAPP_LIMIT_24H, Meta's rolling 24 h limit; null when the owner has not configured it. */
   whatsappLimit: number | null;
   /** The whole Twilio account (every company), not just this one. */
   twilio: { ok: true; whatsapp: ProviderCounts; sms: ProviderCounts } | { ok: false; error: string };

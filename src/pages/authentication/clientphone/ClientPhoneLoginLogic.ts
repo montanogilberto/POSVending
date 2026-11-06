@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useUser } from '../../../contexts/UserContext';
+import { getOneCompany } from '../../../api/companiesApi';
 import { useToast } from '../../../hooks/useToast';
 import {
   sendClientLoginCode, verifyClientLoginCode, setClientPassword, verifyClientPassword, CodeChannel,
@@ -28,6 +29,7 @@ import { pinProblem } from '../../../utils/pin';
 export type ClientPhoneStep = 'quick' | 'phone' | 'code' | 'set-pin' | 'pin' | 'biometric';
 
 interface PendingLogin {
+  pinToken?: string;
   userId: number;
   username: string;
   companyId: number;
@@ -39,7 +41,7 @@ interface PendingLogin {
 /** Phone → (SMS code → PIN) → (biometric) sign-in for customers, shared by /client-login and the Arcade / Rewards login. */
 export const useClientPhoneLogin = (app: LoginApp) => {
   const history = useHistory();
-  const { login } = useUser();
+  const { login, setUserData } = useUser();
 
   const codeRef = useRef<string>('');
   const pinRef = useRef<string>('');
@@ -159,6 +161,10 @@ export const useClientPhoneLogin = (app: LoginApp) => {
       roleCode: pending.roleCode,
       roleName: pending.roleName,
     });
+    // Never holds up the login: the name only labels screens and receipts.
+    getOneCompany(pending.companyId)
+      .then((company) => { if (company?.name) setUserData({ companyName: company.name }); })
+      .catch((err) => console.log('[ClientPhoneLogin] company name failed:', err));
     history.push(appDestination(app, pending.roleCode, pending.clientId).route);
   };
 
@@ -197,6 +203,7 @@ export const useClientPhoneLogin = (app: LoginApp) => {
         return;
       }
       pendingLoginRef.current = {
+        pinToken: result.pinToken,
         userId: Number(result.userId) || 0,
         username: `${result.firstName ?? ''} ${result.lastName ?? ''}`.trim() || 'Cliente',
         companyId: Number(result.companyId) || 0,
@@ -225,7 +232,7 @@ export const useClientPhoneLogin = (app: LoginApp) => {
     setLoading(true);
     try {
       // The PIN is stored as the account's password (4–50 chars server side): no schema change.
-      const result = await setClientPassword(pending.userId, newPinRef.current.trim());
+      const result = await setClientPassword(pending.userId, newPinRef.current.trim(), pending.pinToken);
       if (!result.success) {
         showToast(result.error || 'No se pudo guardar el PIN');
         return;
