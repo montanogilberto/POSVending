@@ -2,7 +2,7 @@ import { API_BASE_URL } from '../utils/appEnv';
 import { ledgerBalance, postLedgerEntry } from './bankingApi';
 
 /**
- * Saldo prepago de GMO Lavandería — vive en walletTransactions, el mismo libro
+ * Saldo prepago de la compañía — vive en walletTransactions, el mismo libro
  * que descuenta /laundryDevices/authorize (LAUNDRY_USAGE) cuando el cliente
  * escanea su QR en la lavadora. Dos formas de recargar:
  *   - tarjeta (Stripe, paymentType laundry_top_up): el backend acredita el NETO
@@ -35,7 +35,7 @@ export const createLaundryTopUpIntent = async (
     body: JSON.stringify({
       companyId, fromClientId: clientId, toClientId: clientId,
       amount: Math.round(amountMXN * 100), paymentType: 'laundry_top_up',
-      description: `Recarga de saldo GMO Lavandería — ${amountMXN.toFixed(2)} MXN`,
+      description: `Recarga de saldo — ${amountMXN.toFixed(2)} MXN`,
     }),
   });
   const data = await res.json().catch(() => ({}));

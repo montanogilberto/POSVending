@@ -5,7 +5,7 @@ import {
   UnifiedProduct,
   UnifiedReceiptData
 } from '../../types/receipt';
-import { COMPANY_INFO } from './companyInfo';
+import { getReceiptCompany } from './companyInfo';
 import { normalizePaymentMethod, toEsDateTime } from './normalizers';
 
 export function extractCiclo(options: any[]): string | null {
@@ -131,7 +131,7 @@ export function adaptTicketToUnifiedReceipt(ticket: Ticket): UnifiedReceiptData 
       name: ticket.user.name,
       id: ticket.user.userId || 0
     },
-    company: COMPANY_INFO,
+    company: getReceiptCompany(),
     products,
     totals: {
       subtotal: ticket.totals.subtotal,
@@ -233,7 +233,7 @@ export function transformIncomeData(apiData: LegacyIncomeData): UnifiedReceiptDa
       name: apiData.userName,
       id: 0
     },
-    company: COMPANY_INFO,
+    company: getReceiptCompany(),
     products,
     totals: {
       subtotal: apiData.subtotal,
@@ -293,7 +293,7 @@ export function transformCartData(cartData: LegacyCartData): UnifiedReceiptData 
       name: cartData.user.name,
       id: 0
     },
-    company: COMPANY_INFO,
+    company: getReceiptCompany(),
     products,
     totals: {
       subtotal: cartData.totals.subtotal,

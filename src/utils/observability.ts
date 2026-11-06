@@ -9,6 +9,8 @@
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { API_BASE_URL } from './appEnv';
+import { getAccessToken } from './sessionTokens';
+import { refreshSession } from '../api/sessionApi';
 
 const AUTH_STORAGE_KEY = 'pos_gmo_auth';        // written by UserContext
 const WORKFLOW_STORAGE_KEY = 'pos_gmo_workflow'; // current business workflow
@@ -109,6 +111,66 @@ function isBackendCall(url: string): boolean {
   return url.includes(BACKEND_HOST);
 }
 
+// A 401 from these is the answer itself, not an expired session.
+const NO_REFRESH_PATHS = [
+  '/auth/refresh', '/login', '/set_client_password', '/verify_client_login_code', '/verify_client_password',
+];
+
+function canRefreshFor(url: string): boolean {
+  const { pathname } = new URL(url);
+  return !NO_REFRESH_PATHS.includes(pathname) && !pathname.startsWith('/laundryDevices/');
+}
+
+let refreshing: Promise<string | null> | null = null;
+
+/** Parallel 401s share one renewal. */
+function refreshOnce(fetchImpl: typeof fetch): Promise<string | null> {
+  refreshing ??= refreshSession(fetchImpl).finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+function backendHeaders(input: RequestInfo | URL, init?: RequestInit): Headers | null {
+  if (!isBackendCall(urlOf(input))) return null;
+
+  const headers = new Headers(
+    init?.headers || (input instanceof Request ? input.headers : undefined),
+  );
+
+  // Do not overwrite an explicitly-set correlation id.
+  if (!headers.has('X-Correlation-Id')) headers.set('X-Correlation-Id', uuid());
+
+  const workflowId = getCurrentWorkflowId();
+  if (workflowId && !headers.has('X-Workflow-Id')) headers.set('X-Workflow-Id', workflowId);
+
+  const auth = readAuth();
+  const setId = (name: string, value: unknown) => {
+    if (value != null && value !== 0 && value !== '0' && !headers.has(name)) {
+      headers.set(name, String(value));
+    }
+  };
+  setId('X-User-Id', auth.userId);
+  setId('X-Company-Id', auth.companyId);
+  setId('X-Client-Id', auth.clientId);
+
+  if (!headers.has('X-App-Version')) headers.set('X-App-Version', cachedAppVersion);
+  if (!headers.has('X-Device')) headers.set('X-Device', cachedDevice);
+
+  const accessToken = getAccessToken();
+  if (accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${accessToken}`);
+
+  if (obsDebug()) {
+    console.debug('[obs] →', urlOf(input), {
+      correlationId: headers.get('X-Correlation-Id'),
+      workflowId: headers.get('X-Workflow-Id'),
+      userId: headers.get('X-User-Id'),
+    });
+  }
+
+  return headers;
+}
+
 let installed = false;
 
 export function installObservabilityFetch(): void {
@@ -129,47 +191,26 @@ export function installObservabilityFetch(): void {
 
   const originalFetch = window.fetch.bind(window);
 
-  window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    let headers: Headers | null = null;
     try {
-      if (!isBackendCall(urlOf(input))) {
-        return originalFetch(input, init);
-      }
-
-      const headers = new Headers(
-        init?.headers || (input instanceof Request ? input.headers : undefined),
-      );
-
-      // Do not overwrite an explicitly-set correlation id.
-      if (!headers.has('X-Correlation-Id')) headers.set('X-Correlation-Id', uuid());
-
-      const workflowId = getCurrentWorkflowId();
-      if (workflowId && !headers.has('X-Workflow-Id')) headers.set('X-Workflow-Id', workflowId);
-
-      const auth = readAuth();
-      const setId = (name: string, value: unknown) => {
-        if (value != null && value !== 0 && value !== '0' && !headers.has(name)) {
-          headers.set(name, String(value));
-        }
-      };
-      setId('X-User-Id', auth.userId);
-      setId('X-Company-Id', auth.companyId);
-      setId('X-Client-Id', auth.clientId);
-
-      if (!headers.has('X-App-Version')) headers.set('X-App-Version', cachedAppVersion);
-      if (!headers.has('X-Device')) headers.set('X-Device', cachedDevice);
-
-      if (obsDebug()) {
-        console.debug('[obs] →', urlOf(input), {
-          correlationId: headers.get('X-Correlation-Id'),
-          workflowId: headers.get('X-Workflow-Id'),
-          userId: headers.get('X-User-Id'),
-        });
-      }
-
-      return originalFetch(input, { ...init, headers });
+      headers = backendHeaders(input, init);
     } catch {
       // Never let header injection break a request.
-      return originalFetch(input, init);
     }
+    if (!headers) return originalFetch(input, init);
+
+    // Only header building is guarded: a network failure must reach the caller,
+    // sending the request again could repeat a payment.
+    const retryInput = input instanceof Request ? input.clone() : input;
+    const response = await originalFetch(input, { ...init, headers });
+    if (response.status !== 401 || !headers.has('Authorization') || !canRefreshFor(urlOf(input))) {
+      return response;
+    }
+
+    const accessToken = await refreshOnce(originalFetch);
+    if (!accessToken) return response;
+    headers.set('Authorization', `Bearer ${accessToken}`);
+    return originalFetch(retryInput, { ...init, headers });
   };
 }

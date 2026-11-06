@@ -4,9 +4,10 @@ import { DEFAULT_AVATAR_URL } from '../utils/formatters';
 import { ClientType } from '../api/clientsApi';
 import { listClientCapabilities } from '../api/clientCapabilitiesApi';
 import { ProductContext, availableProducts, defaultProduct } from '../utils/productContext';
+import { SESSION_EXPIRED_EVENT, clearSessionTokens } from '../utils/sessionTokens';
 
 // ── Storage key ────────────────────────────────────────────────────────────
-const STORAGE_KEY = 'pos_gmo_auth';
+export const STORAGE_KEY = 'pos_gmo_auth';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export interface AuthData {
@@ -114,6 +115,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loadRoleCatalog();
   }, []);
 
+  useEffect(() => {
+    const onExpired = () => logout();
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
+
   // clientCapabilities isn't part of what login()/setUserData get handed
   // directly (none of /login, /client-login's verify response, or
   // CreateAccount's flow return it) — fetched here instead, once per
@@ -187,6 +194,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     console.log("🔴 UserContext LOGOUT called. isAuthenticated will become false");
     localStorage.removeItem(STORAGE_KEY);
+    clearSessionTokens();
     setAuth(DEFAULT_AUTH);
   };
 

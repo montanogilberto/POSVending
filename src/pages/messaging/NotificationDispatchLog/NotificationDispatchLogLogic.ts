@@ -11,9 +11,9 @@ import {
 import { getAllClients } from '../../../api/clientsApi';
 import {
   actionItems, channelComparison, channelHealth, clientHistory, computeKpis, defaultGranularity, failureBreakdown,
-  hermosilloMonthKey, inDateRange, inMonth, isShownOnScreen, keyMetrics, matchesDelivery, matchesFocus, matchesSearch, paginate, providerHealth, sortRows, toRow, trendSeries, whatsappQuota,
+  inDateRange, isShownOnScreen, keyMetrics, matchesDelivery, matchesFocus, matchesSearch, paginate, phoneIssues, providerHealth, sortRows, toRow, trendSeries, whatsappQuota, whatsappRecipients24h,
 } from './NotificationStats';
-import { clientProfileRoute, PAGE_SIZE } from './NotificationDispatchLogConstants';
+import { clientProfileRoute, PAGE_SIZE, WHATSAPP_LIMIT_24H } from './NotificationDispatchLogConstants';
 import type {
   CenterSection, ChannelFilter, CustomRange, DateFilter, DeliveryFilter, DetailTab, DispatchRow, FocusFilter, SortKey,
   TrendGranularity,
@@ -61,7 +61,10 @@ export const useNotificationDispatchLog = () => {
         fetchNotificationUsage(),
       ]);
       const names = new Map(clients.map(c => [c.clientId, `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()]));
-      setRows(data.filter(isShownOnScreen).map(d => toRow(d, d.recipientType === 'client' ? names.get(d.recipientId) ?? '' : '')));
+      const phones = new Map(clients.map(c => [c.clientId, c.cellphone ?? '']));
+      setRows(data.filter(isShownOnScreen).map(d => (d.recipientType === 'client'
+        ? toRow(d, names.get(d.recipientId) ?? '', phones.get(d.recipientId) ?? '')
+        : toRow(d))));
       setUsage(providerUsage);
       setLastUpdated(new Date());
     } catch (err) {
@@ -96,6 +99,7 @@ export const useNotificationDispatchLog = () => {
   const actions = useMemo(() => actionItems(periodRows), [periodRows]);
   const failures = useMemo(() => failureBreakdown(periodRows), [periodRows]);
   const channels = useMemo(() => channelComparison(periodRows), [periodRows]);
+  const phones = useMemo(() => phoneIssues(periodRows), [periodRows]);
 
   // A new period goes back to the bucket size that fits it.
   useEffect(() => { setGranularity(null); }, [dateFilter, customRange]);
@@ -104,19 +108,15 @@ export const useNotificationDispatchLog = () => {
   const twilioReachable = usage ? usage.twilio.ok : null;
   const providers = useMemo(() => providerHealth(rows, twilioReachable), [rows, twilioReachable]);
 
-  // The free WhatsApp allowance is monthly, whatever period is on screen.
-  const monthKey = hermosilloMonthKey(new Date().toISOString());
-  const monthMeta = useMemo(() => channelHealth(inMonth(rows, monthKey)).metaWhatsapp, [rows, monthKey]);
-  // Meta bills what went out: delivered + still awaiting, never the failed ones.
+  // Meta's limit is a rolling 24 h, whatever period is on screen.
   const quota = useMemo(
-    () => whatsappQuota(monthMeta.delivered + monthMeta.awaiting, usage?.whatsappLimit ?? null),
-    [monthMeta, usage]);
+    () => whatsappQuota(whatsappRecipients24h(rows), usage?.whatsappLimit ?? WHATSAPP_LIMIT_24H),
+    [rows, usage]);
   /** Settings the screen knows are missing; null usage = the backend could not be asked. */
   const configWarnings = useMemo(() => {
     if (!usage) return [] as string[];
     const list: string[] = [];
     if (usage.whatsappProvider === 'none') list.push('WhatsApp (Meta) no está configurado en el servidor: los avisos salen por SMS.');
-    if (usage.whatsappLimit === null) list.push('Falta configurar el cupo gratis de WhatsApp (WHATSAPP_FREE_MONTHLY_LIMIT).');
     return list;
   }, [usage]);
 
@@ -153,11 +153,13 @@ export const useNotificationDispatchLog = () => {
   };
   const closeDetail = () => setSelected(null);
 
-  const openClientProfile = () => {
-    if (selected?.recipientType !== 'client') return;
-    const id = selected.recipientId;
+  const openClient = (clientId: number) => {
     setSelected(null);
-    router.push(clientProfileRoute(id));
+    router.push(clientProfileRoute(clientId));
+  };
+
+  const openClientProfile = () => {
+    if (selected?.recipientType === 'client') openClient(selected.recipientId);
   };
 
   const copyText = async (text: string | number | undefined, what: string) => {
@@ -177,9 +179,9 @@ export const useNotificationDispatchLog = () => {
     initialLoading: !loadedOnce && !!companyId,
     refresh: load, toastProps, total: rows.length, isDesktop, historyRef,
     kpis, metrics, health, actions, providers, quota, usage, configWarnings,
-    section, setSection, granularity, setGranularity, trend, channels, failures,
+    section, setSection, granularity, setGranularity, trend, channels, failures, phones,
     filtered, pageData, setPage, sortKey, setSortKey, showInList,
-    selected, openDetail, closeDetail, detailTab, setDetailTab, history, openClientProfile, copyText,
+    selected, openDetail, closeDetail, detailTab, setDetailTab, history, openClient, openClientProfile, copyText,
     search, setSearch, focus, setFocus,
     sourceFilter, setSourceFilter, channelFilter, setChannelFilter, deliveryFilter, setDeliveryFilter,
     dateFilter, setDateFilter, customRange, setCustomRange,

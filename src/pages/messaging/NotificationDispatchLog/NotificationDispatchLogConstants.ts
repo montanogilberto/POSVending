@@ -1,6 +1,9 @@
 import { chatbubbleOutline, logoWhatsapp, notificationsOutline } from 'ionicons/icons';
 
-/** Below this share of the free allowance left, the quota card turns amber. */
+/** Meta's messaging limit today; WHATSAPP_LIMIT_24H on the backend overrides it if the tier grows. */
+export const WHATSAPP_LIMIT_24H = 250;
+
+/** Below this share of Meta's 24 h limit left, the quota card turns amber. */
 export const WHATSAPP_LOW_QUOTA_RATIO = 0.2;
 
 export const OUTCOME_LABELS: Record<string, string> = {
@@ -29,6 +32,7 @@ export const STALE_PENDING_HOURS = 6;
  */
 export const NON_RETRYABLE_ERRORS: Record<string, { reason: string; config?: boolean }> = {
   '21211': { reason: 'El número es inválido: corrige el teléfono del cliente antes de reenviar.' },
+  '21614': { reason: 'El número no es un celular válido: corrige el teléfono del cliente antes de reenviar.' },
   '21608': { reason: 'La cuenta de Twilio es de prueba y el número no está verificado.', config: true },
   '63003': { reason: 'El número no tiene WhatsApp: hay que usar otro canal.' },
   '63024': { reason: 'El destinatario no es válido para WhatsApp: hay que usar otro canal.' },
@@ -75,7 +79,7 @@ export const CHANNEL_LABELS: Record<string, string> = {
 export const PROVIDER_ERROR_LABELS: Record<string, string> = {
   // Meta WhatsApp Cloud
   '131047': 'Fuera de la ventana de 24 h: se requiere una plantilla aprobada',
-  '131026': 'WhatsApp no pudo entregarlo a este número (bloqueó al negocio, app desactualizada o términos sin aceptar)',
+  '131026': 'WhatsApp no pudo entregarlo a este número (sin WhatsApp, bloqueó al negocio, app desactualizada o términos sin aceptar)',
   '131042': 'Problema de pago en la cuenta de WhatsApp Business',
   '131049': 'Meta no entregó el mensaje para cuidar la experiencia del usuario',
   '132001': 'La plantilla no existe o no está aprobada',
@@ -86,8 +90,36 @@ export const PROVIDER_ERROR_LABELS: Record<string, string> = {
   '63003': 'El número no tiene WhatsApp',
   '63024': 'Destinatario inválido para WhatsApp',
   '21211': 'Número de teléfono inválido',
+  '21614': 'El número no es un celular válido',
   '21608': 'Número no verificado (cuenta de prueba)',
   '30008': 'Error desconocido del operador',
+};
+
+/** Provider error code → the few words shown under "Fallido" in the messages table. */
+export const FAILURE_REASON_LABELS: Record<string, string> = {
+  '131026': 'No recibe WhatsApp',
+  '63003': 'No recibe WhatsApp',
+  '63024': 'No recibe WhatsApp',
+  '21211': 'Número inválido',
+  '21614': 'Número inválido',
+  '21608': 'Número no verificado',
+  '131047': 'Fuera de la ventana de 24 h',
+  '63016': 'Fuera de la ventana de 24 h',
+  '63005': 'Requiere plantilla aprobada',
+  '132001': 'Plantilla no aprobada',
+  '131042': 'Problema de pago en Meta',
+  '131049': 'Meta no lo entregó',
+  '130472': 'Excluido por Meta',
+  '30008': 'Error del operador',
+};
+
+/** Codes that point at the client's phone, for the "Teléfonos por revisar" card. */
+export const INVALID_PHONE_CODES = ['21211', '21614'];
+export const NO_WHATSAPP_CODES = ['131026', '63003', '63024'];
+
+export const PHONE_ISSUE_LABELS: Record<string, string> = {
+  invalid: 'Número inválido: corrige el teléfono del cliente.',
+  noWhatsapp: 'No recibe WhatsApp: confirma el número con el cliente.',
 };
 
 /** Text for the "Motivo del fallo" row: known code → Spanish, else the provider's own message. */

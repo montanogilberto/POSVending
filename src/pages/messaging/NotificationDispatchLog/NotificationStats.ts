@@ -5,11 +5,13 @@ import { hermosilloMonthKey, inPeriod } from '../../../utils/period';
 export { hermosilloDayKey, hermosilloMonthKey } from '../../../utils/period';
 export { paginate, pageWindow } from '../../../utils/paging';
 export { percent } from '../../../utils/format';
-import { NON_RETRYABLE_ERRORS, STALE_PENDING_HOURS, WHATSAPP_LOW_QUOTA_RATIO } from './NotificationDispatchLogConstants';
+import {
+  FAILURE_REASON_LABELS, INVALID_PHONE_CODES, NO_WHATSAPP_CODES, NON_RETRYABLE_ERRORS, STALE_PENDING_HOURS, WHATSAPP_LOW_QUOTA_RATIO,
+} from './NotificationDispatchLogConstants';
 import type {
   ActionItems, ChannelComparisonRow, ChannelCounts, ChannelHealth, CustomRange, DateFilter, DeliveryFilter, DeliveryState, DispatchAttempt,
   DispatchRow, FocusFilter, KeyMetrics, NotificationKpis, ProviderHealth, RetryEligibility, SortKey, TimelineStep,
-  FailureBreakdown, FailureCause, TrendGranularity, TrendPoint, WhatsappQuota,
+  FailureBreakdown, FailureCause, PhoneIssue, PhoneProblem, TrendGranularity, TrendPoint, WhatsappQuota,
 } from './NotificationDispatchLogTypes';
 
 const createdMs = (r: DispatchRow) => new Date(r.created_At.includes('Z') ? r.created_At : `${r.created_At}Z`).getTime();
@@ -54,9 +56,10 @@ export const parseAttempts = (raw: string | undefined): DispatchAttempt[] => {
  */
 export const isShownOnScreen = (row: NotificationDispatch) => row.providerName !== 'twilio_whatsapp';
 
-export const toRow = (row: NotificationDispatch, clientName = ''): DispatchRow => ({
+export const toRow = (row: NotificationDispatch, clientName = '', clientPhone = ''): DispatchRow => ({
   ...row,
   clientName,
+  clientPhone,
   delivery: deliveryState(row),
   attempts: parseAttempts(row.attemptedChannels),
 });
@@ -112,7 +115,20 @@ export const channelHealth = (rows: DispatchRow[]): ChannelHealth => {
   };
 };
 
-/** `used` messages against the free allowance; null when no allowance is configured. */
+/**
+ * Customers the business started a WhatsApp with in the last 24 h, the way Meta counts
+ * its messaging limit: unique recipients. Agent and staff replies aren't dispatches, so
+ * they stay out, as they should. An estimate: Meta's own count isn't available here.
+ */
+export const whatsappRecipients24h = (rows: DispatchRow[], now: Date = new Date()): number => {
+  const since = now.getTime() - 24 * 60 * 60 * 1000;
+  return new Set(rows
+    .filter(r => r.selectedChannel === 'whatsapp' && r.providerName === 'meta_whatsapp' && r.delivery !== 'failed')
+    .filter(r => createdMs(r) >= since && createdMs(r) <= now.getTime())
+    .map(r => `${r.recipientType}:${r.recipientId}`)).size;
+};
+
+/** `used` recipients against Meta's 24 h limit; null when no limit is configured. */
 export const whatsappQuota = (used: number, limit: number | null, lowRatio = WHATSAPP_LOW_QUOTA_RATIO): WhatsappQuota | null => {
   if (!limit || limit <= 0) return null;
   const remaining = Math.max(limit - used, 0);
@@ -348,6 +364,52 @@ export const failureCause = (row: DispatchRow): FailureCause | null => {
   const rule = NON_RETRYABLE_ERRORS[code];
   if (!rule) return 'temporary';
   return rule.config ? 'config' : 'recipient';
+};
+
+/** The few words under "Fallido" in the table; '' when the message did not fail. */
+export const failureReason = (row: DispatchRow): string => {
+  if (row.delivery !== 'failed') return '';
+  const code = (row.providerErrorCode ?? '').trim();
+  if (!code) return 'Sin código del proveedor';
+  return FAILURE_REASON_LABELS[code] ?? `Código ${code}`;
+};
+
+const phoneProblem = (row: DispatchRow): PhoneProblem | null => {
+  if (row.delivery !== 'failed') return null;
+  const code = (row.providerErrorCode ?? '').trim();
+  if (INVALID_PHONE_CODES.includes(code)) return 'invalid';
+  return NO_WHATSAPP_CODES.includes(code) ? 'noWhatsapp' : null;
+};
+
+/**
+ * Clients whose number is failing, bad numbers first. A later message that got through
+ * clears the problem (the phone was corrected): a WhatsApp delivery proves the number
+ * for both channels, an SMS accepted by Twilio only proves it is valid — bad numbers
+ * are rejected on the spot, and an accepted SMS says nothing about WhatsApp.
+ */
+export const phoneIssues = (rows: DispatchRow[]): PhoneIssue[] => {
+  const open = new Map<string, PhoneIssue>();
+  for (const r of sortRows(rows, 'oldest')) {
+    if (r.recipientType !== 'client') continue;
+    const problem = phoneProblem(r);
+    if (problem) {
+      const key = `${r.recipientId}:${problem}`;
+      open.set(key, {
+        clientId: r.recipientId, clientName: r.clientName, clientPhone: r.clientPhone,
+        problem, failures: (open.get(key)?.failures ?? 0) + 1, lastAt: r.created_At,
+      });
+    } else if (r.selectedChannel === 'whatsapp' && r.delivery === 'confirmed') {
+      open.delete(`${r.recipientId}:noWhatsapp`);
+      open.delete(`${r.recipientId}:invalid`);
+    } else if (r.selectedChannel === 'sms' && (r.delivery === 'confirmed' || r.delivery === 'unconfirmed')) {
+      open.delete(`${r.recipientId}:invalid`);
+    }
+  }
+  const issues = [...open.values()];
+  const bad = new Set(issues.filter(i => i.problem === 'invalid').map(i => i.clientId));
+  return issues
+    .filter(i => i.problem === 'invalid' || !bad.has(i.clientId))
+    .sort((a, b) => Number(b.problem === 'invalid') - Number(a.problem === 'invalid') || b.lastAt.localeCompare(a.lastAt));
 };
 
 export const failureBreakdown = (rows: DispatchRow[]): FailureBreakdown => {

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../utils/appEnv';
+import { SessionTokens, saveSessionTokens } from '../utils/sessionTokens';
 export { API_BASE_URL };
 
 /** Azure blob container for user profile photos (filename in `image`, full URL in `imageUrl`). */
@@ -20,6 +21,7 @@ export interface ApiUser {
 }
 
 export interface LoginResult {
+  session?: SessionTokens;
   userId?: string | number;
   companyId?: string | number;
   branchId?: string | number;
@@ -303,7 +305,12 @@ export const postLogin = async (
   }
 
   const data: LoginResponse = await response.json();
-  return data.result?.[0] ?? null;
+  const first = data.result?.[0];
+  if (!first) return null;
+  // Tokens stop here: callers log this result.
+  const { session, ...result } = first;
+  saveSessionTokens(session);
+  return result;
 };
 
 /**

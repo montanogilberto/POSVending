@@ -95,7 +95,6 @@ Optional per-environment build values. Anything left empty uses the defaults in 
 |---|---|---|
 | `VITE_API_URL` | variable | Backend URL for that environment (default: production backend) |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | variable | Stripe key (use `pk_test_…` for DEV/QA) |
-| `VITE_WORKER_KEY` | secret | `x-worker-key` header for `/registerDevice` |
 
 `VITE_APP_ENV` is set automatically by the workflow (`dev`, `qa`, `prod`).
 
