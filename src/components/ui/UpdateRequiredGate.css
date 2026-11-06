@@ -1,0 +1,19 @@
+.update-required {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+
+.update-required h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.update-required p {
+  margin: 0 0 12px;
+  color: var(--ion-color-medium);
+}

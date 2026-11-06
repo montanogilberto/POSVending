@@ -212,6 +212,8 @@ import BiometricLockScreen from './components/BiometricLockScreen';
 import ZoomableImage from './components/ui/ZoomableImage';
 import { isBiometricLockEnabled, authenticateBiometric, isBiometricPromptInProgress } from './utils/biometricAuth';
 import { getPostLoginRoute } from './utils/postLoginRoute';
+import { getAccessToken } from './utils/sessionTokens';
+import UpdateRequiredGate from './components/ui/UpdateRequiredGate';
 import { myLoansRoute, notificationDetailRoute, p2pLendingRoute } from './utils/routes';
 import { PRODUCT_LABELS, productLandingRoute, discoverProducts, DiscoverProduct } from './utils/productContext';
 import DiscoverProductModal from './components/layout/DiscoverProductModal';
@@ -453,13 +455,16 @@ const AppShell: React.FC = () => {
 
       registrationHandle = await PushNotifications.addListener('registration', async (token) => {
         const platform = Capacitor.getPlatform();
+        // Sessions from before tokens existed: the device stays registered as it
+        // was and is updated at the next login.
+        if (!getAccessToken()) {
+          console.log('[Push] sin token de sesión, registro pendiente');
+          return;
+        }
         try {
           await fetch(`${API_BASE_URL}/registerDevice`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-worker-key': import.meta.env.VITE_WORKER_KEY ?? '',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               userId,
               token: token.value,
@@ -1367,24 +1372,26 @@ const App: React.FC = () => {
     <IncomeProvider>
       <ProductProvider>
         <IonApp>
-          <IonReactRouter>
-            <ExitConfirmProvider>
-              <BiometricLockGate>
-                <IonRouterOutlet id="root-outlet">
-                  <Route exact path="/login" component={Login} />
-                  <Route exact path="/forgot-password" component={ForgotPassword} />
-                  <Route exact path="/create-account" component={CreateAccount} />
-                  <Route exact path="/client-login" component={ClientLogin} />
+          <UpdateRequiredGate>
+            <IonReactRouter>
+              <ExitConfirmProvider>
+                <BiometricLockGate>
+                  <IonRouterOutlet id="root-outlet">
+                    <Route exact path="/login" component={Login} />
+                    <Route exact path="/forgot-password" component={ForgotPassword} />
+                    <Route exact path="/create-account" component={CreateAccount} />
+                    <Route exact path="/client-login" component={ClientLogin} />
 
-                  <Route exact path="/">
-                    <Redirect to="/login" />
-                  </Route>
+                    <Route exact path="/">
+                      <Redirect to="/login" />
+                    </Route>
 
-                  <Route component={AppShell} />
-                </IonRouterOutlet>
-              </BiometricLockGate>
-            </ExitConfirmProvider>
-          </IonReactRouter>
+                    <Route component={AppShell} />
+                  </IonRouterOutlet>
+                </BiometricLockGate>
+              </ExitConfirmProvider>
+            </IonReactRouter>
+          </UpdateRequiredGate>
         </IonApp>
       </ProductProvider>
     </IncomeProvider>

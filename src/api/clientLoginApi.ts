@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './usersApi';
+import { SessionTokens, saveSessionTokens } from '../utils/sessionTokens';
 
 /** Where the login code goes; WhatsApp falls back to SMS server side when it can't be sent. */
 export type CodeChannel = 'sms' | 'whatsapp';
@@ -25,6 +26,9 @@ export interface VerifyClientLoginCodeResult {
   lastName?: string;
   error?: string;
   firstLoginCompleted?: boolean;
+  session?: SessionTokens;
+  /** Proves the code was verified; /set_client_password needs it. */
+  pinToken?: string;
 }
 
 export interface SetClientPasswordResult {
@@ -33,6 +37,7 @@ export interface SetClientPasswordResult {
 }
 
 export interface VerifyClientPasswordResult {
+  session?: SessionTokens;
   valid: boolean;
   userId?: number | string;
   companyId?: number | string;
@@ -52,7 +57,7 @@ export const sendClientLoginCode = async (
   phone: string,
   { resetPin = false, channel = 'sms' }: { resetPin?: boolean; channel?: CodeChannel } = {},
 ): Promise<SendClientLoginCodeResult> => {
-  console.log('[sendClientLoginCode] phone=%s resetPin=%s channel=%s', phone, resetPin, channel);
+  console.log('[sendClientLoginCode] resetPin=%s channel=%s', resetPin, channel);
   const res = await fetch(`${API_BASE_URL}/send_client_login_code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -66,28 +71,30 @@ export const sendClientLoginCode = async (
 
 /** POST /verify_client_login_code — validates the OTP and returns the login payload. */
 export const verifyClientLoginCode = async (phone: string, code: string): Promise<VerifyClientLoginCodeResult> => {
-  console.log('[verifyClientLoginCode] phone=%s code=%s', phone, code);
   const res = await fetch(`${API_BASE_URL}/verify_client_login_code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ clientLoginCodes: [{ phone, code }] }),
   });
   const data = await res.json();
-  console.log('[verifyClientLoginCode] RESPONSE status=%d', res.status, data);
+  console.log('[verifyClientLoginCode] RESPONSE status=%d', res.status);
   if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-  return data;
+  const { session, ...result } = data;
+  saveSessionTokens(session);
+  return result;
 };
 
 /** POST /set_client_password — first-login onboarding: client sets a password. */
 export const setClientPassword = async (
   userId: number | string,
   password: string,
+  pinToken?: string,
 ): Promise<SetClientPasswordResult> => {
   console.log('[setClientPassword] userId=', userId);
   const res = await fetch(`${API_BASE_URL}/set_client_password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ setClientPassword: [{ userId, password }] }),
+    body: JSON.stringify({ setClientPassword: [{ userId, password, pinToken }] }),
   });
   const data = await res.json();
   console.log('[setClientPassword] RESPONSE status=%d', res.status, data);
@@ -100,14 +107,15 @@ export const verifyClientPassword = async (
   phone: string,
   password: string,
 ): Promise<VerifyClientPasswordResult> => {
-  console.log('[verifyClientPassword] phone=', phone);
   const res = await fetch(`${API_BASE_URL}/verify_client_password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ clientPasswordLogin: [{ phone, password }] }),
   });
   const data = await res.json();
-  console.log('[verifyClientPassword] RESPONSE status=%d', res.status, data);
+  console.log('[verifyClientPassword] RESPONSE status=%d', res.status);
   if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-  return data;
+  const { session, ...result } = data;
+  saveSessionTokens(session);
+  return result;
 };

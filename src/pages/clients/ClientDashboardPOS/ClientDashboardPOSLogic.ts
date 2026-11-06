@@ -33,7 +33,7 @@ import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboar
 export const useClientDashboardPOS = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const clientId = Number(clientIdParam);
-  const { companyId, userId } = useUser();
+  const { companyId, companyName, userId } = useUser();
   const history = useHistory();
   const { showToast, toastProps } = useToast();
 
@@ -208,6 +208,7 @@ export const useClientDashboardPOS = () => {
     qrDownloading,
     downloadQr,
     ...wallet,
+    walletTitle: companyName ? `Saldo ${companyName}` : 'Saldo',
     loading,
     toastProps,
     openReceipt: (incomeId: number) => history.push(`/receipt/${incomeId}`),

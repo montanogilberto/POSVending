@@ -21,6 +21,8 @@ export interface DispatchAttempt {
 export interface DispatchRow extends NotificationDispatch {
   /** Resolved from the clients list; '' when the recipient is a user or unknown. */
   clientName: string;
+  /** Resolved from the clients list; '' when unknown. */
+  clientPhone: string;
   delivery: DeliveryState;
   attempts: DispatchAttempt[];
 }
@@ -164,6 +166,19 @@ export interface ChannelComparisonRow extends ChannelCounts {
 
 /** Why failures happened, from the provider error code. */
 export type FailureCause = 'temporary' | 'config' | 'recipient' | 'unknown';
+
+/** What is wrong with a client's phone, from the provider codes. */
+export type PhoneProblem = 'invalid' | 'noWhatsapp';
+
+/** A client whose number keeps failing and nothing has reached them since. */
+export interface PhoneIssue {
+  clientId: number;
+  clientName: string;
+  clientPhone: string;
+  problem: PhoneProblem;
+  failures: number;
+  lastAt: string;
+}
 
 export interface FailureBreakdown {
   total: number;

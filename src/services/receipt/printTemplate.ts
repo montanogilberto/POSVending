@@ -117,7 +117,7 @@ function generateCompactFooter(data: UnifiedReceiptData): string {
   return `
     <div class="qr-wrapper">
       <div class="qr-label">Escanea para más información</div>
-      <img class="qr-image" src="${qrImageSrc}" alt="QR GMO Lavanderia" />
+      <img class="qr-image" src="${qrImageSrc}" alt="QR" />
     </div>
     <div class="divider"></div>
     <div class="footer">

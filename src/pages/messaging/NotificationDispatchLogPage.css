@@ -440,6 +440,14 @@ ion-button.ndl-counter::part(native) {
   font-weight: 600;
 }
 
+.ndl-cell-reason {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--ion-color-danger-shade);
+  white-space: normal;
+}
+
 .ndl-cell-attempts {
   text-align: center;
 }
@@ -649,6 +657,11 @@ ion-button.ndl-counter::part(native) {
 .ndl-compare,
 .ndl-failures {
   margin: 12px 4px 0;
+}
+
+.ndl-phone-list {
+  max-height: 360px;
+  overflow-y: auto;
 }
 
 .ndl-trend-head {
