@@ -4,7 +4,7 @@ import {
   IonLabel, IonToast, IonRouterLink, IonButton, IonIcon, IonLoading,
   IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonToggle,
 } from '@ionic/react';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useLocation } from 'react-router-dom';
 import {
   eye, eyeOff, fingerPrintOutline, personOutline, lockClosedOutline,
   logInOutline, callOutline, personAddOutline, headsetOutline, chevronForward,
@@ -13,7 +13,7 @@ import { useUser } from '../../contexts/UserContext';
 import { fetchUserProfile, parseUserId, postLogin } from '../../api/usersApi';
 import { isCashRegisterOpen, openCashRegister } from '../../api/cashRegisterApi';
 import { canAccess, normalizeRoleCode } from '../../config/rolePermissions';
-import { appDestination, LOGIN_APPS, LoginApp, readLastLoginApp, saveLastLoginApp } from '../../utils/loginApps';
+import { appDestination, LOGIN_APPS, LoginApp, loginAppFromSearch, readLastLoginApp, saveLastLoginApp } from '../../utils/loginApps';
 import LoginAppPicker from './LoginAppPicker';
 import PhoneAppLogin from './clientphone/PhoneAppLogin';
 import { DEFAULT_AVATAR_URL } from '../../utils/formatters';
@@ -32,12 +32,14 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const history = useHistory();
+  const location = useLocation();
+  const linkedApp = loginAppFromSearch(location.search);
   const { login, setUserData, isAuthenticated, roleCode, clientId } = useUser();
 
   const usernameRef = useRef<string>('');
   const passwordRef = useRef<string>('');
 
-  const [app, setApp]                               = useState<LoginApp>(readLastLoginApp);
+  const [app, setApp]                               = useState<LoginApp>(() => linkedApp ?? readLastLoginApp());
   const [loading, setLoading]                       = useState(false);
   const [message, setMessage]                       = useState<string | null>(null);
   const [showPassword, setShowPassword]             = useState(false);
@@ -71,6 +73,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const appInfo = LOGIN_APPS.find(a => a.id === app) ?? LOGIN_APPS[0];
   // Arcade and Rewards are customer apps: phone number only, no username/password.
   const phoneApp = app === 'arcade' || app === 'rewards';
+
+  // A link to an app skips the form when this device is already signed in.
+  useEffect(() => {
+    if (linkedApp && isAuthenticated) {
+      history.replace(appDestination(linkedApp, roleCode, clientId).route);
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {

@@ -16,7 +16,7 @@ interface UseToastOptions {
   position?: 'top' | 'bottom' | 'middle';
 }
 
-export function useToast({ defaultColor = 'success', duration = 3000, position = 'top' }: UseToastOptions = {}) {
+export function useToast({ defaultColor = 'success', duration = 3000, position = 'bottom' }: UseToastOptions = {}) {
   const [message, setMessage] = useState('');
   const [color, setColor] = useState(defaultColor);
 

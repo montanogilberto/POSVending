@@ -123,6 +123,7 @@ import ClientLogin from './pages/authentication/ClientLogin';
 import SupplierPage from './pages/admin/SupplierPage';
 import ServicePage from './pages/admin/ServicePage';
 import EmployeesPage from './pages/admin/EmployeesPage';
+import CompanyPaymentAccountsPage from './pages/admin/CompanyPaymentAccountsPage';
 import LoanPage from './pages/loans/LoanPage';
 import ProfilePage from './pages/profile/ProfilePage';
 // Lazy-loaded: pulls in the gated @azure/ai-vision-face-ui SDK, which isn't
@@ -265,7 +266,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/expense-categories', '/expense-products', '/expense-cart',
   '/movements', '/led-status', '/iot-dashboard', '/clients', '/client-pos', '/products-management',
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
-  '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees',
+  '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees', '/company-payment-accounts',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
   '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
@@ -742,6 +743,15 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'companyPaymentAccounts') && (
+              <IonItem button routerLink="/company-payment-accounts" title="Cuentas de cobro">
+                <IonIcon icon={cardOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Cuentas de cobro</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
             {!menuCollapsed && <IonItemDivider>Mensajes</IonItemDivider>}
 
             <IonMenuToggle autoHide={false}>
@@ -1027,6 +1037,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/suppliers" feature="suppliers" component={SupplierPage} />
             <PrivateRoute exact path="/services" feature="services" component={ServicePage} />
             <PrivateRoute exact path="/employees" feature="employees" component={EmployeesPage} />
+            <PrivateRoute exact path="/company-payment-accounts" feature="companyPaymentAccounts" component={CompanyPaymentAccountsPage} />
             <PrivateRoute exact path="/loans" feature="loans" component={LoanPage} />
             <PrivateRoute exact path="/profile" component={ProfilePage} />
             <React.Suspense fallback={null}>

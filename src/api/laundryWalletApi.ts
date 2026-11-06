@@ -5,8 +5,9 @@ import { ledgerBalance, postLedgerEntry } from './bankingApi';
  * Saldo prepago de la compañía — vive en walletTransactions, el mismo libro
  * que descuenta /laundryDevices/authorize (LAUNDRY_USAGE) cuando el cliente
  * escanea su QR en la lavadora. Dos formas de recargar:
- *   - tarjeta (Stripe, paymentType laundry_top_up): el backend acredita el NETO
- *     al confirmarse el cargo (confirm del app o webhook, una sola vez);
+ *   - tarjeta (Stripe, paymentType laundry_top_up): cargo directo en la cuenta
+ *     Stripe de la compañía; el backend acredita el NETO al confirmarse
+ *     (confirm del app o webhook, una sola vez);
  *   - efectivo en caja: el cajero registra un DEPOSIT manual.
  */
 
@@ -17,6 +18,10 @@ export interface LaundryTopUpIntent {
   clientSecret: string;
   paymentIntentId: string;
   transactionId: number;
+  /** Cuenta Stripe de la compañía: el cargo se confirma en ella, no en la plataforma. */
+  stripeAccount?: string;
+  /** Si el cliente puede conservar la tarjeta después de pagar. */
+  canSaveCard?: boolean;
 }
 
 export interface LaundryTopUpResult {
@@ -24,6 +29,21 @@ export interface LaundryTopUpResult {
   feeMXN?: number;
   netCreditedMXN?: number;
 }
+
+export interface TransferAccount { holderName: string; clabe: string; bankName?: string; terminalName?: string }
+export interface TopUpOptions { cardTopUpAvailable: boolean; transferAccount: TransferAccount | null }
+
+/** Cómo puede recargar el cliente: tarjeta activa y la CLABE confirmada de la compañía. */
+export const getTopUpOptions = async (companyId: number): Promise<TopUpOptions> => {
+  const res = await fetch(`${API_BASE_URL}/companyPaymentAccounts/active`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId, purpose: 'wallet_topup' }),
+  });
+  if (!res.ok) return { cardTopUpAvailable: false, transferAccount: null };
+  const data = await res.json().catch(() => ({}));
+  return { cardTopUpAvailable: data.cardTopUpAvailable === true, transferAccount: data.transferAccount ?? null };
+};
 
 export const createLaundryTopUpIntent = async (
   companyId: number, clientId: number, amountMXN: number,
@@ -41,24 +61,70 @@ export const createLaundryTopUpIntent = async (
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error || !data.clientSecret) {
     console.log('[laundryWallet] createTopUpIntent failed:', res.status, data.error);
-    throw new Error(data.error || 'No se pudo iniciar el pago. Intenta de nuevo.');
+    throw new Error(data.message || data.error || 'No se pudo iniciar el pago. Intenta de nuevo.');
   }
   return data;
 };
 
 export const confirmLaundryTopUp = async (
-  companyId: number, paymentIntentId: string,
+  companyId: number, paymentIntentId: string, stripeAccount?: string,
 ): Promise<LaundryTopUpResult> => {
   const res = await fetch(`${API_BASE_URL}/stripe/payment-intents/confirm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ paymentIntentId, companyId }),
+    body: JSON.stringify({ paymentIntentId, companyId, paymentType: 'laundry_top_up', stripeAccount }),
   });
   const data = await res.json().catch(() => ({}));
   console.log('[laundryWallet] confirmTopUp ←', res.status, JSON.stringify({ status: data.status, net: data.netCreditedMXN }));
   if (!res.ok || data.error) throw new Error(data.error || 'No se pudo confirmar el pago.');
   return data;
 };
+
+/** Después de pagar, el cliente decide si conserva la tarjeta para futuras recargas. */
+export const answerSaveCard = async (
+  companyId: number, paymentIntentId: string, stripeAccount: string | undefined, save: boolean,
+): Promise<void> => {
+  const res = await fetch(`${API_BASE_URL}/stripe/top-up/save-card`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ companyId, paymentIntentId, stripeAccount, save }),
+  });
+  const data = await res.json().catch(() => ({}));
+  console.log('[laundryWallet] answerSaveCard ←', res.status, data.error ?? 'ok');
+  if (!res.ok || data.error) throw new Error(data.error || 'No se pudo guardar tu respuesta.');
+};
+
+const postTopUp = async (path: string, body: Record<string, unknown>) => {
+  const res = await fetch(`${API_BASE_URL}/walletTopUps${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  console.log('[laundryWallet] topUp', path, res.status, data.error ?? 'ok');
+  if (!res.ok || data.error) throw new Error(data.error ?? data.detail ?? 'error');
+  return data;
+};
+
+export interface TransferConfirmation {
+  balanceAfter: number | null;
+  replayed: boolean;
+  evidenceSaved?: boolean;
+  journalPosted?: boolean;
+}
+
+/**
+ * El cajero ya vio la transferencia en la cuenta de la compañía. El backend abona,
+ * guarda el comprobante y hace el asiento; la clave de rastreo evita abonar dos veces.
+ */
+export const confirmTransferTopUp = (p: {
+  companyId: number; clientId: number; userId: number; amountMXN: number; claveRastreo: string;
+  bankFrom: string; transferDate: string; evidenceFileUrl?: string; transferEvidenceId?: number;
+}): Promise<TransferConfirmation> => postTopUp('/transfer/confirm', p);
+
+export const rejectTransferEvidence = (
+  companyId: number, transferEvidenceId: number, userId: number,
+): Promise<unknown> => postTopUp('/transfer/reject', { companyId, transferEvidenceId, userId });
 
 /**
  * Recarga en efectivo registrada por el cajero. `idempotencyKey` se genera una

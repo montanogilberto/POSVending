@@ -86,6 +86,13 @@ export const PAYMENT_METHOD: Record<string, StatusMeta> = {
   monedero:      { label: 'Monedero',      color: 'secondary' },
 };
 
+/** Cuentas de cobro de la compañía (companyPaymentAccounts.accountStatus). */
+export const COMPANY_PAYMENT_ACCOUNT_STATUS: Record<string, StatusMeta> = {
+  pending_verification: { label: 'Por confirmar', color: 'warning' },
+  active:               { label: 'Activa',        color: 'success' },
+  archived:             { label: 'Archivada',     color: 'medium'  },
+};
+
 /** Tipo de egreso (expenses.expenseType). */
 export const EXPENSE_TYPE: Record<string, StatusMeta> = {
   inventory: { label: 'Inventario', color: 'primary' },

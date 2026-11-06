@@ -1,6 +1,7 @@
 import React from 'react';
 import { IonButton, IonContent, IonPage, IonSpinner, IonText, IonToast } from '@ionic/react';
 import Header from '../../../components/layout/Header';
+import TransferAccountCard from '../../../components/payments/TransferAccountCard';
 import StripePaySheet from '../../../components/payments/StripePaySheet';
 import { usePopovers } from '../../../hooks/usePopovers';
 import { fmtMXN } from '../../../utils/format';
@@ -40,9 +41,17 @@ const MyQrView: React.FC = () => {
         </div>
 
         <BalanceCard vm={vm} />
+        {vm.transferAccount && (
+          <div className="my-qr-transfer">
+            <h2>Recarga por transferencia</h2>
+            <TransferAccountCard account={vm.transferAccount} />
+            <p>Después manda tu comprobante por WhatsApp o muéstralo en caja.</p>
+          </div>
+        )}
         <TopUpAmountSheet vm={vm} />
         <StripePaySheet
           clientSecret={vm.clientSecret}
+          stripeAccount={vm.stripeAccount}
           summaryLabel="Recarga de saldo"
           summaryValue={fmtMXN(vm.amount)}
           payLabel={`Pagar ${fmtMXN(vm.amount)}`}

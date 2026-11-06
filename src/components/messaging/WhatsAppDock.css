@@ -76,6 +76,10 @@
 @media (max-width: 767px) {
   .wad-dock { display: none; }
   .wad-fab { display: block; }
+  /* The page's own "+" button sits in this corner: go above it. Ionic keeps hidden pages mounted. */
+  body:has(.ion-page:not(.ion-page-hidden) ion-fab.fab-vertical-bottom.fab-horizontal-end) .wad-fab {
+    bottom: calc(144px + env(safe-area-inset-bottom));
+  }
 }
 /* A second window doesn't fit next to the list on small laptops. */
 @media (max-width: 1099px) {
