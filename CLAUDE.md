@@ -84,9 +84,13 @@ Every data page implements **both**:
 
 ## 7. Payments (Stripe/SPEI) — non-negotiables
 
-- Client always sees the Stripe fee (3.6% + $3 MXN + IVA — preview via `stripeFee()`)
-  and the **net**; the ledger credits the REAL net (backend reads the charge's
-  `balance_transaction`; the formula is fallback only).
+- **Loans (Stripe):** client always sees the Stripe fee (3.6% + $3 MXN + IVA — preview
+  via `stripeFee()`) and the **net**; the ledger credits the REAL net (backend reads the
+  charge's `balance_transaction`; the formula is fallback only).
+- **Company saldo top-ups (RFC-012, decision A 2026-11-07):** the client is credited the
+  full approved amount; the provider fee is the company's processing expense. Store
+  gross, fee, fee IVA, net and provider per payment — real fee from the provider, never
+  hard-coded rates.
 - The Stripe **Payment Element must stay mounted during `stripe.confirmPayment()`** —
   switching UI steps first unmounts it → IntegrationError → frozen "Procesando…".
   Show the processing screen only AFTER the charge succeeds.

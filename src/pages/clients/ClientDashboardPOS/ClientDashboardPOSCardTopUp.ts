@@ -5,7 +5,6 @@ import { useTopUpOptions } from '../../../hooks/useTopUpOptions';
 import { useSaveCardPrompt } from '../../../hooks/useSaveCardPrompt';
 import { notifyDataChanged } from '../../../utils/refreshBus';
 import { fmtMXN } from '../../../utils/format';
-import { STRIPE_FEE_LABEL, stripeFee } from '../../../utils/stripeFee';
 import { TOP_UP_MIN_MXN } from '../MyQr/MyQrConstants';
 
 interface CardPayment { clientSecret: string; stripeAccount?: string; canSaveCard?: boolean; amount: number }
@@ -43,11 +42,10 @@ export const usePosCardTopUp = (
   };
 
   const confirmAmount = (amount: number) => {
-    const fee = stripeFee(amount);
     presentConfirmAlert({
       header: 'Confirmar recarga',
-      message: `${clientName} paga ${fmtMXN(amount)}. ${STRIPE_FEE_LABEL}: ${fmtMXN(fee)}. `
-        + `Se abonan ${fmtMXN(amount - fee)} a su saldo.`,
+      // RFC-012 decision A: the company absorbs the card fee.
+      message: `${clientName} paga ${fmtMXN(amount)} y se abonan ${fmtMXN(amount)} a su saldo.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { text: 'Continuar', handler: () => { startCharge(amount); } },
@@ -84,7 +82,7 @@ export const usePosCardTopUp = (
   const onCardPaid = async (paymentIntentId: string) => {
     try {
       const r = await confirmLaundryTopUp(companyId, paymentIntentId, cardPayment?.stripeAccount);
-      showToast(`✓ Recarga exitosa: se abonaron ${fmtMXN(r.netCreditedMXN ?? (cardPayment?.amount ?? 0) - stripeFee(cardPayment?.amount ?? 0))}`);
+      showToast(`✓ Recarga exitosa: se abonaron ${fmtMXN(r.netCreditedMXN ?? cardPayment?.amount ?? 0)}`);
     } catch {
       // The charge already succeeded; the Stripe webhook credits the balance.
       showToast('Pago recibido. El saldo se actualizará en unos momentos.', 'warning');

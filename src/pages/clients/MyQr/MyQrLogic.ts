@@ -8,7 +8,6 @@ import { useToast } from '../../../hooks/useToast';
 import { useViewEnterLoad } from '../../../hooks/useViewEnterLoad';
 import { notifyDataChanged, onDataChanged } from '../../../utils/refreshBus';
 import { fmtMXN } from '../../../utils/format';
-import { stripeFee } from '../../../utils/stripeFee';
 import {
   confirmLaundryTopUp, createLaundryTopUpIntent, getLaundryBalance,
 } from '../../../api/laundryWalletApi';
@@ -17,7 +16,8 @@ import { TOP_UP_MIN_MXN } from './MyQrConstants';
 /**
  * The client's own screen: the signed QR they show at the register / laundry
  * machine, plus the prepaid laundry balance the machine charges and a card
- * top-up (Stripe, paymentType laundry_top_up → credited net to walletTransactions).
+ * top-up (Stripe, paymentType laundry_top_up → credited in full to walletTransactions;
+ * the company absorbs the fee, RFC-012 decision A).
  */
 export const useMyQr = () => {
   const { clientId, companyId, username } = useUser();
@@ -64,8 +64,6 @@ export const useMyQr = () => {
   const [canSaveCard, setCanSaveCard] = useState(false);
 
   const amount = Number(amountInput) || 0;
-  const fee = stripeFee(amount);
-  const net = Math.max(0, amount - fee);
   const amountValid = amount >= TOP_UP_MIN_MXN;
 
   const openTopUp = () => { setAmountInput(''); setShowAmountSheet(true); };
@@ -90,7 +88,7 @@ export const useMyQr = () => {
   const onPaid = async (paymentIntentId: string) => {
     try {
       const r = await confirmLaundryTopUp(companyId, paymentIntentId, stripeAccount);
-      showToast(`✓ Recarga exitosa: se abonaron ${fmtMXN(r.netCreditedMXN ?? net)} a tu saldo`);
+      showToast(`✓ Recarga exitosa: se abonaron ${fmtMXN(r.netCreditedMXN ?? amount)} a tu saldo`);
     } catch {
       // The charge already succeeded; the Stripe webhook credits the balance.
       showToast('Pago recibido. Tu saldo se actualizará en unos momentos.', 'warning');
@@ -107,7 +105,7 @@ export const useMyQr = () => {
     balance, balanceError, loadBalance,
     cardTopUpAvailable, transferAccount, stripeAccount,
     showAmountSheet, openTopUp, closeTopUp,
-    amountInput, setAmountInput, amount, fee, net, amountValid,
+    amountInput, setAmountInput, amount, amountValid,
     startingPayment, startPayment,
     clientSecret, onPaid, dismissPayment: () => setClientSecret(null),
     toastProps,

@@ -1,6 +1,5 @@
 import React from 'react';
-import { IonButton, IonCard, IonCardContent, IonIcon } from '@ionic/react';
-import { giftOutline } from 'ionicons/icons';
+import { IonCard, IonCardContent } from '@ionic/react';
 import { fmtInt, mxDate } from '../../../../utils/format';
 import { ClientDashboardPOSVM } from '../ClientDashboardPOSLogic';
 
@@ -17,12 +16,7 @@ const PosPointsCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => {
   return (
     <IonCard className="cpos-card">
       <IonCardContent className="cpos-card-content">
-        <div className="cpos-section-head">
-          <h2 className="cpos-section-title">Puntos POS</h2>
-          <IonButton fill="clear" size="small" onClick={vm.openRewards} className="cpos-link">
-            <IonIcon icon={giftOutline} slot="start" /> Recompensas
-          </IonButton>
-        </div>
+        <h2 className="cpos-section-title">Puntos POS</h2>
         <div className="cpos-kpi-grid">
           {kpis.map((k) => (
             <div key={k.label} className={`cpos-kpi${k.accent ? ' cpos-kpi--accent' : ''}`}>

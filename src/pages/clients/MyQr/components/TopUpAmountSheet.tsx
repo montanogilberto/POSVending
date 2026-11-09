@@ -4,11 +4,10 @@ import {
   IonTitle, IonToolbar,
 } from '@ionic/react';
 import { fmtMXN } from '../../../../utils/format';
-import { STRIPE_FEE_LABEL } from '../../../../utils/stripeFee';
 import { TOP_UP_MIN_MXN, TOP_UP_QUICK_AMOUNTS } from '../MyQrConstants';
 import type { MyQrVM } from '../MyQrLogic';
 
-/** Paso 1 de la recarga: monto, comisión y neto que se abona. */
+/** Paso 1 de la recarga: monto. Se abona completo; la comisión la absorbe la compañía. */
 const TopUpAmountSheet: React.FC<{ vm: MyQrVM }> = ({ vm }) => (
   <IonModal isOpen={vm.showAmountSheet} onDidDismiss={vm.closeTopUp}
     initialBreakpoint={0.75} breakpoints={[0, 0.75, 1]}>
@@ -48,8 +47,7 @@ const TopUpAmountSheet: React.FC<{ vm: MyQrVM }> = ({ vm }) => (
       {vm.amount > 0 && (
         <div className="my-qr-topup-breakdown">
           <div><span>Pagas</span><span>{fmtMXN(vm.amount)}</span></div>
-          <div><span>{STRIPE_FEE_LABEL}</span><span>-{fmtMXN(vm.fee)}</span></div>
-          <div className="my-qr-topup-net"><span>Se abona a tu saldo</span><strong>{fmtMXN(vm.net)}</strong></div>
+          <div className="my-qr-topup-net"><span>Se abona a tu saldo</span><strong>{fmtMXN(vm.amount)}</strong></div>
         </div>
       )}
       {vm.amount > 0 && !vm.amountValid && (

@@ -6,8 +6,7 @@ import { useClientDashboardPOS } from './ClientDashboardPOSLogic';
 import PosProfileCard from './components/PosProfileCard';
 import PosPointsCard from './components/PosPointsCard';
 import PosStampCards from './components/PosStampCards';
-import PosPurchasesCard from './components/PosPurchasesCard';
-import PosActivityCard from './components/PosActivityCard';
+import PosRecentActivityCard from './components/PosRecentActivityCard';
 import PosFollowUpsCard from './components/PosFollowUpsCard';
 import PosMessagesCard from './components/PosMessagesCard';
 import PosQrCard from './components/PosQrCard';
@@ -45,8 +44,7 @@ const ClientDashboardPOSView: React.FC = () => {
             </div>
             <div className="cpos-col">
               <PosMessagesCard vm={vm} />
-              <PosPurchasesCard vm={vm} />
-              <PosActivityCard vm={vm} />
+              <PosRecentActivityCard vm={vm} />
               <PosFollowUpsCard vm={vm} />
             </div>
           </div>

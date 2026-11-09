@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   IonPage,
   IonContent,
@@ -16,6 +16,8 @@ import {
   IonToast,
   IonBadge,
   IonChip,
+  IonSpinner,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import {
   cashOutline,
@@ -35,12 +37,15 @@ import {
   shieldCheckmarkOutline,
   cogOutline,
   fingerPrintOutline,
+  gameControllerOutline,
 } from 'ionicons/icons';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
 import { usePopovers } from '../../hooks/usePopovers';
-import { RoleCode, UiFeature, ROLE_UI } from '../../config/rolePermissions';
+import { RoleCode, UiFeature, ROLE_UI, loadRoleCatalog, applyRoleUiFeatures } from '../../config/rolePermissions';
+import { updateRoleUiFeatures, fetchUiFeatures, ApiUiFeature } from '../../api/rolesApi';
+import { useToast } from '../../hooks/useToast';
 import {
   isBiometricAvailable,
   isBiometricLockEnabled,
@@ -62,7 +67,9 @@ interface ModuleDef {
   features: FeatureDef[];
 }
 
-const MODULES: ModuleDef[] = [
+/** Fallback only: the list now comes from the registry (GET /ui_features), where
+ * every factory module registers itself. Used when that request fails or is empty. */
+const FALLBACK_MODULES: ModuleDef[] = [
   {
     name: 'POS',
     features: [
@@ -111,6 +118,38 @@ const MODULES: ModuleDef[] = [
   },
 ];
 
+/** Registry icon names → ionicons. Same set the factory's frontend prompt offers. */
+const ICONS: Record<string, string> = {
+  cashOutline, qrCodeOutline, waterOutline, peopleOutline, cubeOutline, gridOutline,
+  notificationsOutline, mailOutline, personOutline, barChartOutline, trendingDownOutline,
+  bulbOutline, settingsOutline, cartOutline, shieldCheckmarkOutline, cogOutline,
+  fingerPrintOutline, gameControllerOutline,
+};
+
+const SECTION_ORDER = ['POS', 'Catálogo', 'Mensajes', 'Administración', 'IOT', 'Entretenimiento'];
+
+/** Group registry rows into /setting cards; rows without a section are not configurable here. */
+function modulesFromRegistry(rows: ApiUiFeature[]): ModuleDef[] {
+  const bySection = new Map<string, FeatureDef[]>();
+  for (const row of rows) {
+    if (!row.section) continue;
+    const list = bySection.get(row.section) ?? [];
+    list.push({
+      code: row.featureCode as UiFeature,
+      label: row.label || row.displayName || row.featureCode,
+      icon: ICONS[row.icon ?? ''] ?? settingsOutline,
+    });
+    bySection.set(row.section, list);
+  }
+  const rank = (name: string) => {
+    const i = SECTION_ORDER.indexOf(name);
+    return i === -1 ? SECTION_ORDER.length : i;
+  };
+  return Array.from(bySection.entries())
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([name, features]) => ({ name, features }));
+}
+
 const ROLE_LABELS: Record<RoleCode, string> = {
   admin:    'Administrador',
   manager:  'Gerente',
@@ -156,8 +195,30 @@ const Setting: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<RoleCode>('admin');
   const [permissions, setPermissions]   = useState<PermissionMap>(buildInitialPermissions);
   const [savedPerms, setSavedPerms]     = useState<PermissionMap>(buildInitialPermissions);
-  const [showToast, setShowToast]       = useState(false);
-  const [toastMsg, setToastMsg]         = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [modules, setModules]           = useState<ModuleDef[]>(FALLBACK_MODULES);
+  const [saving, setSaving]             = useState(false);
+  const { showToast, toastProps }       = useToast({ defaultColor: 'success', duration: 2500 });
+
+  // ROLE_UI is overwritten by GET /roles; read it fresh every time the page is
+  // entered (Ionic keeps it mounted) instead of the snapshot taken at mount.
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [, registry] = await Promise.all([
+      loadRoleCatalog(),
+      fetchUiFeatures().catch(err => {
+        console.warn('[Setting] GET /ui_features failed, using fallback list:', err);
+        return [] as ApiUiFeature[];
+      }),
+    ]);
+    const fromRegistry = modulesFromRegistry(registry);
+    setModules(fromRegistry.length ? fromRegistry : FALLBACK_MODULES);
+    const fresh = buildInitialPermissions();
+    setPermissions(fresh);
+    setSavedPerms(buildInitialPermissions());
+    setLoading(false);
+  }, []);
+  useIonViewWillEnter(() => { load(); });
 
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
@@ -180,18 +241,17 @@ const Setting: React.FC = () => {
     }
     await setBiometricLockEnabled(nextValue);
     setBiometricEnabledState(nextValue);
-    setToastMsg(nextValue ? 'Bloqueo biométrico activado' : 'Bloqueo biométrico desactivado');
-    setShowToast(true);
+    showToast(nextValue ? 'Bloqueo biométrico activado' : 'Bloqueo biométrico desactivado');
   };
 
   const pops = usePopovers();
 
   const currentPerms = permissions[selectedRole];
 
-  const toggle = (feature: UiFeature) => {
+  const toggle = (feature: UiFeature, on: boolean) => {
     setPermissions(prev => {
       const next = new Set(prev[selectedRole]);
-      next.has(feature) ? next.delete(feature) : next.add(feature);
+      if (on) next.add(feature); else next.delete(feature);
       return { ...prev, [selectedRole]: next };
     });
   };
@@ -205,22 +265,21 @@ const Setting: React.FC = () => {
   };
 
   const handleSave = async () => {
-    const payload = {
-      roleCode:    selectedRole,
-      permissions: Array.from(permissions[selectedRole]),
-    };
-    console.log('POST /update_role_permissions', payload);
-
-    // TODO: replace with real API call:
-    // await fetch('/update_role_permissions', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(payload),
-    // });
-
-    setSavedPerms(prev => ({ ...prev, [selectedRole]: new Set(permissions[selectedRole]) }));
-    setToastMsg(`Permisos de ${ROLE_LABELS[selectedRole]} guardados`);
-    setShowToast(true);
+    const role = selectedRole;
+    setSaving(true);
+    try {
+      const granted = await updateRoleUiFeatures(role, Array.from(permissions[role]));
+      // Apply what the backend actually stored, and push it to the menu/routes now.
+      applyRoleUiFeatures(role, granted);
+      const stored = new Set(granted as UiFeature[]);
+      setPermissions(prev => ({ ...prev, [role]: new Set(stored) }));
+      setSavedPerms(prev => ({ ...prev, [role]: stored }));
+      showToast(`Permisos de ${ROLE_LABELS[role]} guardados (aplica a todas las compañías)`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'No se pudieron guardar los permisos', 'danger');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleReset = () => {
@@ -290,8 +349,14 @@ const Setting: React.FC = () => {
         </div>
 
         {/* ── Module cards ── */}
+        {loading ? (
+          <div className="setting-loading">
+            <IonSpinner name="crescent" />
+            <p>Cargando permisos…</p>
+          </div>
+        ) : (
         <div className="setting-modules">
-          {MODULES.map(mod => {
+          {modules.map(mod => {
             const activeCount = mod.features.filter(f => currentPerms.has(f.code)).length;
             return (
               <IonCard key={mod.name} className="setting-module-card">
@@ -324,9 +389,9 @@ const Setting: React.FC = () => {
                       <IonToggle
                         slot="end"
                         checked={currentPerms.has(feature.code)}
-                        onIonChange={() => toggle(feature.code)}
+                        onIonChange={e => toggle(feature.code, e.detail.checked)}
                         color="primary"
-                        disabled={selectedRole === 'admin'}
+                        disabled={selectedRole === 'admin' || saving}
                       />
                     </IonItem>
                   ))}
@@ -335,6 +400,7 @@ const Setting: React.FC = () => {
             );
           })}
         </div>
+        )}
 
         {/* ── Admin lock notice ── */}
         {selectedRole === 'admin' && (
@@ -345,25 +411,18 @@ const Setting: React.FC = () => {
         )}
 
         {/* ── Actions ── */}
-        {selectedRole !== 'admin' && (
+        {selectedRole !== 'admin' && !loading && (
           <div className="setting-actions">
-            <IonButton fill="outline" color="medium" onClick={handleReset} disabled={!hasChanges()}>
+            <IonButton fill="outline" color="medium" onClick={handleReset} disabled={!hasChanges() || saving}>
               Descartar
             </IonButton>
-            <IonButton color="primary" onClick={handleSave} disabled={!hasChanges()}>
-              Guardar cambios
+            <IonButton color="primary" onClick={handleSave} disabled={!hasChanges() || saving}>
+              {saving ? <IonSpinner name="dots" /> : 'Guardar cambios'}
             </IonButton>
           </div>
         )}
 
-        <IonToast
-          isOpen={showToast}
-          onDidDismiss={() => setShowToast(false)}
-          message={toastMsg}
-          duration={2500}
-          color="success"
-          position="bottom"
-        />
+        <IonToast {...toastProps} />
       </IonContent>
     </IonPage>
   );

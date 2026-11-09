@@ -206,6 +206,7 @@ import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess, UiFeature } from './config/rolePermissions';
+import { useRoleCatalogVersion } from './hooks/useRoleCatalogVersion';
 import { useNotificationAttention } from './hooks/useNotificationAttention';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
@@ -280,6 +281,8 @@ const AppShell: React.FC = () => {
     logout, username, companyName, branchName, avatarUrl, userId, clientId, companyId, roleCode, roleName, setAvatarUrl,
     activeProduct, availableProducts, setActiveProduct, clientCapabilities,
   } = useUser();
+  // Re-render the menu/routes when role permissions change (catalog fetch, /setting save).
+  useRoleCatalogVersion();
   // Self-service sessions follow the ACTIVE PRODUCT (from clientCapabilities),
   // so one login can be a POS customer and a SmartLoans borrower. Staff have
   // no product context and keep the role-based shell.

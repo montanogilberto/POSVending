@@ -7,13 +7,21 @@ import { activeCardTerminal } from '../../../utils/incomeMoney';
 import { useViewEnterLoad } from '../../../hooks/useViewEnterLoad';
 import { notifyDataChanged, onDataChanged } from '../../../utils/refreshBus';
 import {
-  addCompanyTransferAccount, CompanyPaymentAccount, confirmCompanyPaymentAccount, getCompanyStripeLink, listCompanyPaymentAccounts,
+  addCompanyTransferAccount, CompanyPaymentAccount, confirmCompanyPaymentAccount, getCompanyPaymentAccounts,
+  getCompanyStripeLink, requestPlatformStripeAccount,
 } from '../../../api/companyPaymentAccountsApi';
 
 const CONFIRM_ERRORS: Record<string, string> = {
   second_admin_required: 'Debe confirmarla otro administrador, no quien la conectó.',
   charges_not_enabled: 'Stripe aún no habilita los cobros. Termina el registro en Stripe.',
 };
+
+const PLATFORM_ERRORS: Record<string, string> = {
+  platform_not_allowed: 'Esta compañía debe conectar su propia cuenta Stripe.',
+  platform_already_requested: 'Ya hay una solicitud para usar la cuenta Stripe de GMO.',
+};
+
+const CARD_TYPES = ['stripe_connect', 'stripe_platform'];
 
 export const useCompanyPaymentAccounts = () => {
   const { companyId, companyName, userId } = useUser();
@@ -22,6 +30,8 @@ export const useCompanyPaymentAccounts = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [platformAllowed, setPlatformAllowed] = useState(false);
+  const [requestingPlatform, setRequestingPlatform] = useState(false);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [holderName, setHolderName] = useState('');
   const [clabe, setClabe] = useState('');
@@ -42,7 +52,9 @@ export const useCompanyPaymentAccounts = () => {
     if (!companyId) return;
     setLoadError(false);
     try {
-      setAccounts(await listCompanyPaymentAccounts(companyId));
+      const list = await getCompanyPaymentAccounts(companyId);
+      setAccounts(list.accounts);
+      setPlatformAllowed(list.platformTopUpAllowed);
     } catch (err) {
       console.log('[useCompanyPaymentAccounts] load failed:', err);
       setLoadError(true);
@@ -54,9 +66,11 @@ export const useCompanyPaymentAccounts = () => {
   useViewEnterLoad(() => { load(); }, !!companyId);
   useEffect(() => onDataChanged(() => { load(); }), [load]);
 
-  const current = accounts.find(
-    (a) => a.accountType === 'stripe_connect' && a.accountStatus !== 'ARCHIVED',
-  ) ?? null;
+  // A pending card account comes first: it's the one waiting for a second admin.
+  const cards = accounts.filter((a) => CARD_TYPES.includes(a.accountType) && a.accountStatus !== 'ARCHIVED');
+  const current = cards.find((a) => a.accountStatus === 'PENDING_VERIFICATION')
+    ?? cards.find((a) => a.accountStatus === 'ACTIVE') ?? null;
+  const onPlatform = current?.accountType === 'stripe_platform';
   const spei = accounts.find((a) => a.accountType === 'spei' && a.accountStatus !== 'ARCHIVED') ?? null;
   // Stripe needs an https page to return to, which the native app doesn't have.
   const canConnect = !Capacitor.isNativePlatform();
@@ -89,6 +103,21 @@ export const useCompanyPaymentAccounts = () => {
     }
   };
 
+  const choosePlatform = async () => {
+    if (requestingPlatform) return;
+    setRequestingPlatform(true);
+    try {
+      await requestPlatformStripeAccount(companyId, userId);
+      showToast('✓ Solicitud guardada. Falta que otro administrador la confirme.');
+      notifyDataChanged('company_platform_account_requested');
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      showToast(PLATFORM_ERRORS[code] ?? 'No se pudo guardar la solicitud.', 'danger');
+    } finally {
+      setRequestingPlatform(false);
+    }
+  };
+
   const confirm = async (account: CompanyPaymentAccount) => {
     if (confirmingId) return;
     setConfirmingId(account.companyPaymentAccountId);
@@ -105,7 +134,8 @@ export const useCompanyPaymentAccounts = () => {
   };
 
   return {
-    companyName, userId, loading, loadError, load, current, canConnect,
+    companyName, userId, loading, loadError, load, current, canConnect, onPlatform,
+    platformAllowed, requestingPlatform, choosePlatform,
     terminals, terminalId, setTerminalId, spei, holderName, setHolderName, clabe, setClabe, savingClabe, saveClabe,
     connecting, connectStripe, confirmingId, confirm, toastProps,
   };

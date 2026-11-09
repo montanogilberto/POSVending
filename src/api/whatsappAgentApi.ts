@@ -215,24 +215,40 @@ export const whatsappConversationsApi = {
 };
 
 /** Why a staff reply was not sent (POST /whatsapp/staffReply). */
-export type StaffReplyError = 'outside_24h' | 'no_channel' | 'send_failed' | 'network' | 'invalid';
+export type StaffReplyError =
+  | 'outside_24h' | 'no_channel' | 'send_failed' | 'template_failed' | 'too_long_for_template' | 'network' | 'invalid';
 
-/** A POS user answers the customer on WhatsApp from the number they wrote to; the bot pauses 2 h. */
+/** Outside the 24 h window a message goes inside the mensaje_negocio template, up to this length. */
+export const STAFF_TEMPLATE_MAX_CHARS = 900;
+
+/**
+ * A POS user answers the customer on WhatsApp from the number they wrote to.
+ * asTemplate: writing first (no message from the client in 24 h) — the backend
+ * sends the text inside the approved mensaje_negocio template.
+ */
 export const sendWhatsAppStaffReply = async (
-  companyId: number, userId: number, phone10: string, body: string,
-): Promise<{ ok: true } | { ok: false; error: StaffReplyError }> => {
+  companyId: number, userId: number, phone10: string, body: string, asTemplate = false,
+): Promise<{ ok: true; viaTemplate: boolean } | { ok: false; error: StaffReplyError }> => {
+  // Tracking: phone as last 4 digits only, never the message text.
+  console.log('[whatsappAgentApi] staffReply →', { companyId, phone: `…${phone10.slice(-4)}`, chars: body.length, asTemplate });
   try {
     const response = await fetch(`${API_BASE_URL}/whatsapp/staffReply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ whatsappStaffReply: [{ companyId, userId, phone10, body }] }),
+      body: JSON.stringify({ whatsappStaffReply: [{ companyId, userId, phone10, body, asTemplate }] }),
     });
     const data = await response.json().catch(() => ({}));
-    if (response.ok && data?.sent) return { ok: true };
-    console.log('[whatsappAgentApi] staffReply failed:', response.status, data?.error);
-    const known: StaffReplyError[] = ['outside_24h', 'no_channel', 'send_failed'];
+    if (response.ok && data?.sent) {
+      console.log('[whatsappAgentApi] staffReply ← sent', { viaTemplate: data.viaTemplate === true, attempts: data.attempts });
+      return { ok: true, viaTemplate: data.viaTemplate === true };
+    }
+    // attempts: each business number tried and Meta's reason; reason: why the template was refused.
+    console.log('[whatsappAgentApi] staffReply failed:', response.status, data?.error,
+      { attempts: data?.attempts, reason: data?.reason, lastInboundUtc: data?.lastInboundUtc });
+    const known: StaffReplyError[] = ['outside_24h', 'no_channel', 'send_failed', 'template_failed', 'too_long_for_template'];
     return { ok: false, error: known.includes(data?.error) ? data.error : response.status === 400 ? 'invalid' : 'send_failed' };
-  } catch {
+  } catch (err) {
+    console.log('[whatsappAgentApi] staffReply network error:', err);
     return { ok: false, error: 'network' };
   }
 };
