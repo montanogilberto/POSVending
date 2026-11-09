@@ -95,6 +95,7 @@ const FALLBACK_MODULES: ModuleDef[] = [
       { code: 'emails', label: 'Correos',  icon: mailOutline },
       { code: 'pushNotifications', label: 'Notificaciones', icon: notificationsOutline },
       { code: 'manufacturing',     label: 'Manufactura',    icon: cogOutline },
+      { code: 'voiceCalls', label: 'Llamadas de voz', icon: callOutline },
     ],
   },
   {
