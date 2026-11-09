@@ -11,6 +11,7 @@ import PosFollowUpsCard from './components/PosFollowUpsCard';
 import PosMessagesCard from './components/PosMessagesCard';
 import PosQrCard from './components/PosQrCard';
 import PosWalletCard from './components/PosWalletCard';
+import PosMessageSheet from './components/PosMessageSheet';
 
 const ClientDashboardPOSView: React.FC = () => {
   const vm = useClientDashboardPOS();
@@ -50,6 +51,7 @@ const ClientDashboardPOSView: React.FC = () => {
           </div>
         )}
 
+        <PosMessageSheet vm={vm} />
         <IonToast {...vm.toastProps} />
       </IonContent>
     </IonPage>

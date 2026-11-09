@@ -13,7 +13,7 @@ import TopUpAmountSheet from './components/TopUpAmountSheet';
  * Self-service client's own QR, shown at the register or a laundry machine.
  * Encodes the signed `GMO1.<companyId>.<clientId>.<firma>` value from the
  * backend (/laundryDevices/clientQr) — the ESP32 washers only accept that
- * format, and src/components/pos/ClientQrScannerModal.tsx parses it too.
+ * format, and src/utils/clientQr.ts parses it too.
  * Scanning it at the register sets CartPage's selectedClient (reward points);
  * at a machine it charges the balance shown here.
  */

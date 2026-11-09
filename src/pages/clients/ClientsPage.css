@@ -13,12 +13,20 @@
   box-shadow: none;
 }
 
-.clients-scan-btn {
-  --border-radius: 12px;
-  width: 100%;
-  margin: 6px 0 0;
-  text-transform: none;
+.clients-qr-looking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.85rem;
   font-weight: 600;
+  color: #059669;
+}
+
+.clients-qr-looking ion-spinner {
+  width: 18px;
+  height: 18px;
+  color: #059669;
 }
 
 .clients-searchbar {
