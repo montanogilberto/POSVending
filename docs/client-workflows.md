@@ -114,11 +114,11 @@ one.
 3. They enter the code (`POST /verify_client_login_code`). First time ever:
    a `dbo.users` row is auto-provisioned with `roleCode='client'` (OTP-only,
    no password). Returning: the same account is reused.
-4. They land on `/rewards-dashboard/:clientId` — the **same page staff use**
-   to look up a client's rewards, now self-scoped: the session is pinned to
-   its own `clientId` regardless of the URL, and the header's back button
-   (which used to point at the staff-only `/clients` page) is hidden for
-   this role.
+4. They land on `/rewards-dashboard/:clientId`, self-scoped: the session is
+   pinned to its own `clientId` regardless of the URL, and the header's back
+   button (which used to point at the staff-only `/clients` page) is hidden
+   for this role. Staff with the `clients` feature who open another client's
+   URL are redirected to `/client-pos/:clientId`.
 5. They see: current balance, lifetime earned/redeemed, activity history,
    redeemable catalog — and can redeem an item directly
    (`posRewardsApi.redeem`), reflected immediately.

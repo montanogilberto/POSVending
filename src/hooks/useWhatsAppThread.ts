@@ -86,9 +86,13 @@ export function useWhatsAppThread({ conv, startDate, endDate, active, showToast,
     if (!companyId || !userId || !phone10 || !body || sending) return;
     setSending(true);
     try {
-      const res = await sendWhatsAppStaffReply(companyId, userId, phone10, body);
+      // Window closed (or the client never wrote): the staff are writing first.
+      console.log('[useWhatsAppThread] sendReply', { phone: `…${phone10.slice(-4)}`, windowOpen,
+        lastInboundUtc: thread?.lastInboundUtc ?? null });
+      const res = await sendWhatsAppStaffReply(companyId, userId, phone10, body, !windowOpen);
       if (res.ok) {
         setDraft('');
+        if (res.viaTemplate) showToast('Enviado como mensaje del negocio. Podrás escribirle libremente cuando responda.');
         notifyDataChanged('whatsapp_staff_reply');
         onSent?.();
         await load(true);

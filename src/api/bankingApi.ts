@@ -84,6 +84,7 @@ export async function ledgerBalance(companyId: number, clientId: number): Promis
 export interface LedgerEntry {
   entryId: number; entryType: string; direction: 'D' | 'C';
   amountMXN: number; balanceAfter: number | null; note?: string; created_At: string;
+  referenceType?: string | null; referenceId?: number | null;
 }
 
 export async function ledgerStatement(companyId: number, clientId: number): Promise<LedgerEntry[]> {
@@ -96,6 +97,7 @@ export async function ledgerStatement(companyId: number, clientId: number): Prom
 export async function postLedgerEntry(payload: {
   companyId: number; clientId: number; entryType: string; direction: 'D' | 'C';
   amountMXN: number; idempotencyKey: string; note?: string;
+  referenceType?: string; referenceId?: number;
 }): Promise<any> {
   console.log('[Banking] postLedgerEntry →', JSON.stringify({ entryType: payload.entryType, amountMXN: payload.amountMXN, key: payload.idempotencyKey }));
   const r = await post("/walletTransactions", { walletTransactions: [{ action: 1, ...payload }] });

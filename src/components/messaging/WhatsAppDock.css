@@ -75,7 +75,8 @@
 }
 @media (max-width: 767px) {
   .wad-dock { display: none; }
-  .wad-fab { display: block; }
+  /* Same right edge as Ionic's end-side ion-fab, so both buttons line up in one column. */
+  .wad-fab { display: block; right: calc(10px + env(safe-area-inset-right)); }
   /* The page's own "+" button sits in this corner: go above it. Ionic keeps hidden pages mounted. */
   body:has(.ion-page:not(.ion-page-hidden) ion-fab.fab-vertical-bottom.fab-horizontal-end) .wad-fab {
     bottom: calc(144px + env(safe-area-inset-bottom));

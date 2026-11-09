@@ -1,10 +1,3 @@
-import { PosRewardRedemptionStatus, PosRewardTxType } from '../../../api/posRewardsApi';
-
-/** One row of the merged points timeline (ledger + redemptions). */
-export type PosActivityItem =
-  | { kind: 'ledger'; id: string; date: string; points: number; txType: PosRewardTxType; description: string }
-  | { kind: 'redemption'; id: string; date: string; points: number; status: PosRewardRedemptionStatus; description: string };
-
 /** A sale that earned points — the ledger's EARN rows that reference a ticket. */
 export interface PosPurchase {
   incomeId: number;
@@ -22,4 +15,20 @@ export interface PosStampProgress {
   requiredUnits: number;
   /** 0–100 */
   pct: number;
+}
+
+export type RecentCategory = 'compras' | 'pagos' | 'beneficios';
+export type RecentFilter = 'todo' | RecentCategory;
+
+/** One row of "Actividad reciente": a purchase, a saldo movement or a benefit. */
+export interface RecentActivityItem {
+  id: string;
+  category: RecentCategory;
+  date: string;
+  title: string;
+  /** Formatted amount: money for pagos, points for compras/beneficios. */
+  amount: string;
+  positive: boolean;
+  /** A purchase opens its ticket. */
+  incomeId?: number;
 }

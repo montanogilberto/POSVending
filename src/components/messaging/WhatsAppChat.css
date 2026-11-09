@@ -78,6 +78,8 @@
   margin: 0 0 6px; font-size: 0.72rem; color: #6b7280;
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
 }
+.wac-reply-note--template { display: flex; align-items: flex-start; gap: 6px; }
+.wac-reply-note--template ion-icon { flex-shrink: 0; margin-top: 2px; }
 .wac-reply-row { display: flex; align-items: flex-end; gap: 6px; }
 .wac-reply-input {
   flex: 1;
@@ -86,9 +88,3 @@
   border-radius: 18px; margin: 0; min-height: 0;
 }
 .wac-reply-send { --border-radius: 50%; width: 44px; height: 44px; margin: 0; }
-.wac-reply--closed {
-  display: flex; align-items: flex-start; gap: 8px;
-  background: #fffbeb; color: #92400e;
-}
-.wac-reply--closed p { margin: 0; font-size: 0.78rem; }
-.wac-reply--closed ion-icon { flex-shrink: 0; margin-top: 2px; }

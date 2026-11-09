@@ -11,6 +11,7 @@ import { listClientCapabilities, ClientCapabilityRow } from '../../../api/client
 import { getAllClientFaceRecognitions } from '../../../api/clientFaceRecognitionApi';
 import { getAllClientFollowUps, ClientFollowUp } from '../../../api/clientFollowUpApi';
 import { getCompanyProducts } from '../../../api/productsApi';
+import { ledgerStatement, LedgerEntry } from '../../../api/bankingApi';
 import {
   posRewardsApi,
   PosRewardBalance,
@@ -24,10 +25,12 @@ import { downloadClientQrPdf } from '../../../utils/clientQrPdf';
 import { useClientQr } from '../../../hooks/useClientQr';
 import { usePosWallet } from './ClientDashboardPOSWallet';
 import { usePosCardTopUp } from './ClientDashboardPOSCardTopUp';
+import { usePosTerminalTopUp } from './ClientDashboardPOSTerminalTopUp';
 import { usePosTransfer } from './ClientDashboardPOSTransfer';
 import { usePosMessages } from './ClientDashboardPOSMessages';
 import { CLIENT_TYPE_LABEL, LIST_PREVIEW } from './ClientDashboardPOSConstants';
-import { PosActivityItem, PosPurchase, PosStampProgress } from './ClientDashboardPOSTypes';
+import { PosPurchase, PosStampProgress, RecentCategory, RecentFilter } from './ClientDashboardPOSTypes';
+import { buildRecentActivity } from './ClientDashboardPOSActivity';
 
 /**
  * Staff view of one POS client (/client-pos/:clientId), opened by tapping the
@@ -53,7 +56,8 @@ export const useClientDashboardPOS = () => {
   const [productCounts, setProductCounts] = useState<PosRewardProductCount[]>([]);
   const [followUps, setFollowUps] = useState<ClientFollowUp[]>([]);
   const [productNames, setProductNames] = useState<Map<number, string>>(new Map());
-  const [showAllPurchases, setShowAllPurchases] = useState(false);
+  const [walletEntries, setWalletEntries] = useState<LedgerEntry[]>([]);
+  const [recentFilter, setRecentFilter] = useState<RecentFilter>('todo');
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [qrDownloading, setQrDownloading] = useState(false);
 
@@ -62,7 +66,7 @@ export const useClientDashboardPOS = () => {
     setLoading(true);
     try {
       // Each source fails on its own — one missing table must not blank the page.
-      const [clientRes, faceRes, capsRes, balanceRes, ledgerRes, redemptionsRes, catalogRes, countsRes, followRes, productsRes] =
+      const [clientRes, faceRes, capsRes, balanceRes, ledgerRes, redemptionsRes, catalogRes, countsRes, followRes, productsRes, walletRes] =
         await Promise.all([
           getOneClient({ clients: [{ clientId }] }).catch(() => [] as Client[]),
           getAllClientFaceRecognitions(Number(companyId)).catch(() => []),
@@ -74,6 +78,7 @@ export const useClientDashboardPOS = () => {
           posRewardsApi.getProductCounts(companyId, clientId).catch(() => []),
           getAllClientFollowUps(Number(companyId), clientId).catch(() => []),
           getCompanyProducts(Number(companyId)).catch(() => []),
+          ledgerStatement(Number(companyId), clientId).catch(() => [] as LedgerEntry[]),
         ]);
       setClient(clientRes?.[0] ?? null);
       setSelfieUrl(faceRes.find((r) => r.clientId === clientId)?.clientSelfieBlobUrl || null);
@@ -85,6 +90,7 @@ export const useClientDashboardPOS = () => {
       setProductCounts(countsRes);
       setFollowUps(followRes);
       setProductNames(new Map(productsRes.map((p) => [Number(p.productId), p.name])));
+      setWalletEntries(walletRes);
     } catch (error) {
       console.error('[useClientDashboardPOS] load failed:', error);
       showToast('No se pudo cargar la información del cliente', 'danger');
@@ -96,13 +102,15 @@ export const useClientDashboardPOS = () => {
   useViewEnterLoad(() => { load(); }, !!companyId && !!clientId);
 
   useEffect(() => onDataChanged((reason) => {
-    if (reason.startsWith('pos_reward_') || reason.startsWith('client')) load();
+    // laundry_*_top_up: a new abono shows up in Actividad reciente.
+    if (reason.startsWith('pos_reward_') || reason.startsWith('client') || reason.startsWith('laundry_')) load();
   }), [load]);
 
   const fullName = client ? `${client.first_name ?? ''} ${client.last_name ?? ''}`.trim() : `Cliente #${clientId}`;
   const wallet = usePosWallet(companyId, clientId, userId, fullName, showToast);
   const cardTopUp = usePosCardTopUp(companyId, clientId, fullName, showToast);
   const transfer = usePosTransfer(companyId, clientId, userId, fullName, showToast);
+  const terminalTopUp = usePosTerminalTopUp(companyId, clientId, userId, fullName, showToast);
   const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, canAccess(roleCode, 'notificationDispatchLog'));
   const [presentTopUpOptions] = useIonActionSheet();
 
@@ -112,17 +120,14 @@ export const useClientDashboardPOS = () => {
     history.push('/company-payment-accounts');
   };
 
-  const payByCard = () => {
-    if (cardTopUp.cardTopUpAvailable) cardTopUp.openCardTopUp();
-    else if (canManageAccounts) history.push('/company-payment-accounts');
-    else showToast('La compañía aún no activa los pagos con tarjeta. Avisa a un administrador.', 'warning');
-  };
-
+  // RFC-012: card in store goes through the company's terminal. The online card
+  // option only shows while a company Stripe account is active.
   const openTopUp = () => presentTopUpOptions({
     header: 'Abonar saldo',
     buttons: [
       { text: 'Efectivo', handler: wallet.openCashTopUp },
-      { text: 'Tarjeta de crédito o débito', handler: payByCard },
+      { text: 'Tarjeta en terminal', handler: terminalTopUp.openTerminalTopUp },
+      ...(cardTopUp.cardTopUpAvailable ? [{ text: 'Tarjeta en línea', handler: cardTopUp.openCardTopUp }] : []),
       { text: 'Transferencia', handler: transfer.openTransferTopUp },
       { text: 'Cancelar', role: 'cancel' },
     ],
@@ -142,29 +147,18 @@ export const useClientDashboardPOS = () => {
     [catalog],
   );
 
-  const activity = useMemo<PosActivityItem[]>(() => {
-    const ledgerItems: PosActivityItem[] = ledger
-      .filter((tx) => tx.txType !== 'REDEEM') // the redemption row below already shows it
-      .map((tx) => ({
-        kind: 'ledger',
-        id: `ledger-${tx.transactionId}`,
-        date: tx.created_At,
-        points: tx.points,
-        txType: tx.txType,
-        description: tx.description || (tx.referenceType === 'ticket' ? `Ticket #${tx.referenceId}` : tx.referenceType),
-      }));
-    const redemptionItems: PosActivityItem[] = redemptions.map((r) => ({
-      kind: 'redemption',
-      id: `redemption-${r.redemptionId}`,
-      date: r.created_At,
-      points: r.pointsSpent,
-      status: r.status,
-      description: catalogNameById.get(r.catalogItemId) || `Recompensa #${r.catalogItemId}`,
-    }));
-    return [...ledgerItems, ...redemptionItems].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-    );
-  }, [ledger, redemptions, catalogNameById]);
+  const recentActivity = useMemo(
+    () => buildRecentActivity({ wallet: walletEntries, pointsLedger: ledger, redemptions, rewardNames: catalogNameById }),
+    [walletEntries, ledger, redemptions, catalogNameById],
+  );
+  const recentCounts = useMemo(() => {
+    const counts: Record<RecentCategory, number> = { compras: 0, pagos: 0, beneficios: 0 };
+    recentActivity.forEach((i) => { counts[i.category] += 1; });
+    return counts;
+  }, [recentActivity]);
+  const filteredActivity = recentFilter === 'todo'
+    ? recentActivity
+    : recentActivity.filter((i) => i.category === recentFilter);
 
   const stampCards = useMemo<PosStampProgress[]>(
     () => catalog
@@ -221,11 +215,12 @@ export const useClientDashboardPOS = () => {
     capabilities,
     balance,
     purchases,
-    visiblePurchases: showAllPurchases ? purchases : purchases.slice(0, LIST_PREVIEW),
-    showAllPurchases,
-    toggleAllPurchases: () => setShowAllPurchases((v) => !v),
-    activity,
-    visibleActivity: showAllActivity ? activity : activity.slice(0, LIST_PREVIEW),
+    recentActivity,
+    recentCounts,
+    recentFilter,
+    setRecentFilter: (f: RecentFilter) => { setRecentFilter(f); setShowAllActivity(false); },
+    filteredActivity,
+    visibleRecentActivity: showAllActivity ? filteredActivity : filteredActivity.slice(0, LIST_PREVIEW),
     showAllActivity,
     toggleAllActivity: () => setShowAllActivity((v) => !v),
     redemptionsCount: redemptions.filter((r) => r.status === 'applied').length,
@@ -241,16 +236,16 @@ export const useClientDashboardPOS = () => {
     ...wallet,
     ...cardTopUp,
     ...transfer,
+    ...terminalTopUp,
     ...messages,
     openTopUp,
     canManageAccounts,
     openPaymentAccounts,
-    topUpBusy: wallet.cashSaving || transfer.transferSaving || cardTopUp.cardStarting,
+    topUpBusy: wallet.cashSaving || transfer.transferSaving || cardTopUp.cardStarting || terminalTopUp.terminalSaving,
     walletTitle: companyName ? `Saldo ${companyName}` : 'Saldo',
     loading,
     toastProps,
     openReceipt: (incomeId: number) => history.push(`/receipt/${incomeId}`),
-    openRewards: () => history.push(`/rewards-dashboard/${clientId}`),
     openFollowUp: () => history.push(`/client-followup/${clientId}`),
     openInClients: () => history.push(`/clients?clientId=${clientId}`),
     refresh: load,

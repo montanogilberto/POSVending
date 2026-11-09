@@ -71,7 +71,9 @@ const CompanyPaymentAccountsView: React.FC = () => {
             <IonCardContent>
               <h2 className="cpa-title">Recargas con tarjeta</h2>
               <p className="cpa-text">
-                El dinero de las recargas llega directo a la cuenta Stripe de {vm.companyName || 'la compañía'}.
+                {vm.onPlatform
+                  ? 'El dinero de las recargas llega a la cuenta Stripe de GMO.'
+                  : `El dinero de las recargas llega directo a la cuenta Stripe de ${vm.companyName || 'la compañía'}.`}
               </p>
               {current ? (
                 <div className="cpa-row">
@@ -85,12 +87,17 @@ const CompanyPaymentAccountsView: React.FC = () => {
                 <p className="cpa-text">Todavía no hay una cuenta conectada.</p>
               )}
               <div className="cpa-actions">
-                {vm.canConnect && (!current || !current.chargesEnabled) && (
-                  <IonButton onClick={() => vm.connectStripe()} disabled={vm.connecting}>
-                    {vm.connecting ? <IonSpinner name="dots" /> : current ? 'Continuar registro' : 'Conectar Stripe'}
+                {vm.platformAllowed && !vm.onPlatform && (!current || !current.chargesEnabled) && (
+                  <IonButton onClick={vm.choosePlatform} disabled={vm.requestingPlatform}>
+                    {vm.requestingPlatform ? <IonSpinner name="dots" /> : 'Usar la cuenta Stripe de GMO'}
                   </IonButton>
                 )}
-                {vm.canConnect && current?.accountStatus === 'ACTIVE' && current.chargesEnabled && (
+                {vm.canConnect && !vm.onPlatform && (!current || !current.chargesEnabled) && (
+                  <IonButton onClick={() => vm.connectStripe()} disabled={vm.connecting}>
+                    {vm.connecting ? <IonSpinner name="dots" /> : current ? 'Continuar registro' : 'Conectar Stripe propia'}
+                  </IonButton>
+                )}
+                {vm.canConnect && !vm.onPlatform && current?.accountStatus === 'ACTIVE' && current.chargesEnabled && (
                   <IonButton fill="outline" onClick={() => vm.connectStripe(true)} disabled={vm.connecting}>
                     {vm.connecting ? <IonSpinner name="dots" /> : 'Reemplazar cuenta'}
                   </IonButton>
@@ -101,7 +108,7 @@ const CompanyPaymentAccountsView: React.FC = () => {
                   </IonButton>
                 )}
               </div>
-              {!vm.canConnect && (!current || !current.chargesEnabled) && (
+              {!vm.canConnect && !vm.platformAllowed && (!current || !current.chargesEnabled) && (
                 <p className="cpa-text">Conecta Stripe desde el POS web; no se puede desde la app.</p>
               )}
               {pending && current?.chargesEnabled && current.createdByUserId === vm.userId && (

@@ -17,9 +17,10 @@ import { isStaffRole } from '../../../config/rolePermissions';
 import { RewardsActivityItem } from './RewardsDashboardTypes';
 
 export const useRewardsDashboard = () => {
-  // /rewards-dashboard/:clientId is used two ways: staff pulling up any
-  // client's record (roleCode admin/manager/employee/etc — param wins,
-  // same as every other :clientId dashboard), and a client viewing their
+  // /rewards-dashboard/:clientId is used two ways: staff without the
+  // 'clients' feature pulling up a client's record (param wins, same as
+  // every other :clientId dashboard; staff with it are redirected to
+  // /client-pos by RewardsDashboardPage), and a client viewing their
   // own account after /client-login (roleCode 'pos' — renamed from
   // 'client', see rolePermissions.ts's RoleCode comment). Uses isStaffRole
   // rather than a single roleCode==='pos' check (same fix as
