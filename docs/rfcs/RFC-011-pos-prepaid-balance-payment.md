@@ -3,6 +3,7 @@
 > Estado: **BORRADOR** 2026-11-06. Pendiente de aprobación; al aprobarse enmienda §16 de `p2p-direct-payments-architecture.md` (v1.5).
 > Fecha: 2026-11-06 · Autor: GMO · Alcance: cualquier compañía que lo active
 > Amplía RFC-009 y RFC-010. No los reemplaza.
+> 2026-11-09: adelantado el primer punto de P7, sólo lectura. El carrito muestra el saldo del cliente seleccionado (`useClientSaldo`, lee `walletTransactions` por `companyId`). No hay botón Saldo ni cobro hasta aprobar este RFC.
 
 ## Contexto
 Hoy el cliente sólo gasta su saldo en las máquinas ESP32 (`POST /laundryDevices/authorize`). En el POS, escanear su QR únicamente selecciona al cliente y carga puntos, cupones y recompensas; las formas de pago siguen siendo Efectivo, Tarjeta, Transferir y Pago dividido.

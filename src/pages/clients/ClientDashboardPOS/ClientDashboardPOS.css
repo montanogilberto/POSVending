@@ -576,3 +576,20 @@
   text-transform: none;
   font-size: 13px;
 }
+
+/* Enviar mensaje (WhatsApp / push) */
+.cpos-message {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cpos-message-to {
+  margin: 0;
+  color: var(--ion-color-medium);
+}
+
+.cpos-message-hint {
+  margin: 0;
+  font-size: 13px;
+}

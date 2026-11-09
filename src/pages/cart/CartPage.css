@@ -767,8 +767,28 @@
   text-overflow: ellipsis;
 }
 
-.client-points-chip {
+.client-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-top: 6px;
+}
+
+.client-saldo-chip {
+  margin: 0;
+  font-size: 0.78rem;
+  --background: #dbeafe;
+  --color: #1e40af;
+}
+
+.client-saldo-spinner {
+  width: 22px;
+  height: 14px;
+  margin-left: 6px;
+}
+
+.client-points-chip {
+  margin: 0;
   font-size: 0.78rem;
   --background: #d1fae5;
   --color: #065f46;
@@ -839,14 +859,29 @@
   font-style: italic;
 }
 
+.client-qr-looking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.client-qr-looking ion-spinner {
+  width: 18px;
+  height: 18px;
+  color: #059669;
+}
+
 .client-actions-row {
   display: flex;
   gap: 8px;
   margin-top: 12px;
 }
 
-.client-change-btn,
-.client-scan-btn {
+.client-change-btn {
   --border-radius: 10px;
   --border-width: 1.5px;
   font-weight: 600;
@@ -867,18 +902,6 @@
 .client-change-btn:hover {
   --background: #eff6ff;
   --border-color: #2563eb;
-}
-
-.client-scan-btn {
-  --border-color: #10b981;
-  --color: #059669;
-  --background: transparent;
-  --background-hover: #ecfdf5;
-}
-
-.client-scan-btn:hover {
-  --background: #ecfdf5;
-  --border-color: #059669;
 }
 
 .client-choose-btn {
@@ -1161,8 +1184,7 @@
     margin-top: 12px;
   }
 
-  .client-change-btn,
-  .client-scan-btn {
+  .client-change-btn {
     font-size: 0.9rem;
     min-height: 48px;
     width: 100%;
