@@ -1,6 +1,6 @@
 # RFC-011 — Pago con saldo prepagado en el POS
 
-> Estado: **BORRADOR** 2026-11-06. Pendiente de aprobación; al aprobarse enmienda §16 de `p2p-direct-payments-architecture.md` (v1.5).
+> Estado: **APROBADO** 2026-11-09 (borrador del 2026-11-06). Enmienda `p2p-direct-payments-architecture.md` a v1.5. Las preguntas abiertas siguen abiertas: no bloquean los pasos 2–4 del rollout, pero sí la activación (paso 9).
 > Fecha: 2026-11-06 · Autor: GMO · Alcance: cualquier compañía que lo active
 > Amplía RFC-009 y RFC-010. No los reemplaza.
 > 2026-11-09: adelantado el primer punto de P7, sólo lectura. El carrito muestra el saldo del cliente seleccionado (`useClientSaldo`, lee `walletTransactions` por `companyId`). No hay botón Saldo ni cobro hasta aprobar este RFC.

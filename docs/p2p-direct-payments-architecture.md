@@ -1,6 +1,6 @@
 # SmartLoans — Arquitectura P2P de Pagos Directos (SPEI sin custodia)
 
-> **Versión 1.4 · 2026-10-31 · ARQUITECTURA CONGELADA** — documento base del dominio.
+> **Versión 1.5 · 2026-11-09 · ARQUITECTURA CONGELADA** — documento base del dominio.
 > Cambios posteriores SOLO vía RFC (§16). Changelogs al final.
 >
 > Principio rector: **SmartLoans nunca recibe, guarda, transfiere ni custodia dinero.**
@@ -414,12 +414,16 @@ class PaymentProvider(Protocol):
 | RFC-008 Open Finance Integration | Confirmación bancaria automática | adapter |
 | RFC-010 Laundry Wallet Top-ups | Recarga en efectivo, tarjeta (direct charge en la cuenta conectada de la lavandería) y SPEI a su CLABE con confirmación humana | PRD laundryWalletTopUp |
 | RFC-009 Laundry Prepaid Wallet | Monedero de la lavandería (companyId 1) fuera de `walletTransactions`; recarga en mostrador; uso de máquina = ticket del POS | PRD laundryWallet |
+| RFC-011 POS Prepaid Balance Payment | Pagar con saldo en caja, por compañía (circuito cerrado): libro genérico `prepaidWalletEntries`, PIN del cliente, cobro atómico con la venta, devolución al eliminarla | PRD prepaidWallet |
 
 Los RFC-001 a 003 son el MVP del modelo sin custodia; sus PRDs van al posgmo-factory.
 
 ---
 
 ## Changelog
+
+**v1.4 → v1.5 (RFC-011, 2026-11-09):**
+1. **Pago con saldo prepagado en el POS** (`docs/rfcs/RFC-011-pos-prepaid-balance-payment.md`): el saldo es un pasivo de cada compañía con su cliente y sólo se gasta en esa compañía (y sus sucursales), nunca entre compañías. El libro de RFC-009 se construye con nombre genérico (`prepaidWalletEntries`) y agrega `POS_SALE`. Cobrar exige el PIN del cliente y ocurre en la misma transacción que la venta; eliminar la venta devuelve el saldo. Prerrequisito: `POST /walletTransactions` exige sesión de personal o worker key. Reafirma D1: el dinero de una recarga llega a la compañía; SmartLoans sólo lleva el registro.
 
 **v1.3 → v1.4 (RFC-010, 2026-10-31):**
 1. **Tres formas de recarga del monedero de la lavandería** (`docs/rfcs/RFC-010-laundry-wallet-topups.md`): efectivo en mostrador, tarjeta y transferencia SPEI. El dinero llega siempre a una cuenta de la lavandería: tarjeta como *direct charge* en su cuenta conectada de Stripe (nunca en la cuenta de plataforma), SPEI a su CLABE con `transferEvidence` y confirmación de un empleado (la IA sólo aconseja). Reafirma D1 y la regla de oro.
