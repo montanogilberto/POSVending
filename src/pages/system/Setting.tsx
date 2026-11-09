@@ -38,6 +38,7 @@ import {
   cogOutline,
   fingerPrintOutline,
   gameControllerOutline,
+  callOutline,
 } from 'ionicons/icons';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';

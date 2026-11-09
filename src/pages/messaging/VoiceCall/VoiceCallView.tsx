@@ -2,15 +2,14 @@ import React from 'react';
 import {
   IonPage, IonContent, IonLoading, IonToast, IonList, IonItem, IonLabel,
   IonBadge, IonSegment, IonSegmentButton, IonModal, IonButton, IonIcon,
-  IonInfiniteScroll, IonInfiniteScrollContent
+  IonInfiniteScroll, IonInfiniteScrollContent, IonItemDivider
 } from '@ionic/react';
 import Header from '../../../components/layout/Header';
-import { usePopovers } from '../../../hooks/usePopovers';
 import { useVoiceCall, VoiceCallVM } from './VoiceCallLogic';
 import { checkmark, callOutline, calendarOutline, personOutline, chevronForward } from 'ionicons/icons';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import EmptyState from '../../../components/ui/EmptyState';
-import { mxDate, mxTime, toHermosillo } from '../../../utils/format';
+import { toHermosillo } from '../../../utils/format';
 
 const VoiceCallDetailModal: React.FC<{ vm: VoiceCallVM }> = ({ vm }) => {
   if (!vm.selectedCall) return null;
@@ -111,13 +110,12 @@ const VoiceCallDetailModal: React.FC<{ vm: VoiceCallVM }> = ({ vm }) => {
           {timelineEvents
             .sort((a, b) => new Date(a.date || '').getTime() - new Date(b.date || '').getTime())
             .map((event, index) => {
-              const hermosilloDate = toHermosillo(event.date || '');
               return (
                 <IonItem key={index}>
                   <IonIcon icon={event.icon} slot="start" color="medium" />
                   <IonLabel>
                     <h3>{event.label}</h3>
-                    <p>{mxDate(hermosilloDate)} {mxTime(hermosilloDate)}</p>
+                    <p>{toHermosillo(event.date || undefined)}</p>
                   </IonLabel>
                 </IonItem>
               );
@@ -133,9 +131,9 @@ const VoiceCallView: React.FC = () => {
 
   return (
     <IonPage>
-      <Header screenTitle="Llamadas de voz" showBackButton={true} backButtonHref="/dashboard" posSupportTopic="voiceCall" {...vm.pops.headerProps} />
+      <Header screenTitle="Llamadas de voz" showBackButton={true} backButtonHref="/dashboard" {...vm.pops.headerProps} />
       <IonContent fullscreen className="voice-calls-content">
-        <IonLoading isOpen={vm.loading && !vm.isRefreshing} message="Cargando llamadas..." />
+        <IonLoading isOpen={(vm.loading && vm.items.length === 0) || vm.detailLoading} message={vm.detailLoading ? 'Cargando detalle...' : 'Cargando llamadas...'} />
         <IonToast {...vm.toastProps} />
 
         <IonSegment value={vm.filter} onIonChange={(e: CustomEvent) => vm.handleFilterChange(e.detail.value as VoiceCallVM['filter'])} className="voice-calls-segment">
@@ -158,8 +156,6 @@ const VoiceCallView: React.FC = () => {
         ) : (
           <IonList className="voice-calls-list">
             {vm.items.map((call) => {
-              const createdAtHermosillo = toHermosillo(call.created_At);
-              const confirmedAtHermosillo = call.confirmedAt ? toHermosillo(call.confirmedAt) : null;
               return (
                 <IonItem key={call.voiceCallId} button onClick={() => vm.openDetailModal(call.voiceCallId)} detail={false} className="voice-calls-item">
                   <IonIcon icon={callOutline} slot="start" color="medium" />
@@ -170,8 +166,8 @@ const VoiceCallView: React.FC = () => {
                       <StatusBadge status={call.callStatus} map={vm.callStatusMap} className="voice-calls-item-badge" />
                       <StatusBadge status={call.agreementStatus} map={vm.agreementStatusMap} className="voice-calls-item-badge" />
                     </div>
-                    {confirmedAtHermosillo && (
-                      <p><IonIcon icon={calendarOutline} /> {mxDate(confirmedAtHermosillo)} {mxTime(confirmedAtHermosillo)}</p>
+                    {call.confirmedAt && (
+                      <p><IonIcon icon={calendarOutline} /> {toHermosillo(call.confirmedAt)}</p>
                     )}
                   </IonLabel>
                   <IonIcon icon={chevronForward} slot="end" color="medium" />
