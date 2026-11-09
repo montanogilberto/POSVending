@@ -84,7 +84,8 @@ export type UiFeature =
   | 'game'
   | 'arcade'
   | 'myRewards'
-  | 'companyPaymentAccounts';
+  | 'companyPaymentAccounts'
+  | 'voiceCalls';
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
