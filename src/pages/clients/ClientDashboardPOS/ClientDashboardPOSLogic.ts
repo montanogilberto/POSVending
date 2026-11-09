@@ -28,6 +28,7 @@ import { usePosCardTopUp } from './ClientDashboardPOSCardTopUp';
 import { usePosTerminalTopUp } from './ClientDashboardPOSTerminalTopUp';
 import { usePosTransfer } from './ClientDashboardPOSTransfer';
 import { usePosMessages } from './ClientDashboardPOSMessages';
+import { usePosContact } from './ClientDashboardPOSContact';
 import { CLIENT_TYPE_LABEL, LIST_PREVIEW } from './ClientDashboardPOSConstants';
 import { PosPurchase, PosStampProgress, RecentCategory, RecentFilter } from './ClientDashboardPOSTypes';
 import { buildRecentActivity } from './ClientDashboardPOSActivity';
@@ -112,6 +113,7 @@ export const useClientDashboardPOS = () => {
   const transfer = usePosTransfer(companyId, clientId, userId, fullName, showToast);
   const terminalTopUp = usePosTerminalTopUp(companyId, clientId, userId, fullName, showToast);
   const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, canAccess(roleCode, 'notificationDispatchLog'));
+  const contact = usePosContact(Number(companyId), clientId, Number(userId), client?.cellphone, companyName, showToast);
   const [presentTopUpOptions] = useIonActionSheet();
 
   const canManageAccounts = canAccess(roleCode, 'companyPaymentAccounts');
@@ -238,6 +240,7 @@ export const useClientDashboardPOS = () => {
     ...transfer,
     ...terminalTopUp,
     ...messages,
+    ...contact,
     openTopUp,
     canManageAccounts,
     openPaymentAccounts,

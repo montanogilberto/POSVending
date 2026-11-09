@@ -1,6 +1,6 @@
 import React from 'react';
-import { IonAvatar, IonButton, IonCard, IonCardContent, IonCardTitle, IonChip, IonIcon, IonLabel } from '@ionic/react';
-import { personCircle, callOutline, mailOutline, listOutline } from 'ionicons/icons';
+import { IonAvatar, IonButton, IonCard, IonCardContent, IonCardTitle, IonChip, IonIcon, IonLabel, IonSpinner } from '@ionic/react';
+import { personCircle, callOutline, chatbubbleEllipsesOutline, mailOutline, listOutline } from 'ionicons/icons';
 import { mxDate } from '../../../../utils/format';
 import { CAPABILITY_LABEL } from '../ClientDashboardPOSConstants';
 import { ClientDashboardPOSVM } from '../ClientDashboardPOSLogic';
@@ -65,11 +65,14 @@ const PosProfileCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => {
         )}
 
         <div className="cpos-profile-actions">
-          {c?.cellphone && (
-            <IonButton fill="outline" size="small" color="success" href={`tel:${c.cellphone}`} className="cpos-action">
-              <IonIcon icon={callOutline} slot="start" /> Llamar
+          {vm.contactHasPhone && (
+            <IonButton fill="outline" size="small" color="success" onClick={vm.openCall} disabled={vm.calling} className="cpos-action">
+              {vm.calling ? <IonSpinner name="dots" /> : <><IonIcon icon={callOutline} slot="start" /> Llamar</>}
             </IonButton>
           )}
+          <IonButton fill="outline" size="small" color="tertiary" onClick={() => vm.openMessage()} className="cpos-action">
+            <IonIcon icon={chatbubbleEllipsesOutline} slot="start" /> Mensaje
+          </IonButton>
           {c?.email && (
             <IonButton fill="outline" size="small" color="primary" href={`mailto:${c.email}`} className="cpos-action">
               <IonIcon icon={mailOutline} slot="start" /> Correo

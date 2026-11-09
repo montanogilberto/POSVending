@@ -12,10 +12,11 @@ import {
   IonLabel,
   IonChip,
   IonInput,
+  IonSpinner,
   useIonViewWillEnter,
 } from '@ionic/react';
 import ConfirmBackButton from '../../components/ui/ConfirmBackButton';
-import { addCircle, card, wallet, business, receipt, cart, person, pricetag, qrCodeOutline, giftOutline } from 'ionicons/icons';
+import { addCircle, card, wallet, business, receipt, cart, person, pricetag, giftOutline } from 'ionicons/icons';
 import { useCart } from '../../contexts/CartContext';
 import { useProduct } from '../../contexts/ProductContext';
 import { useUser } from '../../contexts/UserContext';
@@ -33,13 +34,15 @@ import {
   posRewardsApi, PosRewardBalance, PosRewardCatalogItem, PosRewardProductCount, IncomeDiscountsResult, stampUnits,
 } from '../../api/posRewardsApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
+import { useClientSaldo } from '../../hooks/useClientSaldo';
+import { useClientQrReader } from '../../hooks/useClientQrReader';
+import { fmtMXN } from '../../utils/format';
 
 import '../../styles/dashboard.css';
 import './CartPage.css';
 
 import CartItemCard from '../../components/pos/CartItemCard';
 import ClientSelector from '../../components/pos/ClientSelector';
-import ClientQrScannerModal from '../../components/pos/ClientQrScannerModal';
 import ReceiptDisplay from '../receipt/ReceiptDisplay';
 
 /**
@@ -91,8 +94,25 @@ const CartPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
-  const [showQrScanner, setShowQrScanner] = useState(false);
   const [clientBalance, setClientBalance] = useState<PosRewardBalance | null>(null);
+  // Prepaid saldo, read-only: paying with it at the register is RFC-011 (not built).
+  const { saldo, saldoLoading, saldoError, saldoAvailable } = useClientSaldo(Number(companyId), selectedClient?.clientId);
+  // Handheld QR scanner: read in the background, no button. Paused while a
+  // sale is being charged or its receipt is on screen.
+  const { looking: qrLooking } = useClientQrReader({
+    enabled: !loading && !ticketData,
+    onClientFound: (client) => {
+      setSelectedClient(client);
+      setToastMessage(`Cliente identificado: ${client.first_name} ${client.last_name}`);
+      setToastColor('success');
+      setShowToast(true);
+    },
+    onError: (message) => {
+      setToastMessage(message);
+      setToastColor('danger');
+      setShowToast(true);
+    },
+  });
   // Card terminal (commission catalog) — previews the commission the business
   // absorbs on a card sale; the customer still pays `total`.
   const [cardTerminal, setCardTerminal] = useState<CommissionTerminal | null>(null);
@@ -718,12 +738,22 @@ const CartPage: React.FC = () => {
                             {selectedClient.cellphone}
                             {selectedClient.email && ` • ${selectedClient.email}`}
                           </div>
-                          {clientBalance != null && (
-                            <IonChip color="success" className="client-points-chip">
-                              <IonIcon icon={pricetag} />
-                              <IonLabel>{clientBalance.balance} pts</IonLabel>
-                            </IonChip>
-                          )}
+                          <div className="client-chips-row">
+                            {saldoAvailable && (
+                              <IonChip className="client-saldo-chip" disabled={saldoLoading}>
+                                <IonIcon icon={wallet} />
+                                {saldoLoading
+                                  ? <IonSpinner name="dots" className="client-saldo-spinner" />
+                                  : <IonLabel>Saldo {saldo != null ? fmtMXN(saldo) : saldoError ? 'no disponible' : '—'}</IonLabel>}
+                              </IonChip>
+                            )}
+                            {clientBalance != null && (
+                              <IonChip color="success" className="client-points-chip">
+                                <IonIcon icon={pricetag} />
+                                <IonLabel>{clientBalance.balance} pts</IonLabel>
+                              </IonChip>
+                            )}
+                          </div>
                         </>
                       ) : (
                         <>
@@ -733,6 +763,13 @@ const CartPage: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {qrLooking && (
+                    <div className="client-qr-looking">
+                      <IonSpinner name="crescent" />
+                      <span>Buscando cliente…</span>
+                    </div>
+                  )}
 
                   {availableCoupons.length > 0 && (
                     <div className="welcome-coupon-row">
@@ -805,17 +842,10 @@ const CartPage: React.FC = () => {
                       fill="outline"
                       onClick={() => setShowClientSelector(true)}
                       className="client-change-btn"
+                      disabled={qrLooking}
                     >
                       <IonIcon icon={person} slot="start" />
                       Cambiar cliente
-                    </IonButton>
-                    <IonButton
-                      fill="outline"
-                      onClick={() => setShowQrScanner(true)}
-                      className="client-scan-btn"
-                    >
-                      <IonIcon icon={qrCodeOutline} slot="start" />
-                      Escanear QR
                     </IonButton>
                   </div>
                 </div>
@@ -1026,17 +1056,6 @@ const CartPage: React.FC = () => {
           onClose={() => setShowClientSelector(false)}
           onChange={setSelectedClient}
           selectedClient={selectedClient}
-        />
-
-        <ClientQrScannerModal
-          isOpen={showQrScanner}
-          onClose={() => setShowQrScanner(false)}
-          onClientFound={(client) => {
-            setSelectedClient(client);
-            setToastMessage(`Cliente identificado: ${client.first_name} ${client.last_name}`);
-            setToastColor('success');
-            setShowToast(true);
-          }}
         />
       </IonContent>
     </IonPage>
