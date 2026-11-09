@@ -156,3 +156,12 @@
 .setting-actions ion-button {
   min-width: 120px;
 }
+
+.setting-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  color: var(--ion-color-medium);
+}

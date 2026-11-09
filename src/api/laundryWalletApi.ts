@@ -1,14 +1,15 @@
 import { API_BASE_URL } from '../utils/appEnv';
-import { ledgerBalance, postLedgerEntry } from './bankingApi';
+import { ledgerBalance } from './bankingApi';
 
 /**
  * Saldo prepago de la compañía — vive en walletTransactions, el mismo libro
  * que descuenta /laundryDevices/authorize (LAUNDRY_USAGE) cuando el cliente
  * escanea su QR en la lavadora. Dos formas de recargar:
  *   - tarjeta (Stripe, paymentType laundry_top_up): cargo directo en la cuenta
- *     Stripe de la compañía; el backend acredita el NETO al confirmarse
+ *     Stripe de la compañía; el backend acredita el monto COMPLETO al confirmarse
+ *     (la comisión la absorbe la compañía, RFC-012 decisión A)
  *     (confirm del app o webhook, una sola vez);
- *   - efectivo en caja: el cajero registra un DEPOSIT manual.
+ *   - efectivo o terminal en caja: el cajero registra un DEPOSIT manual.
  */
 
 export const getLaundryBalance = async (companyId: number, clientId: number): Promise<number> =>
@@ -133,11 +134,20 @@ export const rejectTransferEvidence = (
 export const postCashTopUp = async (p: {
   companyId: number; clientId: number; amountMXN: number; userId: number; idempotencyKey: string;
 }): Promise<{ balanceAfter: number | null }> => {
-  const r = await postLedgerEntry({
-    companyId: p.companyId, clientId: p.clientId, entryType: 'DEPOSIT', direction: 'C',
-    amountMXN: p.amountMXN, idempotencyKey: p.idempotencyKey,
-    note: `Recarga en efectivo en caja (usuario ${p.userId})`,
-  });
-  if (r?.error) throw new Error(r.error);
+  const r = await postTopUp('/cash', p);
   return { balanceAfter: r?.balanceAfter ?? null };
+};
+
+/**
+ * Abono cobrado en la terminal física de la compañía (RFC-012, fase 0). La llave
+ * es la terminal + su número de operación: la misma operación nunca abona dos
+ * veces, ni a otro cliente. `replayed` = esa operación ya estaba registrada.
+ * El backend abona y manda el ticket al cliente (push, WhatsApp o SMS).
+ */
+export const postTerminalTopUp = async (p: {
+  companyId: number; clientId: number; amountMXN: number; userId: number;
+  terminalId: number; terminalName: string; operationNumber: string;
+}): Promise<{ balanceAfter: number | null; replayed: boolean }> => {
+  const r = await postTopUp('/terminal', p);
+  return { balanceAfter: r?.balanceAfter ?? null, replayed: r?.replayed === true };
 };

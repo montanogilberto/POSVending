@@ -445,20 +445,17 @@
 }
 
 /* Saldo lavandería + abono en efectivo */
-.cpos-wallet {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
 .cpos-transfer {
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin: 0 auto;
   max-width: 520px;
+}
+
+.cpos-terminal-help {
+  color: #6B7280;
+  margin: 0;
 }
 
 .cpos-transfer-photo {
@@ -475,29 +472,6 @@
   gap: 4px;
 }
 
-.cpos-wallet-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cpos-wallet-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.cpos-wallet-amount {
-  font-size: 24px;
-  font-weight: 800;
-  color: #111827;
-}
-
-.cpos-wallet-error {
-  font-size: 13px;
-}
-
 /* Conversaciones: WhatsApp + push (the timeline's look comes from WhatsAppChat.css). */
 .cpos-messages-filter { margin-bottom: 10px; }
 .cpos-messages .wac-messages { max-height: 420px; border-radius: 12px; }
@@ -507,3 +481,98 @@
 }
 .cpos-messages-loading p { margin: 0; }
 .cpos-messages-note { margin: 8px 0 0; font-size: 0.75rem; color: #6b7280; }
+
+/* Saldo: same blue card as "Mi QR" in the client's Inicio. */
+.cpos-wallet-card {
+  --background: #2563eb;
+  --color: #ffffff;
+  border: 0;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3);
+}
+
+.cpos-wallet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.cpos-wallet-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cpos-wallet-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 26px;
+}
+
+.cpos-wallet-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cpos-wallet-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cpos-wallet-amount {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #ffffff;
+}
+
+.cpos-wallet-error {
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.cpos-wallet-topup {
+  flex-shrink: 0;
+  margin: 0;
+  height: 42px;
+  --border-radius: 12px;
+  --box-shadow: none;
+  --color: #2563eb;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cpos-wallet-pending {
+  align-self: flex-start;
+  margin: 0;
+  --background: #ffffff;
+  --color: #92400e;
+  font-weight: 600;
+}
+
+/* Actividad reciente: Todo / Compras / Pagos / Beneficios */
+.cpos-recent-filter {
+  margin: 4px 0 8px;
+}
+
+.cpos-recent-filter ion-segment-button {
+  min-width: auto;
+  text-transform: none;
+  font-size: 13px;
+}

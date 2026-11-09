@@ -106,6 +106,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   ],
   employee: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
+    'clients',
     'rewards', 'game', 'arcade',
   ],
   borrower: [
@@ -151,6 +152,17 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
 // database-backed values once the fetch resolves.
 let roleCatalogLoaded = false;
 
+/** Fired on window whenever ROLE_UI changes (catalog fetched, or a role's
+ * features saved from /setting) so already-rendered menus re-check canAccess. */
+export const ROLE_CATALOG_CHANGED_EVENT = 'roleCatalogChanged';
+const emitRoleCatalogChanged = () => window.dispatchEvent(new Event(ROLE_CATALOG_CHANGED_EVENT));
+
+/** Apply a role's saved features in place (same object reference, see above). */
+export const applyRoleUiFeatures = (code: RoleCode, features: readonly string[]): void => {
+  (ROLE_UI as Record<RoleCode, readonly UiFeature[]>)[code] = features as UiFeature[];
+  emitRoleCatalogChanged();
+};
+
 const REQUIRED_ROLE_CODES: RoleCode[] = [
   'admin', 'manager', 'employee', 'borrower', 'lender', 'business', 'viewer', 'pos',
 ];
@@ -186,6 +198,7 @@ export const loadRoleCatalog = async (): Promise<boolean> => {
     });
 
     roleCatalogLoaded = true;
+    emitRoleCatalogChanged();
     return true;
   } catch (err) {
     console.warn('[rolePermissions] loadRoleCatalog failed, keeping defaults:', err);

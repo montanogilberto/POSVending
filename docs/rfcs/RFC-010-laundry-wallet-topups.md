@@ -86,3 +86,25 @@ Regla general: **el dinero de una recarga siempre llega a una cuenta de la lavan
 2. ¿SmartLoans cobra comisión de plataforma por recarga (`application_fee_amount`)?
 3. ¿Ya se cobró alguna recarga real con tarjeta en la cuenta de plataforma? (Para el paso 7 del rollout.)
 4. ¿Datos de la cuenta de la lavandería (CLABE, banco, titular) y quién la administra?
+
+## Enmienda A (2026-11-07): la cuenta Stripe de la plataforma para un negocio propio
+
+**Decisión del dueño, 2026-11-07.** D1 aplica a SmartLoans como servicio de préstamos: SmartLoans no recibe ni guarda el dinero entre prestamista y acreditado. La lavandería (`companyId 1`) es un negocio propio de GMO y cobra sus propias ventas. Por eso sus recargas con tarjeta pueden cobrarse en la cuenta Stripe que ya existe, la de la plataforma, sin abrir otra cuenta.
+
+**Qué cambia**
+- Nuevo tipo de cuenta `stripe_platform` en `companyPaymentAccounts`. No tiene `stripeConnectedAccountId`: el cargo se hace sin `stripe_account`, como los pagos de préstamos.
+- Sólo puede usarlo una compañía de la lista `PLATFORM_TOPUP_COMPANIES` en el código (hoy, sólo la `1`). Ninguna otra compañía puede cobrar en la cuenta de la plataforma, así que su dinero nunca llega ahí.
+- Sigue el mismo control que las demás cuentas: un administrador lo solicita y otro lo confirma.
+- Hay una sola cuenta de tarjeta activa por compañía. Confirmar `stripe_platform` archiva la `stripe_connect` activa, y al revés.
+- La recarga sigue siendo sólo con tarjeta, sin OXXO. Se cobra la comisión de Stripe y se acredita el neto real.
+- El webhook de la plataforma (`STRIPE_WEBHOOK_SECRET`) acredita estas recargas. No hace falta el webhook de Connect.
+
+**Lo que no cambia**
+- Préstamos: el cobro sigue directo entre prestamista y acreditado por SPEI.
+- Transferencias: siguen llegando a la CLABE de la compañía.
+- Una compañía de un tercero sigue necesitando su propia cuenta Stripe (`stripe_connect`).
+
+**Rollout**
+1. Ejecutar `sql/migrations/2026-11-07_company_payment_accounts_platform.sql` y `sql/sp_companyPaymentAccounts.sql`.
+2. Publicar el backend y el POS.
+3. Un administrador toca **Usar la cuenta Stripe de GMO** en Cuentas de cobro, y otro administrador la confirma.

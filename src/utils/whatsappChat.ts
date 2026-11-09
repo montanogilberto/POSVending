@@ -59,6 +59,8 @@ export const REPLY_ERROR_TEXT: Record<StaffReplyError, string> = {
   outside_24h: 'Pasaron más de 24 h desde el último mensaje del cliente: WhatsApp ya no permite responderle libremente.',
   no_channel: 'No encontramos el número de WhatsApp del negocio con el que habló este cliente.',
   send_failed: 'WhatsApp no aceptó el mensaje. Intenta de nuevo.',
+  template_failed: 'WhatsApp no aceptó la plantilla "mensaje_negocio". Revisa que esté aprobada en Meta.',
+  too_long_for_template: 'Cuando el cliente no ha escrito en 24 h el mensaje puede tener hasta 900 caracteres.',
   network: 'Sin conexión. Revisa tu internet e intenta de nuevo.',
   invalid: 'El mensaje no es válido (vacío o demasiado largo).',
 };

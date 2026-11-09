@@ -27,8 +27,24 @@ const post = async (path: string, row: Record<string, unknown>) => {
   return data;
 };
 
+export interface CompanyPaymentAccountList {
+  accounts: CompanyPaymentAccount[];
+  /** The company may charge card top-ups on GMO's own Stripe account (RFC-010 Enmienda A). */
+  platformTopUpAllowed: boolean;
+}
+
+export const getCompanyPaymentAccounts = async (companyId: number): Promise<CompanyPaymentAccountList> => {
+  const data = await post('/list', { action: 5, companyId });
+  return { accounts: data.companyPaymentAccounts ?? [], platformTopUpAllowed: data.platformTopUpAllowed === true };
+};
+
 export const listCompanyPaymentAccounts = async (companyId: number): Promise<CompanyPaymentAccount[]> =>
-  (await post('/list', { action: 5, companyId })).companyPaymentAccounts ?? [];
+  (await getCompanyPaymentAccounts(companyId)).accounts;
+
+/** Pide cobrar las recargas con tarjeta en la cuenta Stripe de GMO. Queda pendiente de un segundo admin. */
+export const requestPlatformStripeAccount = async (companyId: number, userId: number): Promise<void> => {
+  await post('/stripe/platform', { action: 7, companyId, createdByUserId: userId });
+};
 
 export const getCompanyStripeLink = async (
   companyId: number, userId: number, returnUrl: string, replaceActive = false,
