@@ -5,6 +5,8 @@
 > Amplía RFC-009 y RFC-010. No los reemplaza.
 > 2026-11-09: adelantado el primer punto de P7, sólo lectura. El carrito muestra el saldo del cliente seleccionado (`useClientSaldo`, lee `walletTransactions` por `companyId`). No hay botón Saldo ni cobro hasta aprobar este RFC.
 
+> 2026-11-09: escrito el PRD del paso 3, `posgmo-factory/tests/prd_prepaidWallet.json` (sólo el libro; pasa `PRDInput`, la fábrica aún no se ha corrido). Por la convención de la fábrica los SPs quedan en plural: `sp_prepaidWallets`, `_all`, `_one`, `_balance`; la tabla sigue siendo `prepaidWalletEntries`. La autorización con PIN (P3) y la configuración por compañía van en PRDs aparte.
+
 ## Contexto
 Hoy el cliente sólo gasta su saldo en las máquinas ESP32 (`POST /laundryDevices/authorize`). En el POS, escanear su QR únicamente selecciona al cliente y carga puntos, cupones y recompensas; las formas de pago siguen siendo Efectivo, Tarjeta, Transferir y Pago dividido.
 

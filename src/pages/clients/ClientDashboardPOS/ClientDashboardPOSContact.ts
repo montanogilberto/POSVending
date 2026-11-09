@@ -83,9 +83,12 @@ export const usePosContact = (
 
   const sendWhatsApp = async (body: string): Promise<boolean> => {
     if (!phone10) return false;
-    // Free-form first; outside Meta's 24 h window it goes inside the mensaje_negocio template.
+    // Free-form first. Outside Meta's 24 h window, or when the client never wrote to us
+    // (no_channel), it goes inside the mensaje_negocio template from the business number.
     let res = await sendWhatsAppStaffReply(companyId, userId, phone10, body, false);
-    if (!res.ok && res.error === 'outside_24h') res = await sendWhatsAppStaffReply(companyId, userId, phone10, body, true);
+    if (!res.ok && (res.error === 'outside_24h' || res.error === 'no_channel')) {
+      res = await sendWhatsAppStaffReply(companyId, userId, phone10, body, true);
+    }
     if (!res.ok) {
       showToast(REPLY_ERROR_TEXT[res.error], 'danger');
       return false;
