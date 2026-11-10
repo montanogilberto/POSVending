@@ -1,0 +1,112 @@
+/* General page styling */
+.voice-calls-content {
+  --background: var(--ion-color-light-shade);
+}
+
+/* Segment for filters */
+.voice-calls-segment {
+  margin: 16px;
+  --background: var(--ion-color-step-50);
+  --background-checked: var(--ion-color-primary);
+  --color: var(--ion-color-medium-shade);
+  --color-checked: var(--ion-color-primary-contrast);
+  --border-radius: 12px;
+  border: 1px solid var(--ion-color-step-100);
+}
+
+.voice-calls-segment ion-segment-button {
+  min-width: unset; /* Allow buttons to shrink */
+  text-transform: none; /* Prevent uppercase */
+  font-size: 0.85rem;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* List styling */
+.voice-calls-list {
+  background: transparent;
+  padding: 0 16px;
+}
+
+.voice-calls-item {
+  --background: var(--ion-color-step-0);
+  --border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.voice-calls-item-label h3 {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 4px;
+}
+
+.voice-calls-item-label p {
+  color: var(--ion-color-medium);
+  font-size: 0.9em;
+  margin-top: 0;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.voice-calls-item-label ion-icon {
+  font-size: 0.9em;
+}
+
+.voice-calls-status-badges {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.voice-calls-item-badge {
+  font-size: 0.7em;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+/* Detail Modal Styling */
+.voice-calls-detail-modal {
+  --border-radius: 12px;
+  --box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.voice-calls-detail-content {
+  --background: var(--ion-color-light-shade);
+}
+
+.voice-calls-detail-list {
+  background: transparent;
+  margin-top: 20px;
+  padding: 0 16px;
+}
+
+.voice-calls-detail-list ion-item {
+  --background: var(--ion-color-step-0);
+  --border-radius: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.voice-calls-detail-list ion-item h2 {
+  font-weight: bold;
+  font-size: 1.2em;
+  margin-top: 0;
+}
+
+.voice-calls-detail-list ion-item h3 {
+  font-weight: 600;
+  font-size: 1em;
+  margin-top: 0;
+  margin-bottom: 4px;
+  color: var(--ion-color-dark-shade);
+}
+
+.voice-calls-detail-list ion-item p {
+  color: var(--ion-color-medium);
+  font-size: 0.9em;
+  margin-top: 0;
+}

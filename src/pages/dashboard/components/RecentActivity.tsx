@@ -10,12 +10,31 @@ import {
   IonIcon,
   IonLabel,
   IonSpinner,
+  IonToast,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { receiptOutline, arrowForwardOutline } from 'ionicons/icons';
+import { receiptOutline, arrowForwardOutline, notificationsOutline, checkmarkDoneOutline, refreshOutline, personOutline } from 'ionicons/icons';
 import { Income } from '../types';
 import { toHermosilloDate, fmtMXN } from '../../../utils/format';
 import EmptyState from '../../../components/ui/EmptyState';
+import { useServiceCompletion, type ServiceCompletionState } from '../hooks/useServiceCompletion';
+import { useActivityClientNames } from '../hooks/useActivityClientNames';
+
+/** The POS "mostrador" placeholder: a walk-in sale has no client page. */
+const WALK_IN_CLIENT_ID = 1;
+
+const NOTICE_ICON: Record<Exclude<ServiceCompletionState, 'none' | 'sending'>, string> = {
+  available: notificationsOutline,
+  sent: checkmarkDoneOutline,
+  failed: refreshOutline,
+};
+
+const NOTICE_LABEL: Record<Exclude<ServiceCompletionState, 'none'>, string> = {
+  available: 'Avisar al cliente que su servicio está listo',
+  sending: 'Avisando al cliente…',
+  sent: 'Cliente avisado',
+  failed: 'No se pudo avisar. Reintentar',
+};
 
 interface RecentActivityProps {
   allIncome: Income[];
@@ -29,6 +48,9 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ allIncome, onShowReceip
   // Same grouped-by-date, stacked-row format as /movements — group only the
   // slice actually shown here (the widget stays "recent", not the full month).
   const recentIncome = allIncome.slice(0, 10);
+  // Per-company feature: the backend says which sales get the "servicio listo" action.
+  const notice = useServiceCompletion(recentIncome.map((income) => income.incomeId));
+  const clientNames = useActivityClientNames(recentIncome.map((income) => income.clientId));
   const groupedIncome = recentIncome.reduce((groups, income) => {
     const rawDate = toHermosilloDate(income.paymentDate).toLocaleDateString('es-MX', {
       weekday: 'long',
@@ -71,6 +93,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ allIncome, onShowReceip
                   {incomes.map((income, i) => {
                     const time = toHermosilloDate(income.paymentDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
                     const isLoading = loadingReceiptId === income.incomeId;
+                    const noticeState = notice.stateOf(income.incomeId);
                     return (
                       <IonItem
                         key={i}
@@ -84,9 +107,39 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ allIncome, onShowReceip
                           <IonIcon icon={receiptOutline} />
                         </div>
                         <IonLabel>
-                          <div className="activity-amount-label">Ingreso — {fmtMXN(income.total)}</div>
+                          <div className="activity-amount-label"><span className="activity-amount-prefix">Ingreso — </span>{fmtMXN(income.total)}</div>
                           <div className="activity-method-subtitle">{time} — {income.paymentMethod}</div>
+                          {clientNames[income.clientId] && (
+                            <div className="activity-client-name">{clientNames[income.clientId]}</div>
+                          )}
                         </IonLabel>
+                        {!!income.clientId && income.clientId !== WALK_IN_CLIENT_ID && (
+                          <IonButton
+                            slot="end"
+                            fill="clear"
+                            className="activity-client-btn"
+                            aria-label={clientNames[income.clientId] ? `Ver cliente ${clientNames[income.clientId]}` : 'Ver cliente'}
+                            title={clientNames[income.clientId] ?? 'Ver cliente'}
+                            onClick={(e) => { e.stopPropagation(); history.push(`/client-pos/${income.clientId}`); }}
+                          >
+                            <IonIcon icon={personOutline} />
+                          </IonButton>
+                        )}
+                        {noticeState !== 'none' && (
+                          <IonButton
+                            slot="end"
+                            fill="clear"
+                            className={`activity-notice-btn activity-notice-${noticeState}`}
+                            aria-label={NOTICE_LABEL[noticeState]}
+                            title={NOTICE_LABEL[noticeState]}
+                            disabled={noticeState === 'sending' || (notice.sendingAny && noticeState !== 'sent')}
+                            onClick={(e) => { e.stopPropagation(); notice.confirmSend(income.incomeId); }}
+                          >
+                            {noticeState === 'sending'
+                              ? <IonSpinner name="dots" />
+                              : <IonIcon icon={NOTICE_ICON[noticeState]} />}
+                          </IonButton>
+                        )}
                         <div slot="end" className="activity-view-ticket-icon">
                           {isLoading ? <IonSpinner name="dots" /> : <IonIcon icon={receiptOutline} />}
                         </div>
@@ -113,6 +166,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ allIncome, onShowReceip
           </div>
         )}
       </IonCardContent>
+      <IonToast {...notice.toastProps} />
     </IonCard>
   );
 };

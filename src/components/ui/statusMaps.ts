@@ -179,3 +179,26 @@ export const RESERVATION_STATUS: Record<string, StatusMeta> = {
   confirmed: { label: 'Confirmada', color: 'success' },
   cancelled: { label: 'Cancelada',  color: 'medium'  },
 };
+
+/** Llamadas de voz del agente (voiceCalls.callStatus). */
+export const VOICE_CALL_STATUS: Record<string, StatusMeta> = {
+  queued:      { label: 'En cola',       color: 'medium'   },
+  ringing:     { label: 'Sonando',       color: 'primary'  },
+  in_progress: { label: 'En curso',      color: 'tertiary' },
+  completed:   { label: 'Completada',    color: 'success'  },
+  no_answer:   { label: 'Sin respuesta', color: 'warning'  },
+  busy:        { label: 'Ocupado',       color: 'warning'  },
+  failed:      { label: 'Fallida',       color: 'danger'   },
+  canceled:    { label: 'Cancelada',     color: 'danger'   },
+  skipped:     { label: 'Omitida',       color: 'light'    },
+};
+
+/** Acuerdo pactado en la llamada de voz (voiceCalls.agreementStatus). */
+export const VOICE_AGREEMENT_STATUS: Record<string, StatusMeta> = {
+  none:                 { label: 'Sin acuerdo',   color: 'light'   },
+  invalid:              { label: 'Inválido',      color: 'danger'  },
+  pending_confirmation: { label: 'Por confirmar', color: 'warning' },
+  confirmed:            { label: 'Confirmado',    color: 'success' },
+  cancelled:            { label: 'Cancelado',     color: 'danger'  },
+  expired:              { label: 'Expirado',      color: 'medium'  },
+};
