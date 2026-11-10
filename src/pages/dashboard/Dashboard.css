@@ -639,10 +639,19 @@
   text-transform: capitalize;
 }
 
+/* Client of the sale, under the time/method line (walk-in sales have none) */
+.activity-client-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0284C7;
+  margin-top: 2px;
+}
+
 .activity-view-ticket-icon {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
   border-radius: 50%;
   background: #EFF6FF;
   color: #0056D2;
@@ -653,7 +662,62 @@
 }
 
 .activity-view-ticket-icon ion-icon {
-  font-size: 15px;
+  font-size: 20px;
+}
+
+/* Client of the sale → /client-pos/:clientId (not on walk-in sales) */
+.activity-client-btn {
+  --padding-start: 0;
+  --padding-end: 0;
+  --border-radius: 50%;
+  --color: #0284C7;
+  --background: #E0F2FE;
+  --background-hover: #BAE6FD;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 0;
+  margin: 0 0 0 12px;
+  box-shadow: none;
+}
+
+.activity-client-btn ion-icon {
+  font-size: 20px;
+}
+
+/* "Tu servicio está listo" — only on sales whose company has the feature */
+.activity-notice-btn {
+  --padding-start: 0;
+  --padding-end: 0;
+  --border-radius: 50%;
+  --color: #15803D;
+  --background: #ECFDF5;
+  --background-hover: #D1FAE5;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 0;
+  margin: 0 0 0 12px;
+  box-shadow: none;
+}
+
+.activity-notice-btn ion-icon {
+  font-size: 20px;
+}
+
+.activity-notice-btn ion-spinner {
+  width: 22px;
+  height: 22px;
+}
+
+.activity-notice-sent {
+  --color: #64748B;
+  --background: #F1F5F9;
+}
+
+.activity-notice-failed {
+  --color: #B91C1C;
+  --background: #FEF2F2;
 }
 
 /* Empty State — shared EmptyState component styling */
@@ -706,6 +770,48 @@
   }
 
   .activity-icon-badge ion-icon {
+    font-size: 18px;
+  }
+}
+
+/* Phones: the row carries up to three actions (cliente, aviso, ticket). The
+   left badge and the "Ingreso —" prefix go (every row here is an ingreso), so
+   the amount keeps one line instead of breaking letter by letter. */
+@media (max-width: 576px) {
+  .activity-card-content {
+    padding: 0 16px 16px 16px !important;
+  }
+
+  .activity-list-item {
+    --padding-start: 12px !important;
+    --padding-end: 12px !important;
+  }
+
+  .activity-icon-badge,
+  .activity-amount-prefix {
+    display: none;
+  }
+
+  .activity-amount-label,
+  .activity-method-subtitle,
+  .activity-client-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .activity-client-btn,
+  .activity-notice-btn,
+  .activity-view-ticket-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    margin-left: 6px;
+  }
+
+  .activity-client-btn ion-icon,
+  .activity-notice-btn ion-icon,
+  .activity-view-ticket-icon ion-icon {
     font-size: 18px;
   }
 }
