@@ -186,6 +186,7 @@ import HigherLowerPage from './pages/game/HigherLowerPage';
 import MinesPage from './pages/game/MinesPage';
 import PenaltyPage from './pages/game/PenaltyPage';
 import BowlingPage from './pages/game/BowlingPage';
+import VoiceCallPage from './pages/messaging/VoiceCallPage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -1096,6 +1097,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/whatsapp-agent/setup" feature="notificationDispatchLog" component={WhatsAppSetupPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
             <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />
+            <PrivateRoute exact path="/voice-calls" component={VoiceCallPage} />
           </IonRouterOutlet>
 
           {/* Custom bottom nav (was IonTabBar/IonTabButton). The SmartLoans
