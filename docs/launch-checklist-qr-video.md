@@ -44,7 +44,7 @@ Objetivo: demostrar el recorrido completo sin errores y sin mostrar funciones qu
 - [ ] Confirmar que los clientes con PIN de 6 dígitos siguen entrando.
 
 ### URL y tiendas
-- [ ] Definir una sola URL oficial de GMO para registro, Mi QR, promoción y video.
+- [x] URL oficial de GMO para registro, Mi QR, promoción y video: https://www.gmolavanderia.com/ (por companyId).
 - [ ] Confirmar el identificador real de Android: `com.factoryAI.gmo` en la app y `com.lavanderia.gmo` en el enlace.
 - [ ] Reemplazar el enlace de App Store, que es un valor de ejemplo.
 

@@ -8,6 +8,7 @@ import { useUser } from '../../../contexts/UserContext';
 import {
   Reservation, getPOSQueue, confirmReservation, cancelReservation, completeReservation,
 } from '../../../api/reservationsApi';
+import { onDataChanged } from '../../../utils/refreshBus';
 
 const SERVICE_LABEL: Record<string, string> = { lavado: '🫧 Lavado', secado: '🌀 Secado' };
 const STATUS_COLOR: Record<string, string> = {
@@ -31,24 +32,29 @@ const ReservationsWidget: React.FC<Props> = ({ pollIntervalMs = 30_000 }) => {
   const [actioning, setActioning] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async () => {
+  /** silent = background poll: no spinner. */
+  const load = useCallback(async (silent = false) => {
     if (!companyId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const queue = await getPOSQueue(companyId);
       setItems(queue);
     } catch {
       // silently ignore — widget shouldn't crash the dashboard
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [companyId]);
 
   useEffect(() => {
     load();
-    intervalRef.current = setInterval(load, pollIntervalMs);
+    // Background tabs/minimized app don't poll; returning emits 'app_resumed' (below).
+    const tick = () => { if (document.visibilityState === 'visible') load(true); };
+    intervalRef.current = setInterval(tick, pollIntervalMs);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [load, pollIntervalMs]);
+
+  useEffect(() => onDataChanged(() => { load(true); }), [load]);
 
   async function handleAction(fn: () => Promise<void>) {
     await fn();
@@ -70,7 +76,7 @@ const ReservationsWidget: React.FC<Props> = ({ pollIntervalMs = 30_000 }) => {
             <IonBadge color="danger" style={{ marginLeft: 6 }}>{pendingCount}</IonBadge>
           )}
         </IonCardTitle>
-        <IonButton fill="clear" size="small" onClick={load} disabled={loading}>
+        <IonButton fill="clear" size="small" onClick={() => load()} disabled={loading}>
           {loading ? <IonSpinner name="lines-small" style={{ width: 16, height: 16 }} /> : <IonIcon icon={refreshOutline} />}
         </IonButton>
       </IonCardHeader>
