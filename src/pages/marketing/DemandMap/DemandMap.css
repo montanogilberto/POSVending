@@ -1,0 +1,149 @@
+.dmap-content {
+  --background: var(--ion-color-light);
+}
+
+.dmap-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+
+.dmap-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 16px;
+  color: var(--ion-color-medium);
+}
+
+.dmap-card {
+  margin: 12px 16px;
+}
+
+.dmap-funnel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.dmap-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--ion-color-light);
+}
+
+.dmap-kpi strong {
+  font-size: 1.5rem;
+  color: var(--ion-color-dark);
+}
+
+.dmap-kpi span {
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+}
+
+.dmap-kpi--high strong {
+  color: var(--ion-color-success);
+}
+
+.dmap-map {
+  height: 420px;
+  margin: 12px 16px 4px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.dmap-map .leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+.dmap-circle {
+  stroke-width: 2;
+  fill-opacity: 0.35;
+}
+
+.dmap-circle--autoservicio_24h {
+  stroke: var(--ion-color-tertiary);
+  fill: var(--ion-color-tertiary);
+}
+
+.dmap-circle--lockers {
+  stroke: var(--ion-color-success);
+  fill: var(--ion-color-success);
+}
+
+.dmap-circle--qr_gmo {
+  stroke: var(--ion-color-primary);
+  fill: var(--ion-color-primary);
+}
+
+.dmap-note {
+  margin: 4px 16px 12px;
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+}
+
+.dmap-table {
+  overflow-x: auto;
+}
+
+.dmap-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1.2fr repeat(6, 0.8fr);
+  gap: 8px;
+  min-width: 640px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+  font-size: 0.85rem;
+}
+
+.dmap-row--head {
+  font-weight: 600;
+  color: var(--ion-color-medium);
+}
+
+.dmap-host {
+  stroke: var(--ion-color-dark);
+  stroke-width: 2;
+  fill: var(--ion-color-dark);
+  fill-opacity: 0.85;
+}
+
+.dmap-host--aprobado,
+.dmap-host--instalado {
+  stroke: var(--ion-color-warning);
+  fill: var(--ion-color-warning);
+}
+
+.dmap-host-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+}
+
+.dmap-host-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.dmap-host-info span {
+  color: var(--ion-color-medium);
+}
+
+.dmap-host-status {
+  flex: 0 0 140px;
+  display: flex;
+  justify-content: flex-end;
+}

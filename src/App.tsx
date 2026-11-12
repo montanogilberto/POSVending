@@ -20,6 +20,7 @@ import {
   IonHeader,
   IonContent,
   IonToolbar,
+  IonSearchbar,
   IonTitle,
   IonAvatar,
   IonSplitPane,
@@ -81,6 +82,8 @@ import {
   compassOutline,
   briefcaseOutline,
   sparklesOutline,
+  mapOutline,
+  searchOutline,
 }
   from 'ionicons/icons';
   
@@ -157,6 +160,7 @@ import ClientFollowUpPage from './pages/clients/ClientFollowUpPage';
 import PushNotificationPage from './pages/messaging/PushNotificationPage';
 import NotificationDispatchLogPage from './pages/messaging/NotificationDispatchLogPage';
 import WhatsAppAgentPage from './pages/messaging/WhatsAppAgentPage';
+import DemandMapPage from './pages/marketing/DemandMapPage';
 import WhatsAppConversationsPage from './pages/messaging/WhatsAppConversationsPage';
 import WhatsAppSetupPage from './pages/messaging/WhatsAppSetupPage';
 import WhatsAppDock from './components/messaging/WhatsAppDock';
@@ -208,6 +212,9 @@ import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
 import { canAccess, UiFeature } from './config/rolePermissions';
 import { useRoleCatalogVersion } from './hooks/useRoleCatalogVersion';
+import { menuController } from '@ionic/core/components';
+import { useMenuSearch } from './hooks/useMenuSearch';
+import EmptyState from './components/ui/EmptyState';
 import { useNotificationAttention } from './hooks/useNotificationAttention';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
@@ -270,7 +277,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
   '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees', '/company-payment-accounts',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
-  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent',
+  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent', '/demand-map',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
 ];
 
@@ -353,6 +360,25 @@ const AppShell: React.FC = () => {
     resolveAvatarUrl(avatarUrl)
   );
   const [menuCollapsed, setMenuCollapsed] = useState(false);
+  // Azure-Portal-style menu search: "Buscar (Ctrl+/)" filters the items in place.
+  const menuSearch = useMenuSearch();
+  const menuSearchbarRef = useRef<HTMLIonSearchbarElement>(null);
+  const focusMenuSearch = () => {
+    setMenuCollapsed(false);
+    void menuController.open('main-menu'); // no-op when the split pane already shows it
+    // Wait for the searchbar to render (it is hidden in the collapsed rail).
+    setTimeout(() => { void menuSearchbarRef.current?.setFocus(); }, 150);
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === '/' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        focusMenuSearch();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // true una vez que el usuario elige una foto local esta sesión — el efecto
   // de resync (abajo) deja de pisarla con la que trae el backend.
   const hasLocalAvatarOverride = useRef(false);
@@ -587,19 +613,46 @@ const AppShell: React.FC = () => {
       } as React.CSSProperties}
     >
       {/* Side menu */}
-      <IonMenu menuId="main-menu" contentId="main" side="start" className={menuCollapsed ? 'menu-rail' : ''}>
+      <IonMenu
+        menuId="main-menu" contentId="main" side="start"
+        className={menuCollapsed ? 'menu-rail' : ''}
+        onIonDidClose={menuSearch.clear}
+      >
         <IonHeader className="menu-header">
           <IonToolbar>
             {!menuCollapsed && <IonTitle>{shellTitle}</IonTitle>}
             <IonButtons slot="end">
+              {menuCollapsed && (
+                <IonButton fill="clear" size="small" onClick={focusMenuSearch} title="Buscar (Ctrl+/)" aria-label="Buscar en el menú">
+                  <IonIcon icon={searchOutline} />
+                </IonButton>
+              )}
               <IonButton fill="clear" size="small" onClick={() => setMenuCollapsed(c => !c)} className="menu-collapse-btn">
                 <IonIcon icon={menuCollapsed ? chevronForwardOutline : chevronBackOutline} />
               </IonButton>
             </IonButtons>
           </IonToolbar>
+          {!menuCollapsed && (
+            <IonToolbar className="menu-search-toolbar">
+              <IonSearchbar
+                ref={menuSearchbarRef}
+                className="menu-search"
+                placeholder="Buscar (Ctrl+/)"
+                aria-label="Buscar en el menú"
+                value={menuSearch.query}
+                debounce={0}
+                onIonInput={e => menuSearch.setQuery(e.detail.value ?? '')}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') menuSearch.openFirstMatch();
+                  if (e.key === 'Escape') menuSearch.clear();
+                }}
+              />
+            </IonToolbar>
+          )}
         </IonHeader>
 
         <IonContent>
+          {!menuSearch.searching && (
           <div className={`profile-header ${menuCollapsed ? 'profile-header-collapsed' : ''}`}>
             <IonAvatar className="profile-avatar">
               <ZoomableImage
@@ -621,8 +674,9 @@ const AppShell: React.FC = () => {
             </div>
             )}
           </div>
+          )}
 
-          <IonList>
+          <IonList ref={menuSearch.listRef}>
             {availableProducts.length > 1 && (
               <>
                 {!menuCollapsed && <IonItemDivider>Mis productos</IonItemDivider>}
@@ -707,6 +761,15 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/whatsapp-agent" title="Agente WhatsApp">
                 <IonIcon icon={logoWhatsapp} slot="start" />
                 {!menuCollapsed && <IonLabel>Agente WhatsApp</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'demandMap') && (
+              <IonItem button routerLink="/demand-map" title="Mapa de demanda">
+                <IonIcon icon={mapOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mapa de demanda</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -981,6 +1044,9 @@ const AppShell: React.FC = () => {
               </IonItem>
             </IonMenuToggle>
           </IonList>
+          {menuSearch.searching && menuSearch.matchCount === 0 && (
+            <EmptyState icon={searchOutline} text={`Sin resultados para "${menuSearch.query.trim()}"`} className="menu-search-empty" />
+          )}
         </IonContent>
       </IonMenu>
 
@@ -1093,6 +1159,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/notification-dispatch-log" feature="notificationDispatchLog" component={NotificationDispatchLogPage} />
             {/* Same permission as Notificaciones: role features come from GET /roles, a new one would need a DB change first. */}
             <PrivateRoute exact path="/whatsapp-agent" feature="notificationDispatchLog" component={WhatsAppAgentPage} />
+            <PrivateRoute exact path="/demand-map" feature="demandMap" component={DemandMapPage} />
             <PrivateRoute exact path="/whatsapp-agent/conversations" feature="notificationDispatchLog" component={WhatsAppConversationsPage} />
             <PrivateRoute exact path="/whatsapp-agent/setup" feature="notificationDispatchLog" component={WhatsAppSetupPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />

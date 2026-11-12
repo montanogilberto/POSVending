@@ -296,3 +296,23 @@ ion-content {
   --padding-bottom: var(--ion-safe-area-bottom);
 }
   
+/* ── Side menu search (Azure-Portal style) ───────────────── */
+.menu-search-toolbar {
+  --background: #fff;
+  --padding-top: 0;
+  --padding-bottom: 4px;
+}
+.menu-search {
+  --background: var(--ion-color-light, #f4f5f8);
+  --border-radius: 10px;
+  --box-shadow: none;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+/* Set by useMenuSearch on items/sections that don't match the query. */
+.menu-search-hidden {
+  display: none !important;
+}
+.menu-search-empty {
+  padding: 32px 16px;
+}

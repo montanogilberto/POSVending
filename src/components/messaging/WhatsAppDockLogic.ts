@@ -73,13 +73,14 @@ export const useWhatsAppDock = () => {
   }, [companyId, range]);
 
   // First load + polling while the tab is visible and the dock is on screen.
+  // Returning to the tab is covered by App.tsx's 'app_resumed' → onDataChanged
+  // below; a visibilitychange listener here fired a second, duplicate request.
   useEffect(() => {
     if (hidden || !companyId) return undefined;
     load(loadedOnce);
     const tick = () => { if (document.visibilityState === 'visible') load(true); };
     const id = setInterval(tick, LIST_POLL_MS);
-    document.addEventListener('visibilitychange', tick);
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hidden, companyId, load]);
 

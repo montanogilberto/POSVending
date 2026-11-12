@@ -23,7 +23,7 @@ const LoginAppPicker: React.FC<LoginAppPickerProps> = ({ value, onChange, disabl
       >
         <span className="login-app-tile-inner">
           <IonIcon icon={LOGIN_APP_ICONS[app.id]} aria-hidden="true" />
-          <span>{app.shortLabel}</span>
+          <span lang="es">{app.shortLabel}</span>
         </span>
       </IonButton>
     ))}
