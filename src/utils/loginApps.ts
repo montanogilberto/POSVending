@@ -14,9 +14,9 @@ export interface LoginAppInfo {
 
 export const LOGIN_APPS: readonly LoginAppInfo[] = [
   { id: 'pos',        label: 'POS GMO',    shortLabel: 'POS',        subtitle: 'Sistema de punto de venta' },
-  { id: 'smartloans', label: 'Préstamos GMO', shortLabel: 'Préstamos GMO', subtitle: 'Préstamos entre personas' },
-  { id: 'arcade',     label: 'Juegos Online',     shortLabel: 'Juegos Online',     subtitle: 'Juegos Online' },
-  { id: 'rewards',    label: 'Puntos/Recompensas POS',    shortLabel: 'Puntos/Recompensas POS',    subtitle: 'Saldo, Puntos/Recompensas POS' },
+  { id: 'smartloans', label: 'Préstamos GMO', shortLabel: 'Préstamos', subtitle: 'Préstamos entre personas' },
+  { id: 'arcade',     label: 'Juegos Online',     shortLabel: 'Juegos',     subtitle: 'Juegos Online' },
+  { id: 'rewards',    label: 'Puntos/Recompensas POS',    shortLabel: 'Recompensas',    subtitle: 'Billetera, Saldo, Puntos/Recompensas POS' },
 ];
 
 export const DEFAULT_LOGIN_APP: LoginApp = 'pos';
