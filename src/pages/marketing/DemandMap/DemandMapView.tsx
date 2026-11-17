@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonHeader,
+  IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonHeader,
   IonLabel, IonMenuButton, IonPage, IonRefresher, IonRefresherContent, IonSegment,
   IonSegmentButton, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToast, IonToolbar,
 } from '@ionic/react';
@@ -54,17 +54,38 @@ const DemandMapView: React.FC<{ vm: DemandMapVM }> = ({ vm }) => (
 
       {!vm.loading && vm.error && <EmptyState icon={alertCircleOutline} text={vm.error} />}
 
-      {!vm.loading && !vm.error && vm.zones.length === 0 && vm.hosts.length === 0 && (
+      {!vm.loading && !vm.error && !vm.hasAnyData && (
         <EmptyState icon={mapOutline}
-                    text="Todavía no hay señales de demanda ni negocios en este periodo. Se registran cuando el agente de WhatsApp conversa con alguien interesado." />
+                    text="Todavía no llega nadie por anuncios ni hay señales de demanda en este periodo. Se registran cuando el agente de WhatsApp conversa con alguien interesado." />
       )}
 
-      {!vm.loading && !vm.error && (vm.zones.length > 0 || vm.hosts.length > 0) && (
+      {!vm.loading && !vm.error && vm.hasAnyData && (
         <>
+          {vm.adLeadsLost && (
+            <IonCard className="dmap-card dmap-alert">
+              <IonCardContent>
+                <strong>
+                  {vm.adFunnel.adLeads} persona(s) llegaron por anuncio y ninguna dejó sus datos.
+                </strong>
+                <p>
+                  El problema está en la conversación (agente caído, saludo genérico de Meta o un mensaje
+                  del equipo sin seguimiento), no en el alcance de los anuncios. Revisa esas conversaciones.
+                </p>
+                <IonButton size="small" fill="outline" routerLink="/whatsapp-agent/conversations">
+                  Ver conversaciones
+                </IonButton>
+              </IonCardContent>
+            </IonCard>
+          )}
+
           <IonCard className="dmap-card">
             <IonCardHeader><IonCardTitle>Calidad de la demanda</IonCardTitle></IonCardHeader>
             <IonCardContent>
               <div className="dmap-funnel">
+                <div className="dmap-kpi"><strong>{vm.adFunnel.adLeads}</strong><span>Llegaron por anuncio</span></div>
+                <div className={`dmap-kpi${vm.adLeadsLost ? ' dmap-kpi--low' : ''}`}>
+                  <strong>{vm.adFunnel.adLeadsWithSignal}</strong><span>Dejaron sus datos</span>
+                </div>
                 <div className="dmap-kpi"><strong>{vm.funnel.signals}</strong><span>Necesidades identificadas</span></div>
                 <div className="dmap-kpi"><strong>{vm.funnel.optIns}</strong><span>Aceptaron aviso</span></div>
                 <div className="dmap-kpi"><strong>{vm.funnel.registered}</strong><span>Ya son clientes</span></div>

@@ -55,6 +55,17 @@ export const stubConversation = (phone10: string, customerName: string | null): 
 /** Backend timestamps come without a zone: they are UTC. */
 export const utcMs = (s: string) => new Date(s.includes('Z') || s.includes('+') ? s : `${s}Z`).getTime();
 
+/** Why Meta did not deliver a message (statuses[].errors[0].code), in es-MX. */
+export const WHATSAPP_ERROR_REASON: Record<string, string> = {
+  '131047': 'pasaron más de 24 h desde el último mensaje del cliente',
+  '131042': 'la cuenta de WhatsApp Business tiene pagos pendientes',
+  '131026': 'el número no tiene WhatsApp o bloqueó al negocio',
+  '131049': 'Meta limitó los mensajes de marketing a este cliente',
+};
+
+export const whatsappErrorReason = (code: string | null | undefined): string =>
+  (code && WHATSAPP_ERROR_REASON[code]) || (code ? `Meta no lo entregó (código ${code})` : 'Meta no lo entregó');
+
 export const REPLY_ERROR_TEXT: Record<StaffReplyError, string> = {
   outside_24h: 'Pasaron más de 24 h desde el último mensaje del cliente: WhatsApp ya no permite responderle libremente.',
   no_channel: 'No encontramos el número de WhatsApp del negocio con el que habló este cliente.',

@@ -5,7 +5,8 @@ import StatusBadge from '../ui/StatusBadge';
 import { NOTIFICATION_CHANNEL, NOTIFICATION_DISPATCH_STATUS, RESERVATION_STATUS } from '../ui/statusMaps';
 import { hermosilloTime, mxChatDate } from '../../utils/format';
 import { hermosilloDayKey } from '../../utils/period';
-import { CAPABILITY_META } from '../../utils/whatsappChat';
+import { CAPABILITY_META, whatsappErrorReason } from '../../utils/whatsappChat';
+import DeliveryTick from './DeliveryTick';
 import type { WhatsAppConversationThread, WhatsAppThreadItem } from '../../api/whatsappAgentApi';
 import './WhatsAppChat.css';
 
@@ -25,10 +26,12 @@ const Entry: React.FC<{ item: WhatsAppThreadItem }> = ({ item: it }) => {
     case 'staff_app': {
       const who = it.kind === 'bot' ? 'Agente' : it.kind === 'staff' ? 'Equipo (POS)' : 'Equipo (app WhatsApp)';
       const latency = it.kind === 'bot' && it.detail ? ` · ${(Number(it.detail) / 1000).toFixed(1)} s` : '';
+      const undelivered = it.delivery === 'failed';
       return (
-        <div className={`wac-bubble wac-bubble--${it.kind === 'bot' ? 'agent' : 'staff'}`}>
+        <div className={`wac-bubble wac-bubble--${it.kind === 'bot' ? 'agent' : 'staff'}${undelivered ? ' wac-bubble--undelivered' : ''}`}>
           <p>{it.text || '—'}</p>
-          <span className="wac-time">{who}{latency} · {time}</span>
+          {undelivered && <p className="wac-undelivered">No entregado: {whatsappErrorReason(it.error)}</p>}
+          <span className="wac-time">{who}{latency} · {time}<DeliveryTick status={it.delivery} /></span>
         </div>
       );
     }

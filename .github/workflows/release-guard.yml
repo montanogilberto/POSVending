@@ -39,4 +39,7 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+        # Cypress isn't run in CI — skip its ~200 MB binary (a cut download fails npm ci).
+        env:
+          CYPRESS_INSTALL_BINARY: 0
       - run: npm run build

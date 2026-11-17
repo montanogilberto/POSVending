@@ -3,6 +3,7 @@ import { IonAvatar, IonButton, IonIcon, IonItem, IonLabel, IonSpinner } from '@i
 import { chevronDownOutline, chevronUpOutline, closeOutline, resizeOutline } from 'ionicons/icons';
 import WhatsAppTimeline from './WhatsAppTimeline';
 import WhatsAppReplyBox from './WhatsAppReplyBox';
+import ClientNameLink from './ClientNameLink';
 import { useWhatsAppThread } from '../../hooks/useWhatsAppThread';
 import { fmtPhone10 } from '../../utils/whatsappChat';
 import type { DockWindow, WhatsAppDockVM } from './WhatsAppDockLogic';
@@ -28,7 +29,7 @@ const DockChatWindow: React.FC<Props> = ({ vm, win }) => {
           onClick={() => vm.toggleMinimized(conv.phone10)}>
           <IonAvatar slot="start" className="wac-avatar wad-head-avatar">{(name[0] ?? '#').toUpperCase()}</IonAvatar>
           <IonLabel>
-            <h3>{name}</h3>
+            <h3><ClientNameLink name={name} clientId={chat.thread?.clientId} /></h3>
             <p>{fmtPhone10(conv.phone10)}</p>
           </IonLabel>
           <IonIcon slot="end" icon={minimized ? chevronUpOutline : chevronDownOutline} />

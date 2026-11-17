@@ -147,3 +147,18 @@
   display: flex;
   justify-content: flex-end;
 }
+
+.dmap-kpi--low strong {
+  color: var(--ion-color-danger);
+}
+
+.dmap-alert {
+  --background: rgba(var(--ion-color-warning-rgb), 0.12);
+  border-left: 4px solid var(--ion-color-warning);
+}
+
+.dmap-alert p {
+  margin: 6px 0 10px;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+}

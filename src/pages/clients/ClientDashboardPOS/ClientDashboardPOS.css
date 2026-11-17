@@ -264,7 +264,27 @@
   letter-spacing: 0.4px;
 }
 
-/* Stamp cards */
+/* Stamp cards — grouped by category, one bar per product */
+.cpos-stamp-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cpos-stamp-group-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.cpos-stamp-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cpos-stamp-list {
   display: flex;
   flex-direction: column;
@@ -434,6 +454,7 @@
     background: rgba(255, 255, 255, 0.06);
   }
   .cpos-meta-value,
+  .cpos-stamp-group-title,
   .cpos-stamp-head {
     color: #D1D5DB;
   }

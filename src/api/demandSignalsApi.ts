@@ -84,12 +84,25 @@ export const fetchDemandSignals = async (
   return rows;
 };
 
+/** Funnel top from the ad attributions: who reached WhatsApp from an ad, and
+ *  how many of them left a demand signal or a host offer. */
+export interface AdFunnel {
+  adLeads: number;
+  adLeadsWithSignal: number;
+}
+
 export const fetchDemandZones = async (
   companyId: number, userId: number, filters: DemandFilters = {},
-): Promise<DemandZone[]> => {
-  const data = await post<{ result?: { zones?: DemandZone[] }[] }>(
+): Promise<{ zones: DemandZone[]; adFunnel: AdFunnel }> => {
+  const data = await post<{ result?: { zones?: DemandZone[]; funnel?: Partial<AdFunnel> }[] }>(
     '/demandSignals/zoneSummary', companyId, userId, filters);
   const zones = data.result?.[0]?.zones ?? [];
-  console.log('[demandSignalsApi] zoneSummary ←', zones.length);
-  return zones;
+  const funnel = data.result?.[0]?.funnel ?? {};
+  // An older backend has no funnel: 0/0 keeps the screen working.
+  const adFunnel: AdFunnel = {
+    adLeads: Number(funnel.adLeads ?? 0),
+    adLeadsWithSignal: Number(funnel.adLeadsWithSignal ?? 0),
+  };
+  console.log('[demandSignalsApi] zoneSummary ←', zones.length, adFunnel);
+  return { zones, adFunnel };
 };
