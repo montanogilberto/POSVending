@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIonViewWillEnter } from '@ionic/react';
 import {
   fetchDemandSignals, fetchDemandZones,
-  type DemandFilters, type DemandSignal, type DemandZone,
+  type AdFunnel, type DemandFilters, type DemandSignal, type DemandZone,
 } from '../../../api/demandSignalsApi';
 import {
   fetchLocationHosts, updateLocationHostStatus, type HostStatus, type LocationHost,
@@ -35,6 +35,7 @@ export const useDemandMap = () => {
   const [concept, setConcept] = useState<ConceptFilter>('todos');
   const [periodDays, setPeriodDays] = useState<number>(30);
   const [zones, setZones] = useState<DemandZone[]>([]);
+  const [adFunnel, setAdFunnel] = useState<AdFunnel>({ adLeads: 0, adLeadsWithSignal: 0 });
   const [signals, setSignals] = useState<DemandSignal[]>([]);
   const [hosts, setHosts] = useState<LocationHost[]>([]);
   const [savingHostId, setSavingHostId] = useState<number | null>(null);
@@ -58,7 +59,8 @@ export const useDemandMap = () => {
         // Host candidates stay on the map for a year: they're few and slow to process.
         fetchLocationHosts(Number(companyId), Number(userId), { startDate: hermosilloDate(-364), endDate: hermosilloDate() }),
       ]);
-      setZones(z);
+      setZones(z.zones);
+      setAdFunnel(z.adFunnel);
       setSignals(s);
       setHosts(h);
     } catch (e) {
@@ -90,6 +92,11 @@ export const useDemandMap = () => {
 
   const truncated = signals.length >= 500;
 
+  /** People came from ads but the agent recorded none of them: the problem is
+   *  the conversation (agent down, wrong greeting), not the ads' reach. */
+  const adLeadsLost = adFunnel.adLeads > 0 && adFunnel.adLeadsWithSignal === 0;
+  const hasAnyData = zones.length > 0 || hosts.length > 0 || adFunnel.adLeads > 0;
+
   const mappedHosts = useMemo(
     () => hosts.filter(h => h.zoneLat != null && h.zoneLng != null && h.status !== 'descartado'),
     [hosts],
@@ -113,7 +120,7 @@ export const useDemandMap = () => {
 
   return {
     concept, setConcept, periodDays, setPeriodDays,
-    zones, mappedZones, maxPeople, funnel, truncated,
+    zones, mappedZones, maxPeople, funnel, truncated, adFunnel, adLeadsLost, hasAnyData,
     hosts, mappedHosts, savingHostId, changeHostStatus, toastProps,
     loading, error, reload: load,
   };

@@ -4,6 +4,7 @@ import { useIonActionSheet } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
 import { canAccess } from '../../../config/rolePermissions';
 import { useToast } from '../../../hooks/useToast';
+import { useProductCategories } from '../../../hooks/useProductCategories';
 import { useViewEnterLoad } from '../../../hooks/useViewEnterLoad';
 import { onDataChanged } from '../../../utils/refreshBus';
 import { getOneClient, Client } from '../../../api/clientsApi';
@@ -30,7 +31,7 @@ import { usePosTransfer } from './ClientDashboardPOSTransfer';
 import { usePosMessages } from './ClientDashboardPOSMessages';
 import { usePosContact } from './ClientDashboardPOSContact';
 import { CLIENT_TYPE_LABEL, LIST_PREVIEW } from './ClientDashboardPOSConstants';
-import { PosPurchase, PosStampProgress, RecentCategory, RecentFilter } from './ClientDashboardPOSTypes';
+import { PosPurchase, PosStampGroup, PosStampProgress, RecentCategory, RecentFilter } from './ClientDashboardPOSTypes';
 import { buildRecentActivity } from './ClientDashboardPOSActivity';
 
 /**
@@ -56,7 +57,8 @@ export const useClientDashboardPOS = () => {
   const [catalog, setCatalog] = useState<PosRewardCatalogItem[]>([]);
   const [productCounts, setProductCounts] = useState<PosRewardProductCount[]>([]);
   const [followUps, setFollowUps] = useState<ClientFollowUp[]>([]);
-  const [productNames, setProductNames] = useState<Map<number, string>>(new Map());
+  const [products, setProducts] = useState<Map<number, { name: string; categoryId: number }>>(new Map());
+  const { categories } = useProductCategories();
   const [walletEntries, setWalletEntries] = useState<LedgerEntry[]>([]);
   const [recentFilter, setRecentFilter] = useState<RecentFilter>('todo');
   const [showAllActivity, setShowAllActivity] = useState(false);
@@ -90,7 +92,7 @@ export const useClientDashboardPOS = () => {
       setCatalog(catalogRes);
       setProductCounts(countsRes);
       setFollowUps(followRes);
-      setProductNames(new Map(productsRes.map((p) => [Number(p.productId), p.name])));
+      setProducts(new Map(productsRes.map((p) => [Number(p.productId), { name: p.name, categoryId: Number(p.categoryId) }])));
       setWalletEntries(walletRes);
     } catch (error) {
       console.error('[useClientDashboardPOS] load failed:', error);
@@ -162,20 +164,35 @@ export const useClientDashboardPOS = () => {
     ? recentActivity
     : recentActivity.filter((i) => i.category === recentFilter);
 
-  const stampCards = useMemo<PosStampProgress[]>(
-    () => catalog
+  // Stamp cards grouped by the product's top-level category (a subcategory rolls up
+  // into its parent): "Servicio Completo" → Básico 1/4 · Medio 1/4 · Carga alta 2/4.
+  const stampGroups = useMemo<PosStampGroup[]>(() => {
+    const categoryById = new Map(categories.map((c) => [c.categoryId, c]));
+    const groups = new Map<string, PosStampGroup>();
+    catalog
       .filter((i) => i.rewardType === 'free_product' && i.catalogItemId && i.freeProductId != null)
-      .map((i) => {
+      .forEach((i) => {
         const requiredUnits = stampUnits(i);
         const unitsAvailable = productCounts.find((p) => p.productId === i.freeProductId)?.unitsAvailable ?? 0;
         const pct = requiredUnits > 0 ? Math.min(100, Math.round((unitsAvailable / requiredUnits) * 100)) : 0;
         // A card counts one exact product (not its category) — name it so
         // Básico vs Alto is never ambiguous.
-        const productName = productNames.get(Number(i.freeProductId)) || `Producto #${i.freeProductId}`;
-        return { catalogItemId: i.catalogItemId as number, name: i.name, productName, unitsAvailable, requiredUnits, pct };
-      }),
-    [catalog, productCounts, productNames],
-  );
+        const product = products.get(Number(i.freeProductId));
+        const productName = product?.name || `Producto #${i.freeProductId}`;
+        const category = product ? categoryById.get(product.categoryId) : undefined;
+        const top = category?.parentCategoryId != null ? categoryById.get(category.parentCategoryId) ?? category : category;
+        const key = top ? `c${top.categoryId}` : 'other';
+        const title = top?.name || 'Otros';
+        const label = stripPrefix(productName, title);
+        const card: PosStampProgress = {
+          catalogItemId: i.catalogItemId as number, name: i.name, productName, label, unitsAvailable, requiredUnits, pct,
+        };
+        const group = groups.get(key) ?? { key, title, cards: [] };
+        group.cards.push(card);
+        groups.set(key, group);
+      });
+    return Array.from(groups.values());
+  }, [catalog, productCounts, products, categories]);
 
   const pendingFollowUps = followUps.filter((f) => f.status === 'pending').length;
 
@@ -226,7 +243,7 @@ export const useClientDashboardPOS = () => {
     showAllActivity,
     toggleAllActivity: () => setShowAllActivity((v) => !v),
     redemptionsCount: redemptions.filter((r) => r.status === 'applied').length,
-    stampCards,
+    stampGroups,
     followUps,
     pendingFollowUps,
     qrValue,
@@ -256,3 +273,11 @@ export const useClientDashboardPOS = () => {
 };
 
 export type ClientDashboardPOSVM = ReturnType<typeof useClientDashboardPOS>;
+
+/** "Servicio Completo Básico" under "Servicio Completo" → "Básico"; otherwise unchanged. */
+function stripPrefix(name: string, prefix: string): string {
+  const n = name.trim();
+  if (!prefix || !n.toLowerCase().startsWith(prefix.toLowerCase())) return n;
+  const rest = n.slice(prefix.length).replace(/^[\s\-–·:]+/, '');
+  return rest || n;
+}

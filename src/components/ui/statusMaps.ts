@@ -63,6 +63,15 @@ export const NOTIFICATION_DISPATCH_STATUS: Record<string, StatusMeta> = {
   sent:      { label: 'Aceptado por el proveedor', color: 'medium'  },
 };
 
+/** Acuse de Meta de un mensaje de WhatsApp enviado (whatsappMessageDeliveries.status). */
+export const WHATSAPP_DELIVERY_STATUS: Record<string, StatusMeta> = {
+  accepted:  { label: 'Aceptado por Meta', color: 'medium'  },
+  sent:      { label: 'Enviado',           color: 'medium'  },
+  delivered: { label: 'Entregado',         color: 'medium'  },
+  read:      { label: 'Leído',             color: 'primary' },
+  failed:    { label: 'No entregado',      color: 'danger'  },
+};
+
 /** Canal de envío (notificationDispatches.selectedChannel) — verde=gratis, ambar=medio, rojo=caro. */
 export const NOTIFICATION_CHANNEL: Record<string, StatusMeta> = {
   push:     { label: 'Push',     color: 'success' },
