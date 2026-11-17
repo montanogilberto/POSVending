@@ -186,11 +186,21 @@ export interface InsufficientProductUnitsError {
   available: number;
 }
 
-/** Per-product purchase/redemption tally for a client — "available" = units
- * purchased minus units already consumed by applied free_product
- * redemptions. Drives the stamp-card ("compra 3, el 4to gratis") UI. */
+/** A client's stamp-card progress per card and CYCLE (sp_posRewardProductCounts,
+ * fn_posRewardStampVariants) — "available" = units of that cycle purchased minus
+ * units consumed by applied free_product redemptions of that cycle. A card
+ * fills per cycle: 4 Servicio Completo Básico earn 1 free Básico.
+ * The cycle fields are optional so an older backend (one row per product)
+ * still works. */
 export interface PosRewardProductCount {
   productId: number;
+  catalogItemId?: number;
+  /** The product's cycle option (Ciclo, Tamaño); null = product without cycles. */
+  productOptionId?: number | null;
+  /** The cycle (choice of productOptionId); null = whole product / sale without cycle. */
+  productOptionChoiceId?: number | null;
+  choiceName?: string | null;
+  requiredUnits?: number;
   unitsPurchased: number;
   unitsConsumed: number;
   unitsAvailable: number;
