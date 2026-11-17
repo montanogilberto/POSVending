@@ -172,12 +172,23 @@ export interface WhatsAppThreadItem {
   detail: string | null;
   channel: string | null;
   status: string | null;
+  /** bot / staff bubbles: Meta's delivery receipt (whatsappMessageDeliveries). null =
+   *  no receipt recorded (sent before the feature, or a WhatsApp Business app echo).
+   *  Optional so an older backend without the field renders as before. */
+  delivery?: WhatsAppDeliveryStatus | null;
+  /** notification: provider error text · failed bubble (delivery 'failed'): Meta error code. */
   error: string | null;
 }
+
+/** Meta delivery receipt of an outbound WhatsApp message, lowest to highest. */
+export type WhatsAppDeliveryStatus = 'accepted' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface WhatsAppConversationThread {
   phone10: string;
   customerName: string | null;
+  /** The company's client with this phone (opens /client-pos/:clientId). null = not a
+   *  registered client. Optional so an older backend without the field renders as before. */
+  clientId?: number | null;
   /** messages = full WhatsApp transcript · agent_log = only the agent turns
    *  (the phone also wrote to another business, so the shared log can't be used). */
   source: 'messages' | 'agent_log';

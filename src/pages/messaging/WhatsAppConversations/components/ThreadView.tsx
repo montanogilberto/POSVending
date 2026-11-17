@@ -5,6 +5,7 @@ import EmptyState from '../../../../components/ui/EmptyState';
 import PageLoading from '../../../../components/ui/PageLoading';
 import WhatsAppTimeline from '../../../../components/messaging/WhatsAppTimeline';
 import WhatsAppReplyBox from '../../../../components/messaging/WhatsAppReplyBox';
+import ClientNameLink from '../../../../components/messaging/ClientNameLink';
 import { fmtPhone10 } from '../../../../utils/whatsappChat';
 import { WhatsAppConversationsVM } from '../WhatsAppConversationsLogic';
 
@@ -39,7 +40,7 @@ const ThreadView: React.FC<Props> = ({ vm }) => {
           <IonIcon icon={arrowBack} slot="icon-only" />
         </IonButton>
         <div>
-          <h3>{thread?.customerName || selected.customerName || 'Cliente sin nombre'}</h3>
+          <h3><ClientNameLink name={thread?.customerName || selected.customerName || 'Cliente sin nombre'} clientId={thread?.clientId} /></h3>
           <p>{fmtPhone10(selected.phone10)}</p>
         </div>
       </div>

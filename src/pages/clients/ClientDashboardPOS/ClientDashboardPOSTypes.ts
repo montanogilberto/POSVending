@@ -11,10 +11,20 @@ export interface PosStampProgress {
   name: string;
   /** The one product whose purchases fill the card and that it gives free. */
   productName: string;
+  /** Row label inside its category group: the product name without the category prefix
+   *  ("Servicio Completo Básico" under "Servicio Completo" → "Básico"). */
+  label: string;
   unitsAvailable: number;
   requiredUnits: number;
   /** 0–100 */
   pct: number;
+}
+
+/** Stamp cards of one top-level product category (subcategories roll up into it). */
+export interface PosStampGroup {
+  key: string;
+  title: string;
+  cards: PosStampProgress[];
 }
 
 export type RecentCategory = 'compras' | 'pagos' | 'beneficios';
