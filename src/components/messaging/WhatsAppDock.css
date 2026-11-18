@@ -17,6 +17,9 @@
 .wad-list { width: 320px; max-height: min(560px, calc(100vh - 80px)); }
 .wad-window { width: 340px; height: min(460px, calc(100vh - 80px)); }
 .wad-window--min { height: auto; }
+/* Agrandar on the list: wider and almost full height; a big chat window shrinks to fit beside it. */
+.wad-list--big { width: min(520px, calc(100vw - 32px)); max-height: none; height: min(820px, calc(100vh - 80px)); }
+.wad-dock:has(.wad-list--big) .wad-window--big { width: min(680px, calc(100vw - 580px)); }
 /* Agrandar: as wide as fits next to the list (320 + gaps), almost the full height. */
 .wad-window--big { width: min(680px, calc(100vw - 380px)); height: min(820px, calc(100vh - 80px)); }
 
@@ -30,12 +33,15 @@
 .wad-list-logo { color: #25d366; font-size: 1.4rem; margin-inline-end: 10px; }
 .wad-list-head ion-badge { margin-inline-end: 6px; }
 .wad-head { display: flex; align-items: center; }
-.wad-head-item { flex: 1; min-width: 0; }
+.wad-head-item, .wad-head .wad-list-head { flex: 1; min-width: 0; }
 .wad-head-item h3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wad-head-avatar { width: 32px; height: 32px; font-size: 0.85rem; margin-inline-end: 10px; }
 .wad-head-btn { margin: 0 4px 0 0; --padding-start: 6px; --padding-end: 6px; --color: #374151; border-bottom: 1px solid #eef0f3; }
 
 /* List */
+/* Fixed-height bars never shrink: only the chat list scrolls when the panel hits max-height
+   (otherwise the header gets squeezed and the search bar covers "N sin responder"). */
+.wad-list-head, .wad-head, .wad-search, .wad-all { flex-shrink: 0; }
 .wad-list-body { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .wad-search { --border-radius: 10px; --box-shadow: none; padding: 6px 8px; }
 .wad-chat-list { padding: 0; overflow-y: auto; flex: 1; min-height: 120px; }
