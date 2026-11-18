@@ -207,6 +207,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isAuthenticated: true,
     };
     saveAuth(next);
+    // Re-read the DB role catalog: features granted since the page loaded
+    // (new modules, /setting edits) must appear without a full reload.
+    void loadRoleCatalog();
   };
 
   /** Logout — clears everything */

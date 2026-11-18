@@ -25,7 +25,7 @@ import {
   walletOutline, personOutline, timeOutline, alertCircleOutline,
   cashOutline, trendingUpOutline, documentTextOutline, notificationsOutline,
   cardOutline,
-  sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline,
+  sendOutline, handLeftOutline, ribbonOutline, trashOutline, chatbubblesOutline, personAddOutline,
   flaskOutline, chevronForwardOutline, shieldCheckmarkOutline,
   megaphoneOutline, informationCircleOutline, closeOutline,
   cameraOutline, sparklesOutline,
@@ -33,7 +33,7 @@ import {
 import { useHistory, useLocation, useParams } from 'react-router-dom';
 import { myLoansRoute, P2PTab } from '../../utils/routes';
 import { useUser } from '../../contexts/UserContext';
-import { hasCapability } from '../../config/rolePermissions';
+import { canAccess, hasCapability } from '../../config/rolePermissions';
 import { getAllClients, Client, ClientType } from '../../api/clientsApi';
 
 // Shows the "Simular depósito SPEI" test tool. There is no real SPEI-in until
@@ -1456,6 +1456,17 @@ const P2PLendingPage: React.FC = () => {
           {isBorrower && profileComplete && (
             <IonChip className="p2p-profile-ok">
               <IonIcon icon={ribbonOutline} /> Perfil verificado
+            </IonChip>
+          )}
+          {/* These two left the side menu (docs/side-menu-structure.md): reached from here. */}
+          {canAccess(roleCode, 'clients') && (
+            <IonChip outline className="p2p-shortcut" onClick={() => history.push('/borrower-onboarding')}>
+              <IonIcon icon={personAddOutline} /> Registro Prestatario
+            </IonChip>
+          )}
+          {canAccess(roleCode, 'loanChat') && (
+            <IonChip outline className="p2p-shortcut" onClick={() => history.push('/loan-chats')}>
+              <IonIcon icon={chatbubblesOutline} /> Chat de Préstamo
             </IonChip>
           )}
         </div>

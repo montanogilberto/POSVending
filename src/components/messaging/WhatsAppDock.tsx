@@ -2,9 +2,9 @@ import React from 'react';
 import {
   IonBadge, IonButton, IonIcon, IonItem, IonLabel, IonList, IonSearchbar, IonSpinner, IonToast,
 } from '@ionic/react';
-import { chevronDownOutline, chevronUpOutline, logoWhatsapp, openOutline } from 'ionicons/icons';
+import { chevronDownOutline, chevronUpOutline, logoWhatsapp, openOutline, resizeOutline } from 'ionicons/icons';
 import WhatsAppChatListItem from './WhatsAppChatListItem';
-import DockChatWindow from './DockChatWindow';
+import DockChatWindow, { shrinkIcon } from './DockChatWindow';
 import { useWhatsAppDock } from './WhatsAppDockLogic';
 import './WhatsAppChat.css';
 import './WhatsAppDock.css';
@@ -32,17 +32,26 @@ const WhatsAppDock: React.FC = () => {
 
       {/* Desktop / tablet: the dock. */}
       <div className="wad-dock">
-        <section className={`wad-list${vm.listOpen ? '' : ' wad-list--closed'}`} aria-label="Mensajes de WhatsApp">
-          <IonItem button detail={false} lines="none" className="wad-list-head"
-            onClick={() => vm.setListOpen(!vm.listOpen)}>
-            <IonIcon icon={logoWhatsapp} slot="start" className="wad-list-logo" />
-            <IonLabel>
-              <h3>Mensajes</h3>
-              {vm.needsReplyCount > 0 && <p>{vm.needsReplyCount} sin responder</p>}
-            </IonLabel>
-            {badge && <IonBadge color="danger" slot="end">{badge}</IonBadge>}
-            <IonIcon slot="end" icon={vm.listOpen ? chevronDownOutline : chevronUpOutline} />
-          </IonItem>
+        <section className={`wad-list${vm.listOpen ? (vm.listBig ? ' wad-list--big' : '') : ' wad-list--closed'}`} aria-label="Mensajes de WhatsApp">
+          <div className="wad-head">
+            <IonItem button detail={false} lines="none" className="wad-list-head"
+              onClick={() => vm.setListOpen(!vm.listOpen)}>
+              <IonIcon icon={logoWhatsapp} slot="start" className="wad-list-logo" />
+              <IonLabel>
+                <h3>Mensajes</h3>
+                {vm.needsReplyCount > 0 && <p>{vm.needsReplyCount} sin responder</p>}
+              </IonLabel>
+              {badge && <IonBadge color="danger" slot="end">{badge}</IonBadge>}
+              <IonIcon slot="end" icon={vm.listOpen ? chevronDownOutline : chevronUpOutline} />
+            </IonItem>
+            {vm.listOpen && (
+              <IonButton fill="clear" size="small" className="wad-head-btn"
+                aria-label={vm.listBig ? 'Reducir mensajes' : 'Agrandar mensajes'} title={vm.listBig ? 'Reducir' : 'Agrandar'}
+                onClick={vm.toggleListBig}>
+                <IonIcon icon={vm.listBig ? shrinkIcon : resizeOutline} slot="icon-only" />
+              </IonButton>
+            )}
+          </div>
 
           {vm.listOpen && (
             <div className="wad-list-body">

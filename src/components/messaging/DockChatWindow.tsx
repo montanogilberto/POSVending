@@ -11,7 +11,7 @@ import type { DockWindow, WhatsAppDockVM } from './WhatsAppDockLogic';
 interface Props { vm: WhatsAppDockVM; win: DockWindow }
 
 /** Two arrows pointing in: the opposite of resizeOutline (Ionicons' contract has four). */
-const shrinkIcon = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' class='ionicon' viewBox='0 0 512 512'><path fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='32' d='M304 416V304h112M314.2 314.23L432 432M208 96v112H96M197.8 197.77L80 80'/></svg>";
+export const shrinkIcon = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' class='ionicon' viewBox='0 0 512 512'><path fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='32' d='M304 416V304h112M314.2 314.23L432 432M208 96v112H96M197.8 197.77L80 80'/></svg>";
 
 /** One docked chat window (LinkedIn-style): header toggles minimize; timeline + reply when open. */
 const DockChatWindow: React.FC<Props> = ({ vm, win }) => {
