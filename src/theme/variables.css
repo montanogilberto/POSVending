@@ -316,3 +316,52 @@ ion-content {
 .menu-search-empty {
   padding: 32px 16px;
 }
+/* Collapsible side-menu sections (MenuSectionDivider + useMenuSearch). */
+.menu-section-collapsed {
+  display: none !important;
+}
+.menu-section-header {
+  --min-height: 32px;
+  --padding-start: 16px;
+  --inner-padding-end: 12px;
+  --background: transparent;
+  --background-hover: rgba(var(--ion-color-medium-rgb), 0.08);
+  --color: var(--ion-color-medium-shade);
+  margin-top: 10px;
+  border-top: 1px solid var(--ion-color-light-shade, #e3e6eb);
+}
+.menu-section-header:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+.menu-section-header .menu-section-title {
+  margin: 8px 0 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.menu-section-chevron {
+  font-size: 14px;
+  margin: 0;
+  color: var(--ion-color-medium);
+  transition: transform 0.2s ease;
+}
+.menu-section-chevron-collapsed {
+  transform: rotate(-90deg);
+}
+/* Side menu: "Cerrar sesión" pinned under the scrolling list. */
+.menu-footer {
+  border-top: 1px solid var(--ion-color-light-shade, #e3e6eb);
+  box-shadow: none;
+}
+.menu-footer ion-item {
+  --background: transparent;
+}
+.menu-soon {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(var(--ion-color-medium-rgb), 0.12);
+  color: var(--ion-color-medium-shade);
+}

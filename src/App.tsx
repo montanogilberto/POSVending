@@ -15,8 +15,9 @@ import {
   IonMenu,
   IonList,
   IonItem,
-  IonItemDivider,
   IonMenuToggle,
+  IonFooter,
+  IonNote,
   IonHeader,
   IonContent,
   IonToolbar,
@@ -82,11 +83,12 @@ import {
   compassOutline,
   briefcaseOutline,
   sparklesOutline,
+  megaphoneOutline,
   mapOutline,
   searchOutline,
 }
   from 'ionicons/icons';
-  
+
 
 //import Vending from './pages/dashboard/Vending';
 import Setting from './pages/system/Setting';
@@ -191,6 +193,9 @@ import MinesPage from './pages/game/MinesPage';
 import PenaltyPage from './pages/game/PenaltyPage';
 import BowlingPage from './pages/game/BowlingPage';
 import VoiceCallPage from './pages/messaging/VoiceCallPage';
+import AgentPage from './pages/system/AgentPage';
+import AgentCompanySettingPage from './pages/system/AgentCompanySettingPage';
+import OperationalNoticePage from './pages/system/OperationalNoticePage';
 
 /* Core/Theme CSS */
 import '@ionic/react/css/core.css';
@@ -215,6 +220,7 @@ import { useRoleCatalogVersion } from './hooks/useRoleCatalogVersion';
 import { menuController } from '@ionic/core/components';
 import { useMenuSearch } from './hooks/useMenuSearch';
 import EmptyState from './components/ui/EmptyState';
+import MenuSectionDivider from './components/layout/MenuSectionDivider';
 import { useNotificationAttention } from './hooks/useNotificationAttention';
 import { DEFAULT_AVATAR_URL, resolveAvatarUrl } from './utils/formatters';
 import { pickAvatarPhoto } from './utils/pickAvatarPhoto';
@@ -277,7 +283,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
   '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees', '/company-payment-accounts',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
-  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent', '/demand-map',
+  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent', '/demand-map', '/ai-agents', '/operational-notices',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
 ];
 
@@ -680,9 +686,11 @@ const AppShell: React.FC = () => {
           )}
 
           <IonList ref={menuSearch.listRef}>
+            {/* Menu order and sections: docs/side-menu-structure.md. One IonMenuToggle per
+                entry (the menu search reads one item per toggle). */}
             {availableProducts.length > 1 && (
               <>
-                {!menuCollapsed && <IonItemDivider>Mis productos</IonItemDivider>}
+                {!menuCollapsed && <MenuSectionDivider title="Mis productos" collapsed={menuSearch.isCollapsed('Mis productos')} onToggle={menuSearch.toggleSection} />}
                 {availableProducts.map(product => (
                   <IonMenuToggle autoHide={false} key={product}>
                     <IonItem
@@ -699,32 +707,56 @@ const AppShell: React.FC = () => {
                 ))}
               </>
             )}
+            {availableProducts.length <= 1 && (
+              <>
+                {!menuCollapsed && <MenuSectionDivider title="Mis productos" collapsed={menuSearch.isCollapsed('Mis productos')} onToggle={menuSearch.toggleSection} />}
 
-            {!menuCollapsed && <IonItemDivider>Cuenta</IonItemDivider>}
+                <IonMenuToggle autoHide={false}>
+                  {canAccess(roleCode, 'pos') && (
+                  <IonItem button routerLink="/dashboard" title="POS">
+                    <IonIcon icon={storefrontOutline} slot="start" />
+                    {!menuCollapsed && <IonLabel>POS</IonLabel>}
+                  </IonItem>
+                  )}
+                </IonMenuToggle>
 
-            <IonMenuToggle autoHide={false}>
-              <IonItem button routerLink="/profile" title="Mi perfil">
-                <IonIcon icon={personCircle} slot="start" />
-                {!menuCollapsed && <IonLabel>Mi perfil</IonLabel>}
-              </IonItem>
-            </IonMenuToggle>
+                <IonMenuToggle autoHide={false}>
+                  {(canAccess(roleCode, 'clients') || canAccess(roleCode, 'p2pLending')) && (
+                  <IonItem button routerLink={p2pLendingRoute(clientId)} title="SmartLoans">
+                    <IonIcon icon={walletOutline} slot="start" />
+                    {!menuCollapsed && <IonLabel>SmartLoans</IonLabel>}
+                  </IonItem>
+                  )}
+                </IonMenuToggle>
 
-            {!menuCollapsed && <IonItemDivider>Catálogo</IonItemDivider>}
+                <IonMenuToggle autoHide={false}>
+                  {canAccess(roleCode, 'settings') && (
+                  <IonItem disabled title="Factory AI">
+                    <IonIcon icon={sparklesOutline} slot="start" />
+                    {!menuCollapsed && <IonLabel>Factory AI</IonLabel>}
+                    {!menuCollapsed && <IonNote slot="end" className="menu-soon">Próximamente</IonNote>}
+                  </IonItem>
+                  )}
+                </IonMenuToggle>
+
+                <IonMenuToggle autoHide={false}>
+                  {canAccess(roleCode, 'arcade') && (
+                  <IonItem button routerLink="/arcade" title="Juegos">
+                    <IonIcon icon={gameControllerOutline} slot="start" />
+                    {!menuCollapsed && <IonLabel>Juegos</IonLabel>}
+                  </IonItem>
+                  )}
+                </IonMenuToggle>
+              </>
+            )}
+
+            {!menuCollapsed && <MenuSectionDivider title="Catálogos" collapsed={menuSearch.isCollapsed('Catálogos')} onToggle={menuSearch.toggleSection} />}
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'clients') && (
               <IonItem button routerLink="/clients" title="Clientes">
                 <IonIcon icon={people} slot="start" />
                 {!menuCollapsed && <IonLabel>Clientes</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'clients') && (
-              <IonItem button routerLink="/clients-map" title="Mapa de clientes">
-                <IonIcon icon={locationOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Mapa de clientes</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -739,10 +771,144 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'pushNotifications') && (
-              <IonItem button routerLink="/pushNotifications" title="Notificaciones Push">
-                <IonIcon icon={shieldCheckmarkOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Notificaciones Push</IonLabel>}
+              {canAccess(roleCode, 'categories') && (
+              <IonItem button routerLink="/categories" title="Categorías">
+                <IonIcon icon={grid} slot="start" />
+                {!menuCollapsed && <IonLabel>Categorías</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'services') && (
+              <IonItem button routerLink="/services" title="Servicios">
+                <IonIcon icon={receiptOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Servicios</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'suppliers') && (
+              <IonItem button routerLink="/suppliers" title="Proveedores">
+                <IonIcon icon={storefrontOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Proveedores</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            {!menuCollapsed && <MenuSectionDivider title="Operación" collapsed={menuSearch.isCollapsed('Operación')} onToggle={menuSearch.toggleSection} />}
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/clients-map" title="Mapa de clientes">
+                <IonIcon icon={locationOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mapa de clientes</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'demandMap') && (
+              <IonItem button routerLink="/demand-map" title="Mapa de demanda">
+                <IonIcon icon={mapOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mapa de demanda</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'manufacturing') && (
+              <IonItem button routerLink="/manufacturing" title="Manufactura">
+                <IonIcon icon={cogOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Manufactura</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            {!menuCollapsed && <MenuSectionDivider title="Finanzas" collapsed={menuSearch.isCollapsed('Finanzas')} onToggle={menuSearch.toggleSection} />}
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'ingresos') && (
+              <IonItem button routerLink="/ingresos" title="Ingresos">
+                <IonIcon icon={trendingUpOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Ingresos</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'egresos') && (
+              <IonItem button routerLink="/egresos" title="Egresos">
+                <IonIcon icon={trendingDownOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Egresos</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'ingresos') && (
+              <IonItem button routerLink="/monthly-summary" title="Resumen mensual">
+                <IonIcon icon={statsChartOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Resumen mensual</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'accounting') && (
+              <IonItem button routerLink="/accounting" title="Contabilidad">
+                <IonIcon icon={documentTextOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Contabilidad</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'loans') && (
+              <IonItem button routerLink="/loans" title="Préstamos">
+                <IonIcon icon={cashOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Préstamos</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            {!menuCollapsed && <MenuSectionDivider title="Recompensas" collapsed={menuSearch.isCollapsed('Recompensas')} onToggle={menuSearch.toggleSection} />}
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'posRewards') && (
+              <IonItem button routerLink="/pos-rewards" title="Puntos POS">
+                <IonIcon icon={giftOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Puntos POS</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'myRewards') && clientId && (
+              <IonItem button routerLink={`/rewards-dashboard/${clientId}`} title="Mis Recompensas">
+                <IonIcon icon={giftOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Mis Recompensas</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'rewards') && (
+              <IonItem button routerLink="/rewards" title="Recompensas">
+                <IonIcon icon={starOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Recompensas</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            {!menuCollapsed && <MenuSectionDivider title="Mensajes" collapsed={menuSearch.isCollapsed('Mensajes')} onToggle={menuSearch.toggleSection} />}
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'alerts') && (
+              <IonItem button routerLink="/alerts" title="Alertas">
+                <IonIcon icon={notifications} slot="start" />
+                {!menuCollapsed && <IonLabel>Alertas</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -760,6 +926,35 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'emails') && (
+              <IonItem button routerLink="/emails" title="Correos">
+                <IonIcon icon={mail} slot="start" />
+                {!menuCollapsed && <IonLabel>Correos</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'pushNotifications') && (
+              <IonItem button routerLink="/pushNotifications" title="Notificaciones Push">
+                <IonIcon icon={shieldCheckmarkOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Notificaciones Push</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'operationalNotices') && (
+              <IonItem button routerLink="/operational-notices" title="Avisos operativos">
+                <IonIcon icon={megaphoneOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Avisos operativos</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            {!menuCollapsed && <MenuSectionDivider title="Agentes" collapsed={menuSearch.isCollapsed('Agentes')} onToggle={menuSearch.toggleSection} />}
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'notificationDispatchLog') && (
               <IonItem button routerLink="/whatsapp-agent" title="Agente WhatsApp">
                 <IonIcon icon={logoWhatsapp} slot="start" />
@@ -769,37 +964,50 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'demandMap') && (
-              <IonItem button routerLink="/demand-map" title="Mapa de demanda">
-                <IonIcon icon={mapOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Mapa de demanda</IonLabel>}
+              {canAccess(roleCode, 'agents') && (
+              <IonItem button routerLink="/ai-agents" title="Agentes IA">
+                <IonIcon icon={sparklesOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Agentes IA</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            {!menuCollapsed && <MenuSectionDivider title="IOT" collapsed={menuSearch.isCollapsed('IOT')} onToggle={menuSearch.toggleSection} />}
+
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'iot') && (
+              <IonItem button routerLink="/iot-dashboard" title="Tablero IOT">
+                <IonIcon icon={hardwareChipOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Tablero IOT</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'categories') && (
-              <IonItem button routerLink="/categories" title="Categorías">
-                <IonIcon icon={grid} slot="start" />
-                {!menuCollapsed && <IonLabel>Categorías</IonLabel>}
+              {canAccess(roleCode, 'iot') && (
+              <IonItem button routerLink="/water-tanks" title="Water Tanks">
+                <IonIcon icon={water} slot="start" />
+                {!menuCollapsed && <IonLabel>Water Tanks</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'suppliers') && (
-              <IonItem button routerLink="/suppliers" title="Proveedores">
-                <IonIcon icon={storefrontOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Proveedores</IonLabel>}
+              {canAccess(roleCode, 'iot') && (
+              <IonItem button routerLink="/led-status" title="LED Status">
+                <IonIcon icon={bulb} slot="start" />
+                {!menuCollapsed && <IonLabel>LED Status</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
+            {!menuCollapsed && <MenuSectionDivider title="Configuración" collapsed={menuSearch.isCollapsed('Configuración')} onToggle={menuSearch.toggleSection} />}
+
             <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'services') && (
-              <IonItem button routerLink="/services" title="Servicios">
-                <IonIcon icon={receiptOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Servicios</IonLabel>}
+              {canAccess(roleCode, 'users') && (
+              <IonItem button routerLink="/users" title="Usuarios">
+                <IonIcon icon={person} slot="start" />
+                {!menuCollapsed && <IonLabel>Usuarios</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -822,208 +1030,18 @@ const AppShell: React.FC = () => {
               )}
             </IonMenuToggle>
 
-            {!menuCollapsed && <IonItemDivider>Mensajes</IonItemDivider>}
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'alerts') && (
-              <IonItem button routerLink="/alerts" title="Alertas">
-                <IonIcon icon={notifications} slot="start" />
-                {!menuCollapsed && <IonLabel>Alertas</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'emails') && (
-              <IonItem button routerLink="/emails" title="Correos">
-                <IonIcon icon={mail} slot="start" />
-                {!menuCollapsed && <IonLabel>Correos</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            {!menuCollapsed && <IonItemDivider>Administración</IonItemDivider>}
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'users') && (
-              <IonItem button routerLink="/users" title="Usuarios">
-                <IonIcon icon={person} slot="start" />
-                {!menuCollapsed && <IonLabel>Usuarios</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'ingresos') && (
-              <IonItem button routerLink="/ingresos" title="Ingresos">
-                <IonIcon icon={trendingUpOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Ingresos</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'egresos') && (
-              <IonItem button routerLink="/egresos" title="Egresos">
-                <IonIcon icon={trendingDownOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Egresos</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'accounting') && (
-              <IonItem button routerLink="/accounting" title="Contabilidad">
-                <IonIcon icon={documentTextOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Contabilidad</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'ingresos') && (
-              <IonItem button routerLink="/monthly-summary" title="Resumen mensual">
-                <IonIcon icon={statsChartOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Resumen mensual</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'loans') && (
-              <IonItem button routerLink="/loans" title="Préstamos">
-                <IonIcon icon={cashOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Préstamos</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'manufacturing') && (
-              <IonItem button routerLink="/manufacturing" title="Manufactura">
-                <IonIcon icon={cogOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Manufactura</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'rewards') && (
-              <IonItem button routerLink="/rewards" title="Recompensas">
-                <IonIcon icon={starOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Recompensas</IonLabel>}
-              </IonItem>
-              )}
-              {canAccess(roleCode, 'posRewards') && (
-              <IonItem button routerLink="/pos-rewards" title="Puntos POS">
-                <IonIcon icon={giftOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Puntos POS</IonLabel>}
-              </IonItem>
-              )}
-              {canAccess(roleCode, 'myRewards') && clientId && (
-              <IonItem button routerLink={`/rewards-dashboard/${clientId}`} title="Mis Recompensas">
-                <IonIcon icon={giftOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Mis Recompensas</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'game') && (
-              <IonItem button routerLink="/game/mission-clean-room" title="Misión: Limpiar el Cuarto">
-                <IonIcon icon={gameControllerOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Misión: Limpiar el Cuarto</IonLabel>}
-              </IonItem>
-              )}
-              {canAccess(roleCode, 'arcade') && (
-              <IonItem button routerLink="/arcade" title="Juegos Online">
-                <IonIcon icon={diamondOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Juegos Online</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            {!menuCollapsed && <IonItemDivider>Finanzas P2P</IonItemDivider>}
-
-            <IonMenuToggle autoHide={false}>
-              {(canAccess(roleCode, 'clients') || canAccess(roleCode, 'p2pLending')) && (
-              <IonItem button routerLink={p2pLendingRoute(clientId)} title="SmartLoans">
-                <IonIcon icon={walletOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>SmartLoans</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'clients') && (
-              <IonItem button routerLink="/borrower-onboarding" title="Registro Prestatario">
-                <IonIcon icon={constructOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Registro Prestatario</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'loanChat') && (
-              <IonItem
-                button
-                // Both roles land on the conversations LIST. New chats start
-                // from an offer (P2P) or, for borrowers, from the AI-assistant
-                // button inside the list — never a bare /loan-chat/new, which
-                // used to mint lenderId=0 conversations whose pushes targeted
-                // nobody.
-                routerLink="/loan-chats"
-                title="Chat de Préstamo"
-              >
-                <IonIcon icon={chatbubblesOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Chat de Préstamo</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            {!menuCollapsed && <IonItemDivider>IOT</IonItemDivider>}
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'iot') && (
-              <IonItem button routerLink="/iot-dashboard" title="Tablero IOT">
-                <IonIcon icon={hardwareChipOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Tablero IOT</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'iot') && (
-              <IonItem button routerLink="/led-status" title="LED Status">
-                <IonIcon icon={bulb} slot="start" />
-                {!menuCollapsed && <IonLabel>LED Status</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            <IonMenuToggle autoHide={false}>
-              {canAccess(roleCode, 'iot') && (
-              <IonItem button routerLink="/water-tanks" title="Water Tanks">
-                <IonIcon icon={water} slot="start" />
-                {!menuCollapsed && <IonLabel>Water Tanks</IonLabel>}
-              </IonItem>
-              )}
-            </IonMenuToggle>
-
-            {!menuCollapsed && <IonItemDivider>Sistema</IonItemDivider>}
-
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'settings') && (
-              <IonItem button routerLink="/setting" title="Configuración">
+              <IonItem button routerLink="/setting" title="Ajustes generales">
                 <IonIcon icon={settings} slot="start" />
-                {!menuCollapsed && <IonLabel>Configuración</IonLabel>}
+                {!menuCollapsed && <IonLabel>Ajustes generales</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
 
             {discover.length > 0 && clientId > 0 && (
               <>
-                {!menuCollapsed && <IonItemDivider>Descubrir</IonItemDivider>}
+                {!menuCollapsed && <MenuSectionDivider title="Descubrir" collapsed={menuSearch.isCollapsed('Descubrir')} onToggle={menuSearch.toggleSection} />}
                 {discover.map(product => (
                   <IonMenuToggle autoHide={false} key={product}>
                     <IonItem
@@ -1040,10 +1058,12 @@ const AppShell: React.FC = () => {
               </>
             )}
 
+            {!menuCollapsed && <MenuSectionDivider title="Cuenta" collapsed={menuSearch.isCollapsed('Cuenta')} onToggle={menuSearch.toggleSection} />}
+
             <IonMenuToggle autoHide={false}>
-              <IonItem button onClick={handleLogout} title="Cerrar sesión">
-                <IonIcon icon={logOutOutline} slot="start" color="danger" />
-                {!menuCollapsed && <IonLabel color="danger">Cerrar sesión</IonLabel>}
+              <IonItem button routerLink="/profile" title="Mi perfil">
+                <IonIcon icon={personCircle} slot="start" />
+                {!menuCollapsed && <IonLabel>Mi perfil</IonLabel>}
               </IonItem>
             </IonMenuToggle>
           </IonList>
@@ -1051,6 +1071,14 @@ const AppShell: React.FC = () => {
             <EmptyState icon={searchOutline} text={`Sin resultados para "${menuSearch.query.trim()}"`} className="menu-search-empty" />
           )}
         </IonContent>
+        <IonFooter className="menu-footer">
+          <IonMenuToggle autoHide={false}>
+            <IonItem button onClick={handleLogout} title="Cerrar sesión">
+              <IonIcon icon={logOutOutline} slot="start" color="danger" />
+              {!menuCollapsed && <IonLabel color="danger">Cerrar sesión</IonLabel>}
+            </IonItem>
+          </IonMenuToggle>
+        </IonFooter>
       </IonMenu>
 
       <DiscoverProductModal
@@ -1065,9 +1093,9 @@ const AppShell: React.FC = () => {
       <IonPage id="main">
         <IonTabs>
           <IonRouterOutlet>
-            
+
             <PrivateRoute exact path="/setting" feature="settings" component={Setting} />
-            
+
             <PrivateRoute exact path="/dashboard" component={Dashboard} />
             <PrivateRoute exact path="/monthly-summary" component={MonthlySummaryPage} />
 
@@ -1163,6 +1191,9 @@ const AppShell: React.FC = () => {
             {/* Same permission as Notificaciones: role features come from GET /roles, a new one would need a DB change first. */}
             <PrivateRoute exact path="/whatsapp-agent" feature="notificationDispatchLog" component={WhatsAppAgentPage} />
             <PrivateRoute exact path="/demand-map" feature="demandMap" component={DemandMapPage} />
+            <PrivateRoute exact path="/ai-agents" feature="agents" component={AgentPage} />
+            <PrivateRoute exact path="/ai-agents/settings" feature="agents" component={AgentCompanySettingPage} />
+            <PrivateRoute exact path="/operational-notices" feature="operationalNotices" component={OperationalNoticePage} />
             <PrivateRoute exact path="/whatsapp-agent/conversations" feature="notificationDispatchLog" component={WhatsAppConversationsPage} />
             <PrivateRoute exact path="/whatsapp-agent/setup" feature="notificationDispatchLog" component={WhatsAppSetupPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />

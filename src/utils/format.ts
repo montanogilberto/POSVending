@@ -64,3 +64,27 @@ export const percent = (part: number, total: number) => (total > 0 ? Math.round(
 /** "5:00 a. m." — hora de Hermosillo (UTC-7) de un timestamp UTC, para listas agrupadas por día. */
 export const hermosilloTime = (utc: string): string =>
   toHermosilloDate(utc).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' });
+
+// ── Calendar days 'YYYY-MM-DD' (Hermosillo, UTC-7 sin DST) ─────────────────
+/** Hoy en Hermosillo como 'YYYY-MM-DD' (para campos DATE del backend). */
+export const hermosilloTodayISO = (): string =>
+  new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+/** 'YYYY-MM-DD' + n días (aritmética de calendario, sin zona horaria). */
+export const addDaysISO = (iso: string, days: number): string => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+/** "miércoles 19 de noviembre" — día de calendario para mensajes a clientes. */
+export const mxLongDay = (iso: string): string =>
+  iso ? new Date(`${iso}T12:00:00Z`).toLocaleDateString('es-MX', {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
+  }) : '';
+
+/** "19 nov 2026" — día de calendario 'YYYY-MM-DD' (no un timestamp UTC). */
+export const mxDay = (iso: string): string =>
+  iso ? new Date(`${iso}T12:00:00Z`).toLocaleDateString('es-MX', {
+    day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC',
+  }) : '—';

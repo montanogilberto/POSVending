@@ -8,7 +8,7 @@ import {
   IonIcon, IonToast, IonSpinner, IonList, IonItem, IonLabel, IonBadge,
 } from '@ionic/react';
 import {
-  gameControllerOutline, timeOutline, informationCircle,
+  gameControllerOutline, timeOutline, informationCircle, rocketOutline,
 } from 'ionicons/icons';
 import EmptyState from '../../../components/ui/EmptyState';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -115,6 +115,18 @@ const ArcadeView: React.FC = () => {
                   ))}
                 </div>
               </>
+            )}
+
+            {vm.showMission && (
+              <IonList className="arc-history" lines="none">
+                <IonItem button detail routerLink="/game/mission-clean-room">
+                  <IonIcon icon={rocketOutline} slot="start" />
+                  <IonLabel>
+                    <h3>Misión: Limpiar el Cuarto</h3>
+                    <p>Explora la habitación en 3D y ordena tus cosas.</p>
+                  </IonLabel>
+                </IonItem>
+              </IonList>
             )}
 
             <section className="arc-section">

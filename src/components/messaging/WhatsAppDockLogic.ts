@@ -38,6 +38,7 @@ export const useWhatsAppDock = () => {
   const [listOpen, setListOpenState] = useState<boolean>(() => {
     try { return localStorage.getItem(OPEN_KEY) === '1'; } catch { return false; }
   });
+  const [listBig, setListBig] = useState(false);
   const seq = useRef(0);
 
   const hidden = pathname.startsWith(INBOX_ROUTE);
@@ -119,7 +120,7 @@ export const useWhatsAppDock = () => {
   return {
     hidden, inboxRoute: INBOX_ROUTE, range,
     conversations, visible, firstLoad: loading && !loadedOnce, error, reload: () => load(),
-    search, setSearch, listOpen, setListOpen,
+    search, setSearch, listOpen, setListOpen, listBig, toggleListBig: () => setListBig(b => !b),
     unreadCount, needsReplyCount, isUnread,
     windows, openChat, closeChat, toggleMinimized, toggleExpanded,
     showToast, toastProps,

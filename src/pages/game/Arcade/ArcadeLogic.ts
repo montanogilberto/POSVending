@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useIonViewWillEnter } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
+import { canAccess } from '../../../config/rolePermissions';
 import { useToast } from '../../../hooks/useToast';
 import { onDataChanged, notifyDataChanged } from '../../../utils/refreshBus';
 import {
@@ -25,7 +26,9 @@ interface CategoryGroup {
 
 export function useArcade() {
   const history = useHistory();
-  const { clientId, companyId } = useUser();
+  const { clientId, companyId, roleCode } = useUser();
+  // Misión: Limpiar el Cuarto left the side menu; it is reached from the arcade.
+  const showMission = canAccess(roleCode, 'game');
   const { showToast, toastProps } = useToast();
 
   const [games, setGames] = useState<ArcadeGame[]>([]);
@@ -137,6 +140,7 @@ export function useArcade() {
   }
 
   return {
+    showMission,
     history, loading, claiming,
     games, tiles, wallet, rounds, liveWins,
     originals, recentlyPlayed,

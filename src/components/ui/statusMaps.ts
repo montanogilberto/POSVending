@@ -211,3 +211,23 @@ export const VOICE_AGREEMENT_STATUS: Record<string, StatusMeta> = {
   cancelled:            { label: 'Cancelado',     color: 'danger'  },
   expired:              { label: 'Expirado',      color: 'medium'  },
 };
+
+/** Catálogo de agentes IA (agents.status). No hay "apagado": retirado solo es estado de catálogo. */
+export const AGENT_STATUS: Record<string, StatusMeta> = {
+  activo:   { label: 'Activo', color: 'success' },
+  retirado: { label: 'Retirado', color: 'medium' },
+};
+
+/** Avisos operativos (/operational-notices): state is derived from the dates by the SP. */
+export const OPERATIONAL_NOTICE_STATE: Record<string, StatusMeta> = {
+  vigente:    { label: 'Vigente', color: 'danger' },
+  programado: { label: 'Programado', color: 'warning' },
+  vencido:    { label: 'Vencido', color: 'medium' },
+  finalizado: { label: 'Finalizado', color: 'medium' },
+};
+
+/** Biblioteca GMO de plantillas de avisos. */
+export const OPERATIONAL_NOTICE_TEMPLATE_STATUS: Record<string, StatusMeta> = {
+  activo:   { label: 'Activa', color: 'success' },
+  retirado: { label: 'Retirada', color: 'medium' },
+};
