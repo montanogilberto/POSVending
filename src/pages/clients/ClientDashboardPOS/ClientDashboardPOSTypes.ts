@@ -5,14 +5,9 @@ export interface PosPurchase {
   points: number;
 }
 
-/** A stamp card (free_product reward) with this client's progress. */
-export interface PosStampProgress {
-  catalogItemId: number;
-  name: string;
-  /** The one product whose purchases fill the card and that it gives free. */
-  productName: string;
-  /** Row label inside its category group: the product name without the category prefix
-   *  ("Servicio Completo Básico" under "Servicio Completo" → "Básico"). */
+/** One cycle of a stamp card (Básico, Medio…) with this client's progress. */
+export interface PosStampCycle {
+  key: string;
   label: string;
   unitsAvailable: number;
   requiredUnits: number;
@@ -20,11 +15,21 @@ export interface PosStampProgress {
   pct: number;
 }
 
-/** Stamp cards of one top-level product category (subcategories roll up into it). */
-export interface PosStampGroup {
-  key: string;
-  title: string;
-  cards: PosStampProgress[];
+/** A stamp card (free_product reward): its product and progress per cycle.
+ *  Cards fill per cycle — 4 Servicio Completo Básico earn 1 free Básico. */
+export interface PosStampCard {
+  catalogItemId: number;
+  /** The card's catalog name, e.g. "Servicio Completo gratis (4×3)". */
+  name: string;
+  /** The product it counts and gives free. */
+  productName: string;
+  /** false = product without cycles: one bar for the whole product. */
+  hasCycles: boolean;
+  cycles: PosStampCycle[];
+  /** Cycles ready to redeem now. */
+  ready: PosStampCycle[];
+  /** The cycle closest to a free unit (summary on the closed line). */
+  best: PosStampCycle;
 }
 
 export type RecentCategory = 'compras' | 'pagos' | 'beneficios';

@@ -264,18 +264,53 @@
   letter-spacing: 0.4px;
 }
 
-/* Stamp cards — grouped by category, one bar per product */
-.cpos-stamp-groups {
+/* Stamp cards — one line per product, opened into its cycles */
+.cpos-stamp-cards {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
 }
 
-.cpos-stamp-group-title {
-  margin: 0 0 8px;
+.cpos-stamp-acc {
+  --ion-background-color: transparent;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.cpos-stamp-acc-head {
+  --background: transparent;
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --min-height: 48px;
+}
+
+.cpos-stamp-acc-label {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
-  font-weight: 700;
   color: #111827;
+}
+
+.cpos-stamp-acc-label strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cpos-stamp-acc-label span {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.cpos-stamp-cycles {
+  padding: 4px 0 12px 12px;
+}
+
+.cpos-stamp-single {
+  padding: 10px 0;
+  border-bottom: 1px solid #eef0f3;
 }
 
 .cpos-stamp-label {
@@ -454,7 +489,7 @@
     background: rgba(255, 255, 255, 0.06);
   }
   .cpos-meta-value,
-  .cpos-stamp-group-title,
+  .cpos-stamp-acc-label,
   .cpos-stamp-head {
     color: #D1D5DB;
   }
@@ -614,3 +649,46 @@
   margin: 0;
   font-size: 13px;
 }
+
+/* ── Customer-only cards (/rewards-dashboard) ─────────────────────────── */
+.cpos-myqr-card {
+  margin: 0;
+  border-radius: 18px;
+  --background: #2563eb;
+  --color: #ffffff;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+.cpos-myqr-content { display: flex; align-items: center; gap: 14px; padding: 16px; }
+.cpos-myqr-icon {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 52px; height: 52px; border-radius: 14px;
+  background: #ffffff; color: #2563eb; font-size: 32px;
+}
+.cpos-myqr-text { display: flex; flex-direction: column; flex: 1; min-width: 0; color: #ffffff; }
+.cpos-myqr-text strong { font-size: 18px; font-weight: 800; }
+.cpos-myqr-text span { font-size: 13px; opacity: 0.9; }
+.cpos-myqr-chevron { flex-shrink: 0; font-size: 22px; color: #ffffff; }
+
+.cpos-quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cpos-quick-link {
+  margin: 0;
+  height: auto;
+  --background: #f8fafc;
+  --background-hover: #f1f5f9;
+  --border-radius: 14px;
+  --padding-top: 12px; --padding-bottom: 12px; --padding-start: 10px; --padding-end: 10px;
+}
+.cpos-quick-link::part(native) { height: auto; }
+.cpos-quick-link-content { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; text-transform: none; }
+.cpos-quick-link-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.cpos-quick-link-icon ion-icon { font-size: 1.1rem; color: #ffffff; }
+.cpos-quick-link--green .cpos-quick-link-icon { background: #16a34a; }
+.cpos-quick-link--blue .cpos-quick-link-icon { background: #2563eb; }
+.cpos-quick-link-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cpos-quick-link-text strong { font-size: 0.85rem; color: #111827; }
+.cpos-quick-link-text span { font-size: 0.7rem; color: #6b7280; font-weight: 400; white-space: normal; line-height: 1.2; }
+
+.cpos-catalog-icon { font-size: 1.25rem; color: var(--ion-color-medium); }

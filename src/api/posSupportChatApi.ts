@@ -27,7 +27,7 @@ async function sp(payload: Record<string, unknown>) {
 
 // Each topic has its own pos_{topic}_support_agent in LoanAgents_SmartLoans.
 // "rewards" is client-facing (a client asking about their own points), not
-// staff-facing like the other four — see RewardsDashboardView.
+// staff-facing like the other four — see ClientDashboardPOSView.
 export type PosSupportTopic = 'clients' | 'income' | 'expenses' | 'accounting' | 'rewards';
 
 export interface PosSupportMessage {

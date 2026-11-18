@@ -28,10 +28,11 @@ import { fetchTicket } from '../../api/ticketApi';
 import { postIncome } from '../../api/incomeApi';
 import { getAllCommissionTerminals, CommissionTerminal } from '../../api/commissionTerminalsApi';
 import { activeCardTerminal, terminalCommission } from '../../utils/incomeMoney';
+import { pickFreeUnit } from '../../utils/stampCycles';
 import { useIncome } from '../../contexts/IncomeContext';
 import { Client } from '../../api/clientsApi';
 import {
-  posRewardsApi, PosRewardBalance, PosRewardCatalogItem, PosRewardProductCount, IncomeDiscountsResult, stampUnits,
+  posRewardsApi, PosRewardBalance, PosRewardCatalogItem, PosRewardProductCount, IncomeDiscountsResult,
 } from '../../api/posRewardsApi';
 import { notifyDataChanged } from '../../utils/refreshBus';
 import { useClientSaldo } from '../../hooks/useClientSaldo';
@@ -168,13 +169,12 @@ const CartPage: React.FC = () => {
   }, [selectedClient?.clientId]);
 
   const selectedReward = rewardsCatalog.find(c => c.catalogItemId === selectedRewardId) ?? null;
-  const freeUnitsByProduct = useMemo(() => {
-    const map = new Map<number, number>();
-    if (selectedReward?.rewardType === 'free_product' && selectedReward.freeProductId != null) {
-      map.set(selectedReward.freeProductId, 1);
-    }
-    return map;
-  }, [selectedReward]);
+  // Stamp cards fill per cycle: the free unit is one of a cycle the client
+  // completed (first such line), priced at that cycle — as the backend applies it.
+  const freeUnit = useMemo(
+    () => (selectedReward?.rewardType === 'free_product' ? pickFreeUnit(selectedReward, productCounts, cartItems) : null),
+    [selectedReward, productCounts, cartItems]
+  );
 
   // Compute totals with promotion preview
   const totals = useMemo(() => {
@@ -192,20 +192,20 @@ const CartPage: React.FC = () => {
 
       subtotal += lineTotal;
 
-      const payQtyPromo = couponCovers(Number(item.productId)) ? payQty2x1(qty) : qty;
-      const freeUnits = freeUnitsByProduct.get(Number(item.productId)) ?? 0;
-      const payQty = Math.max(0, payQtyPromo - freeUnits);
+      const payQty = couponCovers(Number(item.productId)) ? payQty2x1(qty) : qty;
+      const freeAmount = freeUnit?.lineId === item.id ? freeUnit.amount : 0;
 
-      if (payQty === qty) {
+      if (payQty === qty && freeAmount === 0) {
         // Nothing discounted on this line -- skip the divide/round round-trip
         // so an undiscounted price never drifts by a rounding cent.
         totalPromo += lineTotal;
         return { ...item, payQty, promoLineTotal: lineTotal, discount: 0 };
       }
 
-      const promoLineTotal = qty > 0
+      const couponLineTotal = qty > 0
         ? Math.round((lineTotal * (payQty / qty)) * 100) / 100
         : lineTotal;
+      const promoLineTotal = Math.max(0, Math.round((couponLineTotal - freeAmount) * 100) / 100);
       const discount = Math.round((lineTotal - promoLineTotal) * 100) / 100;
 
       totalPromo += promoLineTotal;
@@ -230,7 +230,7 @@ const CartPage: React.FC = () => {
       discount: Math.round(discount * 100) / 100,
       pointsDiscount: Math.round(pointsDiscount * 100) / 100,
     };
-  }, [cartItems, couponCovers, selectedReward, freeUnitsByProduct]);
+  }, [cartItems, couponCovers, selectedReward, freeUnit]);
 
   // Calculate total (use promo-adjusted total)
   const total = totals.total;
@@ -307,15 +307,15 @@ const CartPage: React.FC = () => {
     return rewardsCatalog.filter(item => {
       if (item.rewardType === 'free_product') {
         if (item.freeProductId == null || !cartProductIds.has(item.freeProductId)) return false;
-        const available = productCounts.find(p => p.productId === item.freeProductId)?.unitsAvailable ?? 0;
-        return available >= stampUnits(item);
+        // Per cycle: the cart needs a line of a cycle the client completed.
+        return pickFreeUnit(item, productCounts, cartItems) != null;
       }
       if (item.rewardType === 'discount_fixed' || item.rewardType === 'discount_pct') {
         return (clientBalance?.balance ?? 0) >= Number(item.requiredPoints);
       }
       return false;
     });
-  }, [rewardsCatalog, productCounts, cartProductIds, clientBalance, selectedClient?.clientId]);
+  }, [rewardsCatalog, productCounts, cartProductIds, cartItems, clientBalance, selectedClient?.clientId]);
 
   // Drop a chosen reward the order no longer qualifies for (e.g. its product
   // was removed from the cart).
@@ -668,7 +668,7 @@ const CartPage: React.FC = () => {
                     const discountAmount = item.discount ?? 0;
                     const labels = [
                       couponCovers(Number(item.productId)) && discountAmount > 0 ? selectedCoupon?.name : undefined,
-                      freeUnitsByProduct.has(Number(item.productId)) ? selectedReward?.name : undefined,
+                      freeUnit?.lineId === item.id ? selectedReward?.name : undefined,
                     ].filter((n): n is string => !!n);
                     const discountLabel = labels.length > 0 ? labels.join(' + ') : undefined;
                     return (

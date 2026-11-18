@@ -27,17 +27,20 @@ const PosWalletCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => (
             <strong className="cpos-wallet-amount">{fmtMXN(vm.walletBalance)}</strong>
           )}
         </div>
-        <IonButton color="light" onClick={vm.openTopUp} disabled={vm.topUpBusy} className="cpos-wallet-topup">
-          {vm.topUpBusy ? <IonSpinner name="dots" /> : <><IonIcon icon={addOutline} slot="start" /> Abonar</>}
-        </IonButton>
+        {!vm.isCustomer && (
+          <IonButton color="light" onClick={vm.openTopUp} disabled={vm.topUpBusy} className="cpos-wallet-topup">
+            {vm.topUpBusy ? <IonSpinner name="dots" /> : <><IonIcon icon={addOutline} slot="start" /> Abonar</>}
+          </IonButton>
+        )}
       </div>
-      {vm.pendingEvidence.map((e) => (
+      {!vm.isCustomer && vm.pendingEvidence.map((e) => (
         <IonChip key={e.transferEvidenceId} className="cpos-wallet-pending" onClick={() => vm.reviewEvidence(e)}>
           Comprobante por revisar · {fmtMXN(e.amountMXN ?? 0)}
         </IonChip>
       ))}
     </IonCardContent>
   </IonCard>
+  {!vm.isCustomer && (<>
   <StripePaySheet
     clientSecret={vm.cardPayment?.clientSecret ?? null}
     stripeAccount={vm.cardPayment?.stripeAccount}
@@ -49,6 +52,7 @@ const PosWalletCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => (
   />
   <PosTransferSheet vm={vm} />
   <PosTerminalSheet vm={vm} />
+  </>)}
   </>
 );
 

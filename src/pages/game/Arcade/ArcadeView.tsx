@@ -35,7 +35,7 @@ const ArcadeView: React.FC = () => {
             <span className="arc-badge">
               <IonIcon icon={gameControllerOutline} />
             </span>
-            Arcade
+            Juegos Online
           </IonTitle>
         </IonToolbar>
       </IonHeader>

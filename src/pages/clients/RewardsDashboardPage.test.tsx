@@ -8,7 +8,9 @@ import RewardsDashboardPage from './RewardsDashboardPage';
 const session = vi.hoisted(() => ({ roleCode: 'admin', clientId: 0 }));
 
 vi.mock('../../contexts/UserContext', () => ({ useUser: () => session }));
-vi.mock('./RewardsDashboard/RewardsDashboardView', () => ({ default: () => <div>rewards view</div> }));
+vi.mock('./ClientDashboardPOS/ClientDashboardPOSView', () => ({
+  default: ({ audience }: { audience?: string }) => <div>rewards view {audience}</div>,
+}));
 
 const Where: React.FC = () => <div data-testid="path">{useLocation().pathname}</div>;
 
@@ -33,7 +35,7 @@ describe('RewardsDashboardPage', () => {
     session.roleCode = 'pos';
     session.clientId = 2242;
     open('/rewards-dashboard/2242');
-    expect(screen.getByText('rewards view')).toBeTruthy();
+    expect(screen.getByText('rewards view customer')).toBeTruthy();
     expect(screen.getByTestId('path').textContent).toBe('/rewards-dashboard/2242');
   });
 
@@ -41,18 +43,18 @@ describe('RewardsDashboardPage', () => {
     session.roleCode = 'pos';
     session.clientId = 7;
     open('/rewards-dashboard/2242');
-    expect(screen.getByText('rewards view')).toBeTruthy();
+    expect(screen.getByText('rewards view customer')).toBeTruthy();
   });
 
   it('keeps staff on their own rewards', () => {
     session.clientId = 2242;
     open('/rewards-dashboard/2242');
-    expect(screen.getByText('rewards view')).toBeTruthy();
+    expect(screen.getByText('rewards view customer')).toBeTruthy();
   });
 
   it('keeps staff without the clients feature, who could not open /client-pos', () => {
-    session.roleCode = 'employee';
+    session.roleCode = 'viewer';
     open('/rewards-dashboard/2242');
-    expect(screen.getByText('rewards view')).toBeTruthy();
+    expect(screen.getByText('rewards view customer')).toBeTruthy();
   });
 });

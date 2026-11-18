@@ -139,7 +139,7 @@ interface InterestOption {
 const INTEREST_OPTIONS: InterestOption[] = [
   { id: 'pos',     label: 'POS',        desc: 'Comprar en negocios POS GMO',     icon: '🛍️', capability: 'POS' },
   { id: 'rewards', label: 'Rewards',    desc: 'Ganar y canjear puntos',          icon: '🎁', capability: 'REWARDS' },
-  { id: 'arcade',  label: 'Arcade',     desc: 'Jugar y usar tus fichas',         icon: '🕹️', capability: 'ARCADE' },
+  { id: 'arcade',  label: 'Juegos Online', desc: 'Jugar y usar tus fichas',         icon: '🕹️', capability: 'ARCADE' },
   { id: 'loans',   label: 'SmartLoans', desc: 'Pedir o dar un préstamo',         icon: '💰' },
   { id: 'factory', label: 'Factory AI', desc: 'Software a la medida con IA',     icon: '🤖', capability: 'FACTORY_AI' },
 ];

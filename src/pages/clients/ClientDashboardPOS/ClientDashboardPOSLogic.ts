@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
 import { useIonActionSheet } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
-import { canAccess } from '../../../config/rolePermissions';
+import { canAccess, isStaffRole } from '../../../config/rolePermissions';
 import { useToast } from '../../../hooks/useToast';
-import { useProductCategories } from '../../../hooks/useProductCategories';
+import { cardCycles } from '../../../utils/stampCycles';
 import { useViewEnterLoad } from '../../../hooks/useViewEnterLoad';
 import { onDataChanged } from '../../../utils/refreshBus';
 import { getOneClient, Client } from '../../../api/clientsApi';
@@ -31,8 +31,19 @@ import { usePosTransfer } from './ClientDashboardPOSTransfer';
 import { usePosMessages } from './ClientDashboardPOSMessages';
 import { usePosContact } from './ClientDashboardPOSContact';
 import { CLIENT_TYPE_LABEL, LIST_PREVIEW } from './ClientDashboardPOSConstants';
-import { PosPurchase, PosStampGroup, PosStampProgress, RecentCategory, RecentFilter } from './ClientDashboardPOSTypes';
+import { PosPurchase, PosStampCard, PosStampCycle, RecentCategory, RecentFilter } from './ClientDashboardPOSTypes';
 import { buildRecentActivity } from './ClientDashboardPOSActivity';
+
+/**
+ * Who is looking at the page. ONE view serves both routes so a change lands
+ * on both (policy: never re-implement this page for another route):
+ *   - 'staff'    → /client-pos/:clientId (everything)
+ *   - 'customer' → /rewards-dashboard/:clientId, the client's own home. Same
+ *     cards minus Conversaciones and Seguimiento, and no staff-only actions
+ *     (abonos en efectivo/terminal/transferencia, revisar comprobantes,
+ *     llamar/mensaje) — a customer must never credit their own saldo.
+ */
+export type PosDashboardAudience = 'staff' | 'customer';
 
 /**
  * Staff view of one POS client (/client-pos/:clientId), opened by tapping the
@@ -40,10 +51,17 @@ import { buildRecentActivity } from './ClientDashboardPOSActivity';
  * client — profile, products, POS points, stamp cards, ticket purchases,
  * follow-ups and QR. Not the SmartLoans ClientDashboardPage.
  */
-export const useClientDashboardPOS = () => {
+export const useClientDashboardPOS = (audience: PosDashboardAudience = 'staff') => {
+  const isCustomer = audience === 'customer';
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
-  const clientId = Number(clientIdParam);
-  const { companyId, companyName, userId, roleCode } = useUser();
+  const { companyId, companyName, userId, roleCode, clientId: ownClientId } = useUser();
+  // A self-service session is pinned to its own clientId — never trusted with
+  // a foreign id from the URL (same rule as MyLoansLogic.ts).
+  const isSelfService = !isStaffRole(roleCode);
+  const clientId = isSelfService && ownClientId ? Number(ownClientId) : Number(clientIdParam);
+  // Staff-only hooks get companyId 0 for a customer, so they never load
+  // (pending transfer evidence, terminals) nor post anything.
+  const staffCompanyId = isCustomer ? 0 : companyId;
   const history = useHistory();
   const { showToast, toastProps } = useToast();
 
@@ -57,8 +75,7 @@ export const useClientDashboardPOS = () => {
   const [catalog, setCatalog] = useState<PosRewardCatalogItem[]>([]);
   const [productCounts, setProductCounts] = useState<PosRewardProductCount[]>([]);
   const [followUps, setFollowUps] = useState<ClientFollowUp[]>([]);
-  const [products, setProducts] = useState<Map<number, { name: string; categoryId: number }>>(new Map());
-  const { categories } = useProductCategories();
+  const [productNames, setProductNames] = useState<Map<number, string>>(new Map());
   const [walletEntries, setWalletEntries] = useState<LedgerEntry[]>([]);
   const [recentFilter, setRecentFilter] = useState<RecentFilter>('todo');
   const [showAllActivity, setShowAllActivity] = useState(false);
@@ -72,14 +89,15 @@ export const useClientDashboardPOS = () => {
       const [clientRes, faceRes, capsRes, balanceRes, ledgerRes, redemptionsRes, catalogRes, countsRes, followRes, productsRes, walletRes] =
         await Promise.all([
           getOneClient({ clients: [{ clientId }] }).catch(() => [] as Client[]),
-          getAllClientFaceRecognitions(Number(companyId)).catch(() => []),
+          // Company-wide list (every client's selfie): staff only.
+          isCustomer ? Promise.resolve([]) : getAllClientFaceRecognitions(Number(companyId)).catch(() => []),
           listClientCapabilities(Number(companyId), clientId).catch(() => []),
           posRewardsApi.getBalance(companyId, clientId).catch(() => null),
           posRewardsApi.listLedger(companyId, clientId).catch(() => []),
           posRewardsApi.listRedemptions(companyId, clientId).catch(() => []),
           posRewardsApi.listCatalog(companyId, true).catch(() => []),
           posRewardsApi.getProductCounts(companyId, clientId).catch(() => []),
-          getAllClientFollowUps(Number(companyId), clientId).catch(() => []),
+          isCustomer ? Promise.resolve([] as ClientFollowUp[]) : getAllClientFollowUps(Number(companyId), clientId).catch(() => []),
           getCompanyProducts(Number(companyId)).catch(() => []),
           ledgerStatement(Number(companyId), clientId).catch(() => [] as LedgerEntry[]),
         ]);
@@ -92,7 +110,7 @@ export const useClientDashboardPOS = () => {
       setCatalog(catalogRes);
       setProductCounts(countsRes);
       setFollowUps(followRes);
-      setProducts(new Map(productsRes.map((p) => [Number(p.productId), { name: p.name, categoryId: Number(p.categoryId) }])));
+      setProductNames(new Map(productsRes.map((p) => [Number(p.productId), p.name])));
       setWalletEntries(walletRes);
     } catch (error) {
       console.error('[useClientDashboardPOS] load failed:', error);
@@ -100,7 +118,7 @@ export const useClientDashboardPOS = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyId, clientId, showToast]);
+  }, [companyId, clientId, isCustomer, showToast]);
 
   useViewEnterLoad(() => { load(); }, !!companyId && !!clientId);
 
@@ -111,11 +129,11 @@ export const useClientDashboardPOS = () => {
 
   const fullName = client ? `${client.first_name ?? ''} ${client.last_name ?? ''}`.trim() : `Cliente #${clientId}`;
   const wallet = usePosWallet(companyId, clientId, userId, fullName, showToast);
-  const cardTopUp = usePosCardTopUp(companyId, clientId, fullName, showToast);
-  const transfer = usePosTransfer(companyId, clientId, userId, fullName, showToast);
-  const terminalTopUp = usePosTerminalTopUp(companyId, clientId, userId, fullName, showToast);
-  const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, canAccess(roleCode, 'notificationDispatchLog'));
-  const contact = usePosContact(Number(companyId), clientId, Number(userId), client?.cellphone, companyName, showToast);
+  const cardTopUp = usePosCardTopUp(staffCompanyId, clientId, fullName, showToast);
+  const transfer = usePosTransfer(staffCompanyId, clientId, userId, fullName, showToast);
+  const terminalTopUp = usePosTerminalTopUp(staffCompanyId, clientId, userId, fullName, showToast);
+  const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, !isCustomer && canAccess(roleCode, 'notificationDispatchLog'));
+  const contact = usePosContact(Number(staffCompanyId), clientId, Number(userId), client?.cellphone, companyName, showToast);
   const [presentTopUpOptions] = useIonActionSheet();
 
   const canManageAccounts = canAccess(roleCode, 'companyPaymentAccounts');
@@ -126,7 +144,7 @@ export const useClientDashboardPOS = () => {
 
   // RFC-012: card in store goes through the company's terminal. The online card
   // option only shows while a company Stripe account is active.
-  const openTopUp = () => presentTopUpOptions({
+  const openTopUp = () => !isCustomer && presentTopUpOptions({
     header: 'Abonar saldo',
     buttons: [
       { text: 'Efectivo', handler: wallet.openCashTopUp },
@@ -164,35 +182,36 @@ export const useClientDashboardPOS = () => {
     ? recentActivity
     : recentActivity.filter((i) => i.category === recentFilter);
 
-  // Stamp cards grouped by the product's top-level category (a subcategory rolls up
-  // into its parent): "Servicio Completo" → Básico 1/4 · Medio 1/4 · Carga alta 2/4.
-  const stampGroups = useMemo<PosStampGroup[]>(() => {
-    const categoryById = new Map(categories.map((c) => [c.categoryId, c]));
-    const groups = new Map<string, PosStampGroup>();
-    catalog
+  // One line per stamp card (product), opened into its cycles: Servicio Completo →
+  // Básico 1/4 · Medio 1/4 · Carga Alta 2/4 · Colchas Grandes 0/4. Cards fill per
+  // cycle (sp_posRewardProductCounts / fn_posRewardStampVariants).
+  const stampCards = useMemo<PosStampCard[]>(
+    () => catalog
       .filter((i) => i.rewardType === 'free_product' && i.catalogItemId && i.freeProductId != null)
-      .forEach((i) => {
-        const requiredUnits = stampUnits(i);
-        const unitsAvailable = productCounts.find((p) => p.productId === i.freeProductId)?.unitsAvailable ?? 0;
-        const pct = requiredUnits > 0 ? Math.min(100, Math.round((unitsAvailable / requiredUnits) * 100)) : 0;
-        // A card counts one exact product (not its category) — name it so
-        // Básico vs Alto is never ambiguous.
-        const product = products.get(Number(i.freeProductId));
-        const productName = product?.name || `Producto #${i.freeProductId}`;
-        const category = product ? categoryById.get(product.categoryId) : undefined;
-        const top = category?.parentCategoryId != null ? categoryById.get(category.parentCategoryId) ?? category : category;
-        const key = top ? `c${top.categoryId}` : 'other';
-        const title = top?.name || 'Otros';
-        const label = stripPrefix(productName, title);
-        const card: PosStampProgress = {
-          catalogItemId: i.catalogItemId as number, name: i.name, productName, label, unitsAvailable, requiredUnits, pct,
-        };
-        const group = groups.get(key) ?? { key, title, cards: [] };
-        group.cards.push(card);
-        groups.set(key, group);
-      });
-    return Array.from(groups.values());
-  }, [catalog, productCounts, products, categories]);
+      .map((i) => {
+        const productName = productNames.get(Number(i.freeProductId)) || `Producto #${i.freeProductId}`;
+        const rows = cardCycles(i, productCounts);
+        const hasCycles = rows.some((r) => r.productOptionId != null);
+        const toCycle = (key: string, label: string, unitsAvailable: number, required: number): PosStampCycle => ({
+          key, label, unitsAvailable, requiredUnits: required,
+          pct: required > 0 ? Math.min(100, Math.round((unitsAvailable / required) * 100)) : 0,
+        });
+        const cycles = rows.length === 0
+          ? [toCycle('all', productName, 0, stampUnits(i))]
+          : [...rows]
+            .sort((a, b) => (a.productOptionChoiceId ?? Number.MAX_SAFE_INTEGER) - (b.productOptionChoiceId ?? Number.MAX_SAFE_INTEGER))
+            .map((r) => toCycle(
+              String(r.productOptionChoiceId ?? 'all'),
+              r.choiceName || (hasCycles ? 'Sin ciclo registrado' : productName),
+              Number(r.unitsAvailable) || 0,
+              Number(r.requiredUnits) || stampUnits(i),
+            ));
+        const ready = cycles.filter((c) => c.pct >= 100);
+        const best = cycles.reduce((a, b) => (b.unitsAvailable / (b.requiredUnits || 1) > a.unitsAvailable / (a.requiredUnits || 1) ? b : a));
+        return { catalogItemId: i.catalogItemId as number, name: i.name, productName, hasCycles, cycles, ready, best };
+      }),
+    [catalog, productCounts, productNames],
+  );
 
   const pendingFollowUps = followUps.filter((f) => f.status === 'pending').length;
 
@@ -226,6 +245,7 @@ export const useClientDashboardPOS = () => {
   };
 
   return {
+    isCustomer,
     clientId,
     client,
     fullName,
@@ -242,8 +262,9 @@ export const useClientDashboardPOS = () => {
     visibleRecentActivity: showAllActivity ? filteredActivity : filteredActivity.slice(0, LIST_PREVIEW),
     showAllActivity,
     toggleAllActivity: () => setShowAllActivity((v) => !v),
+    catalog,
     redemptionsCount: redemptions.filter((r) => r.status === 'applied').length,
-    stampGroups,
+    stampCards,
     followUps,
     pendingFollowUps,
     qrValue,
@@ -273,11 +294,3 @@ export const useClientDashboardPOS = () => {
 };
 
 export type ClientDashboardPOSVM = ReturnType<typeof useClientDashboardPOS>;
-
-/** "Servicio Completo Básico" under "Servicio Completo" → "Básico"; otherwise unchanged. */
-function stripPrefix(name: string, prefix: string): string {
-  const n = name.trim();
-  if (!prefix || !n.toLowerCase().startsWith(prefix.toLowerCase())) return n;
-  const rest = n.slice(prefix.length).replace(/^[\s\-–·:]+/, '');
-  return rest || n;
-}
