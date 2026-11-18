@@ -140,7 +140,7 @@ const PRODUCT_GROUPS: { title: string; items: { id: ClientCapability; label: str
   { title: 'POS GMO', items: [
     { id: 'POS',     label: 'Cliente POS', desc: 'Compras en tienda' },
     { id: 'REWARDS', label: 'Rewards',     desc: 'Puntos y recompensas' },
-    { id: 'ARCADE',  label: 'Arcade',      desc: 'Juegos con fichas' },
+    { id: 'ARCADE',  label: 'Juegos Online', desc: 'Juegos con fichas' },
   ] },
   { title: 'SmartLoans', items: [
     { id: 'SMARTLOANS_BORROWER',  label: 'Acreditado',  desc: 'Solicita préstamos' },

@@ -13,6 +13,10 @@ export interface SendClientLoginCodeResult {
   // true once this client finished password onboarding on a previous
   // login -- no SMS was sent this time, show the password field instead.
   firstLoginCompleted?: boolean;
+  /** The client matched by the phone, for the "Bienvenido de nuevo, …" greeting (optional until the backend sends it). */
+  clientId?: number | string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export interface VerifyClientLoginCodeResult {

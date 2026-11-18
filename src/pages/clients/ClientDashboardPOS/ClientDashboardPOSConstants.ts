@@ -13,7 +13,7 @@ export const CLIENT_TYPE_LABEL: Record<ClientType, string> = {
 export const CAPABILITY_LABEL: Record<ClientCapability, string> = {
   POS: 'POS',
   REWARDS: 'Recompensas',
-  ARCADE: 'Arcade',
+  ARCADE: 'Juegos Online',
   SMARTLOANS_LENDER: 'SmartLoans · Prestamista',
   SMARTLOANS_BORROWER: 'SmartLoans · Acreditado',
   SMARTLOANS_JURIDICAL: 'SmartLoans · Jurídico',

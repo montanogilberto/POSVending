@@ -1,0 +1,45 @@
+.pin-input {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pin-input-box {
+  flex: 0 1 60px;
+  min-width: 0;
+  max-width: 60px;
+  height: 60px;
+  min-height: 60px;
+  --background: #F4F6F9;
+  --border-radius: 12px;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --color: #111827;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
+  transition: border-color 0.15s;
+}
+
+.pin-input-box input {
+  text-align: center;
+  caret-color: transparent;
+}
+
+.pin-input-box.has-focus {
+  border-color: #2563EB;
+}
+
+.pin-input-box.input-disabled {
+  opacity: 0.6;
+}
+
+/* Label above the boxes: centered so it sits over the centered row. */
+.pin-input-label {
+  align-self: center;
+  text-align: center;
+}

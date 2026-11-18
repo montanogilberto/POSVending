@@ -64,6 +64,7 @@ const PosProfileCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => {
           </div>
         )}
 
+        {!vm.isCustomer && (
         <div className="cpos-profile-actions">
           {vm.contactHasPhone && (
             <IonButton fill="outline" size="small" color="success" onClick={vm.openCall} disabled={vm.calling} className="cpos-action">
@@ -82,6 +83,7 @@ const PosProfileCard: React.FC<{ vm: ClientDashboardPOSVM }> = ({ vm }) => {
             <IonIcon icon={listOutline} slot="start" /> Ver en lista
           </IonButton>
         </div>
+        )}
       </IonCardContent>
     </IonCard>
   );

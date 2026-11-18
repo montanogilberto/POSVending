@@ -2,8 +2,12 @@ import React from 'react';
 import { IonButton, IonIcon, IonInput, IonLabel, IonSpinner, IonToast } from '@ionic/react';
 import { fingerPrintOutline, keyOutline } from 'ionicons/icons';
 import CountryPhoneInput from '../../../components/ui/CountryPhoneInput';
+import PinInput from '../../../components/ui/PinInput';
 import { maskPhone } from '../../../utils/biometricAuth';
-import { PIN_LENGTH, PIN_LOGIN_MAX_LENGTH } from '../../../utils/pin';
+
+/** "•••• 8224" — the greeting never shows the full number. */
+const maskPhoneTail = (phone: string) => `•••• ${phone.replace(/\D/g, '').slice(-4)}`;
+import { PIN_LENGTH } from '../../../utils/pin';
 import type { ClientPhoneLoginVM } from './ClientPhoneLoginLogic';
 
 const Spin: React.FC<{ loading: boolean; label: string }> = ({ loading, label }) =>
@@ -92,22 +96,26 @@ const ClientPhoneLoginCard: React.FC<{ vm: ClientPhoneLoginVM }> = ({ vm }) => (
         </p>
         <form onSubmit={vm.submitNewPin} className="login-form">
           <div className="login-field">
-            <IonLabel className="login-label">Nuevo PIN</IonLabel>
-            <IonInput
-              type="text" inputmode="numeric" maxlength={PIN_LENGTH} placeholder="0000" className="login-input"
-              autocomplete="new-password"
-              onIonInput={e => { vm.newPinRef.current = (e.detail.value ?? ''); }}
+            <IonLabel className="login-label pin-input-label">Nuevo PIN</IonLabel>
+            <PinInput
+              value={vm.newPin} onChange={vm.setNewPin} disabled={vm.loading} autoFocus
+              autocomplete="new-password" ariaLabel="Nuevo PIN"
+              onComplete={() => vm.confirmPinInputRef.current?.focus()}
             />
           </div>
           <div className="login-field">
-            <IonLabel className="login-label">Confirma tu PIN</IonLabel>
-            <IonInput
-              type="text" inputmode="numeric" maxlength={PIN_LENGTH} placeholder="0000" className="login-input"
-              autocomplete="new-password"
-              onIonInput={e => { vm.confirmPinRef.current = (e.detail.value ?? ''); }}
+            <IonLabel className="login-label pin-input-label">Confirma tu PIN</IonLabel>
+            <PinInput
+              ref={vm.confirmPinInputRef}
+              value={vm.confirmPin} onChange={vm.setConfirmPin} disabled={vm.loading}
+              autocomplete="new-password" ariaLabel="Confirma tu PIN"
+              onEnter={() => { if (vm.newPin.length === PIN_LENGTH) void vm.submitNewPin(); }}
             />
           </div>
-          <IonButton type="submit" expand="block" disabled={vm.loading} className="login-submit-btn">
+          <IonButton
+            type="submit" expand="block" className="login-submit-btn"
+            disabled={vm.loading || vm.newPin.length < PIN_LENGTH || vm.confirmPin.length < PIN_LENGTH}
+          >
             <Spin loading={vm.loading} label="Guardar PIN" />
           </IonButton>
         </form>
@@ -117,22 +125,30 @@ const ClientPhoneLoginCard: React.FC<{ vm: ClientPhoneLoginVM }> = ({ vm }) => (
     {vm.step === 'pin' && (
       <>
         <h2 className="login-card-title">{vm.legacyPassword ? 'Ingresa tu contraseña' : 'Ingresa tu PIN'}</h2>
-        <p className="login-card-subtitle">Bienvenido de nuevo, {vm.phone}</p>
+        <p className="login-card-subtitle">Bienvenido de nuevo, {vm.clientName || maskPhoneTail(vm.phone)}</p>
         <form onSubmit={vm.submitPin} className="login-form">
           <div className="login-field">
-            <IonLabel className="login-label">{vm.legacyPassword ? 'Contraseña' : 'PIN'}</IonLabel>
-            <IonInput
-              key={vm.legacyPassword ? 'password' : 'pin'}
-              type={vm.legacyPassword ? 'password' : 'text'}
-              inputmode={vm.legacyPassword ? 'text' : 'numeric'}
-              maxlength={vm.legacyPassword ? 50 : PIN_LOGIN_MAX_LENGTH}
-              placeholder={vm.legacyPassword ? 'Tu contraseña' : '0000'}
-              className="login-input"
-              autocomplete="current-password"
-              onIonInput={e => { vm.pinRef.current = (e.detail.value ?? ''); }}
-            />
+            <IonLabel className={vm.legacyPassword ? 'login-label' : 'login-label pin-input-label'}>
+              {vm.legacyPassword ? 'Contraseña' : 'PIN'}
+            </IonLabel>
+            {vm.legacyPassword ? (
+              <IonInput
+                type="password" inputmode="text" maxlength={50} placeholder="Tu contraseña"
+                className="login-input" autocomplete="current-password"
+                onIonInput={e => { vm.pinRef.current = (e.detail.value ?? ''); }}
+              />
+            ) : (
+              <PinInput
+                ref={vm.pinInputRef}
+                value={vm.pin} onChange={vm.setPin} disabled={vm.loading} autoFocus
+                onEnter={() => { void vm.submitPin(); }}
+              />
+            )}
           </div>
-          <IonButton type="submit" expand="block" disabled={vm.loading} className="login-submit-btn">
+          <IonButton
+            type="submit" expand="block" className="login-submit-btn"
+            disabled={vm.loading || (!vm.legacyPassword && vm.pin.length < PIN_LENGTH)}
+          >
             <Spin loading={vm.loading} label="Entrar" />
           </IonButton>
           <IonButton type="button" expand="block" fill="clear" disabled={vm.loading} onClick={vm.toggleLegacyPassword}>
