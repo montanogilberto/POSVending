@@ -210,7 +210,7 @@ import { IncomeProvider } from './contexts/IncomeContext';
 import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
-import { canAccess, UiFeature } from './config/rolePermissions';
+import { canAccess, ROLE_LABELS, UiFeature } from './config/rolePermissions';
 import { useRoleCatalogVersion } from './hooks/useRoleCatalogVersion';
 import { menuController } from '@ionic/core/components';
 import { useMenuSearch } from './hooks/useMenuSearch';
@@ -291,6 +291,9 @@ const AppShell: React.FC = () => {
   } = useUser();
   // Re-render the menu/routes when role permissions change (catalog fetch, /setting save).
   useRoleCatalogVersion();
+  // The live catalog name (re-rendered above when it loads), not the one saved at sign-in —
+  // a renamed role shows without signing in again. Custom roles fall back to the saved name.
+  const roleLabel = (roleCode && ROLE_LABELS[roleCode]) || roleName;
   // Self-service sessions follow the ACTIVE PRODUCT (from clientCapabilities),
   // so one login can be a POS customer and a SmartLoans borrower. Staff have
   // no product context and keep the role-based shell.
@@ -668,8 +671,8 @@ const AppShell: React.FC = () => {
               <h3 className="profile-name">{username || 'Usuario'}</h3>
               <p className="profile-role">
                 {companyName
-                  ? `${companyName}${branchName ? ` · ${branchName}` : ''} · ${roleName}`
-                  : roleName || 'Usuario'}
+                  ? `${companyName}${branchName ? ` · ${branchName}` : ''} · ${roleLabel}`
+                  : roleLabel || 'Usuario'}
               </p>
             </div>
             )}
@@ -933,9 +936,9 @@ const AppShell: React.FC = () => {
               </IonItem>
               )}
               {canAccess(roleCode, 'arcade') && (
-              <IonItem button routerLink="/arcade" title="Arcade">
+              <IonItem button routerLink="/arcade" title="Juegos Online">
                 <IonIcon icon={diamondOutline} slot="start" />
-                {!menuCollapsed && <IonLabel>Arcade</IonLabel>}
+                {!menuCollapsed && <IonLabel>Juegos Online</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -1263,7 +1266,7 @@ const AppShell: React.FC = () => {
                 </button>
                 <button type="button" className={`cd-tab${location.pathname.startsWith('/arcade') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/arcade')}>
                   <IonIcon aria-hidden="true" icon={gameControllerOutline} />
-                  <span>Arcade</span>
+                  <span>Juegos Online</span>
                 </button>
                 <button type="button" className={`cd-tab${location.pathname.startsWith('/profile') ? ' cd-tab--active' : ''}`} onClick={() => history.push('/profile')}>
                   <IonIcon aria-hidden="true" icon={personCircleOutline} />

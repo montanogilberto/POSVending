@@ -4,6 +4,8 @@ import Header from '../../../components/layout/Header';
 import TransferAccountCard from '../../../components/payments/TransferAccountCard';
 import StripePaySheet from '../../../components/payments/StripePaySheet';
 import { usePopovers } from '../../../hooks/usePopovers';
+import { useUser } from '../../../contexts/UserContext';
+import { getPostLoginRoute } from '../../../utils/postLoginRoute';
 import { fmtMXN } from '../../../utils/format';
 import { useMyQr } from './MyQrLogic';
 import BalanceCard from './components/BalanceCard';
@@ -20,10 +22,16 @@ import TopUpAmountSheet from './components/TopUpAmountSheet';
 const MyQrView: React.FC = () => {
   const vm = useMyQr();
   const pops = usePopovers();
+  const { roleCode, clientId } = useUser();
 
   return (
     <IonPage>
-      <Header screenTitle="Mi Código QR" {...pops.headerProps} />
+      <Header
+        screenTitle="Mi Código QR"
+        {...pops.headerProps}
+        showBackButton={true}
+        backButtonHref={getPostLoginRoute(roleCode, clientId)}
+      />
       <IonContent className="ion-padding my-qr-content">
         <div className="my-qr-card">
           {vm.qrError ? (

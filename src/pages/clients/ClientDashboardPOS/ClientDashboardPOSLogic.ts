@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
 import { useIonActionSheet } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
-import { canAccess } from '../../../config/rolePermissions';
+import { canAccess, isStaffRole } from '../../../config/rolePermissions';
 import { useToast } from '../../../hooks/useToast';
 import { cardCycles } from '../../../utils/stampCycles';
 import { useViewEnterLoad } from '../../../hooks/useViewEnterLoad';
@@ -35,15 +35,33 @@ import { PosPurchase, PosStampCard, PosStampCycle, RecentCategory, RecentFilter 
 import { buildRecentActivity } from './ClientDashboardPOSActivity';
 
 /**
+ * Who is looking at the page. ONE view serves both routes so a change lands
+ * on both (policy: never re-implement this page for another route):
+ *   - 'staff'    → /client-pos/:clientId (everything)
+ *   - 'customer' → /rewards-dashboard/:clientId, the client's own home. Same
+ *     cards minus Conversaciones and Seguimiento, and no staff-only actions
+ *     (abonos en efectivo/terminal/transferencia, revisar comprobantes,
+ *     llamar/mensaje) — a customer must never credit their own saldo.
+ */
+export type PosDashboardAudience = 'staff' | 'customer';
+
+/**
  * Staff view of one POS client (/client-pos/:clientId), opened by tapping the
  * client's card in /clients. Read-only: everything already stored about the
  * client — profile, products, POS points, stamp cards, ticket purchases,
  * follow-ups and QR. Not the SmartLoans ClientDashboardPage.
  */
-export const useClientDashboardPOS = () => {
+export const useClientDashboardPOS = (audience: PosDashboardAudience = 'staff') => {
+  const isCustomer = audience === 'customer';
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
-  const clientId = Number(clientIdParam);
-  const { companyId, companyName, userId, roleCode } = useUser();
+  const { companyId, companyName, userId, roleCode, clientId: ownClientId } = useUser();
+  // A self-service session is pinned to its own clientId — never trusted with
+  // a foreign id from the URL (same rule as MyLoansLogic.ts).
+  const isSelfService = !isStaffRole(roleCode);
+  const clientId = isSelfService && ownClientId ? Number(ownClientId) : Number(clientIdParam);
+  // Staff-only hooks get companyId 0 for a customer, so they never load
+  // (pending transfer evidence, terminals) nor post anything.
+  const staffCompanyId = isCustomer ? 0 : companyId;
   const history = useHistory();
   const { showToast, toastProps } = useToast();
 
@@ -71,14 +89,15 @@ export const useClientDashboardPOS = () => {
       const [clientRes, faceRes, capsRes, balanceRes, ledgerRes, redemptionsRes, catalogRes, countsRes, followRes, productsRes, walletRes] =
         await Promise.all([
           getOneClient({ clients: [{ clientId }] }).catch(() => [] as Client[]),
-          getAllClientFaceRecognitions(Number(companyId)).catch(() => []),
+          // Company-wide list (every client's selfie): staff only.
+          isCustomer ? Promise.resolve([]) : getAllClientFaceRecognitions(Number(companyId)).catch(() => []),
           listClientCapabilities(Number(companyId), clientId).catch(() => []),
           posRewardsApi.getBalance(companyId, clientId).catch(() => null),
           posRewardsApi.listLedger(companyId, clientId).catch(() => []),
           posRewardsApi.listRedemptions(companyId, clientId).catch(() => []),
           posRewardsApi.listCatalog(companyId, true).catch(() => []),
           posRewardsApi.getProductCounts(companyId, clientId).catch(() => []),
-          getAllClientFollowUps(Number(companyId), clientId).catch(() => []),
+          isCustomer ? Promise.resolve([] as ClientFollowUp[]) : getAllClientFollowUps(Number(companyId), clientId).catch(() => []),
           getCompanyProducts(Number(companyId)).catch(() => []),
           ledgerStatement(Number(companyId), clientId).catch(() => [] as LedgerEntry[]),
         ]);
@@ -99,7 +118,7 @@ export const useClientDashboardPOS = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyId, clientId, showToast]);
+  }, [companyId, clientId, isCustomer, showToast]);
 
   useViewEnterLoad(() => { load(); }, !!companyId && !!clientId);
 
@@ -110,11 +129,11 @@ export const useClientDashboardPOS = () => {
 
   const fullName = client ? `${client.first_name ?? ''} ${client.last_name ?? ''}`.trim() : `Cliente #${clientId}`;
   const wallet = usePosWallet(companyId, clientId, userId, fullName, showToast);
-  const cardTopUp = usePosCardTopUp(companyId, clientId, fullName, showToast);
-  const transfer = usePosTransfer(companyId, clientId, userId, fullName, showToast);
-  const terminalTopUp = usePosTerminalTopUp(companyId, clientId, userId, fullName, showToast);
-  const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, canAccess(roleCode, 'notificationDispatchLog'));
-  const contact = usePosContact(Number(companyId), clientId, Number(userId), client?.cellphone, companyName, showToast);
+  const cardTopUp = usePosCardTopUp(staffCompanyId, clientId, fullName, showToast);
+  const transfer = usePosTransfer(staffCompanyId, clientId, userId, fullName, showToast);
+  const terminalTopUp = usePosTerminalTopUp(staffCompanyId, clientId, userId, fullName, showToast);
+  const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, !isCustomer && canAccess(roleCode, 'notificationDispatchLog'));
+  const contact = usePosContact(Number(staffCompanyId), clientId, Number(userId), client?.cellphone, companyName, showToast);
   const [presentTopUpOptions] = useIonActionSheet();
 
   const canManageAccounts = canAccess(roleCode, 'companyPaymentAccounts');
@@ -125,7 +144,7 @@ export const useClientDashboardPOS = () => {
 
   // RFC-012: card in store goes through the company's terminal. The online card
   // option only shows while a company Stripe account is active.
-  const openTopUp = () => presentTopUpOptions({
+  const openTopUp = () => !isCustomer && presentTopUpOptions({
     header: 'Abonar saldo',
     buttons: [
       { text: 'Efectivo', handler: wallet.openCashTopUp },
@@ -226,6 +245,7 @@ export const useClientDashboardPOS = () => {
   };
 
   return {
+    isCustomer,
     clientId,
     client,
     fullName,
@@ -242,6 +262,7 @@ export const useClientDashboardPOS = () => {
     visibleRecentActivity: showAllActivity ? filteredActivity : filteredActivity.slice(0, LIST_PREVIEW),
     showAllActivity,
     toggleAllActivity: () => setShowAllActivity((v) => !v),
+    catalog,
     redemptionsCount: redemptions.filter((r) => r.status === 'applied').length,
     stampCards,
     followUps,

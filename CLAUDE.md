@@ -53,6 +53,14 @@ Check these before implementing anything similar; duplicating them is a review f
 **Promotion rule:** a component used by a second feature moves to `components/ui/`
 (e.g. `DoneCard`/`AlertCard` graduate from BorrowerOnboarding when reused).
 
+**One page, many routes — never a second copy.** When two routes show the same screen to
+different audiences, they render ONE view with an `audience` prop; the differences are
+`audience` checks inside it, not a re-implemented page. Current case: the client dashboard
+`src/pages/clients/ClientDashboardPOS/ClientDashboardPOSView.tsx` serves `/client-pos/:clientId`
+(`audience="staff"`, everything) and `/rewards-dashboard/:clientId` (`audience="customer"`: no
+Conversaciones, no Seguimiento, no staff-only actions). A change there lands on both routes;
+never re-create a `RewardsDashboard/` folder.
+
 ## 4. UI rules (Ionic)
 
 1. **Ionic components for every interactive element** — never raw `<button>`,

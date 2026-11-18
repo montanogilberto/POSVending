@@ -73,7 +73,7 @@ const TOPIC_META: Record<PosSupportTopic, { label: string; placeholder: string; 
 
 // Staff topics only (matches the generic /pos-support picker's audience).
 // "rewards" is client-facing and reached directly via /pos-support/rewards
-// (Header's sparkle button on RewardsDashboardView) — it never appears in
+// (Header's sparkle button on ClientDashboardPOSView, customer audience) — it never appears in
 // this staff picker, same reason it's not in POS_ONLY_ROUTE_PREFIXES logic.
 const TOPIC_ORDER: PosSupportTopic[] = ['clients', 'income', 'expenses', 'accounting'];
 
