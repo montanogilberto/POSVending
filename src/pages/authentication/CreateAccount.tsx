@@ -2,23 +2,28 @@
 import React, { useEffect, useState } from 'react';
 import {
   IonContent, IonPage, IonInput, IonFooter,
-  IonToast, IonRouterLink, IonIcon, IonSpinner,
+  IonToast, IonRouterLink, IonIcon, IonSpinner, IonChip, IonLabel, IonButton,
 } from '@ionic/react';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useLocation } from 'react-router-dom';
 import './CreateAccount.css';
 import {
   eye, eyeOff, chevronBack, chevronForward, checkmark,
   personOutline, businessOutline, lockClosedOutline,
   buildOutline, walletOutline, cartOutline,
 } from 'ionicons/icons';
-import { getAllCompanies, getBranchesByCompany, Company, CompanyBranch } from '../../api/companiesApi';
-import { RoleCode, ROLE_GROUPS, ROLE_LABELS } from '../../config/rolePermissions';
+import { getAllCompanies, getBranchesByCompany, createCompany, createBranch, Company, CompanyBranch } from '../../api/companiesApi';
+import { RoleCode, ROLE_LABELS } from '../../config/rolePermissions';
 import { createUser, updateUser, sendVerificationCode, verifyCode, checkContact, checkUsername, sendAccountCreated, ContactCheckResult } from '../../api/usersApi';
 import { createOrUpdateClient, getAllClients, ClientType } from '../../api/clientsApi';
 import { grantClientCapability, ClientCapability } from '../../api/clientCapabilitiesApi';
 import { useUser } from '../../contexts/UserContext';
 import { useObservability } from '../../contexts/ObservabilityContext';
 import { getPostLoginRoute } from '../../utils/postLoginRoute';
+import ServiceFinderView from './ServiceFinder/ServiceFinderView';
+import BusinessMenuView from './BusinessMenu/BusinessMenuView';
+import type { BusinessMenuResult } from './BusinessMenu/BusinessMenuTypes';
+import { SERVICES, serviceFromSearch } from './ServiceFinder/ServiceFinderConstants';
+import type { ServiceId } from './ServiceFinder/ServiceFinderTypes';
 
 // ── Application profiles ────────────────────────────────────────────────────
 
@@ -177,11 +182,6 @@ const ROLE_BY_CLIENT_TYPE: Record<ClientType, RoleCode> = {
   pos:      'employee',
 };
 
-const ROLE_COLOR: Record<string, string> = {
-  admin: '#dc2626', manager: '#d97706', employee: '#2563eb',
-  borrower: '#059669', lender: '#7c3aed', business: '#0369a1', viewer: '#6b7280',
-};
-
 const STEPS = ['Cuenta', 'Perfil', 'Verificar', 'Acceso'];
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -202,6 +202,16 @@ const CreateAccount: React.FC = () => {
 
   const [step, setStep] = useState(0);
 
+  // "Asistente GMO" (ServiceFinder) runs before step "Cuenta" to identify the
+  // service. `?service=pos|smartloans|arcade` skips it with that service preset.
+  const location = useLocation();
+  const [urlService] = useState<ServiceId | null>(() => {
+    const id = serviceFromSearch(location.search);
+    return id && SERVICES[id].supportedHere ? id : null;
+  });
+  const [service, setService] = useState<ServiceId | null>(null);
+  const [finderDone, setFinderDone] = useState(!!urlService);
+
   // Sub-step inside the "Perfil" step, so it plays as a quiz (one question per
   // screen, tap to advance) instead of a single scrolling form: 0 = intent
   // ("¿Qué quieres hacer?"), 1 = the branch detail for the chosen objetivo.
@@ -211,6 +221,11 @@ const CreateAccount: React.FC = () => {
   // Single smart contact field — user types email OR phone; we detect which
   const [contact, setContact]           = useState('');
   const [contactType, setContactType]   = useState<'email' | 'phone' | 'unknown'>('unknown');
+  // Phone-first (2026-11-18): the phone is the identity (SMS/WhatsApp code,
+  // clients.cellphone, WhatsApp follow-up) and email is an optional extra.
+  // 'email' mode only exists so an older email-only signup can resume.
+  const [contactMode, setContactMode]   = useState<'phone' | 'email'>('phone');
+  const [optionalEmailInput, setOptionalEmailInput] = useState('');
 
   // Contact lookup — debounced check against existing clients/users
   const [contactCheck, setContactCheck] = useState<'idle' | 'checking' | 'found' | 'new'>('idle');
@@ -265,8 +280,18 @@ const CreateAccount: React.FC = () => {
   // Step 3 — role + company + branch (Acceso)
   const [userRole, setUserRole]             = useState<RoleCode>('employee');
   const [companies, setCompanies]           = useState<Company[]>([]);
+  // Business signup (POS / custom staff profiles): public signup is owner-only —
+  // the person names their business, we create that company (+ a "Matriz"
+  // branch) and they become its admin. Employees are added later by that admin
+  // from inside POS; nobody can pick an existing company here (2026-11-18).
+  const [businessName, setBusinessName] = useState('');
+  const [ownCompany, setOwnCompany]     = useState<{ company: Company; branch: CompanyBranch | null } | null>(null);
+  // Optional menu/catalog read by the business_menu agent at step "Perfil".
+  // Only its suggested modules are saved (enabledModules); the item list is a
+  // preview — importing products needs its own backend step.
+  const [menuResult, setMenuResult] = useState<BusinessMenuResult | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [branches, setBranches]             = useState<CompanyBranch[]>([]);
+  const [, setBranches]                     = useState<CompanyBranch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<CompanyBranch | null>(null);
   const [branchScreen, setBranchScreen]     = useState(false);
 
@@ -324,7 +349,14 @@ const CreateAccount: React.FC = () => {
   // customer), so their existing clientType is left alone. Skips entirely
   // once SmartLoans is checked — that path owns clientType via the
   // CLIENT_TYPES picker above, this must not fight it.
+  // A business owner (POS / custom profile) is never a loan client either:
+  // their own dbo.clients row (phone signup) is a plain 'pos' client.
   useEffect(() => {
+    if (selectedProfile === 'pos' || selectedProfile === 'custom') {
+      console.log('[clientType] business signup — clientType pos');
+      setClientType('pos');
+      return;
+    }
     if (selectedProfile !== 'customer' || wantsLoans) return;
     console.log('[clientType] customer profile without SmartLoans interest — defaulting clientType to pos');
     setClientType('pos');
@@ -372,10 +404,22 @@ const CreateAccount: React.FC = () => {
   };
 
   // Detect whether user typed an email or a phone number
+  const isEmailValid = (v: string) => /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(v.trim());
+
+  // The main field accepts only what its mode asks for (phone, or email when resuming).
   const detectContactType = (v: string): 'email' | 'phone' | 'unknown' => {
-    if (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(v)) return 'email';
-    if (isPhoneValid(v)) return 'phone';
-    return 'unknown';
+    if (contactMode === 'email') return isEmailValid(v) ? 'email' : 'unknown';
+    return isPhoneValid(v) ? 'phone' : 'unknown';
+  };
+
+  const switchContactMode = (mode: 'phone' | 'email') => {
+    console.log('[contactMode] ->', mode);
+    if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
+    setContactMode(mode);
+    setContact('');
+    setContactType('unknown');
+    setContactCheck('idle');
+    setExistingRecord(null);
   };
 
   const handleContactChange = (v: string) => {
@@ -475,8 +519,61 @@ const CreateAccount: React.FC = () => {
     setUsernameSuggestions([]);
   };
 
+  const isBusinessSignup = selectedProfile === 'pos' || selectedProfile === 'custom';
+  const sameCompanyName = (a: string, b: string) =>
+    a.trim().replace(/\s+/g, ' ').toLowerCase() === b.trim().replace(/\s+/g, ' ').toLowerCase();
+  const businessTaken = !ownCompany && businessName.trim() !== ''
+    && companies.some(c => sameCompanyName(c.name, businessName));
+  const businessValid = !!ownCompany || (businessName.trim().length >= 3 && !businessTaken);
+
+  /**
+   * Creates the owner's company and a "Matriz" branch once (idempotent across
+   * Back/Next). sp_companies doesn't return the new id, so it's found again by
+   * name — unambiguous because duplicate names are rejected first.
+   */
+  const ensureOwnCompany = async (): Promise<{ company: Company; branch: CompanyBranch | null }> => {
+    if (ownCompany) return ownCompany;
+    const name = businessName.trim().replace(/\s+/g, ' ');
+    const before = await getAllCompanies();
+    if (before.some(c => sameCompanyName(c.name, name))) {
+      setCompanies(before);
+      throw new Error('Ya existe un negocio con ese nombre. Agrega tu ciudad o colonia, o pide a su administrador que te agregue.');
+    }
+    console.log('[ensureOwnCompany] creating company name=%s', name);
+    await createCompany(name);
+    const after = await getAllCompanies();
+    setCompanies(after);
+    const company = after.find(c => sameCompanyName(c.name, name));
+    if (!company?.companyId) throw new Error('No se pudo crear tu negocio. Intenta de nuevo.');
+
+    let branch: CompanyBranch | null = null;
+    try {
+      await createBranch('Matriz', company.companyId);
+      const list = await getBranchesByCompany(company.companyId);
+      branch = list.find(b => b.name === 'Matriz') ?? list[0] ?? null;
+    } catch (err) {
+      console.warn('[ensureOwnCompany] default branch failed — company only', err);
+    }
+    console.log('[ensureOwnCompany] companyId=%d branchId=%s', company.companyId, branch?.branchId);
+    const created = { company, branch };
+    setOwnCompany(created);
+    setSelectedCompany(company);
+    setSelectedBranch(branch);
+    return created;
+  };
+
+  const handleMenuResult = (r: BusinessMenuResult | null) => {
+    setMenuResult(r);
+    if (!r) return;
+    // Add (never remove) what the menu shows the business needs.
+    setEnabledModules(prev => [...prev, ...r.suggestedModules.filter(m => !prev.includes(m))]);
+  };
+
   // For createUser: route to correct field based on detected type
-  const contactEmail    = contactType === 'email' ? contact.trim() : '';
+  // Phone mode: the optional email, when it's a valid address.
+  const optionalEmail   = contactMode === 'phone' && isEmailValid(optionalEmailInput) ? optionalEmailInput.trim() : '';
+  const optionalEmailBad = contactMode === 'phone' && optionalEmailInput.trim() !== '' && !optionalEmail;
+  const contactEmail    = contactType === 'email' ? contact.trim() : optionalEmail;
   const contactPhone    = contactType === 'phone' ? normalizePhone(contact) : '';
 
   // The phone actually usable for the dbo.clients row — either the original
@@ -535,8 +632,9 @@ const CreateAccount: React.FC = () => {
 
   const strength = pwdStrength(password);
 
-  const contactValid = contactType !== 'unknown';
-  const step0Valid = contactValid && username.trim() && usernameCheck !== 'taken' && strength !== '' && password === confirmPassword;
+  const contactValid = contactType !== 'unknown' && !optionalEmailBad;
+  const step0Valid = contactValid && username.trim() && usernameCheck !== 'taken' && strength !== '' && password === confirmPassword
+    && (!isBusinessSignup || businessValid);
 
   const selectProfile = (profile: AppProfile) => {
     console.log('[selectProfile] profile=%s modules=%o', profile.id, profile.modules);
@@ -544,6 +642,21 @@ const CreateAccount: React.FC = () => {
     setEnabledModules(profile.id === 'custom' ? [] : [...profile.modules]);
     setUserRole(DEFAULT_ROLE_BY_PROFILE[profile.id] ?? 'employee');
   };
+
+  // Preset the "Perfil" step from the service chosen in the finder, so that
+  // step opens on the detail sub-question instead of asking the goal again.
+  const applyService = (id: ServiceId) => {
+    console.log('[applyService] service=%s', id);
+    const profile = APP_PROFILES.find(p => p.id === (id === 'pos' ? 'pos' : 'customer'));
+    if (profile) selectProfile(profile);
+    setSelectedInterests(id === 'arcade' ? ['arcade'] : id === 'smartloans' ? ['loans'] : []);
+    setService(id);
+    setFinderDone(true);
+  };
+
+  useEffect(() => {
+    if (urlService) applyService(urlService);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A goal is "on" only when every module it maps to is enabled; toggling it
   // adds or removes that goal's whole module group as a unit.
@@ -554,22 +667,6 @@ const CreateAccount: React.FC = () => {
         ? prev.filter(m => !modules.includes(m))
         : [...prev, ...modules.filter(m => !prev.includes(m))]
     );
-  };
-
-  const handleSelectCompany = async (company: Company) => {
-    console.log('[handleSelectCompany] companyId=%d name=%s', company.companyId, company.name);
-    setSelectedCompany(company);
-    setSelectedBranch(null);
-    setBranches([]);
-    setBranchScreen(true);
-    try {
-      const branchList = await getBranchesByCompany(company.companyId);
-      console.log('[handleSelectCompany] branches=%o', branchList);
-      setBranches(branchList);
-    } catch (err) {
-      console.error('[handleSelectCompany] ERROR', err);
-      setBranches([]);
-    }
   };
 
   const markSaved = (s: number) =>
@@ -589,6 +686,12 @@ const CreateAccount: React.FC = () => {
       // Which step to land on next — only existing accounts with an
       // incomplete registration resume anywhere but "Perfil" (step 1).
       let resumeAtStep = 1;
+
+      // A new business owner's user is created already inside their company
+      // (users.companyId is NOT NULL → companies) — not left on the default.
+      const ownCompanyId = isBusinessSignup && !(existingRecord?.found && existingRecord.userId)
+        ? (await ensureOwnCompany()).company.companyId
+        : undefined;
 
       if (existingRecord?.found && existingRecord.userId) {
         // Existing user account → just update credentials (password reset / link)
@@ -620,11 +723,12 @@ const CreateAccount: React.FC = () => {
         // creating a disconnected user row.
         console.log('[handleStep0Next] existing client clientId=%d, no account yet — creating linked user', existingRecord.clientId);
         const data = await createUser({
-          email:     contactEmail || completeEmail || undefined,
+          email:     completeEmail.trim() || contactEmail || undefined,
           cellphone: contactPhone || undefined,
           name:      username,
           password,
           clientId:  existingRecord.clientId,
+          companyId: ownCompanyId,
         });
         console.log('[handleStep0Next] createUser (linked) response', data);
         const rawUid = data.userId ?? data.id ?? (data as any).users?.[0]?.userId;
@@ -633,7 +737,7 @@ const CreateAccount: React.FC = () => {
         setCreatedClientId(existingRecord.clientId);
 
         // Client matched via phone and had no email on file — complete it.
-        if (completeEmail.trim()) {
+        if (completeEmail.trim() || optionalEmail) {
           console.log('[handleStep0Next] completing client email=%s for clientId=%d', completeEmail, existingRecord.clientId);
           try {
             const [firstName, ...rest] = (existingRecord.firstName ? `${existingRecord.firstName} ${existingRecord.lastName ?? ''}` : username).trim().split(/\s+/);
@@ -643,7 +747,7 @@ const CreateAccount: React.FC = () => {
                 first_name: existingRecord.firstName || firstName || username.trim(),
                 last_name:  existingRecord.lastName || rest.join(' ') || '-',
                 cellphone:  existingRecord.cellphone || contactPhone,
-                email:      completeEmail.trim(),
+                email:      completeEmail.trim() || optionalEmail,
                 action: '2',
               }],
             });
@@ -695,6 +799,7 @@ const CreateAccount: React.FC = () => {
           name:      username,
           password,
           clientId:  newClientId ?? undefined,
+          companyId: ownCompanyId,
         });
         console.log('[handleStep0Next] createUser response', data);
         const rawUid = data.userId ?? data.id ?? (data as any).users?.[0]?.userId;
@@ -865,32 +970,36 @@ const CreateAccount: React.FC = () => {
     // renderStep3 — so there's nothing to require here for that case.
     const isPlainCustomer = selectedProfile === 'customer' && !wantsLoans;
     console.log('[handleStep3Submit] isPlainCustomer=%s interests=%o userRole=%s', isPlainCustomer, selectedInterests, userRole);
-    if (!isPlainCustomer && !selectedCompany) { setMessage('Selecciona una empresa.'); return; }
+    if (isBusinessSignup && !businessValid) { setMessage('Escribe el nombre de tu negocio.'); return; }
+    if (!isPlainCustomer && !isBusinessSignup && !selectedCompany) { setMessage('Selecciona una empresa.'); return; }
     setLoading(true);
     console.log('[handleStep3Submit] userId=%d role=%s companyId=%d branchId=%d',
       createdUserId, userRole, selectedCompany?.companyId, selectedBranch?.branchId);
     try {
+      // Owner-only business signup: always admin of their own company.
+      const own = isBusinessSignup ? await ensureOwnCompany() : null;
       if (createdUserId) {
         const data = await updateUser(createdUserId, {
-          roleCode:  userRole,
-          companyId: selectedCompany?.companyId ?? 0,
-          branchId:  selectedBranch?.branchId  ?? 0,
+          roleCode:  own ? 'admin' : userRole,
+          companyId: own?.company.companyId ?? selectedCompany?.companyId ?? 0,
+          branchId:  own?.branch?.branchId ?? selectedBranch?.branchId ?? 0,
         });
         console.log('[handleStep3Submit] response', data);
       }
 
-      if (createdClientId && selectedCompany?.companyId) {
+      const linkCompany = own?.company ?? selectedCompany;
+      if (createdClientId && linkCompany?.companyId) {
         // sp_clients' UPDATE action overwrites first_name/last_name/cellphone/email
         // unconditionally (no NULLIF) — must resend the real values, not blanks,
         // or this patch would wipe the client stub created at step "Perfil".
         const [firstName, ...rest] = username.trim().split(/\s+/);
         const lastName = rest.join(' ') || '-';
-        console.log('[handleStep3Submit] patching clientId=%d companyId=%d', createdClientId, selectedCompany.companyId);
+        console.log('[handleStep3Submit] patching clientId=%d companyId=%d', createdClientId, linkCompany.companyId);
         try {
           const clientData = await createOrUpdateClient({
             clients: [{
               clientId: createdClientId,
-              companyId: selectedCompany.companyId,
+              companyId: linkCompany.companyId,
               first_name: firstName || username.trim(),
               last_name: lastName,
               cellphone: effectivePhone,
@@ -912,7 +1021,7 @@ const CreateAccount: React.FC = () => {
             ];
             for (const capability of caps) {
               try {
-                await grantClientCapability(selectedCompany.companyId, createdClientId, capability);
+                await grantClientCapability(linkCompany.companyId, createdClientId, capability);
               } catch (capErr) {
                 console.warn('[handleStep3Submit] grantClientCapability failed for', capability, capErr);
               }
@@ -1007,6 +1116,28 @@ const CreateAccount: React.FC = () => {
     </div>
   );
 
+  const renderBusinessName = () => (
+    <div className="ca-business">
+      <IonInput
+        fill="outline" label="Nombre de tu negocio" labelPlacement="floating"
+        type="text" value={ownCompany?.company.name ?? businessName} maxlength={100}
+        disabled={!!ownCompany || loading}
+        onIonInput={e => setBusinessName(e.detail.value || '')}
+        className={businessTaken ? 'ion-invalid ion-touched' : ''}
+        errorText={businessTaken ? 'Ya existe un negocio con ese nombre.' : undefined}
+        helperText={ownCompany
+          ? 'Tu negocio ya está creado.'
+          : 'Serás el administrador. Después podrás agregar a tus empleados.'}
+      />
+      {businessTaken && (
+        <p className="ca-business-hint">
+          Si trabajas ahí, pide a su administrador que te agregue desde POS. Si es otro negocio,
+          agrega tu ciudad o colonia (ej. “{businessName.trim()} Hermosillo”).
+        </p>
+      )}
+    </div>
+  );
+
   const renderStep0 = () => (
     <div className="ca-step-body">
       <div className="ca-step-header">
@@ -1018,18 +1149,23 @@ const CreateAccount: React.FC = () => {
       </div>
 
       <div className="ca-form-fields">
-        {/* Smart contact field — detects email vs phone automatically */}
+        {/* Phone-first contact: the phone identifies the account; email is
+            optional below. "email" mode only resumes older email signups. */}
         <div className="ca-contact-wrap">
           <IonInput
             fill="outline"
-            label="Email o teléfono"
+            label={contactMode === 'phone' ? 'Teléfono celular' : 'Email con el que te registraste'}
             labelPlacement="floating"
-            type="text"
-            inputmode="email"
+            type={contactMode === 'phone' ? 'tel' : 'email'}
+            inputmode={contactMode === 'phone' ? 'tel' : 'email'}
+            autocomplete={contactMode === 'phone' ? 'tel' : 'email'}
             value={contact}
             onIonInput={e => handleContactChange(e.detail.value || '')}
             className={contact && contactType === 'unknown' ? 'ion-invalid ion-touched' : ''}
-            errorText="Ingresa un email válido o número de teléfono (mín. 8 dígitos)"
+            errorText={contactMode === 'phone'
+              ? 'Ingresa tu celular a 10 dígitos (o con +código de país).'
+              : 'Ingresa un email válido.'}
+            helperText={contactMode === 'phone' ? 'Te enviaremos un código por SMS o WhatsApp.' : undefined}
           />
           {contact && contactType !== 'unknown' && (
             <span className={`ca-contact-badge ca-contact-badge--${contactType}`}>
@@ -1039,6 +1175,27 @@ const CreateAccount: React.FC = () => {
             </span>
           )}
         </div>
+
+        {contactMode === 'phone' ? (
+          <>
+            <IonInput
+              fill="outline" label="Email (opcional)" labelPlacement="floating"
+              type="email" inputmode="email" autocomplete="email"
+              value={optionalEmailInput}
+              onIonInput={e => setOptionalEmailInput(e.detail.value || '')}
+              className={optionalEmailBad ? 'ion-invalid ion-touched' : ''}
+              errorText={optionalEmailBad ? 'Revisa el email o déjalo vacío.' : undefined}
+              helperText="Para recibir tus comprobantes y recuperar tu cuenta."
+            />
+            <IonButton fill="clear" size="small" className="ca-contact-mode" onClick={() => switchContactMode('email')}>
+              ¿Empezaste tu registro con email? Continúa aquí
+            </IonButton>
+          </>
+        ) : (
+          <IonButton fill="clear" size="small" className="ca-contact-mode" onClick={() => switchContactMode('phone')}>
+            Registrarme con mi celular
+          </IonButton>
+        )}
 
         {/* Contact lookup status */}
         {contactCheck === 'checking' && (
@@ -1136,7 +1293,7 @@ const CreateAccount: React.FC = () => {
                     </span>
                   ))}
                 </div>
-                {!existingRecord.email && (
+                {!existingRecord.email && contactMode === 'email' && (
                   <div className="ca-complete-field">
                     <IonInput
                       fill="outline" label="Email (opcional, completa tu registro)" labelPlacement="floating"
@@ -1170,7 +1327,12 @@ const CreateAccount: React.FC = () => {
             signups get the same picker later, in renderStep1, once we know
             they'll need a dbo.clients row for SmartLoans — see
             needsClientPhone.) */}
-        {contactCheck === 'new' && contactType === 'phone' && renderClientTypePicker()}
+        {/* Only when a loan is (or may be) what they came for: not for a
+            business owner, nor a customer who picked Juegos/POS in the finder. */}
+        {contactCheck === 'new' && contactType === 'phone' && !isBusinessSignup
+          && (selectedProfile !== 'customer' || wantsLoans) && renderClientTypePicker()}
+
+        {isBusinessSignup && !(existingRecord?.found && existingRecord.userId) && renderBusinessName()}
 
         <IonInput
           fill="outline" label="Nombre de usuario" labelPlacement="floating"
@@ -1452,6 +1614,15 @@ const CreateAccount: React.FC = () => {
           </div>
         </div>
       )}
+
+      {isBusinessSignup && (
+        <BusinessMenuView
+          businessName={ownCompany?.company.name ?? businessName}
+          result={menuResult}
+          onResult={handleMenuResult}
+          moduleLabel={id => ALL_MODULES.find(m => m.id === id)?.label ?? id}
+        />
+      )}
     </div>
   );
 
@@ -1460,7 +1631,6 @@ const CreateAccount: React.FC = () => {
   // ── Step 3: Role + company (Acceso) ──────────────────────────────────────
 
   const renderStep3 = () => {
-    const roleGroup = ROLE_GROUPS[(selectedProfile as keyof typeof ROLE_GROUPS)] ?? ROLE_GROUPS.pos;
     return (
       <div className="ca-step-body">
         <div className="ca-step-header">
@@ -1479,7 +1649,16 @@ const CreateAccount: React.FC = () => {
             already picked mean. POS/custom staff still choose their role
             freely, where role ≠ client type. */}
         <p className="ca-section-label">Rol de acceso:</p>
-        {selectedProfile === 'customer' && wantsLoans ? (
+        {isBusinessSignup ? (
+          <div className="ca-business-access">
+            {!ownCompany && renderBusinessName()}
+            <div className="ca-summary-box">
+              <div className="ca-summary-row"><span>Rol</span><strong>{ROLE_LABELS.admin} (dueño)</strong></div>
+              <div className="ca-summary-row"><span>Negocio</span><strong>{ownCompany?.company.name ?? (businessName.trim() || '—')}</strong></div>
+              <div className="ca-summary-row"><span>Sucursal</span><strong>{ownCompany?.branch?.name ?? 'Matriz'}</strong></div>
+            </div>
+          </div>
+        ) : selectedProfile === 'customer' && wantsLoans ? (
           <div className="ca-summary-box" style={{ marginBottom: 20 }}>
             <div className="ca-summary-row">
               <span>Rol</span>
@@ -1499,33 +1678,7 @@ const CreateAccount: React.FC = () => {
               </strong>
             </div>
           </div>
-        ) : (
-          <div className="ca-profile-list" style={{ marginBottom: 20 }}>
-            {roleGroup.map(r => {
-              const selected = userRole === r.id;
-              const color = ROLE_COLOR[r.id] ?? '#6b7280';
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  className={`ca-profile-btn${selected ? ' selected' : ''}`}
-                  style={selected ? { borderColor: color, background: `${color}0f` } : undefined}
-                  onClick={() => setUserRole(r.id)}
-                >
-                  <div className="ca-profile-icon-wrap" style={selected ? { background: `${color}20`, color } : undefined}>
-                    <span style={{ fontSize: 20 }}>{r.emoji}</span>
-                  </div>
-                  <div className="ca-profile-text">
-                    <span className="ca-profile-name" style={selected ? { color } : undefined}>{r.label}</span>
-                    <span className="ca-profile-desc">{r.desc}</span>
-                  </div>
-                  <div className={`ca-radio-dot${selected ? ' selected' : ''}`}
-                    style={selected ? { borderColor: color, background: color } : undefined} />
-                </button>
-              );
-            })}
-          </div>
-        )}
+        ) : null}
 
         {/* Company / branch — SmartLoans interest is scoped to the SmartLoans
             company only, auto-selected above, so there's nothing to pick.
@@ -1537,53 +1690,7 @@ const CreateAccount: React.FC = () => {
             <div className="ca-summary-row"><span>Empresa</span><strong>{selectedCompany?.name ?? 'SmartLoans'}</strong></div>
             <div className="ca-summary-row"><span>Sucursal</span><strong>{selectedBranch?.name ?? '—'}</strong></div>
           </div>
-        ) : selectedProfile === 'customer' ? null : (
-          <>
-            <p className="ca-section-label">
-              {branchScreen ? (
-                <button type="button" className="ca-back-inline" onClick={() => setBranchScreen(false)}>
-                  <IonIcon icon={chevronBack} /> {selectedCompany?.name}
-                </button>
-              ) : 'Empresa:'}
-            </p>
-
-            <div className="ca-company-list">
-              {!branchScreen ? (
-                companies.length === 0
-                  ? <p className="ca-empty-msg">No hay empresas disponibles.</p>
-                  : companies.map(c => (
-                    <button
-                      key={c.companyId}
-                      type="button"
-                      className={`ca-company-btn${selectedCompany?.companyId === c.companyId ? ' selected' : ''}`}
-                      onClick={() => handleSelectCompany(c)}
-                    >
-                      <div className="ca-company-icon">🏢</div>
-                      <span className="ca-company-name">{c.name}</span>
-                      <IonIcon icon={chevronForward} className="ca-company-arrow" />
-                    </button>
-                  ))
-              ) : (
-                branches.length === 0
-                  ? <p className="ca-empty-msg">Sin sucursales — se vinculará solo la empresa.</p>
-                  : branches.map(b => (
-                    <button
-                      key={b.branchId}
-                      type="button"
-                      className={`ca-company-btn${selectedBranch?.branchId === b.branchId ? ' selected' : ''}`}
-                      onClick={() => setSelectedBranch(prev => prev?.branchId === b.branchId ? null : b)}
-                    >
-                      <div className="ca-company-icon">📍</div>
-                      <span className="ca-company-name">{b.name}</span>
-                      {selectedBranch?.branchId === b.branchId
-                        ? <IonIcon icon={checkmark} className="ca-company-check" />
-                        : <IonIcon icon={chevronForward} className="ca-company-arrow" />}
-                    </button>
-                  ))
-              )}
-            </div>
-          </>
-        )}
+        ) : null}
 
         {/* Summary — the 'customer' profile already showed its own "Lo que
             usarás"/role/company summaries above (module count and
@@ -1594,9 +1701,6 @@ const CreateAccount: React.FC = () => {
           {selectedProfile !== 'customer' && (
             <>
               <div className="ca-summary-row"><span>Módulos activos</span><strong>{enabledModules.length}</strong></div>
-              <div className="ca-summary-row"><span>Rol</span><strong>{ROLE_GROUPS.custom.find(r => r.id === userRole)?.label}</strong></div>
-              <div className="ca-summary-row"><span>Empresa</span><strong>{selectedCompany?.name ?? '—'}</strong></div>
-              {selectedBranch && <div className="ca-summary-row"><span>Sucursal</span><strong>{selectedBranch.name}</strong></div>}
             </>
           )}
         </div>
@@ -1744,19 +1848,33 @@ const CreateAccount: React.FC = () => {
           position="bottom"
         />
 
-        <div className="ca-page-wrap">
+        {!finderDone && (
+          <div className="ca-page-wrap">
+            <ServiceFinderView onContinueHere={applyService} onResume={() => setFinderDone(true)} />
+          </div>
+        )}
+
+        {finderDone && <div className="ca-page-wrap">
           <StepBar />
+          {step === 0 && service && (
+            <div className="ca-service-chip-row">
+              <IonChip outline onClick={() => setFinderDone(false)} disabled={loading}>
+                <IonIcon icon={SERVICES[service].icon} />
+                <IonLabel>Registro para {SERVICES[service].label} · Cambiar</IonLabel>
+              </IonChip>
+            </div>
+          )}
           {step === 0 && renderStep0()}
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
 
           <div style={{ height: 100 }} />
-        </div>
+        </div>}
       </IonContent>
 
       {/* Step 2 (verify) has its own inline buttons — no footer */}
-      {step !== 2 && (
+      {finderDone && step !== 2 && (
         <IonFooter className="ca-footer">
           <div className="ca-footer-inner">
             {step > 0 && (

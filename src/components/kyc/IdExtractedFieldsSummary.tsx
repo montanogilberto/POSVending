@@ -9,6 +9,8 @@ interface IdExtractedFieldsSummaryProps {
   onFieldsChange: (fields: ExtractedIdFields) => void;
   ocrLoading: boolean;
   ocrError: string;
+  /** Fields the agent read but is not sure about — shown with "Revisa este dato". */
+  lowConfidence?: (keyof ExtractedIdFields)[];
 }
 
 // Domicilio and Clave de Elector are required on the contract (see
@@ -17,12 +19,19 @@ interface IdExtractedFieldsSummaryProps {
 // OCR, and a Gemini-vision alternative fabricated a different address/clave
 // on nearly every call against the same photo) — kept here as manual-entry
 // fields the client fills in by hand.
+/** Digit-only fields and their exact length (RFC-015). */
+const DIGIT_FIELDS: Partial<Record<keyof ExtractedIdFields, number>> = { cic: 9, ocr: 13, vigencia: 4 };
+
 const FIELD_LABELS: Array<{ key: keyof ExtractedIdFields; label: string }> = [
   { key: 'nombre', label: 'Nombre' },
   { key: 'domicilio', label: 'Domicilio' },
   { key: 'curp', label: 'CURP' },
   { key: 'claveElector', label: 'Clave de elector' },
   { key: 'fechaNacimiento', label: 'Fecha de nacimiento' },
+  // RFC-015: back of the INE (machine-readable zone). Used to verify the credential with the INE.
+  { key: 'cic', label: 'CIC (reverso, 9 dígitos)' },
+  { key: 'ocr', label: 'OCR (reverso, 13 dígitos)' },
+  { key: 'vigencia', label: 'Vigencia (último año)' },
 ];
 
 // Pure display/edit component — the OCR fetch itself runs in the parent
@@ -34,6 +43,7 @@ const IdExtractedFieldsSummary: React.FC<IdExtractedFieldsSummaryProps> = ({
   onFieldsChange,
   ocrLoading,
   ocrError,
+  lowConfidence = [],
 }) => {
   return (
     <div className="id-extracted-fields ion-margin-top">
@@ -56,8 +66,16 @@ const IdExtractedFieldsSummary: React.FC<IdExtractedFieldsSummaryProps> = ({
             fill="outline"
             value={fields[key]}
             placeholder={ocrLoading ? 'Leyendo...' : 'No detectado'}
-            onIonInput={(e) => onFieldsChange({ ...fields, [key]: e.detail.value ?? '' })}
+            inputmode={DIGIT_FIELDS[key] ? 'numeric' : undefined}
+            maxlength={DIGIT_FIELDS[key]}
+            onIonInput={(e) => {
+              const raw = e.detail.value ?? '';
+              onFieldsChange({ ...fields, [key]: DIGIT_FIELDS[key] ? raw.replace(/\D/g, '') : raw });
+            }}
           />
+          {!!fields[key] && lowConfidence.includes(key) && (
+            <span className="id-extracted-field-check">Revisa este dato: no se leyó con claridad.</span>
+          )}
         </div>
       ))}
 

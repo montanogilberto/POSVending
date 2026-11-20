@@ -4,14 +4,50 @@
     {
       "name": "POSVending",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "POSVending (Azure API)",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "VITE_API_URL=https://smartloansbackend.azurewebsites.net npm run dev -- --port 5173 --strictPort"],
+      "runtimeArgs": [
+        "-c",
+        "VITE_API_URL=https://smartloansbackend.azurewebsites.net npm run dev -- --port 5173 --strictPort"
+      ],
       "port": 5173
+    },
+    {
+      "name": "LoanAgents (local)",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/apple12/LoanAgents_SmartLoans && python3 -m uvicorn main:app --port 8080"
+      ],
+      "port": 8080,
+      "url": "http://localhost:8080"
+    },
+    {
+      "name": "SmartLoans app",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/apple12/PycharmProjects/smartLoans/smartloans && npx vite --port 8101 --strictPort"
+      ],
+      "port": 8101,
+      "autoPort": false
+    },
+    {
+      "name": "SmartLoans app (Azure API)",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/apple12/PycharmProjects/smartLoans/smartloans && VITE_API_URL=https://smartloansbackend.azurewebsites.net npx vite --port 8101 --strictPort"
+      ],
+      "port": 8101,
+      "autoPort": false
     }
   ]
 }

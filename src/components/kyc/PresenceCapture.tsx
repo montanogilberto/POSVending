@@ -44,6 +44,12 @@ const PresenceCapture: React.FC<PresenceCaptureProps> = ({ onCapture }) => {
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    // Detach the stopped stream so the WebView releases the camera buffers.
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.srcObject = null;
+    }
   }, []);
 
   useEffect(() => {

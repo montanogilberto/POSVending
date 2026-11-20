@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIonViewDidLeave, useIonViewWillEnter } from '@ionic/react';
 import { useLocation } from 'react-router-dom';
 import { useUser } from '../../../contexts/UserContext';
+import { canAccess } from '../../../config/rolePermissions';
 import { useToast } from '../../../hooks/useToast';
 import { useWhatsAppSeen } from '../../../hooks/useWhatsAppSeen';
 import { useWhatsAppThread } from '../../../hooks/useWhatsAppThread';
@@ -13,7 +14,11 @@ import { SEARCH_DEBOUNCE_MS, type InboxFilter } from './WhatsAppConversationsCon
 
 /** Agente WhatsApp › Conversaciones: the inbox to attend WhatsApp customers and follow up. */
 export const useWhatsAppConversations = () => {
-  const { companyId } = useUser();
+  const { companyId, roleCode } = useUser();
+  // Employees reach the inbox from the menu; only agent managers have the Agente dashboard to go back to.
+  const back = canAccess(roleCode, 'notificationDispatchLog')
+    ? { href: '/whatsapp-agent', text: 'Agente' }
+    : { href: '/dashboard', text: 'Inicio' };
   const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
   const { isUnread } = useWhatsAppSeen(companyId);
 
@@ -118,7 +123,7 @@ export const useWhatsAppConversations = () => {
     conversations, visible, filter, setFilter, counts, isUnread,
     listLoading, listFirstLoad: listLoading && !listLoadedOnce, listError,
     selected, openConversation: setSelected, closeConversation: () => setSelected(null),
-    chat, reload, toastProps,
+    chat, reload, toastProps, back,
   };
 };
 

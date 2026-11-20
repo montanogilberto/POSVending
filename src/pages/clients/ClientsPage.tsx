@@ -116,6 +116,9 @@ const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   curp: '',
   claveElector: '',
   fechaNacimiento: '',
+  cic: '',
+  ocr: '',
+  vigencia: '',
 };
 
 type CaptureSubStep =
@@ -330,6 +333,9 @@ const ClientsPage: React.FC = () => {
           curp: fields.curp || prev.curp,
           claveElector: fields.claveElector || prev.claveElector,
           fechaNacimiento: fields.fechaNacimiento || prev.fechaNacimiento,
+          cic: fields.cic || prev.cic,
+          ocr: fields.ocr || prev.ocr,
+          vigencia: fields.vigencia || prev.vigencia,
         }));
       })
       .catch((err) => {

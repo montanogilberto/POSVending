@@ -415,6 +415,7 @@ class PaymentProvider(Protocol):
 | RFC-010 Laundry Wallet Top-ups | Recarga en efectivo, tarjeta (direct charge en la cuenta conectada de la lavandería) y SPEI a su CLABE con confirmación humana | PRD laundryWalletTopUp |
 | RFC-009 Laundry Prepaid Wallet | Monedero de la lavandería (companyId 1) fuera de `walletTransactions`; recarga en mostrador; uso de máquina = ticket del POS | PRD laundryWallet |
 | RFC-011 POS Prepaid Balance Payment | Pagar con saldo en caja, por compañía (circuito cerrado): libro genérico `prepaidWalletEntries`, PIN del cliente, cobro atómico con la venta, devolución al eliminarla | PRD prepaidWallet |
+| RFC-014 Loan Transaction Tickets (APROBADO; fases 0–1 escritas) | Ticket por cada evento de dinero del préstamo (fondeo, cuotas, marketplace) vía `notificationDispatch` push→WhatsApp→SMS + email, con enlace firmado a un comprobante generado al abrirlo; avisos salen del backend (D7) | Sin PRD: extensión de los módulos de pagos existentes |
 
 Los RFC-001 a 003 son el MVP del modelo sin custodia; sus PRDs van al posgmo-factory.
 

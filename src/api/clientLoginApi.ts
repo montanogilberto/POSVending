@@ -1,13 +1,25 @@
 import { API_BASE_URL } from './usersApi';
 import { SessionTokens, saveSessionTokens } from '../utils/sessionTokens';
 
-/** Where the login code goes; WhatsApp falls back to SMS server side when it can't be sent. */
-export type CodeChannel = 'sms' | 'whatsapp';
+/** The channel that carried the login code: the GMO app (push), WhatsApp or SMS. */
+export type CodeChannel = 'push' | 'sms' | 'whatsapp';
+
+/**
+ * What the app asks for. 'auto' (first send, "Olvidé mi PIN"): the backend tries
+ * the app (push) → WhatsApp → SMS. 'sms' / 'whatsapp': the client picked one on
+ * the code step. WhatsApp falls back to SMS server side when it can't be sent.
+ */
+export type CodeRequestChannel = 'auto' | 'sms' | 'whatsapp';
+
+/** Digits of a code from a backend that doesn't send codeLength yet (before RFC-013). */
+export const LEGACY_CODE_LENGTH = 6;
 
 export interface SendClientLoginCodeResult {
   found: boolean;
   /** The channel that actually carried the code (absent when none was sent). */
   channel?: CodeChannel;
+  /** Digits in the code that was sent (RFC-013: 4). Absent on older backends → LEGACY_CODE_LENGTH. */
+  codeLength?: number;
   message?: string;
   error?: string;
   // true once this client finished password onboarding on a previous
@@ -59,7 +71,7 @@ export interface VerifyClientPasswordResult {
  */
 export const sendClientLoginCode = async (
   phone: string,
-  { resetPin = false, channel = 'sms' }: { resetPin?: boolean; channel?: CodeChannel } = {},
+  { resetPin = false, channel = 'auto' }: { resetPin?: boolean; channel?: CodeRequestChannel } = {},
 ): Promise<SendClientLoginCodeResult> => {
   console.log('[sendClientLoginCode] resetPin=%s channel=%s', resetPin, channel);
   const res = await fetch(`${API_BASE_URL}/send_client_login_code`, {

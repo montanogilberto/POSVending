@@ -116,6 +116,27 @@ export async function getFaceDescriptorFromImage(base64OrDataUrl: string): Promi
   return result?.descriptor ?? null;
 }
 
+// Liveness pose check: is there a face in this captured frame at all? Uses the
+// permissive video detector — this only rejects frames with no face (turned
+// out of frame, covered, black), it is not an identity check.
+export async function faceInDataUrl(dataUrl: string): Promise<boolean> {
+  if (!dataUrl) return false;
+  await loadFaceApiModels();
+  const img = new Image();
+  const loaded = new Promise<void>((resolvePromise, reject) => {
+    img.onload = () => resolvePromise();
+    img.onerror = () => reject(new Error('pose frame could not be decoded'));
+  });
+  img.src = dataUrl;
+  try {
+    await loaded;
+  } catch {
+    return false;
+  }
+  const found = await faceapi.detectSingleFace(img, VIDEO_DETECTOR_OPTIONS_PERMISSIVE);
+  return !!found;
+}
+
 export function compareFaceDescriptors(a: Float32Array, b: Float32Array): { distance: number; isMatch: boolean } {
   const distance = faceapi.euclideanDistance(a, b);
   const isMatch = distance <= MATCH_DISTANCE_THRESHOLD;

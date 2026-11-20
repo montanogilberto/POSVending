@@ -18,9 +18,10 @@ import {
   IonItem,
   IonCheckbox,
   IonIcon,
+  useIonAlert,
   IonSpinner,
 } from '@ionic/react';
-import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline } from 'ionicons/icons';
+import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline, closeOutline } from 'ionicons/icons';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
@@ -36,6 +37,7 @@ import SavedCardSetup from '../../components/payments/SavedCardSetup';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import { actsAsLender } from '../../utils/productContext';
+import { ineVigenciaProblem, parseVigenciaYear } from '../../utils/ineVigencia';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../contexts/UserContext';
 import { saveProfileImage } from '../../api/usersApi';
@@ -62,6 +64,9 @@ const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   curp: '',
   claveElector: '',
   fechaNacimiento: '',
+  cic: '',
+  ocr: '',
+  vigencia: '',
 };
 
 // Sub-steps inside the capture wizard step
@@ -109,6 +114,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // Default "done" destination is role-aware: a lender must return to the LENDER
   // dashboard, not the borrower one. Only used when the caller didn't pass an
   // explicit returnTo (the lender/borrower dashboards do pass it).
+  const [presentAlert] = useIonAlert();
   const returnTo = location.state?.returnTo
     || (actsAsLender(roleCode, activeProduct)
           ? `/lender-dashboard/${deepLinkClientId ?? contextClientId}`
@@ -175,6 +181,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
           curp: record.curp ?? '',
           claveElector: record.claveElector ?? '',
           fechaNacimiento: record.fechaNacimiento ?? '',
+          // RFC-015: only present once the all-records SP returns them; '' until then.
+          cic: record.cic ?? '',
+          ocr: record.ocr ?? '',
+          vigencia: record.vigencia ?? '',
         };
         if (Object.values(extracted).some(Boolean)) setExtractedIdFields(extracted);
 
@@ -234,6 +244,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
+  // RFC-015: an expired (or unreadable) INE vigencia blocks the KYC — INE only;
+  // passports and licences expire differently.
+  const vigenciaProblem = documentType === 'INE' ? ineVigenciaProblem(extractedIdFields.vigencia) : null;
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState('');
   const ocrRanForRef = useRef('');
@@ -735,6 +748,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const handleSubmitContract = async () => {
+    // Last guard (the Datos step already blocks it): never submit an expired INE.
+    if (vigenciaProblem) {
+      setError(vigenciaProblem);
+      setShowToast(true);
+      return;
+    }
     // confidenceScore now comes from the validation agent's whole-session
     // verdict, not the local two-descriptor comparison — 'scoreSource' makes
     // clear which produced it, because a local-fallback score means the agent
@@ -793,6 +812,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
         curp: cap(extractedIdFields.curp, 18),
         claveElector: cap(extractedIdFields.claveElector, 20),
         fechaNacimiento: cap(extractedIdFields.fechaNacimiento, 10),
+        // RFC-015: digits only; the backend keeps them only at exactly 9 / 13 digits.
+        cic: cap(extractedIdFields.cic.replace(/\D/g, ''), 9),
+        ocr: cap(extractedIdFields.ocr.replace(/\D/g, ''), 13),
+        vigencia: String(parseVigenciaYear(extractedIdFields.vigencia) ?? ''),
       };
 
       const pdfParams = {
@@ -824,6 +847,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
         curp: idf.curp,
         claveElector: idf.claveElector,
         fechaNacimiento: idf.fechaNacimiento,
+        cic: idf.cic,
+        ocr: idf.ocr,
+        vigencia: idf.vigencia,
         contractAccepted: true,
         contractPdfBase64: generateContractPdfBase64(pdfParams),
         contractAcceptedAt: now,
@@ -876,6 +902,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+
+  // ✕ in the wizard: leave without finishing, after a confirm (an accidental tap
+  // must not throw away the photos just taken). Goes where "done" would go.
+  const confirmExit = () => presentAlert({
+    header: '¿Salir de la verificación?',
+    message: 'Podrás continuar después desde tu panel. Lo que no hayas guardado se tendrá que capturar de nuevo.',
+    buttons: [
+      { text: 'Seguir aquí', role: 'cancel' },
+      { text: 'Salir', role: 'destructive', handler: () => { history.push(returnTo); } },
+    ],
+  });
 
   const StepBar = () => (
     <div className="wizard-step-indicator">
@@ -1066,7 +1104,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         )}
         {step === 3 && (
           // Terms accepted here; signing happens on the next step (Firma).
-          <button className="wizard-footer-next" onClick={() => setStep(4)} disabled={!contractAccepted || !pagareAccepted}>
+          <button className="wizard-footer-next" onClick={() => setStep(4)} disabled={!contractAccepted || !pagareAccepted || !!vigenciaProblem}>
             Continuar <IonIcon icon={chevronForward} />
           </button>
         )}
@@ -1448,6 +1486,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
             ocrLoading={ocrLoading}
             ocrError={ocrError}
           />
+          {!ocrLoading && vigenciaProblem && (
+            <p className="cfr-vigencia-problem" role="alert">{vigenciaProblem}</p>
+          )}
 
           <IonContent className="contract-terms-content ion-padding" scrollY={true}>
             <p><strong>Términos y Condiciones del Contrato:</strong></p>
@@ -1609,6 +1650,17 @@ const ClientFaceRecognitionPage: React.FC = () => {
       />
 
       <IonContent fullscreen className="ion-padding client-face-recognition-page">
+        <div className="cfr-topbar">
+          <IonButton
+            fill="clear"
+            className="cfr-close"
+            aria-label="Cerrar verificación"
+            disabled={loading}
+            onClick={confirmExit}
+          >
+            <IonIcon icon={closeOutline} slot="icon-only" />
+          </IonButton>
+        </div>
         <StepBar />
         {renderStepContent()}
       </IonContent>

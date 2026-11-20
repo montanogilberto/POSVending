@@ -215,7 +215,7 @@ import { IncomeProvider } from './contexts/IncomeContext';
 import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
-import { canAccess, ROLE_LABELS, UiFeature } from './config/rolePermissions';
+import { canAccess, canUseWhatsAppChat, ROLE_LABELS, UiFeature, WHATSAPP_CHAT_FEATURES } from './config/rolePermissions';
 import { useRoleCatalogVersion } from './hooks/useRoleCatalogVersion';
 import { menuController } from '@ionic/core/components';
 import { useMenuSearch } from './hooks/useMenuSearch';
@@ -244,8 +244,9 @@ interface PrivateRouteProps {
   exact?: boolean;
   /** Staff-only screen: also requires canAccess(roleCode, feature). The side
    * menu already hides these items, but without this a lower role could still
-   * open them by typing the URL. Denied → the role's own landing page. */
-  feature?: UiFeature;
+   * open them by typing the URL. Denied → the role's own landing page.
+   * An array means any one of them is enough. */
+  feature?: UiFeature | readonly UiFeature[];
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({
@@ -260,7 +261,8 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
       {...rest}
       render={(props) => {
         if (!isAuthenticated) return <Redirect to="/login" />;
-        if (feature && !canAccess(roleCode, feature)) {
+        const features = feature === undefined ? [] : Array.isArray(feature) ? feature : [feature];
+        if (features.length && !features.some(f => canAccess(roleCode, f))) {
           console.warn('[PrivateRoute] role', roleCode, 'lacks feature', feature, '→ redirecting from', props.location.pathname);
           return <Redirect to={getPostLoginRoute(roleCode, clientId)} />;
         }
@@ -607,7 +609,7 @@ const AppShell: React.FC = () => {
 
   // LinkedIn-style WhatsApp dock: staff who attend customers (same access as Agente WhatsApp).
   const showWhatsAppDock = !isSmartLoansRole && !isClientRole && !isOwnDashboardProduct
-    && canAccess(roleCode, 'notificationDispatchLog');
+    && canUseWhatsAppChat(roleCode);
 
   return (
     <>
@@ -964,6 +966,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {!canAccess(roleCode, 'notificationDispatchLog') && canUseWhatsAppChat(roleCode) && (
+              <IonItem button routerLink="/whatsapp-agent/conversations" title="Conversaciones WhatsApp">
+                <IonIcon icon={chatbubblesOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Conversaciones</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'agents') && (
               <IonItem button routerLink="/ai-agents" title="Agentes IA">
                 <IonIcon icon={sparklesOutline} slot="start" />
@@ -1194,7 +1205,7 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/ai-agents" feature="agents" component={AgentPage} />
             <PrivateRoute exact path="/ai-agents/settings" feature="agents" component={AgentCompanySettingPage} />
             <PrivateRoute exact path="/operational-notices" feature="operationalNotices" component={OperationalNoticePage} />
-            <PrivateRoute exact path="/whatsapp-agent/conversations" feature="notificationDispatchLog" component={WhatsAppConversationsPage} />
+            <PrivateRoute exact path="/whatsapp-agent/conversations" feature={WHATSAPP_CHAT_FEATURES} component={WhatsAppConversationsPage} />
             <PrivateRoute exact path="/whatsapp-agent/setup" feature="notificationDispatchLog" component={WhatsAppSetupPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
             <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />
