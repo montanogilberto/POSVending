@@ -35,6 +35,12 @@ export interface BankAccount {
   accountStatus?: 'PRIMARY' | 'PENDING_VERIFICATION' | 'ARCHIVED';
 }
 
+// La CLABE Principal — la única que recibe dinero (D18 / RFC-001). Con
+// `accountStatus` es la verdad; sin él, sólo `isVerified && isDefault` cuenta
+// (una ARCHIVED llega con isVerified=1, así que "verificada" no basta).
+export const isPrimaryBankAccount = (a: BankAccount): boolean =>
+  a.accountStatus ? a.accountStatus === 'PRIMARY' : (a.isVerified && a.isDefault);
+
 export async function linkBankAccount(payload: {
   clientId: number; companyId: number; clabe: string; holderName: string;
 }): Promise<any> {

@@ -8,14 +8,16 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import './StripePaySheet.css';
 
-const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
+import { STRIPE_PUBLISHABLE_KEY } from '../../utils/appEnv';
+
+const STRIPE_PK = STRIPE_PUBLISHABLE_KEY;
 
 // One Stripe.js per account: a direct charge must be confirmed on the company's account.
 const stripePromises = new Map<string, Promise<Stripe | null>>();
 const getStripe = (stripeAccount?: string) => {
   const key = stripeAccount ?? '';
   if (!stripePromises.has(key)) {
-    stripePromises.set(key, loadStripe(STRIPE_PK, stripeAccount ? { stripeAccount } : undefined));
+    stripePromises.set(key, STRIPE_PK ? loadStripe(STRIPE_PK, stripeAccount ? { stripeAccount } : undefined) : Promise.resolve(null));
   }
   return stripePromises.get(key)!;
 };

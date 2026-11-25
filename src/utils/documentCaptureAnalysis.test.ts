@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeFrame, OverlayRect } from './documentCaptureAnalysis';
+import { analyzeFrame, computeCaptureNoise, computeEdgeSnr, OverlayRect } from './documentCaptureAnalysis';
 
 function makeImageData(width: number, height: number, fill: (x: number, y: number) => [number, number, number]): ImageData {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -111,5 +111,34 @@ describe('analyzeFrame', () => {
     });
     const { metrics } = analyzeFrame(frame, RECT, null);
     expect(metrics.positionHint).toBe('move-back');
+  });
+});
+
+describe('capture noise and edge SNR', () => {
+  // Deterministic Gaussian grain (LCG + Box-Muller) so the test never flakes.
+  const grainy = (sigma: number) => {
+    let seed = 1;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    return makeImageData(WIDTH, HEIGHT, (x) => {
+      const n = sigma * Math.sqrt(-2 * Math.log(rand())) * Math.cos(2 * Math.PI * rand());
+      const v = (x % 40 < 20 ? 90 : 170) + n;
+      return [v, v, v];
+    });
+  };
+
+  it('is zero on flat and linear-gradient frames', () => {
+    expect(computeCaptureNoise(makeImageData(WIDTH, HEIGHT, () => [140, 140, 140]))).toBe(0);
+    expect(computeCaptureNoise(makeImageData(WIDTH, HEIGHT, (x) => [x, x, x]))).toBe(0);
+  });
+
+  it('recovers the grain level, on either side of the gate', () => {
+    expect(computeCaptureNoise(grainy(12))).toBeGreaterThan(10);
+    expect(computeCaptureNoise(grainy(12))).toBeLessThan(14);
+    expect(computeCaptureNoise(grainy(3))).toBeLessThan(5);
+  });
+
+  it('edge SNR drops as grain rises', () => {
+    const snr = (s: number) => computeEdgeSnr(grainy(s), computeCaptureNoise(grainy(s)));
+    expect(snr(2)).toBeGreaterThan(snr(12) * 2);
   });
 });

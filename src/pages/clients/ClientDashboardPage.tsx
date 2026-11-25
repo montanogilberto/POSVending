@@ -64,7 +64,6 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
 import { useUser } from '../../contexts/UserContext';
-import { hasCapability } from '../../config/rolePermissions';
 import BenefitPicker from '../../components/rewards/BenefitPicker';
 import { ClientDashboard, getAllClientDashboards } from '../../api/clientDashboardApi';
 import { Loan, getAllLoans } from '../../api/loanApi';
@@ -89,6 +88,7 @@ import { getStripeAccountStatus, createOrRefreshStripeAccount } from '../../api/
 import LoanCompletionRing, { LoanStep } from '../../components/loans/LoanCompletionRing';
 import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
 import BankAccountLink from '../../components/payments/BankAccountLink';
+import { listBankAccounts, isPrimaryBankAccount, type BankAccount } from '../../api/bankingApi';
 import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
@@ -200,7 +200,7 @@ const ClientDashboardPage: React.FC = () => {
   const { clientId: clientIdParam } = useParams<{ clientId: string }>();
   const history = useHistory();
   const location = useLocation();
-  const { companyId, clientId: contextClientId, username, avatarUrl, setAvatarUrl, roleCode, clientType, clientCapabilities } = useUser();
+  const { companyId, clientId: contextClientId, username, avatarUrl, setAvatarUrl } = useUser();
   // Foto de cuenta (users.imageUrl) — distinta de la selfie biométrica KYC
   // (clientFaceRecognitions.clientSelfieBlobUrl), así que sí se puede
   // reemplazar con cualquier foto. setAvatarUrl solo actualiza esta sesión;
@@ -217,11 +217,6 @@ const ClientDashboardPage: React.FC = () => {
     setAvatarUrl(dataUrl);
     console.log('[ClientDashboard] avatar picker → actualizado (solo local, NO persistido en backend)');
   };
-  // A lender/payout client's payment step IS a Stripe payout account (needs an
-  // external bank). A borrower's is the repayment CARD — they are never asked
-  // for a payout account, so the checklist must not gate them on one.
-  const isPayoutClient = hasCapability(clientCapabilities, 'SMARTLOANS_LENDER')
-    || clientType === 'lender' || clientType === 'both' || roleCode === 'lender';
   const clientId = clientIdParam ? Number(clientIdParam) : contextClientId;
 
   console.log('[ClientDashboard] render. clientId =', clientId, 'companyId =', companyId, 'tab query =', location.search);
@@ -286,6 +281,11 @@ const ClientDashboardPage: React.FC = () => {
   const [qrGenerating, setQrGenerating] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+
+  // CLABE (RFC-016 Fase 2) — la cuenta para SPEI es el paso de pago del
+  // registro para todos los roles; la Principal es la que recibe dinero.
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const primaryClabe = bankAccounts.find(isPrimaryBankAccount) ?? null;
 
   // Stripe state
   const [stripeAccount, setStripeAccount] = useState<any>(null);
@@ -387,16 +387,25 @@ const ClientDashboardPage: React.FC = () => {
     }
   };
 
+  const fetchBankAccounts = async () => {
+    if (!companyId || !clientId) return;
+    try {
+      setBankAccounts(await listBankAccounts(Number(companyId), Number(clientId)));
+    } catch (err) {
+      console.log('[ClientDashboard] fetchBankAccounts ❌', String(err));
+    }
+  };
+
   const fetchStripe = async () => {
     if (!companyId || !clientId) {
       console.log('[ClientDashboard] fetchStripe skipped — companyId:', companyId, 'clientId:', clientId);
       return;
     }
     setStripeLoading(true);
-    console.log('[ClientDashboard] fetchStripe → /stripe/connected-accounts/status', { clientId, companyId });
+    console.log('[ClientDashboard] fetchStripe →', { clientId, companyId, accountStatus: SHOW_STRIPE_RAIL });
     try {
       const [statusRes, txRes, wallet] = await Promise.all([
-        getStripeAccountStatus(clientId, companyId),
+        SHOW_STRIPE_RAIL ? getStripeAccountStatus(clientId, companyId) : Promise.resolve({ account: null }),
         stripeGetTransactions(clientId, companyId),
         getWalletBalance(clientId, companyId),
       ]);
@@ -611,6 +620,7 @@ const ClientDashboardPage: React.FC = () => {
     fetchLoans();
     fetchProposals();
     fetchStripe();
+    fetchBankAccounts();
     // Solicitudes que este borrower envió y siguen sin respuesta — banner del home.
     if (companyId && clientId) {
       countPendingProposalsForBorrower(companyId, Number(clientId))
@@ -658,6 +668,7 @@ const ClientDashboardPage: React.FC = () => {
       fetchLoans();
       fetchProposals();
       fetchStripe();
+      fetchBankAccounts();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, clientId]);
@@ -672,6 +683,7 @@ const ClientDashboardPage: React.FC = () => {
     fetchLoans();
     fetchProposals();
     fetchStripe();
+    fetchBankAccounts();
     countPendingProposalsForBorrower(companyId, Number(clientId))
       .then(setMyPendingProposals)
       .catch(() => {});
@@ -801,11 +813,10 @@ const ClientDashboardPage: React.FC = () => {
       onClick: handleGenerateQr,
     },
     {
-      // Borrower: the repayment card (savedCard). Lender/payout client: the
-      // Stripe payout account's external bank. Mirrors the wizard, which labels
-      // step 5 "Tarjeta" for borrowers and "Cuenta de pago" for payout clients.
-      label: isPayoutClient ? 'Cuenta de pago' : 'Tarjeta',
-      done: isPayoutClient ? !!stripeAccount?.hasExternalAccount : !!savedCard,
+      // RFC-016: el mismo paso para todos los roles — una CLABE Principal
+      // para SPEI directo. Igual que el Paso 5 del wizard ("Cuenta para SPEI").
+      label: 'Cuenta para SPEI',
+      done: !!primaryClabe,
       onClick: handleStartWizard,
     },
     {
@@ -952,13 +963,14 @@ const ClientDashboardPage: React.FC = () => {
                 <span className="cd-pay-brand">{savedCard.brand?.toUpperCase() || 'TARJETA'}</span>
               </div>
             )}
-            {stripeAccount?.hasExternalAccount && (
+            {primaryClabe && (
               <div className="cd-pay-tile cd-pay-tile-payout">
                 <IonIcon icon={checkmarkCircleOutline} className="cd-pay-payout-icon" />
-                <span className="cd-pay-last4">•••• {stripeAccount.externalAccountLast4 || '····'}</span>
+                <span className="cd-pay-last4">•••• {primaryClabe.clabeLast4 || '····'}</span>
+                <span className="cd-pay-brand">CLABE</span>
               </div>
             )}
-            <button className="cd-pay-tile cd-pay-add" onClick={() => goTab('payments')} aria-label="Agregar método de pago">
+            <button className="cd-pay-tile cd-pay-add" onClick={() => goTab('payments')} aria-label="Agregar cuenta CLABE">
               <IonIcon icon={add} />
             </button>
           </div>
@@ -1060,7 +1072,7 @@ const ClientDashboardPage: React.FC = () => {
               <p style={{ fontSize: 12, color: '#6b7280', marginTop: 12, marginBottom: 0 }}>
                 Completa todos los pasos para acceder al crédito.
               </p>
-              {(!faceRecord?.isVerified || !faceRecord?.contractAccepted || !faceRecord?.pagareAccepted || !stripeAccount?.hasExternalAccount) && (
+              {(!faceRecord?.isVerified || !faceRecord?.contractAccepted || !faceRecord?.pagareAccepted || !primaryClabe) && (
                 <IonButton expand="block" shape="round" className="client-dashboard-action-button"
                   style={{ marginTop: 12 }} disabled={wizardStarting} onClick={handleStartWizard}>
                   <IonIcon icon={addCircleOutline} slot="start" />
@@ -1327,6 +1339,7 @@ const ClientDashboardPage: React.FC = () => {
                 clientId={Number(clientId)}
                 companyId={Number(companyId)}
                 holderName={clientRecord ? `${clientRecord.first_name} ${clientRecord.last_name}` : ''}
+                onChanged={setBankAccounts}
               />
             </IonCardContent>
           </IonCard>

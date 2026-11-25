@@ -5,7 +5,9 @@ import { Capacitor } from '@capacitor/core';
 import { Camera } from '@capacitor/camera';
 import {
   analyzeFrame,
+  computeCaptureNoise,
   computeCaptureSharpness,
+  computeEdgeSnr,
   detectCardGeometry,
   OverlayRect,
   PositionHint,
@@ -134,6 +136,11 @@ const MIN_CAPTURE_SHARPNESS = 480;
 // legible without demanding it fill the guide edge-to-edge. (Very low coverage
 // does degrade OCR, so this isn't dropped further.)
 const MIN_CARD_COVERAGE = 0.45;
+// Sensor-noise ceiling (computeCaptureNoise). From 14 stored INE fronts: the 8
+// unreadable ones measured 11.4-13.1, the 4 partly readable 2.3-6.0 and the 2
+// readable 1.1-1.5. Measured on the stored JPEGs, mostly one card, so check
+// the `noise` values in device logs before tightening.
+const MAX_CAPTURE_NOISE = 8;
 // How many rejected attempts before the manual shutter is allowed to override
 // the quality gate — see the escape hatch in captureFrame.
 const FORCE_AFTER_REJECTIONS = 3;
@@ -344,6 +351,9 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     // photo of the same card that extracted perfectly.
     const captureImageData = ctx.getImageData(0, 0, outputW, outputH);
     const sharpness = computeCaptureSharpness(captureImageData);
+    const noise = computeCaptureNoise(captureImageData);
+    const tooNoisy = noise > MAX_CAPTURE_NOISE;
+    const edgeSnr = computeEdgeSnr(captureImageData, noise); // logged only
     const geometry = detectCardGeometry(captureImageData);
 
     // JSON.stringify, not a bare object: Capacitor's Android console bridge
@@ -352,6 +362,9 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     console.log('[GuidedDocumentCapture] captureFrame: quality =', JSON.stringify({
       sharpness: Math.round(sharpness),
       minRequired: MIN_CAPTURE_SHARPNESS,
+      noise: Number(noise.toFixed(2)),
+      maxNoise: MAX_CAPTURE_NOISE,
+      edgeSnr: Number(edgeSnr.toFixed(1)),
       coverage: Number(geometry.coverage.toFixed(3)),
       minCoverage: MIN_CARD_COVERAGE,
       tiltDegrees: Number(geometry.tiltDegrees.toFixed(1)),
@@ -360,10 +373,12 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
       effectiveCardDpi: Math.round((outputW * Math.sqrt(geometry.coverage)) / 85.6 * 25.4),
     }));
 
+    // Noisy frames are never retained: grain inflates `sharpness`, so they
+    // would win over cleaner ones.
     // Retain the sharpest not-too-small frame of this attempt, so if the gate
     // is force-overridden below we can upload it rather than the current frame,
     // which is often blurrier than frames rejected seconds earlier.
-    if (sharpness > bestSharpnessRef.current && (!geometry.detected || geometry.coverage >= MIN_CARD_COVERAGE)) {
+    if (!tooNoisy && sharpness > bestSharpnessRef.current && (!geometry.detected || geometry.coverage >= MIN_CARD_COVERAGE)) {
       bestSharpnessRef.current = sharpness;
       const best = buildOutputs();
       bestBase64Ref.current = best.base64;
@@ -371,7 +386,7 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     }
 
     // Reject rather than accept a capture the agent would silently misread.
-    // Only sharpness and coverage gate — the tilt/keystone numbers are not
+    // Only noise, sharpness and coverage gate — the tilt/keystone numbers are not
     // calibrated yet and ranked the two known captures backwards, so they
     // only drive guidance text (see detectCardGeometry).
     const tooBlurry = sharpness < MIN_CAPTURE_SHARPNESS;
@@ -384,16 +399,17 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
     // FORCE_AFTER_REJECTIONS rejections the client's next manual press goes
     // through regardless, logged loudly so these show up in device logs.
     const exhaustedRetries = rejectionCountRef.current >= FORCE_AFTER_REJECTIONS;
-    if ((tooBlurry || tooSmall) && force && exhaustedRetries) {
+    if ((tooNoisy || tooBlurry || tooSmall) && force && exhaustedRetries) {
       console.warn(
         '[GuidedDocumentCapture] captureFrame: FORCED past quality gate after',
         rejectionCountRef.current, 'rejections —',
-        JSON.stringify({ sharpness: Math.round(sharpness), coverage: Number(geometry.coverage.toFixed(3)) }),
+        JSON.stringify({ sharpness: Math.round(sharpness), noise: Number(noise.toFixed(2)), coverage: Number(geometry.coverage.toFixed(3)) }),
         'extraction on this image may be unreliable; expect manual correction.'
       );
       // Upload the sharpest frame we saw this attempt, not the current one —
       // it's frequently blurrier than frames rejected earlier in the streak.
-      if (bestBase64Ref.current && bestSharpnessRef.current > sharpness) {
+      // A clean retained frame always beats a noisy current one.
+      if (bestBase64Ref.current && (tooNoisy || bestSharpnessRef.current > sharpness)) {
         console.warn(
           '[GuidedDocumentCapture] captureFrame: emitting sharpest retained frame instead of current —',
           JSON.stringify({ retained: Math.round(bestSharpnessRef.current), current: Math.round(sharpness) })
@@ -408,16 +424,19 @@ const GuidedDocumentCapture: React.FC<GuidedDocumentCaptureProps> = ({
         setTimeout(() => onCapture(retainedBase64, retainedHiRes), 350);
         return;
       }
-    } else if (tooBlurry || tooSmall) {
+    } else if (tooNoisy || tooBlurry || tooSmall) {
       rejectionCountRef.current += 1;
-      const reason = tooBlurry
+      const reason = tooNoisy
+        ? 'Hay poca luz. Acércate a una luz y vuelve a intentar.'
+        : tooBlurry
         ? 'La foto salió borrosa. Mantén el teléfono quieto y espera a que enfoque.'
         : 'Acerca más la credencial para que llene el recuadro.';
       console.log(
         '[GuidedDocumentCapture] captureFrame: REJECTED —',
-        tooBlurry ? 'sharpness' : 'coverage',
+        tooNoisy ? 'noise' : tooBlurry ? 'sharpness' : 'coverage',
         JSON.stringify({
           sharpness: Math.round(sharpness),
+          noise: Number(noise.toFixed(2)),
           coverage: Number(geometry.coverage.toFixed(3)),
           rejectionCount: rejectionCountRef.current,
         })

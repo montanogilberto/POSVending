@@ -1,6 +1,6 @@
 # SmartLoans — Arquitectura P2P de Pagos Directos (SPEI sin custodia)
 
-> **Versión 1.5 · 2026-11-09 · ARQUITECTURA CONGELADA** — documento base del dominio.
+> **Versión 1.7 · 2026-11-23 · ARQUITECTURA CONGELADA** — documento base del dominio.
 > Cambios posteriores SOLO vía RFC (§16). Changelogs al final.
 >
 > Principio rector: **SmartLoans nunca recibe, guarda, transfiere ni custodia dinero.**
@@ -416,12 +416,20 @@ class PaymentProvider(Protocol):
 | RFC-009 Laundry Prepaid Wallet | Monedero de la lavandería (companyId 1) fuera de `walletTransactions`; recarga en mostrador; uso de máquina = ticket del POS | PRD laundryWallet |
 | RFC-011 POS Prepaid Balance Payment | Pagar con saldo en caja, por compañía (circuito cerrado): libro genérico `prepaidWalletEntries`, PIN del cliente, cobro atómico con la venta, devolución al eliminarla | PRD prepaidWallet |
 | RFC-014 Loan Transaction Tickets (APROBADO; fases 0–1 escritas) | Ticket por cada evento de dinero del préstamo (fondeo, cuotas, marketplace) vía `notificationDispatch` push→WhatsApp→SMS + email, con enlace firmado a un comprobante generado al abrirlo; avisos salen del backend (D7) | Sin PRD: extensión de los módulos de pagos existentes |
+| RFC-019 Interés posterior al plazo (APROBADO; escrito, sin desplegar) | Plan "sin intereses": 0 % en el plazo, cuotas de monto ÷ plazo; el capital vencido genera `loans.postTermRate` por día, cobrado en una cuota `POST_TERM_INTEREST` inmutable por periodo mensual; se paga por SPEI con confirmación humana | Sin PRD: extensión de `automatedPayments`/`sp_loans`/`sp_loanInstallments` |
+| RFC-020 Frecuencia de pago por préstamo (APROBADO; sin código) | Semanal, catorcenal, quincenal o mensual, negociada y congelada al nacer el préstamo; plazo = número de pagos + frecuencia; cuotas no mensuales con días reales/365; mensual sin cambio; SPEI con confirmación humana | Sin PRD: extensión de los módulos de préstamos existentes |
 
 Los RFC-001 a 003 son el MVP del modelo sin custodia; sus PRDs van al posgmo-factory.
 
 ---
 
 ## Changelog
+
+**v1.6 → v1.7 (RFC-020, 2026-11-23):**
+1. **Frecuencia de pago por préstamo** (`docs/rfcs/RFC-020-loan-payment-frequency.md`): el préstamo congela `paymentFrequency`, `numberOfPayments` y `paymentAnchorDate`. Los préstamos existentes siguen mensuales. El cobro con tarjeta excluye los no mensuales. Requisitos previos: ajuste del fin del plazo de RFC-019 y job de escalación de cuotas. Reafirma D1/D5.
+
+**v1.5 → v1.6 (RFC-019, 2026-11-20):**
+1. **Interés posterior al plazo en préstamos "sin intereses"** (`docs/rfcs/RFC-019-interest-free-post-term-interest.md`): el préstamo congela `paymentPlan` y `postTermRate` al nacer; un job diario agrega una cuota de interés por periodo cerrado (actual/365, sin capitalizar), que nunca se modifica. Reafirma D1/D5: el job sólo registra lo adeudado; el pago va por SPEI con confirmación del prestamista y el cobro con tarjeta excluye estas cuotas.
 
 **v1.4 → v1.5 (RFC-011, 2026-11-09):**
 1. **Pago con saldo prepagado en el POS** (`docs/rfcs/RFC-011-pos-prepaid-balance-payment.md`): el saldo es un pasivo de cada compañía con su cliente y sólo se gasta en esa compañía (y sus sucursales), nunca entre compañías. El libro de RFC-009 se construye con nombre genérico (`prepaidWalletEntries`) y agrega `POS_SALE`. Cobrar exige el PIN del cliente y ocurre en la misma transacción que la venta; eliminar la venta devuelve el saldo. Prerrequisito: `POST /walletTransactions` exige sesión de personal o worker key. Reafirma D1: el dinero de una recarga llega a la compañía; SmartLoans sólo lleva el registro.

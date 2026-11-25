@@ -15,11 +15,13 @@ import {
 import { KycPrefill } from '../../utils/kycPrefill';
 import './NativeConnectOnboarding.css';
 
-const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
+import { STRIPE_PUBLISHABLE_KEY, STRIPE_KEY_MISSING_MSG } from '../../utils/appEnv';
+
+const STRIPE_PK = STRIPE_PUBLISHABLE_KEY;
 
 let stripePromise: Promise<Stripe | null> | null = null;
 function getStripe() {
-  if (!stripePromise) stripePromise = loadStripe(STRIPE_PK);
+  if (!stripePromise) stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : Promise.resolve(null);
   return stripePromise;
 }
 
@@ -167,7 +169,7 @@ const OnboardingForm: React.FC<Props> = ({ clientId, companyId, email, onProgres
   const submitPayout = async () => {
     if (!stripe) {
       console.log('[NativeConnect] submitPayout: BLOCKED — Stripe.js not initialised');
-      setError('No se pudo inicializar Stripe.'); return;
+      setError(STRIPE_PK ? 'No se pudo inicializar Stripe.' : STRIPE_KEY_MISSING_MSG); return;
     }
     if (!holderName.trim()) {
       console.log('[NativeConnect] submitPayout: BLOCKED — no account holder name');

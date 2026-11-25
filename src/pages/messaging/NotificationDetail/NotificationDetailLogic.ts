@@ -56,7 +56,7 @@ function relatedLabel(route: string): string {
 export function useNotificationDetail() {
   const history = useHistory();
   const location = useLocation<NotificationTapState | undefined>();
-  const { userId, roleCode, clientId } = useUser();
+  const { userId, roleCode, clientId, companyId } = useUser();
 
   const [info, setInfo] = useState<NotificationDetailInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,7 +83,7 @@ export function useNotificationDetail() {
     inFlight.current = true;
     setLoading(true);
     try {
-      const { notifications } = await fetchMyNotifications(userId);
+      const { notifications } = await fetchMyNotifications(userId, { companyId, clientId });
       const hit = findInboxMatch(notifications, base, !!(tap?.title || tap?.body));
       console.log('[NotificationDetail] load ←', JSON.stringify({ id: base.pushNotificationId, matched: hit?.pushNotificationId ?? null }));
       if (hit) {
@@ -98,7 +98,7 @@ export function useNotificationDetail() {
           navigationRoute: hit.navigationRoute || base.navigationRoute,
           fromInbox: true,
         });
-        if (!hit.isRead) markNotificationsRead(userId, hit.pushNotificationId).catch(() => {});
+        if (!hit.isRead) markNotificationsRead(userId, hit.pushNotificationId, { companyId, clientId }).catch(() => {});
       }
     } catch (e) {
       console.log('[NotificationDetail] load ❌', String(e));
@@ -106,7 +106,7 @@ export function useNotificationDetail() {
       inFlight.current = false;
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, companyId, clientId]);
 
   // Un toque nuevo mientras la página ya está montada (misma ruta, otro state).
   useEffect(() => {

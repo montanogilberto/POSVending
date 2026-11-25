@@ -83,7 +83,7 @@ import {
   compassOutline,
   briefcaseOutline,
   sparklesOutline,
-  megaphoneOutline,
+  megaphoneOutline, calendarOutline,
   mapOutline,
   searchOutline,
 }
@@ -195,6 +195,7 @@ import BowlingPage from './pages/game/BowlingPage';
 import VoiceCallPage from './pages/messaging/VoiceCallPage';
 import AgentPage from './pages/system/AgentPage';
 import AgentCompanySettingPage from './pages/system/AgentCompanySettingPage';
+import ReservationsPage from './pages/pos/ReservationsPage';
 import OperationalNoticePage from './pages/system/OperationalNoticePage';
 
 /* Core/Theme CSS */
@@ -285,7 +286,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
   '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees', '/company-payment-accounts',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
-  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent', '/demand-map', '/ai-agents', '/operational-notices',
+  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent', '/demand-map', '/ai-agents', '/operational-notices', '/reservations',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
 ];
 
@@ -946,6 +947,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/reservations" title="Reservaciones">
+                <IonIcon icon={calendarOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Reservaciones</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'operationalNotices') && (
               <IonItem button routerLink="/operational-notices" title="Avisos operativos">
                 <IonIcon icon={megaphoneOutline} slot="start" />
@@ -1204,6 +1214,8 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/demand-map" feature="demandMap" component={DemandMapPage} />
             <PrivateRoute exact path="/ai-agents" feature="agents" component={AgentPage} />
             <PrivateRoute exact path="/ai-agents/settings" feature="agents" component={AgentCompanySettingPage} />
+            {/* 'clients': staff roles only (customer names and phones); a new feature would need a DB change first. */}
+            <PrivateRoute exact path="/reservations" feature="clients" component={ReservationsPage} />
             <PrivateRoute exact path="/operational-notices" feature="operationalNotices" component={OperationalNoticePage} />
             <PrivateRoute exact path="/whatsapp-agent/conversations" feature={WHATSAPP_CHAT_FEATURES} component={WhatsAppConversationsPage} />
             <PrivateRoute exact path="/whatsapp-agent/setup" feature="notificationDispatchLog" component={WhatsAppSetupPage} />
