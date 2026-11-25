@@ -40,7 +40,7 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const history = useHistory();
   const { cart } = useCart();
-  const { roleCode, userId, activeProduct } = useUser();
+  const { roleCode, userId, activeProduct, companyId, clientId } = useUser();
   // No shopping cart concept in the SmartLoans (borrower/lender) experience.
   // Follows the active product for self-service sessions (a POS customer who
   // is also a borrower gets SmartLoans icons while in SmartLoans).
@@ -64,10 +64,10 @@ const Header: React.FC<HeaderProps> = ({
   // the app was open, so nothing was trackable afterwards.
   useEffect(() => {
     if (!userId) return;
-    fetchMyNotifications(userId)
+    fetchMyNotifications(userId, { companyId, clientId })
       .then(({ unreadCount: n }) => setUnreadCount(n))
       .catch(() => {});
-  }, [userId]);
+  }, [userId, companyId, clientId]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;

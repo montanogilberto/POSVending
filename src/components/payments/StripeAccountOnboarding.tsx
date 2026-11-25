@@ -3,9 +3,9 @@ import { loadConnectAndInitialize, StripeConnectInstance } from '@stripe/connect
 import { ConnectComponentsProvider, ConnectAccountOnboarding } from '@stripe/react-connect-js';
 import { IonButton, IonSpinner } from '@ionic/react';
 import './StripeAccountOnboarding.css';
-import { API_BASE_URL } from '../../utils/appEnv';
+import { API_BASE_URL, STRIPE_PUBLISHABLE_KEY } from '../../utils/appEnv';
 
-const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
+const STRIPE_PK = STRIPE_PUBLISHABLE_KEY;
 const API_BASE = API_BASE_URL;
 
 interface StripeAccountOnboardingProps {

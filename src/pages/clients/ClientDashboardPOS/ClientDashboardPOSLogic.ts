@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHistory, useParams } from 'react-router-dom';
 import { useIonActionSheet } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
-import { canAccess, isStaffRole } from '../../../config/rolePermissions';
+import { canAccess, canUseWhatsAppChat, isStaffRole } from '../../../config/rolePermissions';
 import { useToast } from '../../../hooks/useToast';
 import { cardCycles } from '../../../utils/stampCycles';
 import { useViewEnterLoad } from '../../../hooks/useViewEnterLoad';
@@ -132,7 +132,7 @@ export const useClientDashboardPOS = (audience: PosDashboardAudience = 'staff') 
   const cardTopUp = usePosCardTopUp(staffCompanyId, clientId, fullName, showToast);
   const transfer = usePosTransfer(staffCompanyId, clientId, userId, fullName, showToast);
   const terminalTopUp = usePosTerminalTopUp(staffCompanyId, clientId, userId, fullName, showToast);
-  const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, !isCustomer && canAccess(roleCode, 'notificationDispatchLog'));
+  const messages = usePosMessages(Number(companyId), client?.cellphone, fullName, !isCustomer && canUseWhatsAppChat(roleCode));
   const contact = usePosContact(Number(staffCompanyId), clientId, Number(userId), client?.cellphone, companyName, showToast);
   const [presentTopUpOptions] = useIonActionSheet();
 

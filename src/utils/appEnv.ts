@@ -34,3 +34,18 @@ export const API_BASE_URL: string = (
   (import.meta.env.VITE_API_URL as string | undefined)?.trim() ||
   (import.meta.env.DEV ? DEV_API_URL : PROD_API_URL)
 ).replace(/\/+$/, '');
+
+/**
+ * Llave publicable de Stripe (pk_live_… / pk_test_…) — ÚNICA fuente para el
+ * frontend. Es pública por diseño (va en el bundle), pero debe ser de la MISMA
+ * cuenta y modo que `STRIPE_SECRET_KEY` del backend (hoy: live).
+ *
+ * Se fija al compilar con `VITE_STRIPE_PUBLISHABLE_KEY` (GitHub vars para web;
+ * `.env` local para builds nativas). Sin ella queda vacía y la UI muestra un
+ * error claro en lugar de llamar a Stripe con una llave falsa.
+ */
+export const STRIPE_PUBLISHABLE_KEY: string =
+  (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined)?.trim() || '';
+
+export const STRIPE_KEY_MISSING_MSG =
+  'Los pagos no están configurados en esta versión de la app. Contacta a soporte.';

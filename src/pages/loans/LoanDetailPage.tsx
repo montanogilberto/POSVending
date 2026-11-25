@@ -33,7 +33,6 @@ import {
 import {
   validateTransferEvidence as validateEvidenceWithAgent, TransferEvidenceVerdict,
 } from '../../api/transferEvidenceAgentApi';
-import { createPushNotification } from '../../api/pushNotificationsApi';
 import { pickEvidencePhoto } from '../../utils/pickAvatarPhoto';
 import { listContractsForClient } from '../../api/digitalContractsApi';
 import { notifyDataChanged, onDataChanged } from '../../utils/refreshBus';
@@ -288,14 +287,7 @@ const LoanDetailPage: React.FC = () => {
         });
       } else {
         showToast('Comprobante subido — la revisión automática encontró diferencias y quedó pendiente de revisión manual.', 'warning');
-        await createPushNotification({
-          companyId: Number(companyId),
-          title: '🔎 Revisa el comprobante de fondeo',
-          message: `El comprobante subido para tu préstamo de ${fmt(loan.principalAmount)} necesita revisión antes de confirmar la recepción.${verdict?.overallAssessment ? ' ' + verdict.overallAssessment : ''}`,
-          notificationType: 'Warning', priority: 'High', targetType: 'User', targetUserId: loan.clientId,
-          navigationRoute: `/loan-detail/${loanId}`,
-          payloadJson: JSON.stringify({ type: 'FundingEvidenceNeedsReview', loanId, transferEvidenceId: evidence.transferEvidenceId }),
-        }).catch(() => {});
+        // Push sent by the backend (core push, modules/loanPush.py: 'funding_evidence_review') — RFC-014.
       }
     } catch (e) {
       console.log('[LoanDetail] evidence validation FAILED (non-fatal) —', String(e));

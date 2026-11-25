@@ -8,11 +8,13 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { fmtInt } from '../../../../utils/format';
 
-const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
+import { STRIPE_PUBLISHABLE_KEY } from '../../../../utils/appEnv';
+
+const STRIPE_PK = STRIPE_PUBLISHABLE_KEY;
 
 /** Una sola instancia para toda la app: loadStripe descarga el SDK. */
 let stripePromise: Promise<Stripe | null> | null = null;
-const getStripe = () => (stripePromise ??= loadStripe(STRIPE_PK));
+const getStripe = () => (stripePromise ??= STRIPE_PK ? loadStripe(STRIPE_PK) : Promise.resolve(null));
 
 interface SheetProps {
   clientSecret: string | null;

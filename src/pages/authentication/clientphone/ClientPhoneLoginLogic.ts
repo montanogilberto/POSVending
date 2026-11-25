@@ -4,6 +4,7 @@ import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
 import {
   sendClientLoginCode, verifyClientLoginCode, setClientPassword, verifyClientPassword, CodeChannel,
+  CodeRequestChannel, LEGACY_CODE_LENGTH,
 } from '../../../api/clientLoginApi';
 import { normalizeRoleCode } from '../../../config/rolePermissions';
 import { appDestination, LoginApp } from '../../../utils/loginApps';
@@ -38,6 +39,10 @@ interface PendingLogin {
   roleName: string;
 }
 
+/** "por SMS" / "por WhatsApp" / "a tu app GMO" — where the code went, for toasts and the code step. */
+export const channelPhrase = (channel: CodeChannel): string =>
+  channel === 'push' ? 'a tu app GMO' : channel === 'whatsapp' ? 'por WhatsApp' : 'por SMS';
+
 // clientId 1 is each company's generic walk-in record ("Desconocido"), never a person.
 const WALK_IN_CLIENT_ID = 1;
 
@@ -51,7 +56,9 @@ export const useClientPhoneLogin = (app: LoginApp) => {
   const history = useHistory();
   const { login } = useUser();
 
-  const codeRef = useRef<string>('');
+  // The code step's boxes: as many as the backend says the code has (RFC-013: 4).
+  const [code, setCode] = useState('');
+  const [codeLength, setCodeLength] = useState(LEGACY_CODE_LENGTH);
   const pinRef = useRef<string>('');
   // The 4-box PIN fields are controlled (the submit button waits for 4 digits).
   const [pin, setPin] = useState('');
@@ -76,7 +83,7 @@ export const useClientPhoneLogin = (app: LoginApp) => {
   const [loading, setLoading] = useState(false);
   // Shared toast (top, red by default); a resend confirmation passes 'success'.
   const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
-  const codeInputRef = useRef<HTMLIonInputElement>(null);
+  const codeInputRef = useRef<PinInputHandle>(null);
 
   // Quick-login is only offered when this device already proved it's the
   // client's own (biometric on) AND has a remembered number.
@@ -109,6 +116,8 @@ export const useClientPhoneLogin = (app: LoginApp) => {
       setResettingPin(false);
       setPin('');
       setCodeChannel(result.channel ?? 'sms');
+      setCodeLength(result.codeLength ?? LEGACY_CODE_LENGTH);
+      setCode('');
       // Onboarding already done: no SMS was sent this time, ask for the PIN.
       setStep(result.firstLoginCompleted ? 'pin' : 'code');
     } catch (err) {
@@ -149,12 +158,14 @@ export const useClientPhoneLogin = (app: LoginApp) => {
     setLoading(true);
     try {
       const result = await sendClientLoginCode(phone, { resetPin: true });
-      setCodeChannel(result.channel ?? 'sms');
+      const sentBy = result.channel ?? 'sms';
+      setCodeChannel(sentBy);
+      setCodeLength(result.codeLength ?? LEGACY_CODE_LENGTH);
       setResettingPin(true);
       setLegacyPassword(false);
-      codeRef.current = '';
+      setCode('');
       setStep('code');
-      showToast('Te enviamos un código por SMS', 'success');
+      showToast(`Te enviamos un código ${channelPhrase(sentBy)}`, 'success');
     } catch (err) {
       showToast(`No se pudo enviar el código: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     } finally {
@@ -191,24 +202,20 @@ export const useClientPhoneLogin = (app: LoginApp) => {
   // A wrong or stale code (every send/resend invalidates the previous one)
   // must not linger in the field: clear it and refocus for the next try.
   const resetCodeInput = () => {
-    codeRef.current = '';
-    const input = codeInputRef.current;
-    if (input) {
-      input.value = '';
-      void input.setFocus();
-    }
+    setCode('');
+    codeInputRef.current?.focus();
   };
 
-  const submitCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = codeRef.current.trim();
-    if (!code) {
-      showToast('Ingresa el código que recibiste por SMS');
+  const submitCode = async (e?: React.FormEvent, value: string = code) => {
+    e?.preventDefault();
+    if (loading) return;
+    if (value.length < codeLength) {
+      showToast(`Ingresa los ${codeLength} dígitos del código`);
       return;
     }
     setLoading(true);
     try {
-      const result = await verifyClientLoginCode(phone, code);
+      const result = await verifyClientLoginCode(phone, value);
       if (!result.valid) {
         showToast(result.error || 'Código incorrecto');
         resetCodeInput();
@@ -325,12 +332,13 @@ export const useClientPhoneLogin = (app: LoginApp) => {
     }
   };
 
-  const resendCode = async (channel: CodeChannel) => {
+  const resendCode = async (channel: Exclude<CodeRequestChannel, 'auto'>) => {
     setLoading(true);
     try {
       const result = await sendClientLoginCode(phone, { resetPin: resettingPin, channel });
       const sentBy = result.channel ?? 'sms';
       setCodeChannel(sentBy);
+      setCodeLength(result.codeLength ?? LEGACY_CODE_LENGTH);
       if (channel === 'whatsapp' && sentBy === 'sms') {
         showToast('WhatsApp no está disponible, te lo enviamos por SMS', 'warning');
       } else {
@@ -348,7 +356,7 @@ export const useClientPhoneLogin = (app: LoginApp) => {
     step, loading, toastProps,
     country, setCountry, national, setNational, phone, savedPhone, clientName,
     legacyPassword, toggleLegacyPassword, resettingPin, codeChannel,
-    codeRef, codeInputRef, pinRef,
+    code, setCode, codeLength, codeInputRef, pinRef,
     pin, setPin, pinInputRef, newPin, setNewPin, confirmPin, setConfirmPin, confirmPinInputRef,
     submitPhone, quickContinue, useAnotherNumber, submitCode, resendCode,
     submitNewPin, submitPin, forgotPin, enableBiometric, skipBiometric: completeLogin,

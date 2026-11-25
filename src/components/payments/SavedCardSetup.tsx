@@ -4,14 +4,14 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { IonSpinner, IonIcon } from '@ionic/react';
 import { cardOutline, checkmarkCircle } from 'ionicons/icons';
 import './SavedCardSetup.css';
-import { API_BASE_URL } from '../../utils/appEnv';
+import { API_BASE_URL, STRIPE_PUBLISHABLE_KEY } from '../../utils/appEnv';
 
-const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
+const STRIPE_PK = STRIPE_PUBLISHABLE_KEY;
 const API_BASE = API_BASE_URL;
 
 let stripePromise: Promise<Stripe | null> | null = null;
 function getStripe() {
-  if (!stripePromise) stripePromise = loadStripe(STRIPE_PK);
+  if (!stripePromise) stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : Promise.resolve(null);
   return stripePromise;
 }
 

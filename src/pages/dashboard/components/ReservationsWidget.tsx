@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IonCard, IonCardHeader, IonCardTitle, IonCardContent,
-  IonBadge, IonButton, IonIcon, IonSpinner, IonChip, IonLabel,
+  IonBadge, IonButton, IonIcon, IonSpinner, IonChip, IonLabel, IonToast,
 } from '@ionic/react';
 import { calendarOutline, checkmarkCircleOutline, closeCircleOutline, refreshOutline } from 'ionicons/icons';
+import { canAccess } from '../../../config/rolePermissions';
 import { useUser } from '../../../contexts/UserContext';
 import {
   Reservation, getPOSQueue, confirmReservation, cancelReservation, completeReservation,
 } from '../../../api/reservationsApi';
+import { useToast } from '../../../hooks/useToast';
 import { onDataChanged } from '../../../utils/refreshBus';
 
 const SERVICE_LABEL: Record<string, string> = { lavado: '🫧 Lavado', secado: '🌀 Secado' };
@@ -26,9 +28,11 @@ interface Props {
 }
 
 const ReservationsWidget: React.FC<Props> = ({ pollIntervalMs = 30_000 }) => {
-  const { companyId } = useUser();
+  const { companyId, roleCode } = useUser();
   const [items, setItems] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const { showToast, toastProps } = useToast({ defaultColor: 'danger' });
   const [actioning, setActioning] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -39,8 +43,9 @@ const ReservationsWidget: React.FC<Props> = ({ pollIntervalMs = 30_000 }) => {
     try {
       const queue = await getPOSQueue(companyId);
       setItems(queue);
+      setFailed(false);
     } catch {
-      // silently ignore — widget shouldn't crash the dashboard
+      setFailed(true); // shown in the card; never crashes the dashboard
     } finally {
       if (!silent) setLoading(false);
     }
@@ -57,9 +62,14 @@ const ReservationsWidget: React.FC<Props> = ({ pollIntervalMs = 30_000 }) => {
   useEffect(() => onDataChanged(() => { load(true); }), [load]);
 
   async function handleAction(fn: () => Promise<void>) {
-    await fn();
-    await load();
-    setActioning(null);
+    try {
+      await fn();
+      await load();
+    } catch {
+      showToast('No se pudo actualizar la reservación. Intenta de nuevo.');
+    } finally {
+      setActioning(null);
+    }
   }
 
   const today = todayIso();
@@ -84,7 +94,7 @@ const ReservationsWidget: React.FC<Props> = ({ pollIntervalMs = 30_000 }) => {
       <IonCardContent style={{ paddingTop: 0 }}>
         {todayItems.length === 0 ? (
           <p style={{ color: 'var(--ion-color-medium)', fontSize: 14, textAlign: 'center', padding: '12px 0' }}>
-            Sin reservaciones para hoy
+            {failed ? 'No se pudieron cargar las reservaciones' : 'Sin reservaciones para hoy'}
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -144,7 +154,13 @@ const ReservationsWidget: React.FC<Props> = ({ pollIntervalMs = 30_000 }) => {
             ))}
           </div>
         )}
+        {canAccess(roleCode, 'clients') && (
+          <IonButton fill="clear" size="small" expand="block" routerLink="/reservations">
+            Ver todas las reservaciones
+          </IonButton>
+        )}
       </IonCardContent>
+      <IonToast {...toastProps} />
     </IonCard>
   );
 };

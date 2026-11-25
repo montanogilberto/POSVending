@@ -19,6 +19,11 @@ export interface ClientFaceRecognition {
   domicilio?: string;
   curp?: string;
   claveElector?: string;
+  /** RFC-015: INE back identifiers (9 / 13 digits). */
+  cic?: string;
+  ocr?: string;
+  /** RFC-015: last year of the INE 'VIGENCIA'. */
+  vigencia?: string;
   rfc?: string; // Mexico tax ID (Stripe individual.id_number) — NOT the CURP
   fechaNacimiento?: string;
 
@@ -80,6 +85,10 @@ export interface ContractSubmissionRequest {
   domicilio?: string;
   curp?: string;
   claveElector?: string;
+  cic?: string;
+  ocr?: string;
+  /** RFC-015: last year of the INE 'VIGENCIA'. */
+  vigencia?: string;
   rfc?: string; // Mexico tax ID (Stripe individual.id_number) — NOT the CURP
   fechaNacimiento?: string;
 
@@ -273,4 +282,29 @@ export async function submitContractClientFaceRecognition(payload: ContractSubmi
   });
   if (!res.ok) throw new Error(await res.text());
   return await res.json();
+}
+
+// READ A SAVED KYC PHOTO BACK (resume) -- GET on the photo's public-read blob URL.
+// A resumed expediente has only the saved URLs in hand; the on-device
+// selfie↔INE match needs the pixels. Returns '' on any failure (the caller then
+// leaves the decision to the remote validator, which reads the URL itself).
+export async function fetchKycImageAsDataUrl(url: string): Promise<string> {
+  if (!url) return '';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.log('[clientFaceRecognitionApi] fetchKycImageAsDataUrl: HTTP', res.status);
+      return '';
+    }
+    const blob = await res.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.log('[clientFaceRecognitionApi] fetchKycImageAsDataUrl: failed', String(err));
+    return '';
+  }
 }
