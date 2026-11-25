@@ -1,43 +1,21 @@
-import React, { useRef } from 'react';
-import { IonPage, IonContent, IonLoading, IonToast, IonList, IonItem, IonLabel, IonChip, IonNote, IonIcon, IonButton, IonInfiniteScroll, IonInfiniteScrollContent, IonAlert, IonTextarea } from '@ionic/react';
+import React from 'react';
+import { IonPage, IonContent, IonLoading, IonToast, IonList, IonItem, IonLabel, IonNote, IonButton, IonSpinner, IonAlert } from '@ionic/react';
 import Header from '../../../components/layout/Header';
 import { usePopovers } from '../../../hooks/usePopovers';
 import { useLoanPayment } from './LoanPaymentLogic';
 import { toHermosillo, fmtMXN } from '../../../utils/format';
-import { helpCircleOutline, checkmarkCircleOutline, closeCircleOutline, warningOutline, informationCircleOutline } from 'ionicons/icons';
+import { helpCircleOutline } from 'ionicons/icons';
 import EmptyState from '../../../components/ui/EmptyState';
+import StatusBadge from '../../../components/ui/StatusBadge';
+import { LOAN_PAYMENT_STATUS } from '../../../components/ui/statusMaps';
 
 const LoanPaymentView: React.FC = () => {
   const vm = useLoanPayment();
   const pops = usePopovers();
 
-  const infiniteScrollRef = useRef<HTMLIonInfiniteScrollElement>(null);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING_CONFIRMATION': return 'warning';
-      case 'CONFIRMED': return 'success';
-      case 'REJECTED': return 'danger';
-      case 'ESCALATED': return 'tertiary'; // Ionic's default purple color
-      case 'CANCELLED': return 'medium'; // Grey
-      default: return 'light';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'PENDING_CONFIRMATION': return helpCircleOutline;
-      case 'CONFIRMED': return checkmarkCircleOutline;
-      case 'REJECTED': return closeCircleOutline;
-      case 'ESCALATED': return warningOutline;
-      case 'CANCELLED': return informationCircleOutline;
-      default: return helpCircleOutline;
-    }
-  };
-
   return (
     <IonPage>
-      <Header screenTitle="Pagos de Préstamos" showBackButton={true} backButtonHref="/dashboard" posSupportTopic="loanPayments" {...pops.headerProps} />
+      <Header screenTitle="Pagos de Préstamos" showBackButton={true} backButtonHref="/dashboard" {...pops.headerProps} />
       <IonContent fullscreen className="loan-payment-content">
         <IonToast {...vm.toastProps} />
         <IonLoading isOpen={vm.loading} message="Cargando..." />
@@ -52,21 +30,18 @@ const LoanPaymentView: React.FC = () => {
             <IonItem key={payment.loanPaymentId} className="loan-payment-list-item">
               <IonLabel>
                 <h2>
-                  <IonChip className={`loan-payment-status-chip ion-color-${getStatusColor(payment.status)}`}>
-                    <IonIcon icon={getStatusIcon(payment.status)} />
-                    <IonLabel>{payment.status.replace(/_/g, ' ')}</IonLabel>
-                  </IonChip>
+                  <StatusBadge status={payment.status} map={LOAN_PAYMENT_STATUS} className="loan-payment-status-chip" />
                   <IonNote className="loan-payment-type-note">{payment.paymentType}</IonNote>
                 </h2>
                 <p className="loan-payment-amount">{fmtMXN(payment.amountMXN)}</p>
                 <p className="loan-payment-details">
                   De: Cliente {payment.payerClientId} &rarr; A: Cliente {payment.payeeClientId}
                 </p>
-                <p className="loan-payment-date">Declarado el: {toHermosillo(payment.declaredAt).toFormat('dd LLL yyyy, HH:mm')}</p>
+                <p className="loan-payment-date">Declarado el: {toHermosillo(payment.declaredAt)}</p>
                 <p className="loan-payment-clave">Clave de rastreo: {payment.claveRastreo}</p>
                 {payment.bankFrom && <p className="loan-payment-bank">Banco origen: {payment.bankFrom}</p>}
                 {payment.confirmedAt && (
-                  <p className="loan-payment-confirmed">Confirmado el: {toHermosillo(payment.confirmedAt).toFormat('dd LLL yyyy, HH:mm')}</p>
+                  <p className="loan-payment-confirmed">Confirmado el: {toHermosillo(payment.confirmedAt)}</p>
                 )}
                 {payment.rejectReason && (
                   <p className="loan-payment-reject-reason">Razón de rechazo: {payment.rejectReason}</p>
@@ -80,7 +55,7 @@ const LoanPaymentView: React.FC = () => {
                     disabled={vm.isResolving}
                     onClick={() => vm.handleResolveEscalationPrompt(payment.loanPaymentId, 'CONFIRMED')}
                   >
-                    Confirmar
+                    {vm.isResolving && vm.selectedEscalatedPaymentId === payment.loanPaymentId && vm.resolutionAction === 'CONFIRMED' ? <IonSpinner name="dots" /> : 'Confirmar'}
                   </IonButton>
                   <IonButton
                     fill="clear"
@@ -88,25 +63,13 @@ const LoanPaymentView: React.FC = () => {
                     disabled={vm.isResolving}
                     onClick={() => vm.handleResolveEscalationPrompt(payment.loanPaymentId, 'REJECTED')}
                   >
-                    Rechazar
+                    {vm.isResolving && vm.selectedEscalatedPaymentId === payment.loanPaymentId && vm.resolutionAction === 'REJECTED' ? <IonSpinner name="dots" /> : 'Rechazar'}
                   </IonButton>
                 </div>
               )}
             </IonItem>
           ))}
         </IonList>
-
-        <IonInfiniteScroll
-          onIonInfinite={(ev: CustomEvent<void>) => {
-            vm.loadMoreItems();
-            (ev.target as HTMLIonInfiniteScrollElement).complete();
-          }}
-          threshold="100px"
-          disabled={!vm.hasMoreItems || vm.loading}
-          ref={infiniteScrollRef}
-        >
-          <IonInfiniteScrollContent loadingText="Cargando más pagos..."></IonInfiniteScrollContent>
-        </IonInfiniteScroll>
 
         <IonAlert
           isOpen={vm.showResolutionAlert}
@@ -117,20 +80,17 @@ const LoanPaymentView: React.FC = () => {
               name: 'resolutionNote',
               type: 'textarea',
               placeholder: 'Ingrese una nota de resolución (obligatorio)',
-              value: vm.resolutionNote,
-              attributes: { minlength: 1 }
             },
           ]}
           buttons={[
             { text: 'Cancelar', role: 'cancel' },
             {
-              text: vm.isResolving ? 'Resolviendo...' : 'Resolver',
+              text: 'Resolver',
               handler: (alertData) => {
-                vm.setResolutionNote(alertData.resolutionNote);
-                vm.handleResolveEscalation(alertData.resolutionNote);
-                return false; // Prevent alert from closing immediately
+                const note = String(alertData.resolutionNote ?? '');
+                vm.handleResolveEscalation(note);
+                return note.trim() !== ''; // stays open until a note is written
               },
-              cssClass: vm.isResolving || vm.resolutionNote.trim() === '' ? 'disabled-button' : ''
             },
           ]}
         />

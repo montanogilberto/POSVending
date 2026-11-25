@@ -16,7 +16,8 @@ const NotificationAudienceView: React.FC = () => {
   const AUDIENCE_OPTIONS = [
     { value: 'borrower', label: 'Acreditado' },
     { value: 'lender', label: 'Prestamista' },
-    { value: 'juridical', label: 'Jurídico' }
+    { value: 'juridical', label: 'Jurídico' },
+    { value: 'staff', label: 'Personal' }
   ];
 
   return (

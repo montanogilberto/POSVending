@@ -1,6 +1,4 @@
-import { Decimal } from 'decimal.js'; // For TIER_2_FINANCIAL exact precision
-
-const BASE_URL = import.meta.env.VITE_API_URL ?? "https://smartloansbackend.azurewebsites.net";
+import { API_BASE_URL } from '../utils/appEnv';
 
 export interface LoanPayment {
   loanPaymentId: number;
@@ -33,6 +31,7 @@ export interface LoanPaymentListResponse {
 
 // Specific interfaces for actions if needed, e.g., for 'declare'
 export interface DeclareLoanPaymentPayload {
+  companyId: number;
   loanId: number;
   intentId: number;
   payerClientId: number;
@@ -46,6 +45,7 @@ export interface DeclareLoanPaymentPayload {
 }
 
 export interface ConfirmRejectLoanPaymentPayload {
+  companyId: number;
   loanPaymentId: number;
   confirmedByClientId?: number; // for confirm
   rejectedByClientId?: number;  // for reject
@@ -54,6 +54,7 @@ export interface ConfirmRejectLoanPaymentPayload {
 }
 
 export interface ResolveEscalationLoanPaymentPayload {
+  companyId: number;
   loanPaymentId: number;
   resolution: 'CONFIRMED' | 'REJECTED';
   resolutionNote: string;
@@ -66,8 +67,8 @@ export interface EscalateDueLoanPaymentPayload {
 }
 
 // ACTION_ROUTER helper — every operation uses this shape
-async function callLoanPaymentsApi(action: string, fields: Record<string, unknown>) {
-  const res = await fetch(BASE_URL + "/loanPayments", {
+async function callLoanPaymentsApi(action: string, fields: object) {
+  const res = await fetch(API_BASE_URL + "/loanPayments", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ "loanPayments": [{ "action": action, ...fields }] }),
   });
@@ -92,17 +93,17 @@ export const loanPaymentApi = {
     return response;
   },
 
-  confirm: async (payload: ConfirmRejectLoanPaymentPayload): Promise<any> => {
+  confirm: async (payload: ConfirmRejectLoanPaymentPayload): Promise<unknown> => {
     const response = await callLoanPaymentsApi("confirm", payload);
     return response;
   },
 
-  reject: async (payload: ConfirmRejectLoanPaymentPayload): Promise<any> => {
+  reject: async (payload: ConfirmRejectLoanPaymentPayload): Promise<unknown> => {
     const response = await callLoanPaymentsApi("reject", payload);
     return response;
   },
 
-  cancel: async (loanPaymentId: number, payerClientId: number, actorUserId: number, companyId: number): Promise<any> => {
+  cancel: async (loanPaymentId: number, payerClientId: number, actorUserId: number, companyId: number): Promise<unknown> => {
     const response = await callLoanPaymentsApi("cancel", { loanPaymentId, payerClientId, actorUserId, companyId });
     return response;
   },
@@ -112,12 +113,12 @@ export const loanPaymentApi = {
     return response.loanPayments ?? []; // Assuming it returns an array of escalated payments
   },
 
-  resolveEscalation: async (payload: ResolveEscalationLoanPaymentPayload): Promise<any> => {
+  resolveEscalation: async (payload: ResolveEscalationLoanPaymentPayload): Promise<unknown> => {
     const response = await callLoanPaymentsApi("resolve_escalation", payload);
     return response;
   },
 
-  statement: async (loanId: number, requesterClientId: number, companyId: number): Promise<any> => {
+  statement: async (loanId: number, requesterClientId: number, companyId: number): Promise<unknown> => {
     const response = await callLoanPaymentsApi("statement", { loanId, requesterClientId, companyId });
     return response;
   },

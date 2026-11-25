@@ -28,23 +28,23 @@
   padding-top: 16px;
 }
 
-.wizard-form-fields {
+.notificationAudience-card .wizard-form-fields {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.wizard-field-group ion-input,
-.wizard-field-group ion-select {
+.notificationAudience-card .wizard-field-group ion-input,
+.notificationAudience-card .wizard-field-group ion-select {
   --border-radius: 12px;
 }
 
 /* Specific styling for error states, consistent with Ionic */
-.ion-invalid.ion-touched {
+.notificationAudience-card .ion-invalid.ion-touched {
   --border-color: var(--ion-color-danger) !important;
 }
 
-.ion-invalid.ion-touched .error-text {
+.notificationAudience-card .ion-invalid.ion-touched .error-text {
   color: var(--ion-color-danger);
   font-size: 0.8em;
   margin-top: 4px;

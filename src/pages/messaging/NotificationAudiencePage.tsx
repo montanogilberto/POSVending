@@ -1,6 +1,6 @@
 import React from 'react';
 import './NotificationAudience/NotificationAudience.css';
-import {NotificationAudienceView} from './NotificationAudience/NotificationAudienceView';
+import NotificationAudienceView from './NotificationAudience/NotificationAudienceView';
 
 const NotificationAudiencePage: React.FC = () => <NotificationAudienceView />;
 

@@ -1,8 +1,7 @@
 import { useCallback, useState } from 'react';
-import { useIonViewWillEnter } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
-import { notificationAudienceApi, NotificationAudienceUpsertRequest } from '../../../api/notificationAudienceApi';
+import { notificationAudienceApi, NotificationAudienceCode, NotificationAudienceUpsertRequest } from '../../../api/notificationAudienceApi';
 import { notifyDataChanged } from '../../../utils/refreshBus';
 
 export const useNotificationAudience = () => {
@@ -11,7 +10,7 @@ export const useNotificationAudience = () => {
 
   const [loading, setLoading] = useState(false);
   const [pushNotificationId, setPushNotificationId] = useState<number | undefined>(undefined);
-  const [audience, setAudience] = useState<'borrower' | 'lender' | 'juridical' | undefined>(undefined);
+  const [audience, setAudience] = useState<NotificationAudienceCode | undefined>(undefined);
   const [excludeUserId, setExcludeUserId] = useState<number | undefined>(undefined);
 
   const [pushNotificationIdError, setPushNotificationIdError] = useState('');
@@ -64,10 +63,6 @@ export const useNotificationAudience = () => {
       setLoading(false);
     }
   }, [companyId, pushNotificationId, audience, excludeUserId, showToast, validateForm]);
-
-  useIonViewWillEnter(() => {
-    // No specific data loading for this single form page
-  });
 
   return {
     loading,
