@@ -12,12 +12,14 @@ import {
   newBlinkTrackerState,
   trackBlink,
   checkDescriptorConsistency,
+  faceInDataUrl,
   CHALLENGE_LABEL,
   LivenessChallenge,
   ChallengeFrameState,
   BlinkTrackerState,
   FaceDetectionResult,
 } from '../../utils/faceLiveness';
+import { lumaThumb, duplicateOf, poseProblem, poseRetryMessage, PoseProblem } from '../../utils/poseQuality';
 import './FaceLivenessCapture.css';
 
 type CaptureState = 'loading-models' | 'starting-camera' | 'searching' | 'challenge' | 'awaiting-blink' | 'captured' | 'error';
@@ -63,9 +65,9 @@ const BLINK_TIMEOUT_MS = 7000;
 const FACE_LOST_GRACE_FRAMES = 4;
 
 // Low on purpose: this flow's goal is extracting the INE data, not a strict
-// biometric face-match, so a lightly-soft pose frame is fine and capturing fast
-// matters more than chasing a pristine still frame. The burst exits as soon as
-// one frame clears this; the best-of fallback still applies if none do.
+// biometric face-match, so a lightly-soft pose frame is fine. But a pose whose
+// SHARPEST frame is still below this is not evidence: the person repeats that
+// one move (device logs had 90–93 kept "as best" and the validator rejected).
 const POSE_SHARPNESS_FLOOR = 130;
 
 // Fixed compass position per direction (SVG angle: 0deg = 3 o'clock, clockwise).
@@ -133,6 +135,17 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
   const [sequence, setSequence] = useState<LivenessChallenge[]>(() => pickChallengeSequence());
   const [challengeIndex, setChallengeIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
+  // A pose is being checked (burst + sharpness + face + duplicate). The challenge
+  // does not advance while this is true, so a rejected pose is simply repeated.
+  const poseCheckingRef = useRef(false);
+  // The neutral (front) pose passed its checks; directional moves start after it.
+  const frontReadyRef = useRef(false);
+  const [frontReady, setFrontReady] = useState(false);
+  // Shown above the instruction when the last pose had to be repeated.
+  const [retryNotice, setRetryNotice] = useState('');
+  const poseRetriesRef = useRef<Partial<Record<FacePose, number>>>({});
+  // Luma thumbnails of ACCEPTED poses, for the duplicate check.
+  const poseThumbsRef = useRef<Partial<Record<FacePose, Float32Array>>>({});
 
   const currentChallenge = sequence[challengeIndex];
 
@@ -140,6 +153,13 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    // Detach the stopped stream so the WebView releases the camera buffers
+    // (Android logged "Unable to acquire a buffer item" / "failed to call release").
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.srcObject = null;
+    }
   }, []);
 
   // Grabs the current video frame as a JPEG data URL. Shared by the per-pose
@@ -165,9 +185,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
   // Cheap focus metric: mean squared horizontal luminance gradient of a
   // downscaled frame. Higher = sharper. Used to reject motion-blurred poses.
-  const measureSharpness = useCallback((): number => {
+  // Also returns the frame's luma thumbnail for the duplicate-pose check.
+  const measureFrame = useCallback((): { sharpness: number; thumb: Float32Array | null } => {
     const video = videoRef.current;
-    if (!video || !video.videoWidth) return 0;
+    if (!video || !video.videoWidth) return { sharpness: 0, thumb: null };
     let canvas = analysisCanvasRef.current;
     if (!canvas) {
       canvas = document.createElement('canvas');
@@ -176,7 +197,7 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       analysisCanvasRef.current = canvas;
     }
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return 0;
+    if (!ctx) return { sharpness: 0, thumb: null };
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
     let sum = 0;
@@ -192,21 +213,27 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
         count++;
       }
     }
-    return count ? sum / count : 0;
+    return { sharpness: count ? sum / count : 0, thumb: lumaThumb(data, width, height) };
   }, []);
 
   // Grab a short burst of frames around the moment a pose is achieved and keep
   // the SHARPEST one. The head momentarily stops at the furthest point, so its
   // clearest frame is right here — the old single grab often landed mid-motion
   // and came out motion-blurred, which the validation agent then rejected.
+  //
+  // Then the pose must pass three checks or it is NOT kept (returns why):
+  // sharp enough (POSE_SHARPNESS_FLOOR), a face is in the chosen frame, and the
+  // frame is not a copy of another accepted pose (a stalled camera produced a
+  // RIGHT identical to UP). The caller asks the person to repeat only that move.
   const capturePose = useCallback(
-    async (pose: FacePose) => {
-      if (poseBurstRef.current[pose]) return; // burst already ran for this pose
+    async (pose: FacePose): Promise<PoseProblem | null> => {
+      if (poseBurstRef.current[pose]) return null; // burst already running for this pose
       poseBurstRef.current[pose] = true;
 
       let bestFrame = grabFrame();
-      let bestSharp = bestFrame ? measureSharpness() : -1;
-      if (bestFrame) posePhotosRef.current[pose] = bestFrame;
+      const first = bestFrame ? measureFrame() : { sharpness: -1, thumb: null };
+      let bestSharp = first.sharpness;
+      let bestThumb = first.thumb;
 
       // Keep sampling until the sharpest frame clears POSE_SHARPNESS_FLOOR, or a
       // bounded window (~720ms at 40ms/frame) elapses — whichever first. With the
@@ -214,27 +241,52 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
       // the user holds the pose for a beat, so the still (sharpest) frame lands a
       // few hundred ms after the turn angle is first hit — the early single grab
       // missed it. A blurry candidate never beats the best, so this only ever
-      // improves the result, and the fallback keeps the sharpest frame so the
-      // pose can never stall.
+      // improves the result. If even the sharpest is below the floor, the pose
+      // is rejected below and the person repeats that move.
       const MAX_ATTEMPTS = 18;
       for (let i = 0; i < MAX_ATTEMPTS && bestSharp < POSE_SHARPNESS_FLOOR; i++) {
         await new Promise((resolve) => setTimeout(resolve, 40));
         if (doneRef.current) break;
         const frame = grabFrame();
         if (!frame) continue;
-        const sharp = measureSharpness();
-        if (sharp > bestSharp) {
-          bestSharp = sharp;
+        const m = measureFrame();
+        if (m.sharpness > bestSharp) {
+          bestSharp = m.sharpness;
           bestFrame = frame;
-          posePhotosRef.current[pose] = frame;
+          bestThumb = m.thumb;
         }
       }
+
+      // Checked in this order; the face detector only runs on a sharp frame.
+      const sharpEnough = bestSharp >= POSE_SHARPNESS_FLOOR;
+      // A detector error counts as "no face" (repeat) — it must never leave the
+      // challenge stuck with poseCheckingRef set.
+      const faceFound = sharpEnough && !doneRef.current
+        ? await faceInDataUrl(bestFrame).catch(() => false)
+        : false;
+      const others = { ...poseThumbsRef.current };
+      delete others[pose];
+      const dupOf = faceFound && bestThumb ? duplicateOf(bestThumb, others) : null;
+      const problem = bestFrame
+        ? poseProblem({ sharpness: bestSharp, floor: POSE_SHARPNESS_FLOOR, faceFound, duplicateOf: dupOf })
+        : 'no-face';
+
       console.log(
         `[FaceLivenessCapture] capturePose(${pose}): sharpest of burst, sharpness=${bestSharp.toFixed(0)}` +
-        `${bestSharp < POSE_SHARPNESS_FLOOR ? ' (below floor — kept best)' : ''}, length=${bestFrame?.length ?? 0}`,
+        ` floor=${POSE_SHARPNESS_FLOOR} face=${faceFound} duplicateOf=${dupOf ?? '-'}` +
+        ` → ${problem ? `REJECTED (${problem}) — repeat this move` : 'accepted'}, length=${bestFrame?.length ?? 0}`,
       );
+
+      if (problem) {
+        delete posePhotosRef.current[pose];
+        poseBurstRef.current[pose] = false; // allow the repeat
+        return problem;
+      }
+      posePhotosRef.current[pose] = bestFrame;
+      if (bestThumb) poseThumbsRef.current[pose] = bestThumb;
+      return null;
     },
-    [grabFrame, measureSharpness],
+    [grabFrame, measureFrame],
   );
 
   const finish = useCallback(
@@ -310,11 +362,37 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
       missedFramesRef.current = 0;
       lastDetectionRef.current = detection;
-      if (!neutralDescriptorRef.current) {
-        neutralDescriptorRef.current = detection.descriptor;
-        // Same frame the neutral descriptor comes from: face acquired, no
-        // challenge presented yet, so the head is still square to the camera.
-        capturePose('front');
+
+      // A pose is being checked: keep the loop alive but don't evaluate moves,
+      // so nothing advances on a pose that may still be rejected.
+      if (poseCheckingRef.current) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      if (!frontReadyRef.current) {
+        // Face acquired, no challenge presented yet, so the head is still square
+        // to the camera. The neutral descriptor comes from this same moment and
+        // is only kept once the front photo itself passes the checks.
+        const neutral = detection.descriptor;
+        poseCheckingRef.current = true;
+        capturePose('front').then((problem) => {
+          poseCheckingRef.current = false;
+          if (doneRef.current) return;
+          if (problem) {
+            const n = (poseRetriesRef.current.front ?? 0) + 1;
+            poseRetriesRef.current.front = n;
+            setRetryNotice(poseRetryMessage(problem, 'Mira de frente a la cámara', n));
+            return;
+          }
+          neutralDescriptorRef.current = neutral;
+          frontReadyRef.current = true;
+          setFrontReady(true);
+          setRetryNotice('');
+        });
+        setState((prev) => (prev === 'captured' ? prev : 'challenge'));
+        rafRef.current = requestAnimationFrame(tick);
+        return;
       }
       setState((prev) => {
         if (prev === 'loading-models' || prev === 'starting-camera' || prev === 'searching') {
@@ -362,27 +440,39 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
         }
 
         doneRef.current = true;
-        // Use the descriptor from the last completed directional challenge
-        // (eyes open, mid-motion) rather than this frame — a blink-detection
-        // frame can land with eyes still closing, a worse source for the
-        // ID-match comparison.
-        finish(challengeDescriptorsRef.current[challengeDescriptorsRef.current.length - 1]);
+        // The ID match uses the FRONTAL descriptor (head square to the camera,
+        // like the INE portrait). It used to take the last directional move's
+        // descriptor — a turned head — which pushed the selfie↔INE distance up
+        // (device log: 0.6993 vs threshold 0.6) without the person being different.
+        finish(neutralDescriptorRef.current ?? challengeDescriptorsRef.current[challengeDescriptorsRef.current.length - 1]);
         return;
       }
 
       const challenge = sequence[challengeIndexRef.current];
       const completed = evaluateChallengeFrame(challenge, detection, challengeStateRef.current);
       if (completed && !doneRef.current) {
-        const nextIndex = challengeIndexRef.current + 1;
-        console.log(`[FaceLivenessCapture] tick: move "${challenge}" satisfied (${nextIndex}/4)`);
+        const index = challengeIndexRef.current;
+        const descriptor = detection.descriptor;
+        console.log(`[FaceLivenessCapture] tick: move "${challenge}" satisfied (${index + 1}/4), checking the photo`);
         // Grab the frame on the very tick the pose was satisfied — the head is
         // at its furthest point now, and waiting even a few frames catches it
-        // already returning to neutral.
-        capturePose(challenge as FacePose);
-        challengeDescriptorsRef.current.push(detection.descriptor);
-        challengeIndexRef.current = nextIndex;
-        challengeStateRef.current = newChallengeState();
-        setChallengeIndex(nextIndex);
+        // already returning to neutral. The move only counts once the photo passes.
+        poseCheckingRef.current = true;
+        capturePose(challenge as FacePose).then((problem) => {
+          poseCheckingRef.current = false;
+          if (doneRef.current) return;
+          challengeStateRef.current = newChallengeState();
+          if (problem) {
+            const n = (poseRetriesRef.current[challenge as FacePose] ?? 0) + 1;
+            poseRetriesRef.current[challenge as FacePose] = n;
+            setRetryNotice(poseRetryMessage(problem, CHALLENGE_LABEL[challenge], n));
+            return; // same index: the person repeats only this move
+          }
+          setRetryNotice('');
+          challengeDescriptorsRef.current.push(descriptor);
+          challengeIndexRef.current = index + 1;
+          setChallengeIndex(index + 1);
+        });
       }
 
       rafRef.current = requestAnimationFrame(tick);
@@ -476,6 +566,12 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
     // would defeat the point of capturing evidence of a single session.
     posePhotosRef.current = {};
     poseBurstRef.current = {};
+    poseThumbsRef.current = {};
+    poseRetriesRef.current = {};
+    poseCheckingRef.current = false;
+    frontReadyRef.current = false;
+    setFrontReady(false);
+    setRetryNotice('');
     doneRef.current = false;
     setSequence(newSequence);
     setChallengeIndex(0);
@@ -510,7 +606,10 @@ const FaceLivenessCapture: React.FC<FaceLivenessCaptureProps> = ({ onComplete, o
 
       {state === 'challenge' && (
         <div className="flc-banner flc-banner--challenge">
-          <span className="flc-banner-step">{challengeIndex + 1}/{sequence.length}</span> {CHALLENGE_LABEL[currentChallenge]}
+          {retryNotice && <span className="flc-banner-retry" role="alert">{retryNotice}</span>}
+          {frontReady
+            ? <><span className="flc-banner-step">{challengeIndex + 1}/{sequence.length}</span> {CHALLENGE_LABEL[currentChallenge]}</>
+            : 'Mira de frente a la cámara y no te muevas'}
         </div>
       )}
 

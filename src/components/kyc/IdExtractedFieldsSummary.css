@@ -44,3 +44,11 @@
   color: var(--ion-color-medium, #92949c);
   margin-top: 8px;
 }
+
+/* The agent read this field but is not sure (lowConfidenceFields). */
+.id-extracted-field-check {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #b45309;
+}

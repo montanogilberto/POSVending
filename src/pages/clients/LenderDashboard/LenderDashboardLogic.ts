@@ -10,10 +10,8 @@ import { getAllLoans, Loan } from '../../../api/loanApi';
 import { fetchActiveLoanOffers, countPendingProposalsForLender } from '../../../api/loanMarketplaceApi';
 import { getAllClients, Client } from '../../../api/clientsApi';
 import { ledgerStatement, LedgerEntry } from '../../../api/bankingApi';
-import { getAllClientFaceRecognitions, upsertClientFaceRecognition, ClientFaceRecognition } from '../../../api/clientFaceRecognitionApi';
+import { getAllClientFaceRecognitions, ClientFaceRecognition } from '../../../api/clientFaceRecognitionApi';
 import { listContractsForClient } from '../../../api/digitalContractsApi';
-import { getStripeAccountStatus, createOrRefreshStripeAccount, StripeConnectedAccount } from '../../../api/stripeApi';
-import { buildKycPrefill, kycFieldsToIne } from '../../../utils/kycPrefill';
 import { onDataChanged } from '../../../utils/refreshBus';
 import { normStatus } from './LenderDashboardConstants';
 
@@ -92,84 +90,9 @@ export function useLenderDashboard() {
   const verificationDone = verificationSteps.filter(s => s.done).length;
   const verificationInReview = verificationSteps.some(s => (s as any).review);
 
-  // The lender's own client record (real email + phone captured at signup),
-  // used to seed the Stripe onboarding instead of the synthetic placeholder.
+  // The lender's own client record — prefills the CLABE holder name.
   const lenderClient = clients.find(c => Number(c.clientId) === lenderClientId);
   const lenderEmail = lenderClient?.email?.trim() || `client${lenderClientId}@posgmo.mx`;
-
-  // Stripe — lets the lender fund loan disbursements (money out to
-  // borrowers) and receive repayments (money back in). Same pattern as
-  // ClientDashboardPage.tsx's Payments tab.
-  const [stripeAccount, setStripeAccount] = useState<StripeConnectedAccount | null>(null);
-  const [stripeLoading, setStripeLoading] = useState(false);
-  const [stripeError, setStripeError] = useState('');
-  const [showStripeOnboarding, setShowStripeOnboarding] = useState(false);
-
-  const fetchStripeStatus = async () => {
-    if (!companyId || !lenderClientId) return;
-    console.log('[LenderDashboard] fetchStripeStatus →', { lenderClientId, companyId });
-    try {
-      const res = await getStripeAccountStatus(lenderClientId, companyId);
-      console.log('[LenderDashboard] fetchStripeStatus ✅', res);
-      setStripeAccount(res.account ?? null);
-    } catch (err) {
-      console.log('[LenderDashboard] fetchStripeStatus ❌', err);
-    }
-  };
-
-  const handleStripeKyc = async () => {
-    if (!companyId || !lenderClientId) return;
-    setStripeLoading(true);
-    setStripeError('');
-    try {
-      await createOrRefreshStripeAccount(lenderClientId, companyId, `client${lenderClientId}@posgmo.mx`);
-      await fetchStripeStatus();
-      setShowStripeOnboarding(true);
-    } catch (err) {
-      console.log('[LenderDashboard] handleStripeKyc ❌', err);
-      const raw = (err as Error).message ?? '';
-      // Raw Stripe errors are English, technical, and can even leak a
-      // dashboard.stripe.com link + request id (e.g. the platform-profile /
-      // "responsibilities of collecting requirements" config error). None of
-      // these are actionable by a lender, so show a friendly Spanish message
-      // and keep the real error in the console/logs for debugging.
-      const isPlatformOrInternal = /stripe\.com|platform-profile|responsibilities|req_[A-Za-z0-9]+/i.test(raw);
-      setStripeError(
-        isPlatformOrInternal
-          ? 'El registro de la cuenta de pago aún no está habilitado. Estamos configurándolo — inténtalo más tarde o contacta al administrador.'
-          : 'No se pudo iniciar el registro de la cuenta de pago. Inténtalo de nuevo.',
-      );
-    } finally {
-      setStripeLoading(false);
-    }
-  };
-
-  const handleStripeOnboardingExit = () => {
-    setShowStripeOnboarding(false);
-    fetchStripeStatus();
-  };
-
-  // Persist the lender's edited identity so their corrections survive and
-  // re-seed the form next time (not the raw OCR).
-  const handleIdentitySaved = async (f: Parameters<typeof kycFieldsToIne>[0]) => {
-    const ine = kycFieldsToIne(f);
-    try {
-      if (faceRecord?.clientFaceRecognitionId) {
-        await upsertClientFaceRecognition(
-          Number(companyId), lenderClientId, faceRecord.documentType,
-          { nombre: ine.nombre, domicilio: ine.domicilio, fechaNacimiento: ine.fechaNacimiento, rfc: ine.rfc },
-          faceRecord.clientFaceRecognitionId,
-        );
-        setFaceRecord((prev) => (prev ? { ...prev, ...ine } : prev));
-      }
-    } catch (e) { console.warn('[LenderDashboard] could not persist KYC identity edits:', e); }
-  };
-
-  // Seeded from the lender's captured INE + their real account email/phone.
-  const kycPrefill = buildKycPrefill(faceRecord ?? {}, {
-    email: lenderClient?.email,
-    cellphone: lenderClient?.cellphone,
-  });
 
   const fetchAll = async () => {
     if (!companyId) {
@@ -245,7 +168,6 @@ export function useLenderDashboard() {
   useEffect(() => {
     console.log('[LenderDashboard] initial-load effect: mounting, companyId =', companyId, 'lenderClientId =', lenderClientId);
     fetchAll();
-    fetchStripeStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, lenderClientId]);
 
@@ -255,7 +177,6 @@ export function useLenderDashboard() {
   useIonViewWillEnter(() => {
     console.log('[LenderDashboard] view re-entered → refreshing');
     fetchAll();
-    fetchStripeStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, lenderClientId]);
 
@@ -265,7 +186,6 @@ export function useLenderDashboard() {
     return onDataChanged((reason) => {
       console.log('[LenderDashboard] data-changed →', reason);
       fetchAll();
-      fetchStripeStatus();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, lenderClientId]);
@@ -347,11 +267,6 @@ export function useLenderDashboard() {
     // verification
     faceRecord, wizardStarting, handleStartVerification,
     verificationSteps, verificationDone, verificationInReview,
-    // stripe
-    stripeAccount, stripeLoading, stripeError, showStripeOnboarding,
-    setShowStripeOnboarding,
-    fetchStripeStatus, handleStripeKyc, handleStripeOnboardingExit,
-    handleIdentitySaved, kycPrefill,
     // kpis / metrics
     activeLoans, paidLoans, pendingLoans,
     totalDeployed, totalActive, totalRepaid, collectionRate, avgInterest,

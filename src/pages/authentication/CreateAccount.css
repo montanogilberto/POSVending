@@ -919,3 +919,44 @@
 }
 .ca-btn-next:active { transform: scale(0.97) translateY(0); }
 .ca-btn-next:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+/* Service chosen in the "Asistente GMO" (ServiceFinder), with a way back to it */
+.ca-service-chip-row {
+  display: flex;
+  justify-content: center;
+  padding: 12px 16px 0;
+}
+
+/* Business signup (owner-only): "Nombre de tu negocio" + owner summary */
+.ca-business {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ca-business-hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #FFFBEB;
+  color: #92400E;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ca-business-access {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+/* Phone-first contact: link to switch to the email-resume mode and back */
+.ca-contact-mode {
+  align-self: flex-start;
+  margin: -4px 0 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  --padding-start: 0;
+}

@@ -136,3 +136,12 @@
   font-size: 13px;
   font-weight: 600;
 }
+
+/* A pose had to be repeated (blurry, no face, or a copy of another pose). */
+.flc-banner-retry {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #fde68a;
+}

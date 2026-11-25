@@ -18,9 +18,10 @@ import {
   IonItem,
   IonCheckbox,
   IonIcon,
+  useIonAlert,
   IonSpinner,
 } from '@ionic/react';
-import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline } from 'ionicons/icons';
+import { checkmark, chevronForward, cameraOutline, refreshOutline, personOutline, idCardOutline, closeOutline } from 'ionicons/icons';
 import Header from '../../components/layout/Header';
 import AlertPopover from '../../components/popovers/AlertPopover';
 import MailPopover from '../../components/popovers/MailPopover';
@@ -32,10 +33,10 @@ import IdExtractedFieldsSummary from '../../components/kyc/IdExtractedFieldsSumm
 import ZoomableImage from '../../components/ui/ZoomableImage';
 import PresenceCapture, { PresenceCaptureResult } from '../../components/kyc/PresenceCapture';
 import SignaturePad from '../../components/kyc/SignaturePad';
-import SavedCardSetup from '../../components/payments/SavedCardSetup';
-import NativeConnectOnboarding from '../../components/payments/NativeConnectOnboarding';
-import { buildKycPrefill, kycFieldsToIne } from '../../utils/kycPrefill';
+import BankAccountLink from '../../components/payments/BankAccountLink';
+import { isPrimaryBankAccount, type BankAccount } from '../../api/bankingApi';
 import { actsAsLender } from '../../utils/productContext';
+import { ineVigenciaProblem, parseVigenciaYear } from '../../utils/ineVigencia';
 import { validateFaceSession, FaceValidationResult } from '../../api/faceValidationApi';
 import { useUser } from '../../contexts/UserContext';
 import { saveProfileImage } from '../../api/usersApi';
@@ -48,9 +49,10 @@ import {
   reverseGeocode,
   ContractSubmissionRequest,
   getAllClientFaceRecognitions,
+  fetchKycImageAsDataUrl,
 } from '../../api/clientFaceRecognitionApi';
 import { getFaceDescriptorFromImage, compareFaceDescriptors, distanceToConfidence } from '../../utils/faceLiveness';
-import { ExtractedIdFields, extractIneFields } from '../../utils/idOcr';
+import { ExtractedIdFields, extractIneFields, mergeOcrPass, frontNeedsAnotherPass, IdFieldSource } from '../../utils/idOcr';
 import { cropIneSignatureRegion } from '../../utils/signatureCrop';
 import { generateContractPdfBase64, generatePagarePdfBase64 } from '../../utils/contractPdf';
 
@@ -62,6 +64,9 @@ const EMPTY_EXTRACTED_ID_FIELDS: ExtractedIdFields = {
   curp: '',
   claveElector: '',
   fechaNacimiento: '',
+  cic: '',
+  ocr: '',
+  vigencia: '',
 };
 
 // Sub-steps inside the capture wizard step
@@ -78,6 +83,16 @@ type CaptureSubStep =
   | 'liveness-intro'  // "Mueve la cabeza..."
   | 'liveness-active' // liveness in progress
   | 'processing';     // "Cargando..."
+
+/** Non-empty identity values only — what the autosave writes onto the KYC record. */
+const idFieldsPatch = (fields: ExtractedIdFields): Partial<ExtractedIdFields> => {
+  const patch: Partial<ExtractedIdFields> = {};
+  (Object.keys(fields) as (keyof ExtractedIdFields)[]).forEach((k) => {
+    const v = String(fields[k] ?? '').trim();
+    if (v) patch[k] = v;
+  });
+  return patch;
+};
 
 const ClientFaceRecognitionPage: React.FC = () => {
   const { companyId, clientId: contextClientId, roleCode, setAvatarUrl, activeProduct } = useUser();
@@ -109,6 +124,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // Default "done" destination is role-aware: a lender must return to the LENDER
   // dashboard, not the borrower one. Only used when the caller didn't pass an
   // explicit returnTo (the lender/borrower dashboards do pass it).
+  const [presentAlert] = useIonAlert();
   const returnTo = location.state?.returnTo
     || (actsAsLender(roleCode, activeProduct)
           ? `/lender-dashboard/${deepLinkClientId ?? contextClientId}`
@@ -160,6 +176,8 @@ const ClientFaceRecognitionPage: React.FC = () => {
         if (record.idFrontImageBlobUrl) setIdFrontImageBlobUrl(record.idFrontImageBlobUrl);
         if (record.idBackImageBlobUrl) setIdBackImageBlobUrl(record.idBackImageBlobUrl);
         if (record.clientSelfieBlobUrl) setClientSelfieBlobUrl(record.clientSelfieBlobUrl);
+        // Presence video already recorded: resuming must not ask for it again.
+        if (record.presenceVideoBlobUrl) setPresenceVideoBlobUrl(record.presenceVideoBlobUrl);
         if (record.confidenceScore) setConfidenceScore(record.confidenceScore);
         setIsVerified(!!record.isVerified);
         setContractAccepted(!!record.contractAccepted);
@@ -175,8 +193,20 @@ const ClientFaceRecognitionPage: React.FC = () => {
           curp: record.curp ?? '',
           claveElector: record.claveElector ?? '',
           fechaNacimiento: record.fechaNacimiento ?? '',
+          // RFC-015: only present once the all-records SP returns them; '' until then.
+          cic: record.cic ?? '',
+          ocr: record.ocr ?? '',
+          vigencia: record.vigencia ?? '',
         };
-        if (Object.values(extracted).some(Boolean)) setExtractedIdFields(extracted);
+        if (Object.values(extracted).some(Boolean)) {
+          ocrSourceRef.current = Object.fromEntries(
+            (Object.keys(extracted) as (keyof ExtractedIdFields)[]).filter((k) => !!extracted[k]).map((k) => [k, 'saved']),
+          );
+          // Already on the record: the autosave has nothing new to write.
+          savedIdFieldsSigRef.current = JSON.stringify(idFieldsPatch(extracted));
+          extractedRef.current = extracted;
+          setExtractedIdFields(extracted);
+        }
 
         // Land on the first UNFINISHED step, which also makes every completed
         // step render green in the indicator (i < step). Previously a
@@ -196,12 +226,17 @@ const ClientFaceRecognitionPage: React.FC = () => {
         const resumeStep = record.contractAccepted
           ? (continueToPayments ? 5 : lastStepIndex)
           : record.isVerified ? 3
-          : (record.idFrontImageBlobUrl && record.idBackImageBlobUrl) ? 2
+          // Both INE sides saved but the face check not passed yet (an error, a
+          // failed attempt, or the app closed): back to the CAPTURE step, at the
+          // first capture still missing — never to the photos already taken.
+          : (record.idFrontImageBlobUrl && record.idBackImageBlobUrl) ? 1
           : 0;
         console.log('[Expediente] resume:', JSON.stringify({
           clientFaceRecognitionId: record.clientFaceRecognitionId,
           hasFront: !!record.idFrontImageBlobUrl,
           hasBack: !!record.idBackImageBlobUrl,
+          hasPresence: !!record.presenceVideoBlobUrl,
+          hasIdentityFields: Object.values(extracted).some(Boolean),
           isVerified: !!record.isVerified,
           contractAccepted: !!record.contractAccepted,
           continueToPayments,
@@ -209,7 +244,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         }));
         if (resumeStep > 0) {
           setStep(resumeStep);
-          if (resumeStep === 2) setCaptureSubStep('liveness-intro');
+          if (resumeStep === 1) setCaptureSubStep(record.presenceVideoBlobUrl ? 'liveness-intro' : 'presence-intro');
         }
       })
       .catch((err) => console.warn('[Expediente] resume: lookup failed, starting fresh', err))
@@ -234,9 +269,29 @@ const ClientFaceRecognitionPage: React.FC = () => {
   const [livenessStatus, setLivenessStatus] = useState<'idle' | 'ready' | 'in-progress' | 'completed' | 'failed'>('idle');
   const [idInfoConfirmed, setIdInfoConfirmed] = useState<boolean>(false);
   const [extractedIdFields, setExtractedIdFields] = useState<ExtractedIdFields>(EMPTY_EXTRACTED_ID_FIELDS);
+  // RFC-015: an expired (or unreadable) INE vigencia blocks the KYC — INE only;
+  // passports and licences expire differently.
+  const vigenciaProblem = documentType === 'INE' ? ineVigenciaProblem(extractedIdFields.vigencia) : null;
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrError, setOcrError] = useState('');
   const ocrRanForRef = useRef('');
+  // Field-level confidence + provenance of the extracted data (see mergeOcrPass).
+  const extractedRef = useRef(extractedIdFields);
+  extractedRef.current = extractedIdFields;
+  const ocrLowRef = useRef<Set<keyof ExtractedIdFields>>(new Set());
+  const ocrSourceRef = useRef<Partial<Record<keyof ExtractedIdFields, IdFieldSource>>>({});
+  const [ocrLowFields, setOcrLowFields] = useState<(keyof ExtractedIdFields)[]>([]);
+  // The capture the OCR results belong to; a result for an older photo is dropped.
+  const ocrCaptureKeyRef = useRef('');
+  // The in-flight first pass: the hi-res pass waits for it instead of racing it.
+  const ocrInFlightRef = useRef<Promise<void> | null>(null);
+  const ocrRunRef = useRef(0);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+  // Last identity-field set written to the KYC record (progress autosave).
+  const savedIdFieldsSigRef = useRef('');
+  // Full-resolution front, kept for the on-device selfie↔INE portrait match.
+  const idFrontHiResBase64Ref = useRef('');
   const [presenceResult, setPresenceResult] = useState<PresenceCaptureResult | null>(null);
   // Held in state (not just written straight to the upsert) because the face
   // validation agent scores the presence video alongside the pose photos.
@@ -249,16 +304,14 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // captures/scores update that same row instead of creating duplicates.
   const clientFaceRecognitionIdRef = useRef<number | undefined>(undefined);
 
-  // The payment step differs by role. Lenders (and 'both') RECEIVE money, so
-  // theirs is a payout account — a Custom connected account onboarded natively
-  // (NativeConnectOnboarding), which lets them receive repayments and withdraw
-  // to their CLABE. Borrowers are CHARGED for repayments, so theirs is a card
-  // on file (SavedCardSetup) on the platform account. Both run on the single
-  // POS GMO platform account; the one-time Connect platform-profile must be
-  // configured in the Stripe Dashboard for the lender path to create accounts.
-  const isPayoutClient =
-    selectedClient?.clientType === 'lender' || selectedClient?.clientType === 'both';
-  const paymentStepLabel = isPayoutClient ? 'Cuenta de pago' : 'Tarjeta';
+  // RFC-016 Fase 1: el paso de pago es el MISMO para todos los roles — la
+  // CLABE propia para SPEI directo (RFC-001, BankAccountLink). El prestatario
+  // la registra para recibir el préstamo; el prestamista, para recibir las
+  // cuotas. Ya no se manda identidad ni CLABE a Stripe (Connect) ni se guarda
+  // tarjeta para cobros automáticos: GMO Prestamos no mueve dinero de clientes.
+  const paymentStepLabel = 'Cuenta para SPEI';
+  // Se habilita "Continuar" cuando el cliente ya tiene una CLABE principal.
+  const [hasPrimaryClabe, setHasPrimaryClabe] = useState(false);
 
   // Firma (signature) is its own step now, split out of Contrato: the client
   // accepts the terms on step 3, then signs on step 4, then (if the launch
@@ -291,68 +344,140 @@ const ClientFaceRecognitionPage: React.FC = () => {
   // finish well before the review UI (now shown at the Contrato step) ever
   // appears.
   useEffect(() => {
-    if (!idFrontImageBase64 || !idBackImageBase64) return;
-    const key = `${idFrontImageBase64.length}:${idBackImageBase64.length}`;
-    if (ocrRanForRef.current === key) return;
-    ocrRanForRef.current = key;
+    // Fresh captures use the in-memory photos; a resumed expediente only has the
+    // saved blob URLs (the agent fetches those itself).
+    const frontSrc = idFrontImageBase64 || idFrontImageBlobUrl;
+    const backSrc = idBackImageBase64 || idBackImageBlobUrl;
+    if (!frontSrc || !backSrc) return;
+    // Resumed with the identity data already saved: nothing to re-read.
+    if (!idFrontImageBase64 && !idBackImageBase64 && Object.values(extractedRef.current).some(Boolean)) return;
 
-    let cancelled = false;
-    console.log('[Expediente] OCR effect: running OCR on front+back captures', JSON.stringify({
-      frontSource: idFrontImageBlobUrl ? 'blobUrl' : 'base64',
-      backSource: idBackImageBlobUrl ? 'blobUrl' : 'base64',
-      idFrontImageBlobUrl: idFrontImageBlobUrl || '(not uploaded yet)',
-      idBackImageBlobUrl: idBackImageBlobUrl || '(not uploaded yet)',
-    }));
-    setOcrLoading(true);
-    setOcrError('');
+    // Which photos these are (a new photo → a new key), and which pass.
+    const captureKey = `${idFrontImageBase64.length || idFrontImageBlobUrl}:${idBackImageBase64.length || idBackImageBlobUrl}`;
+    const passKey = `${captureKey}:${idFrontHiResBlobUrl}`;
+    if (ocrRanForRef.current === passKey) return;
+    ocrRanForRef.current = passKey;
+    if (ocrCaptureKeyRef.current !== captureKey) {
+      // A different photo: earlier confidence/provenance no longer applies.
+      ocrCaptureKeyRef.current = captureKey;
+      ocrLowRef.current = new Set();
+      ocrSourceRef.current = {};
+      setOcrLowFields([]);
+    }
 
-    // One call for both sides — the agent reconciles front/back itself, so
-    // the old two-call + merge dance is gone. Blob URLs are used when the
-    // early upload has already landed; base64 covers the case where it
-    // hasn't (or failed), so OCR still starts as soon as the captures exist.
-    extractIneFields({
-      frontUrl: idFrontImageBlobUrl || undefined,
-      backUrl: idBackImageBlobUrl || undefined,
-      frontBase64: idFrontImageBase64,
-      backBase64: idBackImageBase64,
-    })
-      .then(({ fields, lowConfidenceFields }) => {
-        if (cancelled) return;
-        console.log('[Expediente] OCR effect: result', JSON.stringify(fields), 'lowConfidence:', lowConfidenceFields);
-        // Merge, don't overwrite: a later/softer re-capture often reads small
-        // fields (CURP, claveElector) as empty, and a blind overwrite would wipe
-        // a value a sharper earlier capture already read correctly. Only replace
-        // a field when the new pass actually has a value for it; empty results
-        // keep whatever we already have. Fields stay manually editable downstream.
-        setExtractedIdFields((prev) => {
-          const merged = { ...prev };
-          (Object.keys(fields) as (keyof ExtractedIdFields)[]).forEach((k) => {
-            const v = fields[k];
-            if (typeof v === 'string' ? v.trim() : v) merged[k] = v;
-          });
-          return merged;
+    // The full-resolution front, when its upload has landed: CURP is the
+    // smallest text on the INE and sits on the anti-copy watermark, so the
+    // ~1100px OCR image can leave it unreadable (the agent returns "" rather
+    // than guess). The hi-res pass is a SECOND request for the same photo, so:
+    // it waits for the first pass (it used to cancel it and throw its result
+    // away), runs only if the first left a front field empty or unsure, and its
+    // result is merged field by field — it never makes a field worse.
+    const isHiResPass = !!idFrontHiResBlobUrl;
+    const source: IdFieldSource = isHiResPass ? 'ocr-hires' : 'ocr';
+    const run = async () => {
+      if (isHiResPass && ocrInFlightRef.current) await ocrInFlightRef.current;
+      if (ocrCaptureKeyRef.current !== captureKey) return; // a newer photo was taken
+      if (isHiResPass && Object.values(extractedRef.current).some(Boolean)
+          && !frontNeedsAnotherPass({ fields: extractedRef.current, low: ocrLowRef.current, source: ocrSourceRef.current })) {
+        console.log('[Expediente] OCR effect: hi-res pass skipped — first pass read every front field with confidence');
+        return;
+      }
+      const runId = ++ocrRunRef.current;
+      const frontUrl = idFrontHiResBlobUrl || idFrontImageBlobUrl;
+      console.log('[Expediente] OCR effect: running OCR', JSON.stringify({
+        pass: source,
+        frontSource: idFrontHiResBlobUrl ? 'hiResBlobUrl' : idFrontImageBlobUrl ? 'blobUrl' : 'base64',
+        backSource: idBackImageBlobUrl ? 'blobUrl' : 'base64',
+      }));
+      setOcrLoading(true);
+      setOcrError('');
+      try {
+        // One call for both sides — the agent reconciles front/back itself.
+        // Blob URLs when the upload has landed; base64 otherwise.
+        const result = await extractIneFields({
+          frontUrl: frontUrl || undefined,
+          backUrl: idBackImageBlobUrl || undefined,
+          frontBase64: idFrontImageBase64,
+          backBase64: idBackImageBase64,
         });
-      })
-      .catch((err) => {
+        if (!mountedRef.current || ocrCaptureKeyRef.current !== captureKey) return;
+        const merged = mergeOcrPass(
+          { fields: extractedRef.current, low: ocrLowRef.current, source: ocrSourceRef.current },
+          result,
+          source,
+        );
+        ocrLowRef.current = merged.low;
+        ocrSourceRef.current = merged.source;
+        extractedRef.current = merged.fields;
+        setOcrLowFields(Array.from(merged.low));
+        setExtractedIdFields(merged.fields);
+        // Which fields were read and where from — never their values (personal data).
+        console.log('[Expediente] OCR effect: result', JSON.stringify({
+          pass: source,
+          filled: (Object.keys(result.fields) as (keyof ExtractedIdFields)[]).filter((k) => !!result.fields[k]),
+          lowConfidence: result.lowConfidenceFields,
+          kept: merged.source,
+        }));
+      } catch (err) {
         console.log('[Expediente] OCR effect: FAILED', String(err));
-        if (!cancelled) {
+        if (mountedRef.current) {
           setOcrError('No se pudo leer la identificación automáticamente. Completa los datos manualmente.');
         }
-      })
-      .finally(() => {
-        if (!cancelled) setOcrLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
+      } finally {
+        if (mountedRef.current && runId === ocrRunRef.current) setOcrLoading(false);
+      }
     };
+    const p = run();
+    if (!isHiResPass) ocrInFlightRef.current = p.finally(() => {
+      if (ocrInFlightRef.current === p) ocrInFlightRef.current = null;
+    });
+    // No cleanup cancel: a dependency change (the hi-res URL landing) must not
+    // discard the first pass. Stale photos are dropped via ocrCaptureKeyRef.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idFrontImageBase64, idBackImageBase64]);
+  }, [idFrontImageBase64, idBackImageBase64, idFrontHiResBlobUrl, idFrontImageBlobUrl, idBackImageBlobUrl]);
 
-  // No pre-provision step here anymore: NativeConnectOnboarding creates the
-  // Custom connected account itself on identity submit (create-or-refresh is
-  // idempotent), so gating the form behind a separate create call only hid the
-  // form whenever that call failed (e.g. the Connect platform-profile 400).
+  // Progress autosave: the identity data read from the INE (and any correction
+  // typed by the person) goes onto the KYC record as soon as it settles, so an
+  // error, a crash or closing the app never loses it — the resume path reads it
+  // back. Only non-empty values are sent (the SP keeps the stored value for a
+  // missing key). The contract submit still sends the final reviewed values.
+  useEffect(() => {
+    if (!selectedClient?.clientId || !companyId) return;
+    const patch = idFieldsPatch(extractedIdFields);
+    if (!Object.keys(patch).length) return;
+    const sig = JSON.stringify(patch);
+    if (sig === savedIdFieldsSigRef.current) return;
+    const timer = setTimeout(async () => {
+      try {
+        const record = await upsertClientFaceRecognition(
+          Number(companyId),
+          Number(selectedClient.clientId),
+          documentType,
+          { companyId: Number(companyId), clientId: Number(selectedClient.clientId), ...patch },
+          clientFaceRecognitionIdRef.current,
+        );
+        clientFaceRecognitionIdRef.current = record.clientFaceRecognitionId;
+        savedIdFieldsSigRef.current = sig;
+        console.log('[Expediente] autosave: identity fields saved', JSON.stringify(Object.keys(patch)));
+      } catch (err) {
+        console.warn('[Expediente] autosave: identity fields not saved (will retry on next change)', String(err));
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extractedIdFields, selectedClient?.clientId, companyId]);
+
+  // A correction typed by the person is theirs: a later OCR pass never replaces it.
+  const handleIdFieldsChange = (next: ExtractedIdFields) => {
+    (Object.keys(next) as (keyof ExtractedIdFields)[]).forEach((k) => {
+      if (next[k] !== extractedRef.current[k]) {
+        ocrSourceRef.current = { ...ocrSourceRef.current, [k]: 'manual' };
+        ocrLowRef.current.delete(k);
+      }
+    });
+    setOcrLowFields(Array.from(ocrLowRef.current));
+    setExtractedIdFields(next);
+  };
 
   const validateStep = (): boolean => {
     if (step === 0) {
@@ -547,15 +672,47 @@ const ClientFaceRecognitionPage: React.FC = () => {
     console.log('[Expediente] handleLivenessComplete: liveness challenge finished, computing ID descriptor + match');
     setCaptureSubStep('processing');
     try {
-      const idDescriptor = await getFaceDescriptorFromImage(idFrontImageBase64);
-      if (!idDescriptor) {
-        console.log('[Expediente] handleLivenessComplete: no face found in ID image, aborting');
-        throw new Error('No se detectó un rostro en la identificación capturada. Vuelve a capturar el documento.');
+      // INE portrait for the on-device match. Best first: the full-resolution
+      // front (the ~1100px OCR image leaves the portrait tiny), then the OCR
+      // image, then — on a resumed expediente, where nothing is in memory — the
+      // saved photo. The first image where a face is found is used.
+      const candidates: { label: string; load: () => Promise<string> }[] = [
+        { label: 'hiRes', load: async () => idFrontHiResBase64Ref.current },
+        { label: 'ocrImage', load: async () => idFrontImageBase64 },
+        { label: 'savedBlob', load: () => fetchKycImageAsDataUrl(idFrontHiResBlobUrl || idFrontImageBlobUrl) },
+      ];
+      let idDescriptor: Float32Array | null = null;
+      let idSource = 'none';
+      let anyIdImage = false;
+      for (const c of candidates) {
+        const img = await c.load().catch(() => '');
+        if (!img) continue;
+        anyIdImage = true;
+        idDescriptor = await getFaceDescriptorFromImage(img).catch(() => null);
+        if (idDescriptor) { idSource = c.label; break; }
+      }
+      if (anyIdImage && !idDescriptor) {
+        // The INE photo itself is unusable — that is a capture problem, not a
+        // failed identity match: ask for the front again.
+        console.log('[Expediente] handleLivenessComplete: no face found in any INE image → retake the front');
+        throw Object.assign(
+          new Error('No encontramos tu rostro en la foto de tu INE. Vuelve a tomar el frente con buena luz y sin reflejos.'),
+          { retake: 'front' as const },
+        );
       }
 
-      const { distance, isMatch: localMatch } = compareFaceDescriptors(idDescriptor, result.descriptor);
-      const localConfidence = distanceToConfidence(distance);
-      console.log('[Expediente] handleLivenessComplete: LOCAL match — distance =', distance.toFixed(4), 'confidence =', localConfidence.toFixed(4), 'isMatch =', localMatch);
+      // No INE image could be loaded at all (e.g. a resumed session whose saved
+      // photo can't be read here): skip the local match and let the remote
+      // validator, which reads the saved URLs itself, decide.
+      const local = idDescriptor ? compareFaceDescriptors(idDescriptor, result.descriptor) : null;
+      const localMatch = local?.isMatch ?? false;
+      const localConfidence = local ? distanceToConfidence(local.distance) : 0;
+      console.log('[Expediente] handleLivenessComplete: LOCAL match', JSON.stringify({
+        idSource,
+        distance: local ? Number(local.distance.toFixed(4)) : null,
+        confidence: Number(localConfidence.toFixed(4)),
+        isMatch: localMatch,
+      }));
 
       const selfieBlobUrl = await uploadCapturedImage('selfie', result.selfieBase64);
 
@@ -596,6 +753,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
           ? { url: idFrontHiResBlobUrl || idFrontImageBlobUrl }
           : undefined,
       });
+      // Which INE image the validator received (front_hires vs the OCR front).
+      console.log('[Expediente] handleLivenessComplete: ineFront sent =',
+        idFrontHiResBlobUrl ? 'front_hires' : idFrontImageBlobUrl ? 'front' : 'none');
 
       // This flow's goal is extracting verified INE data, not a forensic
       // biometric clone-check, so the ON-DEVICE selfie↔INE face match is the
@@ -667,24 +827,34 @@ const ClientFaceRecognitionPage: React.FC = () => {
         // back to the capture that needs redoing (blurry/low-res INE → re-shoot
         // the ID front; anything else → redo the liveness challenge).
         const reasons = agentResult?.failureReasons ?? [];
-        const reasonText = reasons.length
-          ? reasons.join(' ')
-          : 'El rostro no coincide con la identificación. Vuelve a intentarlo.';
+        const reasonText = reasons.join(' ');
         const ineProblem = /\bine\b|portrait|identificaci|low[-\s]?res|blurr|borros/i.test(reasonText);
+        // Insufficient evidence is NOT a fraud rejection: only an explicit
+        // presentation-attack verdict reads as one. Blurry/duplicate photos are
+        // "we couldn't confirm it with these photos — repeat the capture".
+        const attack = agentResult?.presentationAttackDetected === true;
+        const lead = attack
+          ? 'No pudimos validar que la captura sea de una persona presente.'
+          : ineProblem
+            ? 'La foto de tu INE no es lo bastante clara para comparar tu rostro. Vuelve a tomar el frente.'
+            : 'No pudimos confirmar tu identidad con estas fotos. Repite la validación facial.';
+        const message = reasonText ? `${lead} Detalle: ${reasonText}` : lead;
         // setError (not setToastMessage) so the toast renders red (danger) and
         // the reason persists for handleContinueToContract's guard.
         setToastMessage('');
-        setError(reasonText);
+        setError(message);
         setShowToast(true);
         setStep(1);
         setCaptureSubStep(ineProblem ? 'front-capture' : 'liveness-intro');
       }
     } catch (err) {
-      console.log('[Expediente] handleLivenessComplete: FAILED', err);
+      console.log('[Expediente] handleLivenessComplete: FAILED', String(err));
       setLivenessStatus('failed');
       setError((err as Error).message ?? 'No se pudo completar la validación facial. Vuelve a intentarlo.');
       setShowToast(true);
-      setCaptureSubStep('liveness-intro');
+      // Everything captured so far is already saved (INE photos, presence, the
+      // extracted data); only the step that failed is repeated.
+      setCaptureSubStep((err as { retake?: string }).retake === 'front' ? 'front-capture' : 'liveness-intro');
     }
   };
 
@@ -735,6 +905,12 @@ const ClientFaceRecognitionPage: React.FC = () => {
   };
 
   const handleSubmitContract = async () => {
+    // Last guard (the Datos step already blocks it): never submit an expired INE.
+    if (vigenciaProblem) {
+      setError(vigenciaProblem);
+      setShowToast(true);
+      return;
+    }
     // confidenceScore now comes from the validation agent's whole-session
     // verdict, not the local two-descriptor comparison — 'scoreSource' makes
     // clear which produced it, because a local-fallback score means the agent
@@ -793,6 +969,10 @@ const ClientFaceRecognitionPage: React.FC = () => {
         curp: cap(extractedIdFields.curp, 18),
         claveElector: cap(extractedIdFields.claveElector, 20),
         fechaNacimiento: cap(extractedIdFields.fechaNacimiento, 10),
+        // RFC-015: digits only; the backend keeps them only at exactly 9 / 13 digits.
+        cic: cap(extractedIdFields.cic.replace(/\D/g, ''), 9),
+        ocr: cap(extractedIdFields.ocr.replace(/\D/g, ''), 13),
+        vigencia: String(parseVigenciaYear(extractedIdFields.vigencia) ?? ''),
       };
 
       const pdfParams = {
@@ -824,6 +1004,9 @@ const ClientFaceRecognitionPage: React.FC = () => {
         curp: idf.curp,
         claveElector: idf.claveElector,
         fechaNacimiento: idf.fechaNacimiento,
+        cic: idf.cic,
+        ocr: idf.ocr,
+        vigencia: idf.vigencia,
         contractAccepted: true,
         contractPdfBase64: generateContractPdfBase64(pdfParams),
         contractAcceptedAt: now,
@@ -876,6 +1059,18 @@ const ClientFaceRecognitionPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+
+  // ✕ in the wizard: leave without finishing, after a confirm (an accidental tap
+  // must not throw away the photos just taken). Goes where "done" would go.
+  const confirmExit = () => presentAlert({
+    header: '¿Salir de la verificación?',
+    message: 'Podrás continuar después desde tu panel. Lo que no hayas guardado se tendrá que capturar de nuevo.',
+    buttons: [
+      { text: 'Seguir aquí', role: 'cancel' },
+      { text: 'Salir', role: 'destructive', handler: () => { history.push(returnTo); } },
+    ],
+  });
 
   const StepBar = () => (
     <div className="wizard-step-indicator">
@@ -1066,7 +1261,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
         )}
         {step === 3 && (
           // Terms accepted here; signing happens on the next step (Firma).
-          <button className="wizard-footer-next" onClick={() => setStep(4)} disabled={!contractAccepted || !pagareAccepted}>
+          <button className="wizard-footer-next" onClick={() => setStep(4)} disabled={!contractAccepted || !pagareAccepted || !!vigenciaProblem}>
             Continuar <IonIcon icon={chevronForward} />
           </button>
         )}
@@ -1118,6 +1313,7 @@ const ClientFaceRecognitionPage: React.FC = () => {
             // base64 until the new upload lands.
             setIdFrontImageBlobUrl('');
             setIdFrontHiResBlobUrl('');
+            idFrontHiResBase64Ref.current = highResBase64 ?? '';
             setCaptureSubStep('front-review');
             uploadCapturedImage('front', base64);
             // Upload the full-res front separately (does NOT touch the record's
@@ -1402,14 +1598,14 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <div className="id-preview-grid ion-margin-top">
               <div className="id-preview-card">
                 <span className="id-preview-title">Frente</span>
-                {idFrontImageBase64
-                  ? <ZoomableImage src={idFrontImageBase64} alt="ID Front" className="captured-image captured-image-small" />
+                {(idFrontImageBase64 || idFrontImageBlobUrl)
+                  ? <ZoomableImage src={idFrontImageBase64 || idFrontImageBlobUrl} alt="ID Front" className="captured-image captured-image-small" />
                   : <div className="id-preview-placeholder">Sin captura</div>}
               </div>
               <div className="id-preview-card">
                 <span className="id-preview-title">Reverso</span>
-                {idBackImageBase64
-                  ? <ZoomableImage src={idBackImageBase64} alt="ID Back" className="captured-image captured-image-small" />
+                {(idBackImageBase64 || idBackImageBlobUrl)
+                  ? <ZoomableImage src={idBackImageBase64 || idBackImageBlobUrl} alt="ID Back" className="captured-image captured-image-small" />
                   : <div className="id-preview-placeholder">Sin captura</div>}
               </div>
             </div>
@@ -1438,16 +1634,20 @@ const ClientFaceRecognitionPage: React.FC = () => {
             <p><strong>Documento:</strong> {documentType || '—'}</p>
             <p><strong>Puntaje de confianza:</strong> {confidenceScore > 0 ? confidenceScore.toFixed(4) : '—'}</p>
             <p><strong>Estado:</strong> {isVerified ? 'Verificado ✓' : 'No verificado'}</p>
-            <p><strong>Presencia registrada:</strong> {presenceResult ? 'Sí ✓' : 'No'}</p>
+            <p><strong>Presencia registrada:</strong> {presenceResult || presenceVideoBlobUrl ? 'Sí ✓' : 'No'}</p>
             <p><strong>Contrato aceptado en:</strong> {contractAcceptedAt || 'Pendiente de envío'}</p>
           </div>
 
           <IdExtractedFieldsSummary
             fields={extractedIdFields}
-            onFieldsChange={setExtractedIdFields}
+            onFieldsChange={handleIdFieldsChange}
+            lowConfidence={ocrLowFields}
             ocrLoading={ocrLoading}
             ocrError={ocrError}
           />
+          {!ocrLoading && vigenciaProblem && (
+            <p className="cfr-vigencia-problem" role="alert">{vigenciaProblem}</p>
+          )}
 
           <IonContent className="contract-terms-content ion-padding" scrollY={true}>
             <p><strong>Términos y Condiciones del Contrato:</strong></p>
@@ -1505,76 +1705,41 @@ const ClientFaceRecognitionPage: React.FC = () => {
       </IonCard>
     );
 
-    // step === 5 — the payment step, reached after a successful contract
-    // submission. Borrowers register a repayment card; lenders onboard a native
-    // Custom connected account (payout destination). Both on the single POS GMO
-    // platform account — the lender path needs the one-time Connect
-    // platform-profile configured in the Stripe Dashboard.
+    // step === 5 — cuenta para SPEI (RFC-016 Fase 1), igual para todos los
+    // roles. La CLABE se guarda en bankAccounts y sólo se revela a la
+    // contraparte del préstamo (reveal_counterparty, auditado).
     if (deepLinkClientId && companyId) {
-      if (!isPayoutClient) {
-        // Borrower — card on file for automatic monthly repayment charges.
-        return (
-          <IonCard className="client-face-recognition-step-card">
-            <IonCardHeader>
-              <IonCardTitle>Paso 5: Tarjeta para cobros automáticos</IonCardTitle>
-            </IonCardHeader>
-            <IonCardContent>
-              <p>Registra la tarjeta con la que se cobrarán automáticamente las cuotas de tu préstamo cada mes.</p>
-              <SavedCardSetup
-                clientId={deepLinkClientId}
-                companyId={companyId}
-                onSaved={() => {
-                  console.log('[Expediente] step 5: repayment card saved, returning to', returnTo);
-                  setToastMessage('Tarjeta registrada correctamente.');
-                  setShowToast(true);
-                  history.push(returnTo);
-                }}
-              />
-            </IonCardContent>
-          </IonCard>
-        );
-      }
-      // Lender (or 'both') — native payout onboarding, rendered DIRECTLY (the
-      // form self-creates the Custom connected account on identity submit and
-      // surfaces its own errors inline, so it is no longer gated behind a
-      // separate pre-provision call that hid it whenever that call failed).
       return (
         <IonCard className="client-face-recognition-step-card">
           <IonCardHeader>
-            <IonCardTitle>Paso 5: Cuenta de pago</IonCardTitle>
+            <IonCardTitle>Paso 5: Cuenta para SPEI</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
-            <p>Registra tu cuenta bancaria o tarjeta de débito para recibir pagos.</p>
-            <NativeConnectOnboarding
+            <p>
+              Tu CLABE se guarda en GMO Prestamos y sólo se muestra a la otra persona
+              de tu préstamo para que te transfiera por SPEI.
+            </p>
+            <BankAccountLink
               clientId={deepLinkClientId}
-              companyId={companyId}
-              email={selectedClient?.email?.trim() || `client${deepLinkClientId}@posgmo.mx`}
-              onProgress={(done) => { if (done) history.push(returnTo); }}
-              // Persist the client's edited identity back onto their record so
-              // the corrections (name split, cleaned address, DOB) survive and
-              // re-seed the form next time instead of reverting to the raw OCR.
-              onIdentitySaved={async (f) => {
-                const ine = kycFieldsToIne(f);
-                setExtractedIdFields((prev) => ({ ...prev, ...ine }));
-                try {
-                  if (clientFaceRecognitionIdRef.current) {
-                    await upsertClientFaceRecognition(
-                      Number(companyId), Number(selectedClient?.clientId), documentType,
-                      { nombre: ine.nombre, domicilio: ine.domicilio, fechaNacimiento: ine.fechaNacimiento, rfc: ine.rfc },
-                      clientFaceRecognitionIdRef.current,
-                    );
-                    console.log('[Expediente] persisted edited KYC identity onto record', clientFaceRecognitionIdRef.current);
-                  }
-                } catch (e) { console.warn('[Expediente] could not persist KYC identity edits:', e); }
+              companyId={Number(companyId)}
+              holderName={extractedIdFields.nombre?.trim()
+                || (selectedClient ? `${selectedClient.first_name} ${selectedClient.last_name}`.trim() : '')}
+              onChanged={(accounts: BankAccount[]) => {
+                setHasPrimaryClabe(accounts.some(isPrimaryBankAccount));
               }}
-              // Seed Stripe's identity fields from the INE we just captured
-              // plus the client's real email/phone from their account, rather
-              // than making them retype it.
-              prefill={buildKycPrefill(extractedIdFields, {
-                email: selectedClient?.email,
-                cellphone: selectedClient?.cellphone,
-              })}
             />
+            <IonButton
+              expand="block"
+              disabled={!hasPrimaryClabe}
+              onClick={() => {
+                console.log('[Expediente] step 5: CLABE principal registrada, returning to', returnTo);
+                setToastMessage('Cuenta para SPEI registrada.');
+                setShowToast(true);
+                history.push(returnTo);
+              }}
+            >
+              Continuar
+            </IonButton>
           </IonCardContent>
         </IonCard>
       );
@@ -1609,6 +1774,17 @@ const ClientFaceRecognitionPage: React.FC = () => {
       />
 
       <IonContent fullscreen className="ion-padding client-face-recognition-page">
+        <div className="cfr-topbar">
+          <IonButton
+            fill="clear"
+            className="cfr-close"
+            aria-label="Cerrar verificación"
+            disabled={loading}
+            onClick={confirmExit}
+          >
+            <IonIcon icon={closeOutline} slot="icon-only" />
+          </IonButton>
+        </div>
         <StepBar />
         {renderStepContent()}
       </IonContent>

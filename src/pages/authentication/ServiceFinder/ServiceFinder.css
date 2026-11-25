@@ -1,0 +1,338 @@
+/* ServiceFinder — "Asistente GMO" questionnaire shown before the signup wizard.
+   Colors follow CreateAccount.css (light wizard on #F4F6F9). */
+
+.sf-wrap {
+  --sf-accent: #2563eb;
+  --sf-text: #0f172a;
+  --sf-muted: #64748b;
+  --sf-border: #e2e8f0;
+  --sf-card: #ffffff;
+  padding: 20px 16px 8px;
+}
+
+.sf-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sf-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.sf-head-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--sf-text);
+}
+
+.sf-head-sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--sf-muted);
+}
+
+.sf-progress {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--sf-accent);
+}
+
+.sf-bubble {
+  background: var(--sf-card);
+  border: 1px solid var(--sf-border);
+  border-radius: 4px 18px 18px 18px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.sf-bubble-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--sf-text);
+}
+
+.sf-bubble-sub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--sf-muted);
+}
+
+.sf-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* IonCard resets so it reads as a tappable answer row */
+.sf-option,
+.sf-service {
+  margin: 0;
+  box-shadow: none;
+  border: 1.5px solid var(--sf-border);
+  border-radius: 14px;
+  --background: var(--sf-card);
+  --color: var(--sf-text);
+}
+
+.sf-option::part(native),
+.sf-service::part(native) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.sf-option:hover,
+.sf-service:hover {
+  border-color: var(--sf-accent);
+}
+
+.sf-option-emoji {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.sf-option-label {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.sf-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sf-section-label {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sf-muted);
+}
+
+.sf-service--pos        { --sf-svc: #2563eb; --sf-svc-bg: #eff6ff; }
+.sf-service--smartloans { --sf-svc: #059669; --sf-svc-bg: #ecfdf5; }
+.sf-service--factory    { --sf-svc: #7c3aed; --sf-svc-bg: #f5f3ff; }
+.sf-service--arcade     { --sf-svc: #d97706; --sf-svc-bg: #fffbeb; }
+
+.sf-service--highlight {
+  border-color: var(--sf-svc);
+  border-width: 2px;
+  --background: var(--sf-svc-bg);
+}
+
+.sf-service-icon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--sf-svc);
+  background: var(--sf-svc-bg);
+}
+
+.sf-service--highlight .sf-service-icon {
+  background: #ffffff;
+}
+
+.sf-service-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--sf-muted);
+}
+
+.sf-service-text strong {
+  font-size: 15px;
+  color: var(--sf-text);
+}
+
+.sf-service-desc {
+  margin-top: 4px;
+  color: var(--sf-text);
+}
+
+.sf-service-host {
+  font-size: 11px;
+  color: var(--sf-svc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-service-go {
+  font-size: 18px;
+  color: var(--sf-muted);
+  flex-shrink: 0;
+}
+
+.sf-service-spin {
+  width: 20px;
+  height: 20px;
+  color: var(--sf-svc);
+  flex-shrink: 0;
+}
+
+.sf-actions {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.sf-footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sf-border);
+}
+
+.sf-login-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sf-accent);
+}
+
+.sf-wrap ion-button {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+/* ── Free-text path (service_finder agent) ─────────────────────────────── */
+
+.sf-freetext {
+  margin-top: 16px;
+}
+
+.sf-freetext-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sf-muted);
+}
+
+.sf-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sf-composer-input {
+  flex: 1;
+  --background: var(--sf-card);
+  --color: var(--sf-text);
+  --placeholder-color: var(--sf-muted);
+  --padding-start: 14px;
+  --padding-end: 14px;
+  border: 1.5px solid var(--sf-border);
+  border-radius: 14px;
+  min-height: 48px;
+  font-size: 15px;
+}
+
+.sf-composer-send {
+  margin: 0;
+  width: 48px;
+  height: 48px;
+  --border-radius: 14px;
+  --background: var(--sf-accent);
+  --padding-start: 0;
+  --padding-end: 0;
+  --box-shadow: none;
+}
+
+.sf-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sf-msg {
+  max-width: 85%;
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.4;
+  border-radius: 18px;
+}
+
+.sf-msg--assistant {
+  align-self: flex-start;
+  background: var(--sf-card);
+  border: 1px solid var(--sf-border);
+  border-top-left-radius: 4px;
+  color: var(--sf-text);
+}
+
+.sf-msg--visitor {
+  align-self: flex-end;
+  background: var(--sf-accent);
+  border-top-right-radius: 4px;
+  color: #ffffff;
+}
+
+.sf-typing {
+  display: flex;
+  gap: 4px;
+  padding: 14px 16px;
+}
+
+.sf-typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sf-muted);
+  animation: sf-dot 1.2s infinite ease-in-out;
+}
+
+.sf-typing span:nth-child(2) { animation-delay: 0.15s; }
+.sf-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes sf-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+
+.sf-chat-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sf-chat-option {
+  margin: 0;
+  --color: var(--sf-accent);
+  border-color: var(--sf-accent);
+}
+
+.sf-bubble-agent {
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: var(--sf-text);
+}

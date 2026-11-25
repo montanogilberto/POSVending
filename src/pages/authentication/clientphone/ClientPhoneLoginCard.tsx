@@ -8,7 +8,7 @@ import { maskPhone } from '../../../utils/biometricAuth';
 /** "•••• 8224" — the greeting never shows the full number. */
 const maskPhoneTail = (phone: string) => `•••• ${phone.replace(/\D/g, '').slice(-4)}`;
 import { PIN_LENGTH } from '../../../utils/pin';
-import type { ClientPhoneLoginVM } from './ClientPhoneLoginLogic';
+import { channelPhrase, type ClientPhoneLoginVM } from './ClientPhoneLoginLogic';
 
 const Spin: React.FC<{ loading: boolean; label: string }> = ({ loading, label }) =>
   loading ? <IonSpinner name="dots" /> : <>{label}</>;
@@ -57,19 +57,25 @@ const ClientPhoneLoginCard: React.FC<{ vm: ClientPhoneLoginVM }> = ({ vm }) => (
       <>
         <h2 className="login-card-title">Ingresa el código</h2>
         <p className="login-card-subtitle">
-          Enviamos un código por {vm.codeChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'} al {vm.phone}
+          {vm.codeChannel === 'push'
+            ? `Te enviamos el código a tu app GMO (${maskPhoneTail(vm.phone)})`
+            : `Enviamos un código ${channelPhrase(vm.codeChannel)} al ${vm.phone}`}
         </p>
         <form onSubmit={vm.submitCode} className="login-form">
           <div className="login-field">
-            <IonLabel className="login-label">Código</IonLabel>
-            <IonInput
+            <IonLabel className="login-label pin-input-label">Código</IonLabel>
+            <PinInput
               ref={vm.codeInputRef}
-              type="text" inputmode="numeric" maxlength={6} placeholder="000000" className="login-input"
-              autocomplete="one-time-code"
-              onIonInput={e => { vm.codeRef.current = (e.detail.value ?? ''); }}
+              length={vm.codeLength}
+              value={vm.code} onChange={vm.setCode} disabled={vm.loading} autoFocus
+              autocomplete="one-time-code" ariaLabel="Código"
+              onComplete={value => { void vm.submitCode(undefined, value); }}
             />
           </div>
-          <IonButton type="submit" expand="block" disabled={vm.loading} className="login-submit-btn">
+          <IonButton
+            type="submit" expand="block" className="login-submit-btn"
+            disabled={vm.loading || vm.code.length < vm.codeLength}
+          >
             <Spin loading={vm.loading} label="Verificar" />
           </IonButton>
           <IonButton type="button" expand="block" fill="clear" disabled={vm.loading} onClick={() => vm.resendCode('sms')}>

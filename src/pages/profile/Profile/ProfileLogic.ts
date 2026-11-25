@@ -18,7 +18,7 @@ import {
   getAllClientFaceRecognitions, ClientFaceRecognition,
 } from '../../../api/clientFaceRecognitionApi';
 import { listBankAccounts, BankAccount } from '../../../api/bankingApi';
-import { getStripeAccountStatus, getSavedPaymentMethod, StripeConnectedAccount, SavedPaymentMethod } from '../../../api/stripeApi';
+import { getSavedPaymentMethod, SavedPaymentMethod } from '../../../api/stripeApi';
 import { listContractsForClient, DigitalContract } from '../../../api/digitalContractsApi';
 import { ProfileForm } from './ProfileTypes';
 
@@ -156,7 +156,6 @@ export function useProfile() {
 
   // ── Cuentas de pago (ambos rieles) + tarjeta guardada ────────────────────
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [stripeAccount, setStripeAccount] = useState<StripeConnectedAccount | null>(null);
   const [savedCard, setSavedCard] = useState<SavedPaymentMethod | null>(null);
   const [loadingPayments, setLoadingPayments] = useState(true);
 
@@ -182,17 +181,15 @@ export function useProfile() {
 
     setLoadingPayments(true);
     try {
-      const [banks, stripe, card] = await Promise.all([
+      // RFC-016 Fase 2: sólo CLABE (+ tarjeta guardada, por si aplica a la
+      // comisión de conexión — D10). Ya no se consulta la cuenta de Stripe Connect.
+      const [banks, card] = await Promise.all([
         listBankAccounts(coId, cid).catch(() => [] as BankAccount[]),
-        getStripeAccountStatus(cid, coId).catch(() => ({ account: null })),
         getSavedPaymentMethod(cid, coId).catch(() => null),
       ]);
       setBankAccounts(banks);
-      setStripeAccount(stripe.account ?? null);
       setSavedCard(card);
-      console.log('[Profile] payments ✅', JSON.stringify({
-        clabes: banks.length, hasStripeAccount: !!stripe.account, hasCard: !!card,
-      }));
+      console.log('[Profile] payments ✅', JSON.stringify({ clabes: banks.length, hasCard: !!card }));
     } catch (err) {
       console.log('[Profile] payments ❌', String(err));
     } finally {
@@ -209,7 +206,7 @@ export function useProfile() {
     handleSave, cancelEdit,
     biometricSupported, biometricEnabled, handleBiometricToggle, handlePasswordTap,
     faceRecord, contracts, loadingDocs,
-    bankAccounts, stripeAccount, savedCard, loadingPayments,
+    bankAccounts, savedCard, loadingPayments,
     toastProps,
   };
 }

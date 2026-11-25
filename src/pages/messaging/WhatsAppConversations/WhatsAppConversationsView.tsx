@@ -21,8 +21,8 @@ const WhatsAppConversationsView: React.FC = () => {
         {...pops.headerProps}
         screenTitle="Conversaciones WhatsApp"
         showBackButton={true}
-        backButtonText="Agente"
-        backButtonHref="/whatsapp-agent"
+        backButtonText={vm.back.text}
+        backButtonHref={vm.back.href}
       />
       <AlertPopover {...pops.alertPopoverProps} />
       <MailPopover {...pops.mailPopoverProps} />

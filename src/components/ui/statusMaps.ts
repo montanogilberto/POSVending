@@ -186,6 +186,7 @@ export const LAUNDRY_USE_STATUS: Record<string, StatusMeta> = {
 export const RESERVATION_STATUS: Record<string, StatusMeta> = {
   pending:   { label: 'Pendiente',  color: 'warning' },
   confirmed: { label: 'Confirmada', color: 'success' },
+  completed: { label: 'Completada', color: 'primary' },
   cancelled: { label: 'Cancelada',  color: 'medium'  },
 };
 

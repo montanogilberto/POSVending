@@ -83,7 +83,7 @@ import {
   compassOutline,
   briefcaseOutline,
   sparklesOutline,
-  megaphoneOutline,
+  megaphoneOutline, calendarOutline,
   mapOutline,
   searchOutline,
 }
@@ -195,6 +195,7 @@ import BowlingPage from './pages/game/BowlingPage';
 import VoiceCallPage from './pages/messaging/VoiceCallPage';
 import AgentPage from './pages/system/AgentPage';
 import AgentCompanySettingPage from './pages/system/AgentCompanySettingPage';
+import ReservationsPage from './pages/pos/ReservationsPage';
 import OperationalNoticePage from './pages/system/OperationalNoticePage';
 
 /* Core/Theme CSS */
@@ -215,7 +216,7 @@ import { IncomeProvider } from './contexts/IncomeContext';
 import { ProductProvider } from './contexts/ProductContext';
 import { useUser } from './contexts/UserContext';
 import { getOneUser, pickProfileImageUrl } from './api/usersApi';
-import { canAccess, ROLE_LABELS, UiFeature } from './config/rolePermissions';
+import { canAccess, canUseWhatsAppChat, ROLE_LABELS, UiFeature, WHATSAPP_CHAT_FEATURES } from './config/rolePermissions';
 import { useRoleCatalogVersion } from './hooks/useRoleCatalogVersion';
 import { menuController } from '@ionic/core/components';
 import { useMenuSearch } from './hooks/useMenuSearch';
@@ -244,8 +245,9 @@ interface PrivateRouteProps {
   exact?: boolean;
   /** Staff-only screen: also requires canAccess(roleCode, feature). The side
    * menu already hides these items, but without this a lower role could still
-   * open them by typing the URL. Denied → the role's own landing page. */
-  feature?: UiFeature;
+   * open them by typing the URL. Denied → the role's own landing page.
+   * An array means any one of them is enough. */
+  feature?: UiFeature | readonly UiFeature[];
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({
@@ -260,7 +262,8 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({
       {...rest}
       render={(props) => {
         if (!isAuthenticated) return <Redirect to="/login" />;
-        if (feature && !canAccess(roleCode, feature)) {
+        const features = feature === undefined ? [] : Array.isArray(feature) ? feature : [feature];
+        if (features.length && !features.some(f => canAccess(roleCode, f))) {
           console.warn('[PrivateRoute] role', roleCode, 'lacks feature', feature, '→ redirecting from', props.location.pathname);
           return <Redirect to={getPostLoginRoute(roleCode, clientId)} />;
         }
@@ -283,7 +286,7 @@ const POS_ONLY_ROUTE_PREFIXES = [
   '/categories', '/alerts', '/emails', '/users', '/ingresos', '/egresos',
   '/accounting', '/water-tanks', '/receipt', '/suppliers', '/services', '/employees', '/company-payment-accounts',
   '/clientFaceRecognitions', '/manufacturing', '/rewards', '/pos-rewards',
-  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent', '/demand-map', '/ai-agents', '/operational-notices',
+  '/game/', '/arcade', '/pushNotifications', '/notification-dispatch-log', '/whatsapp-agent', '/demand-map', '/ai-agents', '/operational-notices', '/reservations',
   '/notifications', '/setting', '/profile', '/pos-support', '/my-qr',
 ];
 
@@ -607,7 +610,7 @@ const AppShell: React.FC = () => {
 
   // LinkedIn-style WhatsApp dock: staff who attend customers (same access as Agente WhatsApp).
   const showWhatsAppDock = !isSmartLoansRole && !isClientRole && !isOwnDashboardProduct
-    && canAccess(roleCode, 'notificationDispatchLog');
+    && canUseWhatsAppChat(roleCode);
 
   return (
     <>
@@ -944,6 +947,15 @@ const AppShell: React.FC = () => {
             </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'clients') && (
+              <IonItem button routerLink="/reservations" title="Reservaciones">
+                <IonIcon icon={calendarOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Reservaciones</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'operationalNotices') && (
               <IonItem button routerLink="/operational-notices" title="Avisos operativos">
                 <IonIcon icon={megaphoneOutline} slot="start" />
@@ -959,6 +971,15 @@ const AppShell: React.FC = () => {
               <IonItem button routerLink="/whatsapp-agent" title="Agente WhatsApp">
                 <IonIcon icon={logoWhatsapp} slot="start" />
                 {!menuCollapsed && <IonLabel>Agente WhatsApp</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
+
+            <IonMenuToggle autoHide={false}>
+              {!canAccess(roleCode, 'notificationDispatchLog') && canUseWhatsAppChat(roleCode) && (
+              <IonItem button routerLink="/whatsapp-agent/conversations" title="Conversaciones WhatsApp">
+                <IonIcon icon={chatbubblesOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Conversaciones</IonLabel>}
               </IonItem>
               )}
             </IonMenuToggle>
@@ -1193,8 +1214,10 @@ const AppShell: React.FC = () => {
             <PrivateRoute exact path="/demand-map" feature="demandMap" component={DemandMapPage} />
             <PrivateRoute exact path="/ai-agents" feature="agents" component={AgentPage} />
             <PrivateRoute exact path="/ai-agents/settings" feature="agents" component={AgentCompanySettingPage} />
+            {/* 'clients': staff roles only (customer names and phones); a new feature would need a DB change first. */}
+            <PrivateRoute exact path="/reservations" feature="clients" component={ReservationsPage} />
             <PrivateRoute exact path="/operational-notices" feature="operationalNotices" component={OperationalNoticePage} />
-            <PrivateRoute exact path="/whatsapp-agent/conversations" feature="notificationDispatchLog" component={WhatsAppConversationsPage} />
+            <PrivateRoute exact path="/whatsapp-agent/conversations" feature={WHATSAPP_CHAT_FEATURES} component={WhatsAppConversationsPage} />
             <PrivateRoute exact path="/whatsapp-agent/setup" feature="notificationDispatchLog" component={WhatsAppSetupPage} />
             <PrivateRoute exact path="/notifications" component={NotificationsInboxPage} />
             <PrivateRoute exact path="/notifications/detail/:pushNotificationId?" component={NotificationDetailPage} />

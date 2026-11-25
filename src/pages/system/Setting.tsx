@@ -72,14 +72,6 @@ interface ModuleDef {
  * every factory module registers itself. Used when that request fails or is empty. */
 const FALLBACK_MODULES: ModuleDef[] = [
   {
-    name: 'POS',
-    features: [
-      { code: 'pos',       label: 'Vending POS', icon: cashOutline },
-      { code: 'scannerqr', label: 'Lector QR',   icon: qrCodeOutline },
-      { code: 'laundry',   label: 'Lavandería',  icon: waterOutline },
-    ],
-  },
-  {
     name: 'Catálogo',
     features: [
       { code: 'clients',    label: 'Clientes',   icon: peopleOutline },
@@ -97,6 +89,7 @@ const FALLBACK_MODULES: ModuleDef[] = [
       { code: 'pushNotifications', label: 'Notificaciones', icon: notificationsOutline },
       { code: 'manufacturing',     label: 'Manufactura',    icon: cogOutline },
       { code: 'voiceCalls', label: 'Llamadas de voz', icon: callOutline },
+      { code: 'whatsappChat', label: 'Conversaciones WhatsApp', icon: mailOutline },
     ],
   },
   {
@@ -106,7 +99,6 @@ const FALLBACK_MODULES: ModuleDef[] = [
       { code: 'companyPaymentAccounts', label: 'Cuentas de cobro', icon: cartOutline },
       { code: 'ingresos', label: 'Ingresos',      icon: barChartOutline },
       { code: 'egresos',  label: 'Egresos',       icon: trendingDownOutline },
-      { code: 'sells',    label: 'Ventas',        icon: cartOutline },
       { code: 'settings', label: 'Configuración', icon: settingsOutline },
       { code: 'loans', label: 'Préstamos', icon: cashOutline },
       { code: 'clientFaceRecognitions', label: 'Reconocimiento Facial', icon: shieldCheckmarkOutline },
@@ -128,13 +120,23 @@ const ICONS: Record<string, string> = {
   fingerPrintOutline, gameControllerOutline,
 };
 
-const SECTION_ORDER = ['POS', 'Catálogo', 'Mensajes', 'Administración', 'IOT', 'Entretenimiento'];
+const SECTION_ORDER = ['Catálogo', 'Mensajes', 'Administración', 'IOT', 'Entretenimiento'];
+
+/** POS / Lector QR / Lavandería are enabled per company (companyId), not toggled
+ * per role here — hidden from this screen. Their role grants are left untouched:
+ * handleSave sends the role's full set, including these hidden codes. */
+const COMPANY_SCOPED_SECTIONS = new Set(['POS']);
+const COMPANY_SCOPED_FEATURES = new Set<string>(['pos', 'scannerqr', 'laundry']);
+/** Retired from this screen: money is tracked as Ingresos/Egresos, not Ventas. */
+const RETIRED_FEATURES = new Set<string>(['sells']);
 
 /** Group registry rows into /setting cards; rows without a section are not configurable here. */
 function modulesFromRegistry(rows: ApiUiFeature[]): ModuleDef[] {
   const bySection = new Map<string, FeatureDef[]>();
   for (const row of rows) {
     if (!row.section) continue;
+    if (COMPANY_SCOPED_SECTIONS.has(row.section) || COMPANY_SCOPED_FEATURES.has(row.featureCode)
+      || RETIRED_FEATURES.has(row.featureCode)) continue;
     const list = bySection.get(row.section) ?? [];
     list.push({
       code: row.featureCode as UiFeature,

@@ -139,6 +139,56 @@ export function computeCaptureSharpness(imageData: ImageData): number {
   return count === 0 ? 0 : sum / count;
 }
 
+// Sensor noise (Immerkaer 1996 sigma estimate) of the final captured crop.
+// Low-light grain inflates every gradient score, computeCaptureSharpness
+// included, so noise is measured on its own. The kernel cancels flat areas and
+// linear ramps, leaving mostly noise.
+export function computeCaptureNoise(imageData: ImageData): number {
+  const { data, width: w, height: h } = imageData;
+  if (w < 3 || h < 3) return 0;
+  const g = toGrayscale(data, w, h);
+  let sum = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      sum += Math.abs(
+        g[i - w - 1] - 2 * g[i - w] + g[i - w + 1] -
+        2 * g[i - 1] + 4 * g[i] - 2 * g[i + 1] +
+        g[i + w - 1] - 2 * g[i + w] + g[i + w + 1]
+      );
+    }
+  }
+  return (Math.sqrt(Math.PI / 2) * sum) / (6 * (w - 2) * (h - 2));
+}
+
+// Strong-edge gradient (p99, after a 2x box downsample that averages grain
+// out) over the noise sigma. LOGGED ONLY, not a gate: it needs real wizard
+// captures before a reachable threshold can be chosen.
+export function computeEdgeSnr(imageData: ImageData, noise: number): number {
+  const { data, width, height } = imageData;
+  const w = Math.floor(width / 2);
+  const h = Math.floor(height / 2);
+  if (w < 3 || h < 3) return 0;
+  const gray = toGrayscale(data, width, height);
+  const half = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = 2 * y * width + 2 * x;
+      half[y * w + x] = (gray[i] + gray[i + 1] + gray[i + width] + gray[i + width + 1]) / 4;
+    }
+  }
+  const magnitudes = new Float32Array((w - 2) * (h - 2));
+  let n = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      magnitudes[n++] = Math.hypot(half[i + 1] - half[i - 1], half[i + w] - half[i - w]);
+    }
+  }
+  magnitudes.sort();
+  return magnitudes[Math.floor((n - 1) * 0.99)] / Math.max(noise, 0.1);
+}
+
 export interface CardGeometry {
   detected: boolean;
   // Fraction of the analysed frame the card actually occupies. The blurry

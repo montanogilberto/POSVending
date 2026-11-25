@@ -88,7 +88,10 @@ export type UiFeature =
   | 'voiceCalls'
   | 'demandMap'
   | 'agents'
-  | 'operationalNotices';
+  | 'operationalNotices'
+  // Attend customers in the WhatsApp chat (inbox + dock + Conversaciones on
+  // the client dashboard) — without the agent dashboard/setup/dispatch log.
+  | 'whatsappChat';
 
 export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
   admin: [
@@ -100,7 +103,7 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'loans', 'clientDashboards', 'clientFaceRecognitions',
     'manufacturing', 'pushNotifications', 'notificationDispatchLog',
     'rewards', 'loanChat', 'p2pLending', 'game', 'arcade', 'companyPaymentAccounts',
-    'voiceCalls', 'demandMap', 'agents', 'operationalNotices',
+    'voiceCalls', 'demandMap', 'agents', 'operationalNotices', 'whatsappChat',
   ],
   manager: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
@@ -108,11 +111,11 @@ export const ROLE_UI: Record<RoleCode, readonly UiFeature[]> = {
     'ingresos', 'egresos', 'accounting',
     'clientDashboards', 'manufacturing', 'notificationDispatchLog',
     'rewards', 'game', 'arcade', 'companyPaymentAccounts',
-    'voiceCalls', 'demandMap', 'agents', 'operationalNotices',
+    'voiceCalls', 'demandMap', 'agents', 'operationalNotices', 'whatsappChat',
   ],
   employee: [
     'laundry', 'pos', 'posRewards', 'scannerqr', 'sells',
-    'clients',
+    'clients', 'whatsappChat',
     'rewards', 'game', 'arcade',
   ],
   borrower: [
@@ -228,6 +231,13 @@ export const canAccess = (roleCode: RoleCode | string | undefined, feature: UiFe
   const role = normalizeRoleCode(roleCode);
   return (ROLE_UI[role] as readonly string[]).includes(feature);
 };
+
+/** WhatsApp customer chat (inbox, dock, client-dashboard Conversaciones).
+ * 'notificationDispatchLog' still counts so admins/managers keep the chat in an
+ * environment where the 'whatsappChat' grant migration has not run yet. */
+export const WHATSAPP_CHAT_FEATURES: readonly UiFeature[] = ['whatsappChat', 'notificationDispatchLog'];
+export const canUseWhatsAppChat = (roleCode: RoleCode | string | undefined): boolean =>
+  WHATSAPP_CHAT_FEATURES.some(f => canAccess(roleCode, f));
 
 /** Staff roles operate on behalf of a company (any clientId is legitimately
  * theirs to view). Everyone else is a self-service session — always pinned

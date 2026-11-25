@@ -108,10 +108,10 @@ import { notifyDataChanged } from '../../utils/refreshBus';
 import { fmtMXN as fmt } from '../../utils/format';
 import { useToast } from '../../hooks/useToast';
 import './LoanPaymentPage.css';
-import { API_BASE_URL } from '../../utils/appEnv';
+import { API_BASE_URL, STRIPE_PUBLISHABLE_KEY } from '../../utils/appEnv';
 
 // ── Stripe publishable key (safe to expose in frontend) ────────────────────
-const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_YOUR_PUBLISHABLE_KEY';
+const STRIPE_PK = STRIPE_PUBLISHABLE_KEY;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 // Comisión Stripe México por cargo exitoso: 3.6% + $3 MXN + IVA (16%) sobre la
@@ -172,7 +172,7 @@ const LoanPaymentPage: React.FC = () => {
       setLoading(true);
       try {
         const [stripe, acct] = await Promise.all([
-          loadStripe(STRIPE_PK),
+          STRIPE_PK ? loadStripe(STRIPE_PK) : Promise.resolve(null),
           getConnectedAccount(clientId, companyId),
         ]);
         stripeRef.current = stripe;
