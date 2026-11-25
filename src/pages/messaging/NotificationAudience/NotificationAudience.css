@@ -1,0 +1,51 @@
+/* src/pages/messaging/NotificationAudience/NotificationAudience.css */
+.notificationAudience-content {
+  --background: var(--ion-color-light);
+}
+
+.notificationAudience-container {
+  max-width: 500px;
+  margin: 20px auto;
+  padding: 0;
+}
+
+.notificationAudience-card {
+  box-shadow: var(--ion-box-shadow);
+  border-radius: 12px;
+}
+
+.notificationAudience-card ion-card-header {
+  padding-bottom: 0;
+}
+
+.notificationAudience-card ion-card-title {
+  font-size: 1.4em;
+  font-weight: bold;
+  color: var(--ion-color-dark);
+}
+
+.notificationAudience-card ion-card-content {
+  padding-top: 16px;
+}
+
+.wizard-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wizard-field-group ion-input,
+.wizard-field-group ion-select {
+  --border-radius: 12px;
+}
+
+/* Specific styling for error states, consistent with Ionic */
+.ion-invalid.ion-touched {
+  --border-color: var(--ion-color-danger) !important;
+}
+
+.ion-invalid.ion-touched .error-text {
+  color: var(--ion-color-danger);
+  font-size: 0.8em;
+  margin-top: 4px;
+}
