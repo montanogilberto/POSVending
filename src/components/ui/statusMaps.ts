@@ -44,6 +44,15 @@ export const LOAN_STATUS: Record<string, StatusMeta> = {
   cancelled:       { label: 'Cancelado',         color: 'medium'  },
 };
 
+/** Pagos SPEI directos (loanPayments.status). */
+export const LOAN_PAYMENT_STATUS: Record<string, StatusMeta> = {
+  pending_confirmation: { label: 'Por confirmar', color: 'warning'  },
+  confirmed:            { label: 'Confirmado',    color: 'success'  },
+  rejected:             { label: 'Rechazado',     color: 'danger'   },
+  escalated:            { label: 'Escalado',      color: 'tertiary' },
+  cancelled:            { label: 'Cancelado',     color: 'medium'   },
+};
+
 /** Propuestas P2P (labels; los colores viven en P2PLendingPage.css .p2p-status-*). */
 export const PROPOSAL_STATUS: Record<string, { label: string }> = {
   pending:   { label: 'Pendiente' },
