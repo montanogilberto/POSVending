@@ -95,6 +95,7 @@ import Setting from './pages/system/Setting';
 //mport Sells from './pages/dashboard/Sells';
 import Dashboard from './pages/dashboard/Dashboard';
 import MonthlySummaryPage from './pages/dashboard/MonthlySummaryPage';
+import AnnualSummaryPage from './pages/dashboard/AnnualSummaryPage';
 //import ScannerQR from './pages/dashboard/ScannerQR';
 import Category from './pages/category/CategoryPage';
 import ProductListPage from './pages/products/ProductListPage';
@@ -857,6 +858,14 @@ const AppShell: React.FC = () => {
               </IonItem>
               )}
             </IonMenuToggle>
+            <IonMenuToggle autoHide={false}>
+              {canAccess(roleCode, 'ingresos') && (
+              <IonItem button routerLink="/annual-summary" title="Resumen anual">
+                <IonIcon icon={calendarOutline} slot="start" />
+                {!menuCollapsed && <IonLabel>Resumen anual</IonLabel>}
+              </IonItem>
+              )}
+            </IonMenuToggle>
 
             <IonMenuToggle autoHide={false}>
               {canAccess(roleCode, 'accounting') && (
@@ -1119,6 +1128,7 @@ const AppShell: React.FC = () => {
 
             <PrivateRoute exact path="/dashboard" component={Dashboard} />
             <PrivateRoute exact path="/monthly-summary" component={MonthlySummaryPage} />
+            <PrivateRoute exact path="/annual-summary" feature="ingresos" component={AnnualSummaryPage} />
 
 
             {/* The sale goes straight to the product list (categories are chips there). */}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIonViewWillEnter } from '@ionic/react';
 import { useUser } from '../../../contexts/UserContext';
 import { useToast } from '../../../hooks/useToast';
@@ -8,9 +8,9 @@ import {
   getAllChartOfAccounts, createAccount, updateAccount, deactivateAccount,
 } from '../../../api/chartOfAccountsApi';
 import {
-  JournalEntry, JournalEntryDetail, CreateJournalEntryRequest, LedgerMovement, TrialBalance,
+  JournalEntry, JournalEntryDetail, CreateJournalEntryRequest, LedgerMovement,
   getAllJournalEntries, getOneJournalEntry, postJournalEntry, voidJournalEntry,
-  getJournalEntriesLedger, getTrialBalance,
+  getJournalEntriesLedger,
 } from '../../../api/journalEntriesApi';
 import {
   CommissionTerminal, CreateCommissionTerminalRequest, UpdateCommissionTerminalRequest,
@@ -20,10 +20,12 @@ import {
   addCompanyTransferAccount, CompanyPaymentAccount, listCompanyPaymentAccounts,
 } from '../../../api/companyPaymentAccountsApi';
 import { AccountingTab } from './AccountingTypes';
+import { useTrialBalance } from './TrialBalanceLogic';
 
 export const useAccounting = () => {
   const { companyId, userId } = useUser();
   const { showToast, toastProps } = useToast();
+  const showError = useCallback((message: string) => showToast(message, 'danger'), [showToast]);
 
   const [activeTab, setActiveTab] = useState<AccountingTab>('accounts');
   const [loading, setLoading] = useState(false);
@@ -40,8 +42,7 @@ export const useAccounting = () => {
   const [ledgerMovements, setLedgerMovements] = useState<LedgerMovement[]>([]);
   const [ledgerLoaded, setLedgerLoaded] = useState(false);
 
-  const [trialBalance, setTrialBalance] = useState<TrialBalance | null>(null);
-  const [trialBalanceLoaded, setTrialBalanceLoaded] = useState(false);
+  const trialBalance = useTrialBalance(companyId, activeTab === 'trialBalance', showError);
 
   const [terminals, setTerminals] = useState<CommissionTerminal[]>([]);
   const [showTerminalForm, setShowTerminalForm] = useState(false);
@@ -88,21 +89,6 @@ export const useAccounting = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, ledgerAccountId]);
 
-  const loadTrialBalance = useCallback(async () => {
-    if (!companyId) return;
-    setLoading(true);
-    try {
-      setTrialBalance(await getTrialBalance(companyId));
-      setTrialBalanceLoaded(true);
-    } catch (error) {
-      console.error('[useAccounting] loadTrialBalance failed:', error);
-      showToast('No se pudo cargar la balanza de comprobación', 'danger');
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId]);
-
   // Per company: the terminal catalog is global, the account that receives its money is not.
   const loadTerminalAccounts = useCallback(async () => {
     try {
@@ -146,12 +132,17 @@ export const useAccounting = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadAccounts, loadEntries, loadTerminals, loadTerminalAccounts]);
 
+  const refreshTrialBalance = useRef(() => {});
+  refreshTrialBalance.current = () => { if (activeTab === 'trialBalance') trialBalance.load(); };
+
   useIonViewWillEnter(() => {
     loadAll();
+    refreshTrialBalance.current();
   });
 
   useEffect(() => {
     return onDataChanged((reason) => {
+      refreshTrialBalance.current();
       if (reason.includes('accounting') || reason.includes('journal') || reason.includes('commissionTerminal')) loadAll();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,7 +150,6 @@ export const useAccounting = () => {
 
   useEffect(() => {
     if (activeTab === 'ledger' && !ledgerLoaded) loadLedger();
-    if (activeTab === 'trialBalance' && !trialBalanceLoaded) loadTrialBalance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -205,7 +195,6 @@ export const useAccounting = () => {
       setShowEntryForm(false);
       await loadEntries();
       if (ledgerLoaded) loadLedger();
-      if (trialBalanceLoaded) loadTrialBalance();
       notifyDataChanged('accounting:journal-posted');
     } catch (error: any) {
       showToast(error?.message || 'No se pudo contabilizar el asiento (revisa que Debe = Haber)', 'danger');
@@ -301,7 +290,6 @@ export const useAccounting = () => {
     refreshLedger: loadLedger,
 
     trialBalance,
-    refreshTrialBalance: loadTrialBalance,
 
     terminals,
     showTerminalForm,

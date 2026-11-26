@@ -53,44 +53,52 @@ import type { MonthPeriod } from '../utils/monthPeriod';
 import { API_BASE_URL } from '../utils/appEnv';
 export type IncomePeriod = MonthPeriod;
 
+/** POST /monthly_income; throws on failure, so the caller can tell "failed" from "no sales". */
+export const requestMonthlyIncome = async (
+  companyId: number,
+  signal?: AbortSignal,
+  period?: IncomePeriod
+): Promise<Income[]> => {
+  const response = await fetch(
+    `${API_BASE_URL}/monthly_income`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ income: [{ companyId, ...(period ?? {}) }] }),
+      ...(signal ? { signal } : {}),
+    }
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => '');
+    console.error('monthly_income non-OK response', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText,
+    });
+    throw new Error(`Error ${response.status}: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+
+  console.log('Fetched monthly_income:', data);
+
+  const incomeArray = Array.isArray(data.income) ? data.income : [];
+
+  return incomeArray.sort(
+    (a: Income, b: Income) =>
+      new Date(b.paymentDate).getTime() -
+      new Date(a.paymentDate).getTime()
+  );
+};
+
 export const fetchMonthlyLaundry = async (
   companyId: number,
   signal?: AbortSignal,
   period?: IncomePeriod
 ): Promise<Income[]> => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/monthly_income`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ income: [{ companyId, ...(period ?? {}) }] }),
-        ...(signal ? { signal } : {}),
-      }
-    );
-
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => '');
-      console.error('monthly_income non-OK response', {
-        status: response.status,
-        statusText: response.statusText,
-        body: responseText,
-      });
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    console.log('Fetched monthly_income:', data);
-
-    const incomeArray = Array.isArray(data.income) ? data.income : [];
-
-    return incomeArray.sort(
-      (a: Income, b: Income) =>
-        new Date(b.paymentDate).getTime() -
-        new Date(a.paymentDate).getTime()
-    );
-
+    return await requestMonthlyIncome(companyId, signal, period);
   } catch (error: unknown) {
     if ((error as any)?.name === 'AbortError') {
       console.log('Fetch aborted');

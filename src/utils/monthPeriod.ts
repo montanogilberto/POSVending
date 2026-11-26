@@ -3,7 +3,7 @@
  * mismo límite que usan sp_income_monthly y sp_expense_monthly. Compartido por
  * /ingresos y /egresos (antes vivía dentro de IncomesPage).
  */
-import { toHermosilloDate } from './format';
+import { addDaysISO, hermosilloTodayISO, toHermosilloDate } from './format';
 
 export interface MonthPeriod {
   year: number;
@@ -35,3 +35,20 @@ export const periodLabel = ({ year, month }: MonthPeriod) => {
 /** "sept 26" — short chart label. */
 export const periodShortLabel = ({ year, month }: MonthPeriod) =>
   new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('es-MX', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+
+/** "2026-09" — stable key / URL value. */
+export const periodKey = ({ year, month }: MonthPeriod) => `${year}-${String(month).padStart(2, '0')}`;
+
+/** Inverse of periodKey; null if malformed or after the current Hermosillo month. */
+export const parsePeriodKey = (key?: string | null): MonthPeriod | null => {
+  const match = /^(20\d{2})-(0[1-9]|1[0-2])$/.exec(key ?? '');
+  if (!match || match[0] > periodKey(currentPeriod())) return null;
+  return { year: Number(match[1]), month: Number(match[2]) };
+};
+
+/** First/last calendar day of the month, never after today (Hermosillo). */
+export const periodDateRange = (period: MonthPeriod) => {
+  const lastDay = addDaysISO(`${periodKey(shiftPeriod(period, 1))}-01`, -1);
+  const today = hermosilloTodayISO();
+  return { fromDate: `${periodKey(period)}-01`, toDate: lastDay < today ? lastDay : today };
+};
