@@ -2,6 +2,7 @@ import React from 'react';
 import { IonCard, IonCardContent, IonIcon, IonItem } from '@ionic/react';
 import { cashOutline, trendingDownOutline, walletOutline, swapHorizontalOutline, chevronForwardOutline } from 'ionicons/icons';
 import { fmtMXN, fmtInt } from '../../../utils/format';
+import { periodHref } from '../../../hooks/usePeriodFromUrl';
 import { useUser } from '../../../contexts/UserContext';
 import { canAccess, UiFeature } from '../../../config/rolePermissions';
 
@@ -11,6 +12,8 @@ interface SummaryGridProps {
   egresos: number;
   operaciones: number;
   title?: string;
+  /** 'YYYY-MM': the Ingresos/Egresos links open that month. */
+  month?: string;
 }
 
 interface TileProps {
@@ -49,7 +52,8 @@ const Tile: React.FC<TileProps> = ({ icon, tone, label, value, sub, link }) => {
   return <div className="summary-tile">{body}</div>;
 };
 
-const SummaryGrid: React.FC<SummaryGridProps> = ({ ingresos, comisiones, egresos, operaciones, title = 'RESUMEN DE HOY' }) => {
+const SummaryGrid: React.FC<SummaryGridProps> = ({ ingresos, comisiones, egresos, operaciones, title = 'RESUMEN DE HOY', month }) => {
+  const href = (path: string) => (month ? periodHref(path, month) : path);
   const neto = ingresos - comisiones - egresos;
 
   return (
@@ -58,9 +62,9 @@ const SummaryGrid: React.FC<SummaryGridProps> = ({ ingresos, comisiones, egresos
         <div className="summary-card-title">{title}</div>
         <div className="summary-grid">
           <Tile icon={cashOutline} tone="green" label="Ingresos" value={fmtMXN(ingresos)}
-            link={{ href: '/ingresos', feature: 'ingresos' }} />
+            link={{ href: href('/ingresos'), feature: 'ingresos' }} />
           <Tile icon={trendingDownOutline} tone="pink" label="Egresos" value={fmtMXN(egresos)}
-            link={{ href: '/egresos', feature: 'egresos' }} />
+            link={{ href: href('/egresos'), feature: 'egresos' }} />
           <Tile icon={walletOutline} tone="green" label="Neto" value={fmtMXN(neto)}
             sub={comisiones > 0 && <div className="summary-tile-sub">incl. −{fmtMXN(comisiones)} comisión</div>} />
           <Tile icon={swapHorizontalOutline} tone="blue" label="Operaciones" value={fmtInt(operaciones)} />

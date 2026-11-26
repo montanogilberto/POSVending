@@ -14,7 +14,7 @@ import ExpenseDetailModal from './components/ExpenseDetailModal';
 
 /** /egresos/detalle — every expense of the month, with search + filters (the /movements of Egresos). */
 const ExpensesDetailView: React.FC = () => {
-  const vm = useExpenses();
+  const vm = useExpenses('/egresos/detalle');
   const pops = usePopovers();
 
   return (
