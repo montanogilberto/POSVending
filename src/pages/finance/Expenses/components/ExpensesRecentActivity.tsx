@@ -4,6 +4,8 @@ import { useHistory } from 'react-router-dom';
 import { receiptOutline, arrowForwardOutline } from 'ionicons/icons';
 import EmptyState from '../../../../components/ui/EmptyState';
 import ExpenseMovementList from '../../../../components/finance/ExpenseMovementList';
+import { periodHref } from '../../../../hooks/usePeriodFromUrl';
+import { periodKey } from '../../../../utils/monthPeriod';
 import { ExpensesVM } from '../ExpensesLogic';
 
 /** Latest expenses of the month — the /dashboard "Actividad Reciente" card for Egresos. */
@@ -26,7 +28,7 @@ const ExpensesRecentActivity: React.FC<{ vm: ExpensesVM }> = ({ vm }) => {
 
         {vm.monthlyCount > 0 && (
           <div className="expenses-see-all">
-            <IonButton fill="clear" onClick={() => history.push('/egresos/detalle')}>
+            <IonButton fill="clear" onClick={() => history.push(periodHref('/egresos/detalle', periodKey(vm.period)))}>
               Ver todos ({vm.monthlyCount})
               <IonIcon slot="end" icon={arrowForwardOutline} />
             </IonButton>

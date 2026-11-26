@@ -1,0 +1,27 @@
+/* ‹ Noviembre de 2026 ▾ › — colors fixed: the pages using it are always light. */
+.month-picker {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  --ion-color-primary: #007BFF;
+}
+
+.month-picker ion-button {
+  --color: #374151;
+  --padding-start: 6px;
+  --padding-end: 6px;
+  margin: 0;
+  text-transform: none;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.month-picker-modal {
+  --width: min(350px, 92vw);
+  --height: auto;
+  --border-radius: 16px;
+}
+
+.month-picker-modal ion-datetime {
+  margin: 0 auto;
+}

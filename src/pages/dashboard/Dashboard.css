@@ -816,15 +816,6 @@
   }
 }
 
-.monthly-summary-period {
-  text-transform: capitalize;
-  margin: 0 0 12px 4px;
-  /* The page background is always light; without an explicit color the
-     label inherited dark mode's white text and disappeared on phones. */
-  color: #374151;
-  font-weight: 600;
-}
-
 .monthly-summary-link {
   display: block;
   margin: 4px auto 0;
@@ -926,4 +917,57 @@
     padding-left: 0;
     flex-wrap: wrap;
   }
+}
+
+/* UTILIDAD DEL MES (/monthly-summary) */
+.profit-row,
+.profit-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.profit-row span:last-child,
+.profit-total span:last-child {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.profit-row-strong {
+  font-weight: 600;
+}
+
+.profit-total {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid #E5E7EB;
+  color: #111827;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.profit-note {
+  margin: 2px 0 0;
+  color: #6B7280;
+  font-size: 0.85rem;
+}
+
+.profit-row .profit-negative,
+.profit-total .profit-negative,
+.profit-note.profit-negative {
+  color: #DC2626;
+}
+
+.profit-total .profit-positive {
+  color: #16A34A;
+}
+
+.profit-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6B7280;
 }
