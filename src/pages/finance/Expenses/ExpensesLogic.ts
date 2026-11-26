@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIonViewWillEnter } from '@ionic/react';
 import { fetchMonthlyExpenses, Expense, ExpenseMonthTotal } from '../../../api/expensesApi';
 import { getAllSuppliers, Supplier } from '../../../api/supplierApi';
 import { getAllEmployees, Employee } from '../../../api/employeesApi';
 import { getAllServices, Service } from '../../../api/serviceApi';
 import { useUser } from '../../../contexts/UserContext';
+import { usePeriodFromUrl } from '../../../hooks/usePeriodFromUrl';
 import { useToast } from '../../../hooks/useToast';
 import { EXPENSE_TYPE } from '../../../components/ui/statusMaps';
 import { fmtMXN, mxDate } from '../../../utils/format';
@@ -19,11 +20,11 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50];
 const RECENT_COUNT = 8;
 const TRENDS_MONTHS = 12;
 
-export const useExpenses = () => {
+export const useExpenses = (path: '/egresos' | '/egresos/detalle' = '/egresos') => {
   const { companyId } = useUser();
 
   // One company + one month (sp_expense_monthly) — never the full history.
-  const [period, setPeriod] = useState<MonthPeriod>(currentPeriod);
+  const [period, setPeriod] = usePeriodFromUrl(path);
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [monthlyTotals, setMonthlyTotals] = useState<ExpenseMonthTotal[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -47,8 +48,12 @@ export const useExpenses = () => {
 
   const { showToast, toastProps } = useToast();
 
+  // Only the newest request may fill the page (month changes overlap re-entry loads).
+  const loadSeq = useRef(0);
+
   const loadExpenses = useCallback(async () => {
     if (!companyId) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const [monthly, supplierList, employeeList, serviceList] = await Promise.all([
@@ -63,6 +68,7 @@ export const useExpenses = () => {
           return [];
         }),
       ]);
+      if (seq !== loadSeq.current) return;
       // Guard: never list a row outside the requested month under its label.
       setAllExpenses(monthly.expenses.filter((e) => e?.paymentDate && samePeriod(hermosilloPeriod(e.paymentDate), period)));
       setMonthlyTotals(monthly.monthlyTotals);
@@ -70,10 +76,11 @@ export const useExpenses = () => {
       setEmployees(employeeList);
       setServices(serviceList);
     } catch (error) {
+      if (seq !== loadSeq.current) return;
       console.error('[useExpenses] loadExpenses failed:', error);
       showToast('No se pudieron cargar los egresos', 'danger');
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [companyId, period, showToast]);
 

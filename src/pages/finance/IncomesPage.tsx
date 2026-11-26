@@ -27,8 +27,9 @@ import IncomesChart from '../../components/finance/IncomesChart';
 import IncomesFilters from '../../components/finance/IncomesFilters';
 import IncomeMovementList from '../../components/finance/IncomeMovementList';
 import EmptyState from '../../components/ui/EmptyState';
-import { fetchMonthlyLaundry, IncomePeriod } from '../../api/laundryApi';
+import { fetchMonthlyLaundry } from '../../api/laundryApi';
 import { hermosilloPeriod, currentPeriod, samePeriod, shiftPeriod, periodLabel } from '../../utils/monthPeriod';
+import { usePeriodFromUrl } from '../../hooks/usePeriodFromUrl';
 import { useUser } from '../../contexts/UserContext';
 import { toHermosilloDate } from '../../utils/format';
 import { onDataChanged } from '../../utils/refreshBus';
@@ -73,14 +74,19 @@ const IncomesPage: React.FC = () => {
   const { companyId } = useUser();
   // One company, one month (Hermosillo) — /all_income is NOT filtered by
   // company, so /ingresos used to show and total every company's sales.
-  const [period, setPeriod] = useState<IncomePeriod>(currentPeriod);
+  const [period, setPeriod] = usePeriodFromUrl('/ingresos');
   const isCurrentPeriod = samePeriod(period, currentPeriod());
+
+  // Only the newest request may fill the page (month changes overlap re-entry loads).
+  const loadSeq = useRef(0);
 
   const loadIncomes = useCallback(async () => {
     if (!companyId) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const rows = await fetchMonthlyLaundry(companyId, undefined, period);
+      if (seq !== loadSeq.current) return;
       // Guard: before 2026-09-29_income_monthly_any_month.sql is deployed the
       // SP ignores the period and returns the current month — never show
       // those rows under another month's heading.
@@ -90,11 +96,12 @@ const IncomesPage: React.FC = () => {
       setFilteredIncome(incomes);
       setDisplayedIncome(incomes.slice(0, PAGE_SIZE));
     } catch (error) {
+      if (seq !== loadSeq.current) return;
       console.error('Error fetching incomes:', error);
       setToastMessage('Error al cargar ingresos');
       setShowToast(true);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [companyId, period]);
 

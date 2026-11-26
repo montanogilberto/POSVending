@@ -8,36 +8,12 @@ import { fetchMonthlyExpenses, Expense } from '../../../api/expensesApi';
 import { toHermosilloDate } from '../../../utils/format';
 import { getAllCommissionTerminals, CommissionTerminal } from '../../../api/commissionTerminalsApi';
 import {
-  PaymentMethodLabel,
-  normalizePaymentMethod,
   activeCardTerminal,
   incomeCommission,
 } from '../../../utils/incomeMoney';
 import useInactivityTimer from '../../../hooks/useInactivityTimer';
 import { Transaction, CartItem } from '../types';
 import { API_BASE_URL } from '../../../utils/appEnv';
-
-type PaymentMethod = PaymentMethodLabel;
-
-// Monedero = machine use paid from prepaid balance: income, but no cash enters the drawer.
-const PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta', 'Monedero'];
-// Expenses are never paid from a client's prepaid balance.
-const EXPENSE_PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Transferencia', 'Tarjeta'];
-
-// PAGOS (expenses) uses the expense red of the Egresos trends chart.
-const EXPENSE_PAYMENT_COLORS: Record<PaymentMethod, string> = {
-  Efectivo: '#DC2626',
-  Transferencia: '#F87171',
-  Tarjeta: '#FCA5A5',
-  Monedero: '#FECACA',
-};
-
-const PAYMENT_COLORS: Record<PaymentMethod, string> = {
-  Efectivo: '#16A34A',
-  Transferencia: '#22C55E',
-  Tarjeta: '#86EFAC',
-  Monedero: '#0EA5E9',
-};
 
 export const useDashboard = () => {
   const location = useLocation();
@@ -62,7 +38,6 @@ export const useDashboard = () => {
   const [loadedOnce, setLoadedOnce] = useState(false);
   // Only used to price a card sale the backend has not stamped yet.
   const [cardTerminal, setCardTerminal] = useState<CommissionTerminal | null>(null);
-  //const [pieData, setPieData] = useState<any>(null);
 
   const refreshDashboardData = () => {
     console.log('[Dashboard] refreshDashboardData: loading incomes, companyId =', companyId);
@@ -115,71 +90,6 @@ export const useDashboard = () => {
   useEffect(() => {
     if (!showCart) setCart([]);
   }, [showCart]);
-
-  // ✅ PIE CHART (optimized with useMemo)
-  //const pieChartData = useMemo(() => {
-    //console.log("🔵 useLaundryDashboard - Computing pie chart, allIncome length:", allIncome?.length);
-
-  // ✅ PIE CHART (🔥 FIXED — single source of truth)
-  const paymentBreakdown = useMemo(() => {
-    if (!allIncome?.length) return [];
-
-    const now = new Date();
-    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-
-    const monthly = allIncome.filter((income) => {
-      if (!income?.paymentDate) return false;
-      const d = toHermosilloDate(income.paymentDate);
-      return (
-        d.getMonth() === hermosilloNow.getMonth() &&
-        d.getFullYear() === hermosilloNow.getFullYear()
-      );
-    });
-
-    if (!monthly.length) return [];
-
-    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0, Monedero: 0 };
-    const commissions: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0, Monedero: 0 };
-    monthly.forEach((income) => {
-      const method = normalizePaymentMethod(income.paymentMethod);
-      if (!method) return;
-      totals[method] += Number(income.total) || 0;
-      commissions[method] += incomeCommission(income, cardTerminal);
-    });
-
-    const total = PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
-    if (total === 0) return [];
-
-    return PAYMENT_METHODS.map((method) => ({
-      method,
-      amount: totals[method],
-      commission: commissions[method],
-      percent: (totals[method] / total) * 100,
-      color: PAYMENT_COLORS[method],
-    }));
-  }, [allIncome, cardTerminal]);
-
-  // PAGOS: expenses of the current month by payment method — same shape as
-  // COBROS (no terminal commission on money going out). allExpenses is
-  // already this company's current month (fetchMonthlyExpenses).
-  const expenseBreakdown = useMemo(() => {
-    const totals: Record<PaymentMethod, number> = { Efectivo: 0, Transferencia: 0, Tarjeta: 0, Monedero: 0 };
-    allExpenses.forEach((expense) => {
-      const method = normalizePaymentMethod(expense.paymentMethod);
-      if (method) totals[method] += Number(expense.total) || 0;
-    });
-
-    const total = EXPENSE_PAYMENT_METHODS.reduce((sum, m) => sum + totals[m], 0);
-    if (total === 0) return [];
-
-    return EXPENSE_PAYMENT_METHODS.map((method) => ({
-      method,
-      amount: totals[method],
-      commission: 0,
-      percent: (totals[method] / total) * 100,
-      color: EXPENSE_PAYMENT_COLORS[method],
-    }));
-  }, [allExpenses]);
 
   // ✅ METRICS
   const calculateTotal = () =>
@@ -234,78 +144,6 @@ export const useDashboard = () => {
       .filter((e) => toHermosilloDate(e.paymentDate).toISOString().split('T')[0] === today)
       .reduce((sum, e) => sum + (Number(e.total) || 0), 0);
   };
-
-  const calculateMonthlyTotal = () => {
-    const now = new Date();
-    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-
-    return allIncome
-      .filter((i) => i?.paymentDate)
-      .filter((i) => {
-        const d = toHermosilloDate(i.paymentDate);
-        return (
-          d.getMonth() === hermosilloNow.getMonth() &&
-          d.getFullYear() === hermosilloNow.getFullYear()
-        );
-      })
-      // income.total is already the charged (post-discount) amount — the cart
-      // sends the promo total and sp_income stores it — so no second subtraction.
-      .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
-  };
-
-  // Card-terminal commissions on this month's sales — mirrors calculateDailyCommissions.
-  const calculateMonthlyCommissions = () => {
-    const now = new Date();
-    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-
-    return allIncome
-      .filter((i) => i?.paymentDate)
-      .filter((i) => {
-        const d = toHermosilloDate(i.paymentDate);
-        return (
-          d.getMonth() === hermosilloNow.getMonth() &&
-          d.getFullYear() === hermosilloNow.getFullYear()
-        );
-      })
-      .reduce((sum, i) => sum + incomeCommission(i, cardTerminal), 0);
-  };
-
-  const calculateMonthlySalesCount = () => {
-    const now = new Date();
-    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-
-    return allIncome
-      .filter((i) => i?.paymentDate)
-      .filter((i) => {
-        const d = toHermosilloDate(i.paymentDate);
-        return (
-          d.getMonth() === hermosilloNow.getMonth() &&
-          d.getFullYear() === hermosilloNow.getFullYear()
-        );
-      })
-      .length;
-  };
-
-  const calculateExpensesMonthlyTotal = () => {
-    const now = new Date();
-    const hermosilloNow = new Date(now.getTime() - 7 * 60 * 60 * 1000);
-
-    return allExpenses
-      .filter((e) => e?.paymentDate)
-      .filter((e) => {
-        const d = toHermosilloDate(e.paymentDate);
-        return (
-          d.getMonth() === hermosilloNow.getMonth() &&
-          d.getFullYear() === hermosilloNow.getFullYear()
-        );
-      })
-      .reduce((sum, e) => sum + (Number(e.total) || 0), 0);
-  };
-
-  const currentMonthYear = new Date().toLocaleDateString('es-ES', {
-    month: 'short',
-    year: 'numeric',
-  });
 
   const percentageChange = useMemo(() => {
     if (!allIncome?.length) return '0%';
@@ -427,19 +265,12 @@ export const useDashboard = () => {
     setShowLogoutAlert,
     receiptData,
     setReceiptData,
-    paymentBreakdown,
-    expenseBreakdown,
 
     calculateTotal,
     calculateDailySales,
     calculateDailySalesCount,
     calculateDailyCommissions,
     calculateExpensesDailyTotal,
-    calculateMonthlyTotal,
-    calculateMonthlyCommissions,
-    calculateMonthlySalesCount,
-    calculateExpensesMonthlyTotal,
-    currentMonthYear,
 
     handleStartSeller,
     handleConfirmSale,

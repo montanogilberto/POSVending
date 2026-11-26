@@ -57,3 +57,64 @@
   line-height: 1.35;
   padding: 4px 0 8px;
 }
+
+/* Comparativo: Resumen mensual vs Balanza */
+.books-scroll {
+  overflow-x: auto;
+  margin-top: 12px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+}
+
+.books-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #111827;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.books-table th,
+.books-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #E5E7EB;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.books-table thead th {
+  color: #6B7280;
+  font-weight: 600;
+}
+
+.books-table th:first-child {
+  text-align: left;
+}
+
+/* The month stays visible while the figures scroll sideways. */
+.books-table tbody th,
+.books-table tfoot th {
+  position: sticky;
+  left: 0;
+  background: #FFFFFF;
+}
+
+.books-table .books-profit,
+.books-table tfoot td {
+  font-weight: 700;
+}
+
+.books-table tfoot th,
+.books-table tfoot td {
+  border-bottom: 0;
+}
+
+.books-table .books-differs {
+  color: #DC2626;
+}
+
+.books-note {
+  color: #6B7280;
+  font-size: 0.85rem;
+}
